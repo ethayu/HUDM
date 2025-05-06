@@ -1,0 +1,51 @@
+seed: 42
+
+train:
+  batch_size: 10000
+  epochs: 100
+  learning_rate: 0.03
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+  max_mask_prob: 0.0          # final mask probability
+  mask_warmup_epochs: 10      # linear ramp length
+
+data:
+  path: "/home/aurora/handful-of-trials-pytorch/pusht_dataset"
+  n_rollout: 10000
+  normalize_action: true
+  split_ratio: 0.8
+  train_frac: 0.8
+  num_hist: 8
+  frameskip: 1
+  with_velocity: true
+  state_mean: [236.6155, 264.5674, 255.1307, 266.3721, 0.1650,   0.6914, -2.93032027,  2.54307914]
+  state_std: [101.1202, 87.0112, 52.7054, 57.4971, 0.4698,   0.5234, 74.84556075, 74.14009094]
+
+
+model:
+  # ensemble
+  num_models: 5             # usual for reliable variance
+
+  # I/O dimensions
+  state_dim: 8
+  action_dim: 2
+
+  # transformer backbone
+  embedding_dim: 4
+  n_heads: 2         
+  n_layers: 2                
+  feedforward_dim: 16        
+  dropout: 0.1
+
+  # training hyper-params used in the loop
+  mask_curriculum:
+    max_mask_prob: 0.0       # final probability a state-dim token is masked
+    warmup_epochs: 10         # linear ramp-up
+  var_threshold: 0.25         # start by dropping dims when ensemble σ² > 0.25
+
+wandb:
+  enable: true
+  project: "gnn-dynamics"
+  run_name: "masked-dynamics-experiment"

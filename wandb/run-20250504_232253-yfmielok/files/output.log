@@ -1,0 +1,15 @@
+Loaded 80000.0 rollouts
+Loaded 19999.999999999996 rollouts
+  0%|                                                                                                           | 0/15749 [00:00<?, ?it/s]
+st_tok.shape torch.Size([1000, 8, 8, 64])
+  0%|                                                                                                           | 0/15749 [00:01<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 171, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 126, in main
+    pred = model.models[m_idx](s_hist, a_hist, mask_hist)  # single net
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 88, in forward
+    step_tok = step_tok + torch.cat([rel, rel_act], dim=2)
+RuntimeError: Tensors must have same number of dimensions: got 3 and 4

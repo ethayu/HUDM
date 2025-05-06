@@ -1,0 +1,32 @@
+Loaded 1000 rollouts
+Loaded 1000 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 143, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 91, in main
+    for batch in train_loader:
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 652, in __next__
+    data = self._next_data()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1347, in _next_data
+    return self._process_data(data)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1373, in _process_data
+    data.reraise()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/_utils.py", line 461, in reraise
+    raise exception
+bdb.BdbQuit: Caught BdbQuit in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/_utils/worker.py", line 302, in _worker_loop
+    data = fetcher.fetch(index)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 49, in fetch
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 49, in <listcomp>
+    data = [self.dataset[idx] for idx in possibly_batched_index]
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/data/dataset.py", line 74, in __getitem__
+    prev_state = torch.cat((state_seq[t - self.num_pred], state_seq[min(t - self.num_pred + 1, t-1)], state_seq[min(t - self.num_pred + 2, t-1)]), dim=0)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/data/dataset.py", line 74, in __getitem__
+    prev_state = torch.cat((state_seq[t - self.num_pred], state_seq[min(t - self.num_pred + 1, t-1)], state_seq[min(t - self.num_pred + 2, t-1)]), dim=0)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/bdb.py", line 90, in trace_dispatch
+    return self.dispatch_line(frame)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/bdb.py", line 115, in dispatch_line
+    if self.quitting: raise BdbQuit
+bdb.BdbQuit

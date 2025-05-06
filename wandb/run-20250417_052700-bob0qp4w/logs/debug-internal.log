@@ -1,0 +1,317 @@
+2025-04-17 05:27:00,076 INFO    StreamThr :1620344 [internal.py:wandb_internal():85] W&B internal server running at pid: 1620344, started at: 2025-04-17 05:27:00.075376
+2025-04-17 05:27:00,078 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status
+2025-04-17 05:27:00,080 INFO    WriterThread:1620344 [datastore.py:open_for_write():87] open: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/run-bob0qp4w.wandb
+2025-04-17 05:27:00,081 DEBUG   SenderThread:1620344 [sender.py:send():391] send: header
+2025-04-17 05:27:00,082 DEBUG   SenderThread:1620344 [sender.py:send():391] send: run
+2025-04-17 05:27:00,416 INFO    SenderThread:1620344 [dir_watcher.py:__init__():211] watching files in: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files
+2025-04-17 05:27:00,416 INFO    SenderThread:1620344 [sender.py:_start_run_threads():1200] run started: bob0qp4w with start time 1744882020.073613
+2025-04-17 05:27:00,421 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: check_version
+2025-04-17 05:27:00,422 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: check_version
+2025-04-17 05:27:00,467 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: run_start
+2025-04-17 05:27:00,472 DEBUG   HandlerThread:1620344 [system_info.py:__init__():26] System info init
+2025-04-17 05:27:00,472 DEBUG   HandlerThread:1620344 [system_info.py:__init__():41] System info init done
+2025-04-17 05:27:00,472 INFO    HandlerThread:1620344 [system_monitor.py:start():194] Starting system monitor
+2025-04-17 05:27:00,472 INFO    SystemMonitor:1620344 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2025-04-17 05:27:00,472 INFO    HandlerThread:1620344 [system_monitor.py:probe():214] Collecting system info
+2025-04-17 05:27:00,473 INFO    SystemMonitor:1620344 [interfaces.py:start():188] Started cpu monitoring
+2025-04-17 05:27:00,474 INFO    SystemMonitor:1620344 [interfaces.py:start():188] Started disk monitoring
+2025-04-17 05:27:00,475 INFO    SystemMonitor:1620344 [interfaces.py:start():188] Started gpu monitoring
+2025-04-17 05:27:00,476 INFO    SystemMonitor:1620344 [interfaces.py:start():188] Started memory monitoring
+2025-04-17 05:27:00,477 INFO    SystemMonitor:1620344 [interfaces.py:start():188] Started network monitoring
+2025-04-17 05:27:00,550 DEBUG   HandlerThread:1620344 [system_info.py:probe():152] Probing system
+2025-04-17 05:27:00,553 DEBUG   HandlerThread:1620344 [system_info.py:_probe_git():137] Probing git
+2025-04-17 05:27:00,564 DEBUG   HandlerThread:1620344 [system_info.py:_probe_git():145] Probing git done
+2025-04-17 05:27:00,564 DEBUG   HandlerThread:1620344 [system_info.py:probe():200] Probing system done
+2025-04-17 05:27:00,564 DEBUG   HandlerThread:1620344 [system_monitor.py:probe():223] {'os': 'Linux-5.15.0-134-generic-x86_64-with-glibc2.31', 'python': '3.10.14', 'heartbeatAt': '2025-04-17T09:27:00.550553', 'startedAt': '2025-04-17T09:27:00.067485', 'docker': None, 'cuda': None, 'args': ('configs/train.yaml',), 'state': 'running', 'program': '/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py', 'codePathLocal': 'train.py', 'codePath': 'dynamics_model/new_model/train.py', 'git': {'remote': 'https://jianingq:@github.com/jianingq/handful-of-trials-pytorch.git', 'commit': '9b89794516c852158050d5b6736fe6526842d869'}, 'email': '2424992568@qq.com', 'root': '/home/aurora/handful-of-trials-pytorch', 'host': 'cv-server', 'username': 'aurora', 'executable': '/home/aurora/anaconda3/envs/pusht/bin/python', 'cpu_count': 32, 'cpu_count_logical': 64, 'cpu_freq': {'current': 2585.8087343750003, 'min': 2200.0, 'max': 3700.0}, 'cpu_freq_per_core': [{'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3413.899, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3986.569, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3987.741, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3985.962, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3989.252, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3987.272, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2966.335, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3986.493, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2020.747, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}], 'disk': {'/': {'total': 1832.2072448730469, 'used': 1652.1547393798828}}, 'gpu': 'NVIDIA GeForce RTX 3090', 'gpu_count': 2, 'gpu_devices': [{'name': 'NVIDIA GeForce RTX 3090', 'memory_total': 25443893248}, {'name': 'NVIDIA GeForce RTX 3090', 'memory_total': 25447170048}], 'memory': {'total': 251.56138229370117}}
+2025-04-17 05:27:00,564 INFO    HandlerThread:1620344 [system_monitor.py:probe():224] Finished collecting system info
+2025-04-17 05:27:00,564 INFO    HandlerThread:1620344 [system_monitor.py:probe():227] Publishing system info
+2025-04-17 05:27:00,564 DEBUG   HandlerThread:1620344 [system_info.py:_save_conda():209] Saving list of conda packages installed into the current environment
+2025-04-17 05:27:01,419 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/conda-environment.yaml
+2025-04-17 05:27:07,291 DEBUG   HandlerThread:1620344 [system_info.py:_save_conda():224] Saving conda packages done
+2025-04-17 05:27:07,292 INFO    HandlerThread:1620344 [system_monitor.py:probe():229] Finished publishing system info
+2025-04-17 05:27:07,300 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:07,300 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: keepalive
+2025-04-17 05:27:07,300 DEBUG   SenderThread:1620344 [sender.py:send():391] send: files
+2025-04-17 05:27:07,300 INFO    SenderThread:1620344 [sender.py:_save_file():1466] saving file wandb-metadata.json with policy now
+2025-04-17 05:27:07,418 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/conda-environment.yaml
+2025-04-17 05:27:07,418 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/wandb-metadata.json
+2025-04-17 05:27:07,452 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: python_packages
+2025-04-17 05:27:07,452 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: python_packages
+2025-04-17 05:27:07,454 DEBUG   SenderThread:1620344 [sender.py:send():391] send: telemetry
+2025-04-17 05:27:07,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:27:07,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:07,456 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:27:07,552 INFO    wandb-upload_0:1620344 [upload_job.py:push():130] Uploaded file /tmp/tmp3cp5cez1wandb/49h8d04j-wandb-metadata.json
+2025-04-17 05:27:08,488 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:08,523 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/requirements.txt
+2025-04-17 05:27:08,563 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/output.log
+2025-04-17 05:27:09,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:10,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:10,518 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/output.log
+2025-04-17 05:27:10,770 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:11,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:12,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:13,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:14,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:15,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:16,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:16,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:17,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:18,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:19,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:20,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:21,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:21,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:22,452 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:27:22,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:27:22,495 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:23,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:24,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:25,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:26,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:26,556 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:27,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:28,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:29,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:30,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:31,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:32,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:32,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:32,525 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/config.yaml
+2025-04-17 05:27:33,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:34,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:35,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:36,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:37,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:27:37,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:27:37,499 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:37,577 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:38,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:39,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:40,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:41,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:42,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:43,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:43,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:44,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:45,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:46,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:47,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:48,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:48,456 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:49,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:50,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:51,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:52,452 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:27:52,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:27:52,499 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:53,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:53,518 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:54,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:55,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:56,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:57,457 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:58,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:27:59,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:27:59,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:00,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:00,477 DEBUG   SystemMonitor:1620344 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2025-04-17 05:28:00,485 DEBUG   SenderThread:1620344 [sender.py:send():391] send: stats
+2025-04-17 05:28:01,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:02,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:03,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:04,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:05,454 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:05,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:06,458 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:07,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:28:07,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:28:07,495 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:08,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:09,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:10,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:10,555 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:11,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:12,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:13,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:14,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:15,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:16,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:16,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:17,459 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:18,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:19,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:20,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:21,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:22,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:28:22,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:28:22,495 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:22,615 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:23,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:24,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:25,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:26,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:27,460 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:28,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:28,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:29,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:30,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:30,480 DEBUG   SenderThread:1620344 [sender.py:send():391] send: stats
+2025-04-17 05:28:31,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:32,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:33,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:34,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:34,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:35,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:36,461 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:37,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:28:37,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:28:37,495 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:38,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:39,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:39,619 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:40,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:41,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:42,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:43,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:44,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:45,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:45,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:46,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:47,462 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:48,463 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:49,463 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:50,463 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:51,455 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:51,463 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:52,453 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: stop_status
+2025-04-17 05:28:52,453 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: stop_status
+2025-04-17 05:28:52,464 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:53,463 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:54,467 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:54,551 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/output.log
+2025-04-17 05:28:55,467 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:56,467 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: internal_messages
+2025-04-17 05:28:56,599 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:57,114 DEBUG   SenderThread:1620344 [sender.py:send():391] send: exit
+2025-04-17 05:28:57,114 INFO    SenderThread:1620344 [sender.py:send_exit():598] handling exit code: 255
+2025-04-17 05:28:57,114 INFO    SenderThread:1620344 [sender.py:send_exit():600] handling runtime: 116
+2025-04-17 05:28:57,115 INFO    SenderThread:1620344 [sender.py:_save_file():1466] saving file wandb-summary.json with policy end
+2025-04-17 05:28:57,115 INFO    SenderThread:1620344 [sender.py:send_exit():606] send defer
+2025-04-17 05:28:57,116 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,116 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 0
+2025-04-17 05:28:57,116 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,116 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 0
+2025-04-17 05:28:57,116 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 1
+2025-04-17 05:28:57,116 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,116 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 1
+2025-04-17 05:28:57,116 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,116 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 1
+2025-04-17 05:28:57,116 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 2
+2025-04-17 05:28:57,116 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,117 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 2
+2025-04-17 05:28:57,117 INFO    HandlerThread:1620344 [system_monitor.py:finish():203] Stopping system monitor
+2025-04-17 05:28:57,117 DEBUG   SystemMonitor:1620344 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2025-04-17 05:28:57,117 DEBUG   SystemMonitor:1620344 [system_monitor.py:_start():183] Publishing last batch of metrics
+2025-04-17 05:28:57,118 INFO    HandlerThread:1620344 [interfaces.py:finish():200] Joined cpu monitor
+2025-04-17 05:28:57,120 INFO    HandlerThread:1620344 [interfaces.py:finish():200] Joined disk monitor
+2025-04-17 05:28:57,422 INFO    HandlerThread:1620344 [interfaces.py:finish():200] Joined gpu monitor
+2025-04-17 05:28:57,422 INFO    HandlerThread:1620344 [interfaces.py:finish():200] Joined memory monitor
+2025-04-17 05:28:57,423 INFO    HandlerThread:1620344 [interfaces.py:finish():200] Joined network monitor
+2025-04-17 05:28:57,423 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,423 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 2
+2025-04-17 05:28:57,423 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 3
+2025-04-17 05:28:57,424 DEBUG   SenderThread:1620344 [sender.py:send():391] send: stats
+2025-04-17 05:28:57,424 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,424 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 3
+2025-04-17 05:28:57,425 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,425 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 3
+2025-04-17 05:28:57,425 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 4
+2025-04-17 05:28:57,425 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,425 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 4
+2025-04-17 05:28:57,425 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,425 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 4
+2025-04-17 05:28:57,425 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 5
+2025-04-17 05:28:57,426 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,426 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 5
+2025-04-17 05:28:57,426 DEBUG   SenderThread:1620344 [sender.py:send():391] send: summary
+2025-04-17 05:28:57,426 INFO    SenderThread:1620344 [sender.py:_save_file():1466] saving file wandb-summary.json with policy end
+2025-04-17 05:28:57,427 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,427 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 5
+2025-04-17 05:28:57,427 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 6
+2025-04-17 05:28:57,427 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,427 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 6
+2025-04-17 05:28:57,427 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,427 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 6
+2025-04-17 05:28:57,427 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 7
+2025-04-17 05:28:57,427 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: status_report
+2025-04-17 05:28:57,428 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:57,428 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 7
+2025-04-17 05:28:57,428 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:57,428 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 7
+2025-04-17 05:28:57,552 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/wandb-summary.json
+2025-04-17 05:28:58,114 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: poll_exit
+2025-04-17 05:28:58,299 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 8
+2025-04-17 05:28:58,299 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: poll_exit
+2025-04-17 05:28:58,299 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:58,299 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 8
+2025-04-17 05:28:58,299 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:58,299 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 8
+2025-04-17 05:28:58,300 INFO    SenderThread:1620344 [job_builder.py:build():443] Attempting to build job artifact
+2025-04-17 05:28:58,300 INFO    SenderThread:1620344 [job_builder.py:_get_source_type():572] is repo sourced job
+2025-04-17 05:28:58,321 INFO    SenderThread:1620344 [job_builder.py:build():548] adding wandb-job metadata file
+2025-04-17 05:28:58,335 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 9
+2025-04-17 05:28:58,336 DEBUG   SenderThread:1620344 [sender.py:send():391] send: artifact
+2025-04-17 05:28:58,336 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:28:58,338 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 9
+2025-04-17 05:28:58,553 INFO    Thread-12 :1620344 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/output.log
+2025-04-17 05:28:58,826 INFO    wandb-upload_1:1620344 [upload_job.py:push():85] Skipped uploading /home/aurora/.local/share/wandb/artifacts/staging/tmp59cu0dfe
+2025-04-17 05:28:58,927 INFO    wandb-upload_0:1620344 [upload_job.py:push():88] Uploaded file /tmp/tmpkwyc42ln/wandb-job.json
+2025-04-17 05:28:59,114 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: poll_exit
+2025-04-17 05:28:59,602 INFO    SenderThread:1620344 [sender.py:send_artifact():1549] sent artifact job-https___jianingq__github.com_jianingq_handful-of-trials-pytorch.git_dynamics_model_new_model_train.py - {'id': 'QXJ0aWZhY3Q6MTY2MjUxMDQ2Nw==', 'state': 'PENDING', 'artifactSequence': {'id': 'QXJ0aWZhY3RDb2xsZWN0aW9uOjYxNDU1MDMxOA==', 'latestArtifact': {'id': 'QXJ0aWZhY3Q6MTY2MjM1NDM2Mg==', 'versionIndex': 0}}}
+2025-04-17 05:28:59,602 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:28:59,602 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 9
+2025-04-17 05:28:59,602 INFO    SenderThread:1620344 [dir_watcher.py:finish():358] shutting down directory watcher
+2025-04-17 05:29:00,553 INFO    SenderThread:1620344 [dir_watcher.py:finish():388] scan: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files
+2025-04-17 05:29:00,553 INFO    SenderThread:1620344 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/config.yaml config.yaml
+2025-04-17 05:29:00,554 INFO    SenderThread:1620344 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/output.log output.log
+2025-04-17 05:29:00,556 INFO    SenderThread:1620344 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/wandb-summary.json wandb-summary.json
+2025-04-17 05:29:00,558 INFO    SenderThread:1620344 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/conda-environment.yaml conda-environment.yaml
+2025-04-17 05:29:00,558 INFO    SenderThread:1620344 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/wandb-metadata.json wandb-metadata.json
+2025-04-17 05:29:00,558 INFO    SenderThread:1620344 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/requirements.txt requirements.txt
+2025-04-17 05:29:00,563 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 10
+2025-04-17 05:29:00,565 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: poll_exit
+2025-04-17 05:29:00,565 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:29:00,565 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 10
+2025-04-17 05:29:00,566 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:29:00,566 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 10
+2025-04-17 05:29:00,566 INFO    SenderThread:1620344 [file_pusher.py:finish():169] shutting down file pusher
+2025-04-17 05:29:00,748 INFO    wandb-upload_1:1620344 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/config.yaml
+2025-04-17 05:29:00,769 INFO    wandb-upload_3:1620344 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/conda-environment.yaml
+2025-04-17 05:29:00,782 INFO    wandb-upload_2:1620344 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/wandb-summary.json
+2025-04-17 05:29:00,786 INFO    wandb-upload_4:1620344 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/requirements.txt
+2025-04-17 05:29:00,825 INFO    wandb-upload_0:1620344 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/files/output.log
+2025-04-17 05:29:01,025 INFO    Thread-11 (_thread_body):1620344 [sender.py:transition_state():626] send defer: 11
+2025-04-17 05:29:01,026 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:29:01,026 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 11
+2025-04-17 05:29:01,026 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:29:01,026 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 11
+2025-04-17 05:29:01,027 INFO    SenderThread:1620344 [file_pusher.py:join():175] waiting for file pusher
+2025-04-17 05:29:01,027 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 12
+2025-04-17 05:29:01,027 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:29:01,027 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 12
+2025-04-17 05:29:01,027 DEBUG   SenderThread:1620344 [sender.py:send_request():418] send_request: defer
+2025-04-17 05:29:01,027 INFO    SenderThread:1620344 [sender.py:send_request_defer():622] handle sender defer: 12
+2025-04-17 05:29:01,027 INFO    SenderThread:1620344 [file_stream.py:finish():601] file stream finish called
+2025-04-17 05:29:01,116 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: poll_exit
+2025-04-17 05:29:01,204 WARNING StreamThr :1620344 [internal.py:is_dead():413] Internal process exiting, parent pid 1616690 disappeared
+2025-04-17 05:29:01,204 ERROR   StreamThr :1620344 [internal.py:wandb_internal():151] Internal process shutdown.
+2025-04-17 05:29:01,258 INFO    SenderThread:1620344 [file_stream.py:finish():605] file stream finish is done
+2025-04-17 05:29:01,258 INFO    SenderThread:1620344 [sender.py:transition_state():626] send defer: 13
+2025-04-17 05:29:01,258 INFO    SenderThread:1620344 [sender.py:finish():1631] shutting down sender
+2025-04-17 05:29:01,259 DEBUG   HandlerThread:1620344 [handler.py:handle_request():158] handle_request: defer
+2025-04-17 05:29:01,259 INFO    SenderThread:1620344 [file_pusher.py:finish():169] shutting down file pusher
+2025-04-17 05:29:01,259 INFO    HandlerThread:1620344 [handler.py:handle_request_defer():184] handle defer: 13
+2025-04-17 05:29:01,259 INFO    SenderThread:1620344 [file_pusher.py:join():175] waiting for file pusher
+2025-04-17 05:29:01,259 INFO    HandlerThread:1620344 [handler.py:finish():880] shutting down handler
+2025-04-17 05:29:01,259 INFO    WriterThread:1620344 [datastore.py:close():296] close: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250417_052700-bob0qp4w/run-bob0qp4w.wandb

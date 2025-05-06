@@ -1,0 +1,29 @@
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Current SDK version is 0.17.7
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Configure stats pid to 2713622
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Loading settings from /home/aurora/.config/wandb/settings
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Loading settings from /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/settings
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Loading settings from environment variables: {}
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': 'dynamics_model/new_model/train.py', 'program_abspath': '/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py', 'program': '/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py'}
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_setup.py:_flush():76] Applying login settings: {}
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_init.py:_log_setup():524] Logging user logs to /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_212958-g1bt1uu2/logs/debug.log
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_init.py:_log_setup():525] Logging internal logs to /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_212958-g1bt1uu2/logs/debug-internal.log
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_init.py:init():607] calling init triggers
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_init.py:init():614] wandb.init called with sweep_config: {}
+config: {'seed': 42, 'train': {'batch_size': 1000, 'epochs': 100, 'learning_rate': 0.03, 'no_cuda': False, 'log_file': 'logs/train.log', 'num_workers': 4, 'checkpoint_dir': 'checkpoints', 'max_mask_prob': 0.0, 'mask_warmup_epochs': 10}, 'data': {'path': '/home/aurora/handful-of-trials-pytorch/pusht_dataset', 'n_rollout': 100000, 'normalize_action': True, 'split_ratio': 0.8, 'train_frac': 0.8, 'num_hist': 8, 'frameskip': 1, 'with_velocity': True, 'state_mean': [236.6155, 264.5674, 255.1307, 266.3721, 0.165, 0.6914, -2.93032027, 2.54307914], 'state_std': [101.1202, 87.0112, 52.7054, 57.4971, 0.4698, 0.5234, 74.84556075, 74.14009094]}, 'model': {'num_models': 10, 'state_dim': 8, 'action_dim': 2, 'embedding_dim': 64, 'n_heads': 4, 'n_layers': 4, 'feedforward_dim': 256, 'dropout': 0.1, 'mask_curriculum': {'max_mask_prob': 0.0, 'warmup_epochs': 10}, 'var_threshold': 0.25}, 'wandb': {'enable': True, 'project': 'gnn-dynamics', 'run_name': 'masked-dynamics-experiment'}}
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_init.py:init():657] starting backend
+2025-05-04 21:29:58,984 INFO    MainThread:2713622 [wandb_init.py:init():661] setting up manager
+2025-05-04 21:29:58,986 INFO    MainThread:2713622 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=fork,spawn,forkserver, using: spawn
+2025-05-04 21:29:58,987 INFO    MainThread:2713622 [wandb_init.py:init():669] backend started and connected
+2025-05-04 21:29:58,990 INFO    MainThread:2713622 [wandb_init.py:init():764] updated telemetry
+2025-05-04 21:29:58,997 INFO    MainThread:2713622 [wandb_init.py:init():797] communicating run to backend with 90.0 second timeout
+2025-05-04 21:29:59,202 INFO    MainThread:2713622 [wandb_run.py:_on_init():2479] communicating current version
+2025-05-04 21:29:59,252 INFO    MainThread:2713622 [wandb_run.py:_on_init():2488] got version response upgrade_message: "wandb version 0.19.10 is available!  To upgrade, please run:\n $ pip install wandb --upgrade"
+
+2025-05-04 21:29:59,253 INFO    MainThread:2713622 [wandb_init.py:init():848] starting run threads in backend
+2025-05-04 21:30:06,282 INFO    MainThread:2713622 [wandb_run.py:_console_start():2457] atexit reg
+2025-05-04 21:30:06,282 INFO    MainThread:2713622 [wandb_run.py:_redirect():2303] redirect: wrap_raw
+2025-05-04 21:30:06,283 INFO    MainThread:2713622 [wandb_run.py:_redirect():2368] Wrapping output streams.
+2025-05-04 21:30:06,283 INFO    MainThread:2713622 [wandb_run.py:_redirect():2393] Redirects installed.
+2025-05-04 21:30:06,284 INFO    MainThread:2713622 [wandb_init.py:init():891] run started, returning control to user process
+2025-05-04 21:30:37,822 WARNING MsgRouterThr:2713622 [router.py:message_loop():77] message_loop has been closed

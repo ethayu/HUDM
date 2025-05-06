@@ -1,0 +1,9 @@
+Loaded 10 rollouts
+Loaded 10 rollouts
+2025-04-17 03:33:03,649 INFO Epoch 1, Train Loss: 0.827031
+2025-04-17 03:33:05,697 INFO Epoch 1, Val Loss: 0.397939
+2025-04-17 03:33:05,721 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:33:13,005 INFO Epoch 2, Train Loss: 0.332392
+2025-04-17 03:33:14,838 INFO Epoch 2, Val Loss: 0.185880
+2025-04-17 03:33:14,859 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:33:14,859 INFO Training complete.

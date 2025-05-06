@@ -1,0 +1,14 @@
+sim:
+  env_id: "pusht"
+  seq_len: 10
+  var_threshold: 10000
+  batch_size: 1
+  render_interval: 0.1
+  has_sincos: true   # if you use sin/cos angle encoding
+  sin_idx: 4
+  cos_idx: 5
+  env_kwargs: {with_velocity: true, with_target: true }    # any gym.make kwargs
+  use_planner: true
+  planner_kwargs: {pop_size: 128, elite_frac: 0.1, n_iter: 4, use_gt: false, closed_loop: false, agg_mode: "max", n_impute: 12}
+  checkpoint_dir: "masked-dynamics-experiment_20250426_185535" #"masked-dynamics-experiment_20250420_152051"
+  reset_state: true

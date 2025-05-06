@@ -1,0 +1,999 @@
+2025-05-05 03:45:42,943 INFO    StreamThr :3850929 [internal.py:wandb_internal():85] W&B internal server running at pid: 3850929, started at: 2025-05-05 03:45:42.943138
+2025-05-05 03:45:42,945 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status
+2025-05-05 03:45:42,947 INFO    WriterThread:3850929 [datastore.py:open_for_write():87] open: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/run-5u49gw9o.wandb
+2025-05-05 03:45:42,948 DEBUG   SenderThread:3850929 [sender.py:send():391] send: header
+2025-05-05 03:45:42,950 DEBUG   SenderThread:3850929 [sender.py:send():391] send: run
+2025-05-05 03:45:43,159 INFO    SenderThread:3850929 [dir_watcher.py:__init__():211] watching files in: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files
+2025-05-05 03:45:43,160 INFO    SenderThread:3850929 [sender.py:_start_run_threads():1200] run started: 5u49gw9o with start time 1746431142.94299
+2025-05-05 03:45:43,167 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: check_version
+2025-05-05 03:45:43,167 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: check_version
+2025-05-05 03:45:43,220 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: run_start
+2025-05-05 03:45:43,253 DEBUG   HandlerThread:3850929 [system_info.py:__init__():26] System info init
+2025-05-05 03:45:43,253 DEBUG   HandlerThread:3850929 [system_info.py:__init__():41] System info init done
+2025-05-05 03:45:43,253 INFO    HandlerThread:3850929 [system_monitor.py:start():194] Starting system monitor
+2025-05-05 03:45:43,253 INFO    SystemMonitor:3850929 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2025-05-05 03:45:43,254 INFO    HandlerThread:3850929 [system_monitor.py:probe():214] Collecting system info
+2025-05-05 03:45:43,254 INFO    SystemMonitor:3850929 [interfaces.py:start():188] Started cpu monitoring
+2025-05-05 03:45:43,255 INFO    SystemMonitor:3850929 [interfaces.py:start():188] Started disk monitoring
+2025-05-05 03:45:43,255 INFO    SystemMonitor:3850929 [interfaces.py:start():188] Started gpu monitoring
+2025-05-05 03:45:43,256 INFO    SystemMonitor:3850929 [interfaces.py:start():188] Started memory monitoring
+2025-05-05 03:45:43,257 INFO    SystemMonitor:3850929 [interfaces.py:start():188] Started network monitoring
+2025-05-05 03:45:43,306 DEBUG   HandlerThread:3850929 [system_info.py:probe():152] Probing system
+2025-05-05 03:45:43,308 DEBUG   HandlerThread:3850929 [system_info.py:_probe_git():137] Probing git
+2025-05-05 03:45:43,317 DEBUG   HandlerThread:3850929 [system_info.py:_probe_git():145] Probing git done
+2025-05-05 03:45:43,317 DEBUG   HandlerThread:3850929 [system_info.py:probe():200] Probing system done
+2025-05-05 03:45:43,317 DEBUG   HandlerThread:3850929 [system_monitor.py:probe():223] {'os': 'Linux-5.15.0-138-generic-x86_64-with-glibc2.31', 'python': '3.10.14', 'heartbeatAt': '2025-05-05T07:45:43.306490', 'startedAt': '2025-05-05T07:45:42.937112', 'docker': None, 'cuda': None, 'args': ('configs/train.yaml',), 'state': 'running', 'program': '/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py', 'codePathLocal': 'train.py', 'codePath': 'dynamics_model/new_model/train.py', 'git': {'remote': 'https://jianingq:@github.com/jianingq/handful-of-trials-pytorch.git', 'commit': '9b89794516c852158050d5b6736fe6526842d869'}, 'email': '2424992568@qq.com', 'root': '/home/aurora/handful-of-trials-pytorch', 'host': 'cv-server', 'username': 'aurora', 'executable': '/home/aurora/anaconda3/envs/pusht/bin/python', 'cpu_count': 32, 'cpu_count_logical': 64, 'cpu_freq': {'current': 2797.1251562499992, 'min': 2200.0, 'max': 3700.0}, 'cpu_freq_per_core': [{'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 1948.87, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2639.427, 'min': 2200.0, 'max': 3700.0}, {'current': 2097.684, 'min': 2200.0, 'max': 3700.0}, {'current': 3952.655, 'min': 2200.0, 'max': 3700.0}, {'current': 3948.631, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3543.558, 'min': 2200.0, 'max': 3700.0}, {'current': 3950.87, 'min': 2200.0, 'max': 3700.0}, {'current': 3006.357, 'min': 2200.0, 'max': 3700.0}, {'current': 2923.489, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2765.351, 'min': 2200.0, 'max': 3700.0}, {'current': 2772.631, 'min': 2200.0, 'max': 3700.0}, {'current': 1997.71, 'min': 2200.0, 'max': 3700.0}, {'current': 3196.518, 'min': 2200.0, 'max': 3700.0}, {'current': 3032.684, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2743.671, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3733.83, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2087.435, 'min': 2200.0, 'max': 3700.0}, {'current': 2141.348, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2787.256, 'min': 2200.0, 'max': 3700.0}, {'current': 2638.705, 'min': 2200.0, 'max': 3700.0}, {'current': 2024.889, 'min': 2200.0, 'max': 3700.0}, {'current': 3965.298, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2293.069, 'min': 2200.0, 'max': 3700.0}, {'current': 3277.781, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3949.842, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2820.67, 'min': 2200.0, 'max': 3700.0}, {'current': 2623.453, 'min': 2200.0, 'max': 3700.0}, {'current': 2616.059, 'min': 2200.0, 'max': 3700.0}, {'current': 2328.56, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3198.435, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3940.015, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2645.188, 'min': 2200.0, 'max': 3700.0}, {'current': 2747.86, 'min': 2200.0, 'max': 3700.0}], 'disk': {'/': {'total': 1832.2072448730469, 'used': 1709.639247894287}}, 'gpu': 'NVIDIA GeForce RTX 3090', 'gpu_count': 2, 'gpu_devices': [{'name': 'NVIDIA GeForce RTX 3090', 'memory_total': 25769803776}, {'name': 'NVIDIA GeForce RTX 3090', 'memory_total': 25769803776}], 'memory': {'total': 251.56134796142578}}
+2025-05-05 03:45:43,317 INFO    HandlerThread:3850929 [system_monitor.py:probe():224] Finished collecting system info
+2025-05-05 03:45:43,317 INFO    HandlerThread:3850929 [system_monitor.py:probe():227] Publishing system info
+2025-05-05 03:45:43,317 DEBUG   HandlerThread:3850929 [system_info.py:_save_conda():209] Saving list of conda packages installed into the current environment
+2025-05-05 03:45:44,161 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/conda-environment.yaml
+2025-05-05 03:45:50,161 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/conda-environment.yaml
+2025-05-05 03:45:50,194 DEBUG   HandlerThread:3850929 [system_info.py:_save_conda():224] Saving conda packages done
+2025-05-05 03:45:50,196 INFO    HandlerThread:3850929 [system_monitor.py:probe():229] Finished publishing system info
+2025-05-05 03:45:50,202 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:45:50,202 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: keepalive
+2025-05-05 03:45:50,202 DEBUG   SenderThread:3850929 [sender.py:send():391] send: files
+2025-05-05 03:45:50,203 INFO    SenderThread:3850929 [sender.py:_save_file():1466] saving file wandb-metadata.json with policy now
+2025-05-05 03:45:50,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: python_packages
+2025-05-05 03:45:50,365 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: python_packages
+2025-05-05 03:45:50,366 DEBUG   SenderThread:3850929 [sender.py:send():391] send: telemetry
+2025-05-05 03:45:50,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:45:50,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:45:50,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:50,454 INFO    wandb-upload_0:3850929 [upload_job.py:push():130] Uploaded file /tmp/tmpyno6hwxowandb/zs74o7a2-wandb-metadata.json
+2025-05-05 03:45:51,162 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/wandb-metadata.json
+2025-05-05 03:45:51,162 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:45:51,162 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/requirements.txt
+2025-05-05 03:45:51,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:52,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:53,162 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:45:53,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:53,890 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:45:54,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:55,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:56,550 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:57,572 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:58,682 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:45:59,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:45:59,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:00,734 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:01,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:02,166 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:02,734 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:03,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:04,166 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:04,503 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:04,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:05,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:46:05,365 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:46:05,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:06,167 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:06,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:07,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:08,168 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:08,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:09,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:10,115 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:10,168 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:10,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:11,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:12,169 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:12,735 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:13,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:14,170 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:14,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:15,165 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:15,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:16,170 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:16,170 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/config.yaml
+2025-05-05 03:46:16,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:17,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:18,171 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:18,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:19,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:20,171 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:20,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:46:20,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:46:20,445 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:20,736 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:21,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:22,172 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:22,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:23,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:24,173 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:24,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:25,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:25,933 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:26,173 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:26,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:27,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:28,174 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:28,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:29,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:30,174 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:30,737 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:31,118 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:31,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:32,175 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:32,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:33,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:34,176 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:34,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:35,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:46:35,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:46:35,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:36,176 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:36,532 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:36,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:37,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:38,177 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:38,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:39,739 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:40,178 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:40,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:41,628 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:41,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:42,178 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:42,738 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:43,257 DEBUG   SystemMonitor:3850929 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2025-05-05 03:46:43,259 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:46:43,739 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:44,179 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:44,739 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:45,739 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:46,179 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:46,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:46,904 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:47,739 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:48,180 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:48,739 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:49,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:50,181 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:50,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:46:50,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:46:50,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:51,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:52,012 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:52,182 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:52,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:53,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:54,183 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:54,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:55,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:56,184 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:56,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:57,133 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:46:57,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:58,184 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:46:58,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:46:59,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:00,185 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:00,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:01,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:02,186 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:02,338 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:02,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:03,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:04,186 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:04,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:05,365 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:47:05,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:47:05,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:06,187 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:06,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:07,539 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:07,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:08,188 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:08,741 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:09,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:10,188 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:10,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:11,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:12,189 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:12,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:12,825 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:13,261 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:47:13,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:14,190 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:14,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:15,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:16,191 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:16,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:17,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:18,191 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:18,257 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:18,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:19,742 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:20,192 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:20,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:47:20,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:47:20,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:21,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:22,192 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:22,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:23,672 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:23,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:24,193 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:24,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:25,743 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:26,194 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:26,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:27,745 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:28,194 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:28,745 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:28,817 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:29,745 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:30,195 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:30,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:31,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:32,196 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:32,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:33,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:33,925 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:34,196 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:34,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:35,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:47:35,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:47:35,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:36,197 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:36,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:37,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:38,198 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:38,746 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:39,029 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:39,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:40,198 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:40,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:41,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:42,199 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:42,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:43,262 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:47:43,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:44,200 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:44,263 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:44,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:45,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:46,200 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:46,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:47,786 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:48,201 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:48,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:49,434 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:49,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:50,201 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:50,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:47:50,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:47:50,747 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:51,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:52,202 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:52,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:53,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:54,203 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:54,648 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:47:54,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:55,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:56,203 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:56,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:57,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:58,204 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:47:58,748 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:59,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:47:59,930 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:00,205 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:00,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:01,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:02,205 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:02,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:03,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:04,206 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:04,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:05,089 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:05,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:48:05,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:48:05,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:06,206 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:06,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:07,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:08,207 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:08,749 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:09,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:10,146 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:10,208 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:10,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:11,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:12,208 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:12,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:13,263 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:48:13,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:14,209 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:14,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:15,238 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:15,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:16,210 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:16,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:17,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:18,210 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:18,750 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:19,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:20,211 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:20,253 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:20,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:48:20,366 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:48:20,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:21,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:22,211 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:22,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:23,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:24,212 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:24,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:25,373 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:25,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:26,213 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:26,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:27,751 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:28,213 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:28,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:29,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:30,214 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:30,699 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:30,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:31,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:32,215 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:32,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:33,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:34,216 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:34,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:35,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:48:35,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:48:35,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:36,217 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:36,349 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:36,752 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:37,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:38,218 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:38,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:39,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:40,218 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:40,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:41,740 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:41,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:42,219 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:42,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:43,264 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:48:43,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:44,220 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:44,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:45,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:46,220 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:46,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:46,925 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:47,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:48,221 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:48,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:49,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:50,221 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:50,394 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:48:50,394 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:48:50,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:51,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:52,136 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:52,222 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:52,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:53,754 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:54,223 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:54,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:55,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:56,223 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:56,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:57,138 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:48:57,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:58,224 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:48:58,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:48:59,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:00,226 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:00,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:01,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:02,226 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:02,316 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:02,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:03,755 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:04,227 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:04,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:05,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:49:05,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:49:05,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:06,227 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:06,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:07,353 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:07,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:08,228 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:08,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:09,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:10,228 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:10,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:11,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:12,229 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:12,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:12,851 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:13,265 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:49:13,756 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:14,230 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:14,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:15,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:16,230 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:16,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:17,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:18,231 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:18,294 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:18,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:19,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:20,232 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:20,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:49:20,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:49:20,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:21,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:22,232 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:22,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:23,515 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:23,757 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:24,233 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:24,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:25,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:26,233 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:26,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:27,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:28,234 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:28,568 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:28,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:29,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:30,235 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:30,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:31,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:32,235 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:32,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:33,758 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:33,919 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:34,236 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:34,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:35,366 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:49:35,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:49:35,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:36,237 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:36,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:37,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:38,237 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:38,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:39,019 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:39,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:40,238 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:40,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:41,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:42,239 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:42,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:43,267 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:49:43,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:44,038 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:44,239 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:44,759 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:45,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:46,240 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:46,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:47,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:48,241 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:48,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:49,186 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:49,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:50,241 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:50,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:49:50,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:49:50,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:51,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:52,242 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:52,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:53,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:54,218 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:49:54,242 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:54,760 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:55,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:56,243 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:56,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:57,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:58,244 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:49:58,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:49:59,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:00,106 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:00,244 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:00,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:01,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:02,245 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:02,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:03,761 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:04,246 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:04,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:05,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:50:05,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:50:05,440 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:05,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:06,246 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:06,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:07,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:08,247 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:08,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:09,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:10,248 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:10,719 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:10,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:11,762 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:12,248 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:12,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:13,268 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:50:13,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:14,249 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:14,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:15,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:16,040 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:16,250 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:16,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:17,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:18,251 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:18,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:19,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:20,251 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:20,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:50:20,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:50:20,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:21,143 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:21,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:22,252 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:22,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:23,763 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:24,252 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:24,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:25,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:26,197 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:26,255 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:26,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:27,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:28,255 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:28,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:29,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:30,256 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:30,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:31,376 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:31,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:32,256 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:32,764 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:33,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:34,257 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:34,798 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:35,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:50:35,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:50:35,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:36,258 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:36,470 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:36,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:37,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:38,258 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:38,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:39,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:40,259 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:40,765 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:41,569 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:41,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:42,259 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:42,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:43,269 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:50:43,802 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:44,260 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:44,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:45,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:46,261 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:46,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:46,943 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:47,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:48,261 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:48,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:49,766 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:50,262 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:50,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:50:50,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:50:50,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:51,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:52,263 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:52,630 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:52,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:53,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:54,263 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:54,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:55,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:56,264 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:56,767 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:57,673 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:50:57,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:58,265 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:50:58,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:50:59,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:00,265 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:00,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:01,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:02,266 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:02,702 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:02,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:03,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:04,266 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:04,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:05,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:51:05,368 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:51:05,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:06,267 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:06,768 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:07,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:07,850 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:08,268 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:08,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:09,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:10,268 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:10,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:11,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:12,269 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:12,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:12,920 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:13,270 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:51:13,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:14,271 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:14,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:15,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:16,272 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:16,769 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:17,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:17,944 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:18,272 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:18,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:19,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:20,273 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:20,367 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:51:20,367 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:51:20,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:21,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:22,273 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:22,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:23,332 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:23,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:24,274 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:24,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:25,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:26,275 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:26,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:27,770 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:28,275 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:28,554 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:28,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:29,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:30,276 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:30,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:31,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:32,277 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:32,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:33,629 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:33,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:34,282 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:34,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:35,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:51:35,368 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:51:35,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:36,281 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:36,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:37,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:38,282 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:38,771 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:38,838 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:39,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:40,283 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:40,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:41,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:42,283 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:42,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:43,271 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:51:43,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:43,966 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:44,284 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:44,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:45,782 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:46,284 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:46,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:47,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:48,286 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:48,772 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:49,227 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:49,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:50,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:51:50,368 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:51:50,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:51,287 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:51,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:52,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:53,288 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:53,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:54,491 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:54,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:55,288 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:55,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:56,773 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:57,289 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:57,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:58,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:51:59,290 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:51:59,753 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:51:59,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:00,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:01,290 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:01,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:02,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:03,291 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:03,774 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:04,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:04,955 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:05,292 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:05,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:52:05,368 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:52:05,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:06,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:07,292 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:07,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:08,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:09,293 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:09,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:10,287 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:10,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:11,294 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:11,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:12,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:13,274 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:52:13,294 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:13,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:14,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:15,295 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:15,378 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:15,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:16,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:17,295 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:17,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:18,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:19,297 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:19,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:20,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:52:20,368 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:52:20,516 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:20,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:21,297 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:21,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:22,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:23,298 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:23,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:24,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:25,299 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:25,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:25,782 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:26,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:27,299 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:27,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:28,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:29,300 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:29,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:30,777 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:30,944 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:31,300 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:31,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:32,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:33,301 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:33,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:34,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:35,302 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:35,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:52:35,368 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:52:35,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:36,072 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:36,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:37,303 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:37,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:38,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:39,303 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:39,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:40,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:41,304 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:41,398 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:41,778 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:42,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:43,275 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:52:43,305 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:43,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:44,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:45,305 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:45,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:46,601 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:46,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:47,306 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:47,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:48,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:49,307 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:49,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:50,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:52:50,369 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:52:50,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:51,307 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:51,634 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:51,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:52,779 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:53,308 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:53,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:54,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:55,308 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:55,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:56,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:57,245 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:52:57,309 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:57,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:58,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:52:59,310 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:52:59,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:00,780 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:01,310 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:01,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:02,692 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:53:02,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:03,311 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:03,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:04,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:05,312 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:05,368 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-05 03:53:05,369 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: stop_status
+2025-05-05 03:53:05,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:06,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:07,312 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:07,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:07,930 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:53:08,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:09,313 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:09,781 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:10,782 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:10,945 DEBUG   SenderThread:3850929 [sender.py:send():391] send: exit
+2025-05-05 03:53:10,945 INFO    SenderThread:3850929 [sender.py:send_exit():598] handling exit code: 255
+2025-05-05 03:53:10,945 INFO    SenderThread:3850929 [sender.py:send_exit():600] handling runtime: 447
+2025-05-05 03:53:10,946 INFO    SenderThread:3850929 [sender.py:_save_file():1466] saving file wandb-summary.json with policy end
+2025-05-05 03:53:10,946 INFO    SenderThread:3850929 [sender.py:send_exit():606] send defer
+2025-05-05 03:53:10,946 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:10,946 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 0
+2025-05-05 03:53:10,946 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:10,946 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 0
+2025-05-05 03:53:10,947 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 1
+2025-05-05 03:53:10,947 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:10,947 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 1
+2025-05-05 03:53:10,947 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:10,947 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 1
+2025-05-05 03:53:10,947 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 2
+2025-05-05 03:53:10,947 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:10,947 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 2
+2025-05-05 03:53:10,947 INFO    HandlerThread:3850929 [system_monitor.py:finish():203] Stopping system monitor
+2025-05-05 03:53:10,947 DEBUG   SystemMonitor:3850929 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2025-05-05 03:53:10,948 DEBUG   SystemMonitor:3850929 [system_monitor.py:_start():183] Publishing last batch of metrics
+2025-05-05 03:53:10,948 INFO    HandlerThread:3850929 [interfaces.py:finish():200] Joined cpu monitor
+2025-05-05 03:53:10,950 INFO    HandlerThread:3850929 [interfaces.py:finish():200] Joined disk monitor
+2025-05-05 03:53:11,279 INFO    HandlerThread:3850929 [interfaces.py:finish():200] Joined gpu monitor
+2025-05-05 03:53:11,279 INFO    HandlerThread:3850929 [interfaces.py:finish():200] Joined memory monitor
+2025-05-05 03:53:11,279 INFO    HandlerThread:3850929 [interfaces.py:finish():200] Joined network monitor
+2025-05-05 03:53:11,280 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:11,280 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 2
+2025-05-05 03:53:11,280 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 3
+2025-05-05 03:53:11,280 DEBUG   SenderThread:3850929 [sender.py:send():391] send: stats
+2025-05-05 03:53:11,280 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:11,281 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 3
+2025-05-05 03:53:11,281 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:11,281 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 3
+2025-05-05 03:53:11,281 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 4
+2025-05-05 03:53:11,281 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:11,281 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 4
+2025-05-05 03:53:11,281 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:11,281 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 4
+2025-05-05 03:53:11,281 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 5
+2025-05-05 03:53:11,281 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:11,281 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 5
+2025-05-05 03:53:11,281 DEBUG   SenderThread:3850929 [sender.py:send():391] send: summary
+2025-05-05 03:53:11,282 INFO    SenderThread:3850929 [sender.py:_save_file():1466] saving file wandb-summary.json with policy end
+2025-05-05 03:53:11,282 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:11,282 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 5
+2025-05-05 03:53:11,282 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 6
+2025-05-05 03:53:11,282 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:11,282 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 6
+2025-05-05 03:53:11,282 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:11,282 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 6
+2025-05-05 03:53:11,282 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 7
+2025-05-05 03:53:11,282 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: status_report
+2025-05-05 03:53:11,283 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:11,283 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 7
+2025-05-05 03:53:11,283 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:11,283 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 7
+2025-05-05 03:53:11,313 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:11,314 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/wandb-summary.json
+2025-05-05 03:53:11,945 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-05 03:53:13,314 INFO    Thread-12 :3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:14,405 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 8
+2025-05-05 03:53:14,405 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: poll_exit
+2025-05-05 03:53:14,405 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:14,406 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 8
+2025-05-05 03:53:14,406 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:14,406 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 8
+2025-05-05 03:53:14,406 INFO    SenderThread:3850929 [job_builder.py:build():443] Attempting to build job artifact
+2025-05-05 03:53:14,407 INFO    SenderThread:3850929 [job_builder.py:_get_source_type():572] is repo sourced job
+2025-05-05 03:53:14,434 INFO    SenderThread:3850929 [job_builder.py:build():548] adding wandb-job metadata file
+2025-05-05 03:53:14,440 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 9
+2025-05-05 03:53:14,440 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:14,440 DEBUG   SenderThread:3850929 [sender.py:send():391] send: artifact
+2025-05-05 03:53:14,440 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 9
+2025-05-05 03:53:14,792 INFO    SenderThread:3850929 [sender.py:send_artifact():1549] sent artifact job-https___jianingq__github.com_jianingq_handful-of-trials-pytorch.git_dynamics_model_new_model_train.py - {'id': 'QXJ0aWZhY3Q6MTcwODgzODI3Nw==', 'state': 'COMMITTED', 'artifactSequence': {'id': 'QXJ0aWZhY3RDb2xsZWN0aW9uOjYxNDU1MDMxOA==', 'latestArtifact': {'id': 'QXJ0aWZhY3Q6MTcwOTI5OTM4OQ==', 'versionIndex': 7}}}
+2025-05-05 03:53:14,792 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:14,792 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 9
+2025-05-05 03:53:14,792 INFO    SenderThread:3850929 [dir_watcher.py:finish():358] shutting down directory watcher
+2025-05-05 03:53:14,947 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-05 03:53:15,315 INFO    SenderThread:3850929 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:15,315 INFO    SenderThread:3850929 [dir_watcher.py:finish():388] scan: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files
+2025-05-05 03:53:15,315 INFO    SenderThread:3850929 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/config.yaml config.yaml
+2025-05-05 03:53:15,316 INFO    SenderThread:3850929 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log output.log
+2025-05-05 03:53:15,316 INFO    SenderThread:3850929 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/wandb-summary.json wandb-summary.json
+2025-05-05 03:53:15,318 INFO    SenderThread:3850929 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/conda-environment.yaml conda-environment.yaml
+2025-05-05 03:53:15,321 INFO    SenderThread:3850929 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/wandb-metadata.json wandb-metadata.json
+2025-05-05 03:53:15,325 INFO    SenderThread:3850929 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/requirements.txt requirements.txt
+2025-05-05 03:53:15,325 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 10
+2025-05-05 03:53:15,325 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: poll_exit
+2025-05-05 03:53:15,325 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:15,327 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 10
+2025-05-05 03:53:15,327 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:15,327 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 10
+2025-05-05 03:53:15,328 INFO    SenderThread:3850929 [file_pusher.py:finish():169] shutting down file pusher
+2025-05-05 03:53:15,508 INFO    wandb-upload_0:3850929 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/config.yaml
+2025-05-05 03:53:15,524 INFO    wandb-upload_2:3850929 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/wandb-summary.json
+2025-05-05 03:53:15,557 INFO    wandb-upload_3:3850929 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/conda-environment.yaml
+2025-05-05 03:53:15,568 INFO    wandb-upload_4:3850929 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/requirements.txt
+2025-05-05 03:53:15,575 INFO    wandb-upload_1:3850929 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/files/output.log
+2025-05-05 03:53:15,775 INFO    Thread-11 (_thread_body):3850929 [sender.py:transition_state():626] send defer: 11
+2025-05-05 03:53:15,775 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:15,775 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 11
+2025-05-05 03:53:15,776 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:15,776 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 11
+2025-05-05 03:53:15,776 INFO    SenderThread:3850929 [file_pusher.py:join():175] waiting for file pusher
+2025-05-05 03:53:15,776 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 12
+2025-05-05 03:53:15,776 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:15,776 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 12
+2025-05-05 03:53:15,776 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:15,776 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 12
+2025-05-05 03:53:15,776 INFO    SenderThread:3850929 [file_stream.py:finish():601] file stream finish called
+2025-05-05 03:53:15,872 INFO    SenderThread:3850929 [file_stream.py:finish():605] file stream finish is done
+2025-05-05 03:53:15,872 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 13
+2025-05-05 03:53:15,873 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:15,873 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 13
+2025-05-05 03:53:15,873 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:15,873 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 13
+2025-05-05 03:53:15,873 INFO    SenderThread:3850929 [sender.py:transition_state():626] send defer: 14
+2025-05-05 03:53:15,873 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: defer
+2025-05-05 03:53:15,873 INFO    HandlerThread:3850929 [handler.py:handle_request_defer():184] handle defer: 14
+2025-05-05 03:53:15,873 DEBUG   SenderThread:3850929 [sender.py:send():391] send: final
+2025-05-05 03:53:15,873 DEBUG   SenderThread:3850929 [sender.py:send():391] send: footer
+2025-05-05 03:53:15,874 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: defer
+2025-05-05 03:53:15,874 INFO    SenderThread:3850929 [sender.py:send_request_defer():622] handle sender defer: 14
+2025-05-05 03:53:15,874 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-05 03:53:15,874 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: poll_exit
+2025-05-05 03:53:15,875 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: server_info
+2025-05-05 03:53:15,875 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: server_info
+2025-05-05 03:53:15,877 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-05 03:53:15,877 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: get_summary
+2025-05-05 03:53:15,877 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: sampled_history
+2025-05-05 03:53:15,877 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-05 03:53:15,958 DEBUG   SenderThread:3850929 [sender.py:send_request():418] send_request: poll_exit
+2025-05-05 03:53:15,958 INFO    MainThread:3850929 [wandb_run.py:_footer_history_summary_info():4076] rendering history
+2025-05-05 03:53:15,959 INFO    MainThread:3850929 [wandb_run.py:_footer_history_summary_info():4108] rendering summary
+2025-05-05 03:53:15,959 INFO    MainThread:3850929 [wandb_run.py:_footer_sync_info():4035] logging synced files
+2025-05-05 03:53:15,959 DEBUG   HandlerThread:3850929 [handler.py:handle_request():158] handle_request: shutdown
+2025-05-05 03:53:15,959 INFO    HandlerThread:3850929 [handler.py:finish():880] shutting down handler
+2025-05-05 03:53:16,877 INFO    WriterThread:3850929 [datastore.py:close():296] close: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250505_034542-5u49gw9o/run-5u49gw9o.wandb
+2025-05-05 03:53:16,958 INFO    SenderThread:3850929 [sender.py:finish():1631] shutting down sender
+2025-05-05 03:53:16,958 INFO    SenderThread:3850929 [file_pusher.py:finish():169] shutting down file pusher
+2025-05-05 03:53:16,958 INFO    SenderThread:3850929 [file_pusher.py:join():175] waiting for file pusher

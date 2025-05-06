@@ -1,0 +1,71 @@
+wandb_version: 1
+
+train:
+  desc: null
+  value:
+    batch_size: 8
+    epochs: 2
+    learning_rate: 0.001
+    no_cuda: false
+    log_file: logs/train.log
+    num_workers: 4
+    checkpoint_dir: checkpoints
+data:
+  desc: null
+  value:
+    path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+    n_rollout: 10
+    normalize_action: true
+    split_ratio: 0.5
+    train_frac: 0.8
+    num_hist: 1
+    num_pred: 1
+    frameskip: 1
+    with_velocity: true
+model:
+  desc: null
+  value:
+    num_models: 10
+    state_dim: 8
+    action_dim: 10
+    embedding_dim: 4
+    n_heads: 4
+    n_layers: 2
+    feedforward_dim: 64
+    dropout: 0.1
+wandb:
+  desc: null
+  value:
+    enable: true
+    project: gnn-dynamics
+    run_name: masked-dynamics-experiment
+_wandb:
+  desc: null
+  value:
+    python_version: 3.10.14
+    cli_version: 0.17.7
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1744875163
+    t:
+      1:
+      - 1
+      - 41
+      - 51
+      - 55
+      2:
+      - 1
+      - 41
+      - 51
+      - 55
+      3:
+      - 13
+      - 16
+      - 23
+      - 61
+      4: 3.10.14
+      5: 0.17.7
+      8:
+      - 5
+      13: linux-x86_64

@@ -1,0 +1,149 @@
+Loaded 1000 rollouts
+Loaded 1000 rollouts
+2025-04-26 18:58:38,369 INFO Epoch 1, Train Loss: 0.676910
+2025-04-26 18:58:40,216 INFO Epoch 1, Val Loss: 0.171605
+2025-04-26 18:58:40,240 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch1.pt
+2025-04-26 18:59:11,305 INFO Epoch 2, Train Loss: 0.125997
+2025-04-26 18:59:13,085 INFO Epoch 2, Val Loss: 0.072695
+2025-04-26 18:59:13,109 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch2.pt
+2025-04-26 18:59:43,693 INFO Epoch 3, Train Loss: 0.061850
+2025-04-26 18:59:45,502 INFO Epoch 3, Val Loss: 0.047374
+2025-04-26 18:59:45,525 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch3.pt
+2025-04-26 19:00:16,473 INFO Epoch 4, Train Loss: 0.042284
+2025-04-26 19:00:18,316 INFO Epoch 4, Val Loss: 0.034789
+2025-04-26 19:00:18,340 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch4.pt
+2025-04-26 19:00:49,416 INFO Epoch 5, Train Loss: 0.033035
+2025-04-26 19:00:51,290 INFO Epoch 5, Val Loss: 0.026899
+2025-04-26 19:00:51,322 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch5.pt
+2025-04-26 19:01:22,288 INFO Epoch 6, Train Loss: 0.026718
+2025-04-26 19:01:24,141 INFO Epoch 6, Val Loss: 0.021934
+2025-04-26 19:01:24,165 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch6.pt
+2025-04-26 19:01:55,157 INFO Epoch 7, Train Loss: 0.022309
+2025-04-26 19:01:57,061 INFO Epoch 7, Val Loss: 0.018097
+2025-04-26 19:01:57,087 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch7.pt
+2025-04-26 19:02:27,968 INFO Epoch 8, Train Loss: 0.019032
+2025-04-26 19:02:29,775 INFO Epoch 8, Val Loss: 0.015601
+2025-04-26 19:02:29,801 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch8.pt
+2025-04-26 19:03:01,190 INFO Epoch 9, Train Loss: 0.016617
+2025-04-26 19:03:03,033 INFO Epoch 9, Val Loss: 0.013969
+2025-04-26 19:03:03,056 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch9.pt
+2025-04-26 19:03:33,850 INFO Epoch 10, Train Loss: 0.015181
+2025-04-26 19:03:35,732 INFO Epoch 10, Val Loss: 0.012564
+2025-04-26 19:03:35,757 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch10.pt
+2025-04-26 19:04:06,722 INFO Epoch 11, Train Loss: 0.013894
+2025-04-26 19:04:08,565 INFO Epoch 11, Val Loss: 0.011604
+2025-04-26 19:04:08,589 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch11.pt
+2025-04-26 19:04:39,758 INFO Epoch 12, Train Loss: 0.012919
+2025-04-26 19:04:41,530 INFO Epoch 12, Val Loss: 0.010758
+2025-04-26 19:04:41,557 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch12.pt
+2025-04-26 19:05:12,842 INFO Epoch 13, Train Loss: 0.011977
+2025-04-26 19:05:14,729 INFO Epoch 13, Val Loss: 0.010153
+2025-04-26 19:05:14,766 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch13.pt
+2025-04-26 19:05:45,819 INFO Epoch 14, Train Loss: 0.011120
+2025-04-26 19:05:47,666 INFO Epoch 14, Val Loss: 0.009587
+2025-04-26 19:05:47,691 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch14.pt
+2025-04-26 19:06:19,073 INFO Epoch 15, Train Loss: 0.010909
+2025-04-26 19:06:20,895 INFO Epoch 15, Val Loss: 0.009196
+2025-04-26 19:06:20,922 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch15.pt
+2025-04-26 19:06:52,101 INFO Epoch 16, Train Loss: 0.010367
+2025-04-26 19:06:53,900 INFO Epoch 16, Val Loss: 0.008663
+2025-04-26 19:06:53,927 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch16.pt
+2025-04-26 19:07:25,088 INFO Epoch 17, Train Loss: 0.009976
+2025-04-26 19:07:26,978 INFO Epoch 17, Val Loss: 0.008538
+2025-04-26 19:07:27,000 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch17.pt
+2025-04-26 19:07:57,747 INFO Epoch 18, Train Loss: 0.009706
+2025-04-26 19:07:59,564 INFO Epoch 18, Val Loss: 0.008166
+2025-04-26 19:07:59,589 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch18.pt
+2025-04-26 19:08:30,957 INFO Epoch 19, Train Loss: 0.009270
+2025-04-26 19:08:32,780 INFO Epoch 19, Val Loss: 0.007875
+2025-04-26 19:08:32,805 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch19.pt
+2025-04-26 19:09:03,371 INFO Epoch 20, Train Loss: 0.008857
+2025-04-26 19:09:05,191 INFO Epoch 20, Val Loss: 0.007658
+2025-04-26 19:09:05,217 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch20.pt
+2025-04-26 19:09:36,256 INFO Epoch 21, Train Loss: 0.008745
+2025-04-26 19:09:38,128 INFO Epoch 21, Val Loss: 0.007459
+2025-04-26 19:09:38,153 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch21.pt
+2025-04-26 19:10:08,755 INFO Epoch 22, Train Loss: 0.008551
+2025-04-26 19:10:10,603 INFO Epoch 22, Val Loss: 0.007371
+2025-04-26 19:10:10,626 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch22.pt
+2025-04-26 19:10:41,150 INFO Epoch 23, Train Loss: 0.008297
+2025-04-26 19:10:43,015 INFO Epoch 23, Val Loss: 0.007072
+2025-04-26 19:10:43,040 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch23.pt
+2025-04-26 19:11:14,129 INFO Epoch 24, Train Loss: 0.008276
+2025-04-26 19:11:15,961 INFO Epoch 24, Val Loss: 0.006746
+2025-04-26 19:11:15,989 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch24.pt
+2025-04-26 19:11:47,384 INFO Epoch 25, Train Loss: 0.008045
+2025-04-26 19:11:49,231 INFO Epoch 25, Val Loss: 0.006738
+2025-04-26 19:11:49,267 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch25.pt
+2025-04-26 19:12:20,749 INFO Epoch 26, Train Loss: 0.007731
+2025-04-26 19:12:22,639 INFO Epoch 26, Val Loss: 0.006567
+2025-04-26 19:12:22,663 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch26.pt
+2025-04-26 19:12:54,125 INFO Epoch 27, Train Loss: 0.007722
+2025-04-26 19:12:55,942 INFO Epoch 27, Val Loss: 0.006534
+2025-04-26 19:12:55,969 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch27.pt
+2025-04-26 19:13:27,020 INFO Epoch 28, Train Loss: 0.007641
+2025-04-26 19:13:28,832 INFO Epoch 28, Val Loss: 0.006280
+2025-04-26 19:13:28,863 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch28.pt
+2025-04-26 19:14:00,075 INFO Epoch 29, Train Loss: 0.007648
+2025-04-26 19:14:01,944 INFO Epoch 29, Val Loss: 0.006203
+2025-04-26 19:14:01,969 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch29.pt
+2025-04-26 19:14:32,769 INFO Epoch 30, Train Loss: 0.007407
+2025-04-26 19:14:34,554 INFO Epoch 30, Val Loss: 0.006093
+2025-04-26 19:14:34,581 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch30.pt
+2025-04-26 19:15:05,560 INFO Epoch 31, Train Loss: 0.007249
+2025-04-26 19:15:07,403 INFO Epoch 31, Val Loss: 0.006057
+2025-04-26 19:15:07,422 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch31.pt
+2025-04-26 19:15:38,010 INFO Epoch 32, Train Loss: 0.007272
+2025-04-26 19:15:39,929 INFO Epoch 32, Val Loss: 0.005968
+2025-04-26 19:15:39,952 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch32.pt
+2025-04-26 19:16:11,068 INFO Epoch 33, Train Loss: 0.007134
+2025-04-26 19:16:12,890 INFO Epoch 33, Val Loss: 0.005914
+2025-04-26 19:16:12,913 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch33.pt
+2025-04-26 19:16:43,932 INFO Epoch 34, Train Loss: 0.007003
+2025-04-26 19:16:45,724 INFO Epoch 34, Val Loss: 0.005819
+2025-04-26 19:16:45,748 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch34.pt
+2025-04-26 19:17:16,340 INFO Epoch 35, Train Loss: 0.006920
+2025-04-26 19:17:18,175 INFO Epoch 35, Val Loss: 0.005715
+2025-04-26 19:17:18,200 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch35.pt
+2025-04-26 19:17:49,657 INFO Epoch 36, Train Loss: 0.006752
+2025-04-26 19:17:51,484 INFO Epoch 36, Val Loss: 0.005702
+2025-04-26 19:17:51,520 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch36.pt
+2025-04-26 19:18:21,997 INFO Epoch 37, Train Loss: 0.006790
+2025-04-26 19:18:23,901 INFO Epoch 37, Val Loss: 0.005566
+2025-04-26 19:18:23,925 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch37.pt
+2025-04-26 19:18:55,241 INFO Epoch 38, Train Loss: 0.006752
+2025-04-26 19:18:57,086 INFO Epoch 38, Val Loss: 0.005542
+2025-04-26 19:18:57,112 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch38.pt
+2025-04-26 19:19:28,272 INFO Epoch 39, Train Loss: 0.006581
+2025-04-26 19:19:30,135 INFO Epoch 39, Val Loss: 0.005426
+2025-04-26 19:19:30,160 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch39.pt
+2025-04-26 19:20:01,272 INFO Epoch 40, Train Loss: 0.006572
+2025-04-26 19:20:03,134 INFO Epoch 40, Val Loss: 0.005346
+2025-04-26 19:20:03,158 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch40.pt
+2025-04-26 19:20:34,295 INFO Epoch 41, Train Loss: 0.006435
+2025-04-26 19:20:36,107 INFO Epoch 41, Val Loss: 0.005260
+2025-04-26 19:20:36,129 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250426_185535/model_epoch41.pt
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 144, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 91, in main
+    for batch in train_loader:
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 652, in __next__
+    data = self._next_data()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1330, in _next_data
+    idx, data = self._get_data()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1296, in _get_data
+    success, data = self._try_get_data()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1134, in _try_get_data
+    data = self._data_queue.get(timeout=timeout)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/multiprocessing/queues.py", line 113, in get
+    if not self._poll(timeout):
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/multiprocessing/connection.py", line 257, in poll
+    return self._poll(timeout)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/multiprocessing/connection.py", line 424, in _poll
+    r = wait([self], timeout)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/multiprocessing/connection.py", line 931, in wait
+    ready = selector.select(timeout)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/selectors.py", line 416, in select
+    fd_event_list = self._selector.poll(timeout)
+KeyboardInterrupt

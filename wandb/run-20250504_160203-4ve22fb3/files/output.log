@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 116, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 50, in main
+    train_ds, val_ds = load_pusht_dataset(cfg.data, window_H=cfg.data.num_hist)
+TypeError: load_pusht_dataset() got an unexpected keyword argument 'window_H'

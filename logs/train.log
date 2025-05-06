@@ -1,0 +1,405 @@
+2025-04-17 03:26:29,499 INFO Config:
+train:
+  batch_size: 8
+  epochs: 2
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 1
+  frameskip: 1
+  with_velocity: true
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 10
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 03:26:50,521 INFO Epoch 1, Train Loss: 0.482911
+2025-04-17 03:26:52,494 INFO Epoch 1, Val Loss: 0.201138
+2025-04-17 03:26:52,512 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:27:00,041 INFO Epoch 2, Train Loss: 0.171106
+2025-04-17 03:27:01,847 INFO Epoch 2, Val Loss: 0.105381
+2025-04-17 03:27:01,867 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:27:01,868 INFO Training complete.
+2025-04-17 03:28:51,987 INFO Config:
+train:
+  batch_size: 8
+  epochs: 2
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 1
+  frameskip: 1
+  with_velocity: true
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 03:29:13,807 INFO Epoch 1, Train Loss: 0.485841
+2025-04-17 03:29:15,795 INFO Epoch 1, Val Loss: 0.233928
+2025-04-17 03:29:15,816 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:29:24,163 INFO Epoch 2, Train Loss: 0.196412
+2025-04-17 03:29:26,205 INFO Epoch 2, Val Loss: 0.132051
+2025-04-17 03:29:26,227 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:29:26,227 INFO Training complete.
+2025-04-17 03:30:11,435 INFO Config:
+train:
+  batch_size: 8
+  epochs: 2
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 1
+  frameskip: 1
+  with_velocity: true
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 03:30:31,350 INFO Epoch 1, Train Loss: 0.598457
+2025-04-17 03:30:33,325 INFO Epoch 1, Val Loss: 0.223783
+2025-04-17 03:30:33,347 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:30:40,058 INFO Epoch 2, Train Loss: 0.252553
+2025-04-17 03:30:41,898 INFO Epoch 2, Val Loss: 0.129857
+2025-04-17 03:30:41,916 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:30:41,916 INFO Training complete.
+2025-04-17 03:32:43,216 INFO Config:
+train:
+  batch_size: 8
+  epochs: 2
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 1
+  frameskip: 1
+  with_velocity: true
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 10
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 03:33:03,649 INFO Epoch 1, Train Loss: 0.827031
+2025-04-17 03:33:05,697 INFO Epoch 1, Val Loss: 0.397939
+2025-04-17 03:33:05,721 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:33:13,005 INFO Epoch 2, Train Loss: 0.332392
+2025-04-17 03:33:14,838 INFO Epoch 2, Val Loss: 0.185880
+2025-04-17 03:33:14,859 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:33:14,859 INFO Training complete.
+2025-04-17 03:33:41,629 INFO Config:
+train:
+  batch_size: 8
+  epochs: 2
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 1
+  frameskip: 1
+  with_velocity: true
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 10
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 03:34:01,488 INFO Epoch 1, Train Loss: 0.363418
+2025-04-17 03:34:03,425 INFO Epoch 1, Val Loss: 0.169534
+2025-04-17 03:34:03,451 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:34:10,284 INFO Epoch 2, Train Loss: 0.147804
+2025-04-17 03:34:12,252 INFO Epoch 2, Val Loss: 0.099368
+2025-04-17 03:34:12,273 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:34:12,273 INFO Training complete.
+2025-04-17 03:39:48,209 INFO Config:
+train:
+  batch_size: 8
+  epochs: 2
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 1
+  frameskip: 1
+  with_velocity: true
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 03:40:11,017 INFO Epoch 1, Train Loss: 0.444940
+2025-04-17 03:40:12,863 INFO Epoch 1, Val Loss: 0.198702
+2025-04-17 03:40:12,894 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:40:22,422 INFO Epoch 2, Train Loss: 0.174683
+2025-04-17 03:40:24,321 INFO Epoch 2, Val Loss: 0.121940
+2025-04-17 03:40:24,343 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:40:24,343 INFO Training complete.
+2025-04-17 05:26:59,245 INFO Config:
+train:
+  batch_size: 1000
+  epochs: 50
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10000
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 100
+  frameskip: 1
+  with_velocity: true
+  state_mean:
+  - 236.6155
+  - 264.5674
+  - 255.1307
+  - 266.3721
+  - 0.165
+  - 0.6914
+  - -2.93032027
+  - 2.54307914
+  state_std:
+  - 101.1202
+  - 87.0112
+  - 52.7054
+  - 57.4971
+  - 0.4698
+  - 0.5234
+  - 74.84556075
+  - 74.14009094
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 05:31:22,832 INFO Config:
+train:
+  batch_size: 1000
+  epochs: 50
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 10000
+  normalize_action: true
+  split_ratio: 0.5
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 20
+  frameskip: 1
+  with_velocity: true
+  state_mean:
+  - 236.6155
+  - 264.5674
+  - 255.1307
+  - 266.3721
+  - 0.165
+  - 0.6914
+  - -2.93032027
+  - 2.54307914
+  state_std:
+  - 101.1202
+  - 87.0112
+  - 52.7054
+  - 57.4971
+  - 0.4698
+  - 0.5234
+  - 74.84556075
+  - 74.14009094
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 05:47:52,686 INFO Config:
+train:
+  batch_size: 1000
+  epochs: 50
+  learning_rate: 0.001
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 100
+  normalize_action: true
+  split_ratio: 0.8
+  train_frac: 0.8
+  num_hist: 1
+  num_pred: 20
+  frameskip: 1
+  with_velocity: true
+  state_mean:
+  - 236.6155
+  - 264.5674
+  - 255.1307
+  - 266.3721
+  - 0.165
+  - 0.6914
+  - -2.93032027
+  - 2.54307914
+  state_std:
+  - 101.1202
+  - 87.0112
+  - 52.7054
+  - 57.4971
+  - 0.4698
+  - 0.5234
+  - 74.84556075
+  - 74.14009094
+model:
+  num_models: 10
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 4
+  n_layers: 2
+  feedforward_dim: 64
+  dropout: 0.1
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-04-17 05:48:23,232 INFO Epoch 1, Train Loss: 1.417404
+2025-04-17 05:48:25,082 INFO Epoch 1, Val Loss: 0.885727
+2025-04-17 05:48:25,110 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 05:48:29,385 INFO Epoch 2, Train Loss: 1.150566
+2025-04-17 05:48:31,265 INFO Epoch 2, Val Loss: 0.802099
+2025-04-17 05:48:31,287 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 05:48:35,716 INFO Epoch 3, Train Loss: 1.036483
+2025-04-17 05:48:37,575 INFO Epoch 3, Val Loss: 0.771489
+2025-04-17 05:48:37,599 INFO Saved checkpoint: checkpoints/model_epoch3.pt
+2025-04-17 05:48:41,909 INFO Epoch 4, Train Loss: 0.962645
+2025-04-17 05:48:43,785 INFO Epoch 4, Val Loss: 0.761419
+2025-04-17 05:48:43,812 INFO Saved checkpoint: checkpoints/model_epoch4.pt

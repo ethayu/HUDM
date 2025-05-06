@@ -1,0 +1,17 @@
+Loaded 8000 rollouts
+Loaded 1999 rollouts
+  0%|                                                                                                                                                 | 0/676 [00:16<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 174, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 129, in main
+    pred = model.models[m_idx](s_hist, a_hist, mask_hist)  # single net
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 64, in forward
+    st_tok = self.state_fc(state_hist.unsqueeze(-1))
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/linear.py", line 114, in forward
+    return F.linear(input, self.weight, self.bias)
+RuntimeError: CUDA error: CUBLAS_STATUS_NOT_INITIALIZED when calling `cublasCreate(handle)`

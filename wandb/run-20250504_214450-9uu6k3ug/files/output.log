@@ -1,0 +1,12 @@
+Loaded 80000.0 rollouts
+Loaded 19999.999999999996 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 170, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 125, in main
+    pred = model.models[m_idx](s_hist, a_hist, mask_hist)  # single net
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 58, in forward
+    B, H, D = state_hist.shape
+ValueError: not enough values to unpack (expected 3, got 2)

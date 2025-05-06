@@ -1,0 +1,32 @@
+Loaded 80000.0 rollouts
+Loaded 19999.999999999996 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 174, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 103, in main
+    model = MaskedDynamicsEnsemble(cfg).to(device)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/ensemble.py", line 21, in __init__
+    [build_masked_dynamics_model(cfg) for _ in range(self.num_models)]
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/ensemble.py", line 21, in <listcomp>
+    [build_masked_dynamics_model(cfg) for _ in range(self.num_models)]
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 119, in build_masked_dynamics_model
+    n_heads        = m.n_heads,
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/dictconfig.py", line 355, in __getattr__
+    self._format_and_raise(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/base.py", line 231, in _format_and_raise
+    format_and_raise(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/_utils.py", line 899, in format_and_raise
+    _raise(ex, cause)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/_utils.py", line 797, in _raise
+    raise ex.with_traceback(sys.exc_info()[2])  # set env var OC_CAUSE=1 for full trace
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/dictconfig.py", line 351, in __getattr__
+    return self._get_impl(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/dictconfig.py", line 442, in _get_impl
+    node = self._get_child(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/basecontainer.py", line 73, in _get_child
+    child = self._get_node(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/omegaconf/dictconfig.py", line 480, in _get_node
+    raise ConfigKeyError(f"Missing key {key!s}")
+omegaconf.errors.ConfigAttributeError: Missing key n_heads
+    full_key: model.n_heads
+    object_type=dict

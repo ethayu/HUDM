@@ -1,0 +1,21 @@
+Loaded 10000 rollouts
+Loaded 10000 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 132, in <module>
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 49, in main
+    # Logger (points to a file inside this run directory)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/data/dataset.py", line 40, in load_pusht_dataset
+    train_ds = _RolloutDataset(train_base, data_cfg.num_pred)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/data/dataset.py", line 54, in __init__
+    sample = self.base[traj_idx]
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/datasets/traj_dset.py", line 94, in __getitem__
+    obs, act, state, _ = self.dataset[i]
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/datasets/pusht_dset.py", line 143, in __getitem__
+    return self.get_frames(idx, range(self.get_seq_length(idx)))
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/datasets/pusht_dset.py", line 127, in get_frames
+    reader = VideoReader(str(vid_dir / f"episode_{idx:03d}.mp4"), num_threads=1)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/decord/video_reader.py", line 54, in __init__
+    self._handle = _CAPI_VideoReaderGetVideoReader(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/decord/_ffi/_ctypes/function.py", line 173, in __call__
+    check_call(_LIB.DECORDFuncCall(
+KeyboardInterrupt

@@ -1,0 +1,36 @@
+Loaded 80000.0 rollouts
+Loaded 19999.999999999996 rollouts
+state_hist torch.Size([1000, 8, 8])
+action_hist torch.Size([1000, 8, 2])
+mask_hist torch.Size([1000, 8, 8])
+  0%|                                                                                                                                               | 0/15749 [00:01<?, ?it/s]
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 174, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 129, in main
+    pred = model.models[m_idx](s_hist, a_hist, mask_hist)  # single net
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 107, in forward
+    enc = self.transformer(tokens, src_key_padding_mask=pad)  # (B,N,E)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/transformer.py", line 238, in forward
+    output = mod(output, src_mask=mask, src_key_padding_mask=src_key_padding_mask)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/transformer.py", line 463, in forward
+    x = self.norm1(x + self._sa_block(x, src_mask, src_key_padding_mask))
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/transformer.py", line 471, in _sa_block
+    x = self.self_attn(x, x, x,
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1130, in _call_impl
+    return forward_call(*input, **kwargs)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/activation.py", line 1153, in forward
+    attn_output, attn_output_weights = F.multi_head_attention_forward(
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/functional.py", line 5179, in multi_head_attention_forward
+    attn_output, attn_output_weights = _scaled_dot_product_attention(q, k, v, attn_mask, dropout_p)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/functional.py", line 4858, in _scaled_dot_product_attention
+    attn = dropout(attn, p=dropout_p)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/functional.py", line 1252, in dropout
+    return _VF.dropout_(input, p, training) if inplace else _VF.dropout(input, p, training)
+RuntimeError: CUDA out of memory. Tried to allocate 82.00 MiB (GPU 0; 23.69 GiB total capacity; 538.93 MiB already allocated; 41.94 MiB free; 622.00 MiB reserved in total by PyTorch) If reserved memory is >> allocated memory try setting max_split_size_mb to avoid fragmentation.  See documentation for Memory Management and PYTORCH_CUDA_ALLOC_CONF

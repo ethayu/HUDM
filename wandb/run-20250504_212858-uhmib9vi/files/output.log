@@ -1,0 +1,8 @@
+Loaded 80000.0 rollouts
+Loaded 19999.999999999996 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 170, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 116, in main
+    s_hist = batch['state_hist'].to(device)
+KeyError: 'state_hist'

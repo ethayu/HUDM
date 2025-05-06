@@ -1,0 +1,237 @@
+Loaded 1000 rollouts
+Loaded 1000 rollouts
+2025-04-24 03:37:58,465 INFO Epoch 1, Train Loss: 0.852427
+2025-04-24 03:38:00,173 INFO Epoch 1, Val Loss: 0.533170
+2025-04-24 03:38:00,198 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch1.pt
+2025-04-24 03:38:30,727 INFO Epoch 2, Train Loss: 0.575188
+2025-04-24 03:38:32,409 INFO Epoch 2, Val Loss: 0.443854
+2025-04-24 03:38:32,435 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch2.pt
+2025-04-24 03:39:02,830 INFO Epoch 3, Train Loss: 0.497348
+2025-04-24 03:39:04,617 INFO Epoch 3, Val Loss: 0.409724
+2025-04-24 03:39:04,641 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch3.pt
+2025-04-24 03:39:34,834 INFO Epoch 4, Train Loss: 0.458761
+2025-04-24 03:39:36,533 INFO Epoch 4, Val Loss: 0.391529
+2025-04-24 03:39:36,562 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch4.pt
+2025-04-24 03:40:06,900 INFO Epoch 5, Train Loss: 0.437977
+2025-04-24 03:40:08,660 INFO Epoch 5, Val Loss: 0.383516
+2025-04-24 03:40:08,683 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch5.pt
+2025-04-24 03:40:38,745 INFO Epoch 6, Train Loss: 0.428148
+2025-04-24 03:40:40,458 INFO Epoch 6, Val Loss: 0.377812
+2025-04-24 03:40:40,483 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch6.pt
+2025-04-24 03:41:10,433 INFO Epoch 7, Train Loss: 0.424685
+2025-04-24 03:41:12,148 INFO Epoch 7, Val Loss: 0.375578
+2025-04-24 03:41:12,176 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch7.pt
+2025-04-24 03:41:42,362 INFO Epoch 8, Train Loss: 0.420368
+2025-04-24 03:41:44,203 INFO Epoch 8, Val Loss: 0.375216
+2025-04-24 03:41:44,226 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch8.pt
+2025-04-24 03:42:15,130 INFO Epoch 9, Train Loss: 0.415691
+2025-04-24 03:42:16,835 INFO Epoch 9, Val Loss: 0.374696
+2025-04-24 03:42:16,861 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch9.pt
+2025-04-24 03:42:47,520 INFO Epoch 10, Train Loss: 0.415867
+2025-04-24 03:42:49,180 INFO Epoch 10, Val Loss: 0.373826
+2025-04-24 03:42:49,203 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch10.pt
+2025-04-24 03:43:19,375 INFO Epoch 11, Train Loss: 0.414424
+2025-04-24 03:43:21,146 INFO Epoch 11, Val Loss: 0.372049
+2025-04-24 03:43:21,171 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch11.pt
+2025-04-24 03:43:51,567 INFO Epoch 12, Train Loss: 0.411444
+2025-04-24 03:43:53,232 INFO Epoch 12, Val Loss: 0.371714
+2025-04-24 03:43:53,256 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch12.pt
+2025-04-24 03:44:23,449 INFO Epoch 13, Train Loss: 0.413350
+2025-04-24 03:44:25,203 INFO Epoch 13, Val Loss: 0.372003
+2025-04-24 03:44:55,424 INFO Epoch 14, Train Loss: 0.412158
+2025-04-24 03:44:57,092 INFO Epoch 14, Val Loss: 0.370496
+2025-04-24 03:44:57,119 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch14.pt
+2025-04-24 03:45:27,790 INFO Epoch 15, Train Loss: 0.407422
+2025-04-24 03:45:29,555 INFO Epoch 15, Val Loss: 0.370537
+2025-04-24 03:45:59,777 INFO Epoch 16, Train Loss: 0.410197
+2025-04-24 03:46:01,506 INFO Epoch 16, Val Loss: 0.370144
+2025-04-24 03:46:01,531 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch16.pt
+2025-04-24 03:46:31,963 INFO Epoch 17, Train Loss: 0.406091
+2025-04-24 03:46:33,762 INFO Epoch 17, Val Loss: 0.369280
+2025-04-24 03:46:33,785 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch17.pt
+2025-04-24 03:47:04,286 INFO Epoch 18, Train Loss: 0.411435
+2025-04-24 03:47:06,025 INFO Epoch 18, Val Loss: 0.369825
+2025-04-24 03:47:36,508 INFO Epoch 19, Train Loss: 0.410985
+2025-04-24 03:47:38,329 INFO Epoch 19, Val Loss: 0.368283
+2025-04-24 03:47:38,359 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch19.pt
+2025-04-24 03:48:09,064 INFO Epoch 20, Train Loss: 0.407007
+2025-04-24 03:48:10,813 INFO Epoch 20, Val Loss: 0.367616
+2025-04-24 03:48:10,839 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch20.pt
+2025-04-24 03:48:41,703 INFO Epoch 21, Train Loss: 0.409900
+2025-04-24 03:48:43,368 INFO Epoch 21, Val Loss: 0.368581
+2025-04-24 03:49:13,869 INFO Epoch 22, Train Loss: 0.406216
+2025-04-24 03:49:15,624 INFO Epoch 22, Val Loss: 0.369513
+2025-04-24 03:49:46,093 INFO Epoch 23, Train Loss: 0.409430
+2025-04-24 03:49:47,828 INFO Epoch 23, Val Loss: 0.367997
+2025-04-24 03:50:17,910 INFO Epoch 24, Train Loss: 0.405178
+2025-04-24 03:50:19,745 INFO Epoch 24, Val Loss: 0.368376
+2025-04-24 03:50:49,917 INFO Epoch 25, Train Loss: 0.405455
+2025-04-24 03:50:51,623 INFO Epoch 25, Val Loss: 0.368288
+2025-04-24 03:51:21,941 INFO Epoch 26, Train Loss: 0.406098
+2025-04-24 03:51:23,678 INFO Epoch 26, Val Loss: 0.367883
+2025-04-24 03:51:53,884 INFO Epoch 27, Train Loss: 0.406084
+2025-04-24 03:51:55,697 INFO Epoch 27, Val Loss: 0.368040
+2025-04-24 03:52:26,141 INFO Epoch 28, Train Loss: 0.407077
+2025-04-24 03:52:27,878 INFO Epoch 28, Val Loss: 0.366690
+2025-04-24 03:52:27,905 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch28.pt
+2025-04-24 03:52:58,666 INFO Epoch 29, Train Loss: 0.405593
+2025-04-24 03:53:00,556 INFO Epoch 29, Val Loss: 0.365735
+2025-04-24 03:53:00,577 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch29.pt
+2025-04-24 03:53:31,320 INFO Epoch 30, Train Loss: 0.406288
+2025-04-24 03:53:33,164 INFO Epoch 30, Val Loss: 0.365960
+2025-04-24 03:54:03,277 INFO Epoch 31, Train Loss: 0.406046
+2025-04-24 03:54:05,045 INFO Epoch 31, Val Loss: 0.364188
+2025-04-24 03:54:05,066 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch31.pt
+2025-04-24 03:54:34,932 INFO Epoch 32, Train Loss: 0.403518
+2025-04-24 03:54:36,724 INFO Epoch 32, Val Loss: 0.365731
+2025-04-24 03:55:07,514 INFO Epoch 33, Train Loss: 0.406678
+2025-04-24 03:55:09,243 INFO Epoch 33, Val Loss: 0.366156
+2025-04-24 03:55:39,652 INFO Epoch 34, Train Loss: 0.405107
+2025-04-24 03:55:41,397 INFO Epoch 34, Val Loss: 0.365625
+2025-04-24 03:56:11,735 INFO Epoch 35, Train Loss: 0.406772
+2025-04-24 03:56:13,458 INFO Epoch 35, Val Loss: 0.365837
+2025-04-24 03:56:43,923 INFO Epoch 36, Train Loss: 0.404075
+2025-04-24 03:56:45,591 INFO Epoch 36, Val Loss: 0.362525
+2025-04-24 03:56:45,614 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch36.pt
+2025-04-24 03:57:15,913 INFO Epoch 37, Train Loss: 0.402941
+2025-04-24 03:57:17,601 INFO Epoch 37, Val Loss: 0.364940
+2025-04-24 03:57:48,121 INFO Epoch 38, Train Loss: 0.405425
+2025-04-24 03:57:49,848 INFO Epoch 38, Val Loss: 0.365503
+2025-04-24 03:58:19,965 INFO Epoch 39, Train Loss: 0.405275
+2025-04-24 03:58:21,691 INFO Epoch 39, Val Loss: 0.365892
+2025-04-24 03:58:52,213 INFO Epoch 40, Train Loss: 0.403027
+2025-04-24 03:58:53,936 INFO Epoch 40, Val Loss: 0.364036
+2025-04-24 03:59:24,213 INFO Epoch 41, Train Loss: 0.403074
+2025-04-24 03:59:25,950 INFO Epoch 41, Val Loss: 0.363517
+2025-04-24 03:59:56,501 INFO Epoch 42, Train Loss: 0.403737
+2025-04-24 03:59:58,237 INFO Epoch 42, Val Loss: 0.364748
+2025-04-24 04:00:28,672 INFO Epoch 43, Train Loss: 0.400172
+2025-04-24 04:00:30,425 INFO Epoch 43, Val Loss: 0.361697
+2025-04-24 04:00:30,447 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch43.pt
+2025-04-24 04:01:01,404 INFO Epoch 44, Train Loss: 0.402852
+2025-04-24 04:01:03,140 INFO Epoch 44, Val Loss: 0.362612
+2025-04-24 04:01:33,897 INFO Epoch 45, Train Loss: 0.403349
+2025-04-24 04:01:35,651 INFO Epoch 45, Val Loss: 0.362911
+2025-04-24 04:02:05,894 INFO Epoch 46, Train Loss: 0.402013
+2025-04-24 04:02:07,566 INFO Epoch 46, Val Loss: 0.362302
+2025-04-24 04:02:37,569 INFO Epoch 47, Train Loss: 0.400196
+2025-04-24 04:02:39,356 INFO Epoch 47, Val Loss: 0.361989
+2025-04-24 04:03:09,574 INFO Epoch 48, Train Loss: 0.400171
+2025-04-24 04:03:11,256 INFO Epoch 48, Val Loss: 0.362992
+2025-04-24 04:03:41,360 INFO Epoch 49, Train Loss: 0.401049
+2025-04-24 04:03:43,099 INFO Epoch 49, Val Loss: 0.363587
+2025-04-24 04:04:13,609 INFO Epoch 50, Train Loss: 0.402156
+2025-04-24 04:04:15,392 INFO Epoch 50, Val Loss: 0.360980
+2025-04-24 04:04:15,422 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch50.pt
+2025-04-24 04:04:45,126 INFO Epoch 51, Train Loss: 0.401349
+2025-04-24 04:04:46,882 INFO Epoch 51, Val Loss: 0.361772
+2025-04-24 04:05:17,280 INFO Epoch 52, Train Loss: 0.399231
+2025-04-24 04:05:19,057 INFO Epoch 52, Val Loss: 0.359670
+2025-04-24 04:05:19,082 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch52.pt
+2025-04-24 04:05:49,023 INFO Epoch 53, Train Loss: 0.401941
+2025-04-24 04:05:50,820 INFO Epoch 53, Val Loss: 0.358851
+2025-04-24 04:05:50,846 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch53.pt
+2025-04-24 04:06:21,595 INFO Epoch 54, Train Loss: 0.399141
+2025-04-24 04:06:23,352 INFO Epoch 54, Val Loss: 0.359872
+2025-04-24 04:06:54,106 INFO Epoch 55, Train Loss: 0.400682
+2025-04-24 04:06:55,992 INFO Epoch 55, Val Loss: 0.359360
+2025-04-24 04:07:26,659 INFO Epoch 56, Train Loss: 0.401369
+2025-04-24 04:07:28,496 INFO Epoch 56, Val Loss: 0.359878
+2025-04-24 04:07:59,046 INFO Epoch 57, Train Loss: 0.399121
+2025-04-24 04:08:00,890 INFO Epoch 57, Val Loss: 0.359085
+2025-04-24 04:08:31,691 INFO Epoch 58, Train Loss: 0.399101
+2025-04-24 04:08:33,534 INFO Epoch 58, Val Loss: 0.360239
+2025-04-24 04:09:04,294 INFO Epoch 59, Train Loss: 0.397897
+2025-04-24 04:09:06,147 INFO Epoch 59, Val Loss: 0.358894
+2025-04-24 04:09:37,013 INFO Epoch 60, Train Loss: 0.401336
+2025-04-24 04:09:38,869 INFO Epoch 60, Val Loss: 0.358226
+2025-04-24 04:09:38,894 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch60.pt
+2025-04-24 04:10:09,761 INFO Epoch 61, Train Loss: 0.397110
+2025-04-24 04:10:11,567 INFO Epoch 61, Val Loss: 0.358813
+2025-04-24 04:10:41,998 INFO Epoch 62, Train Loss: 0.399976
+2025-04-24 04:10:43,704 INFO Epoch 62, Val Loss: 0.358479
+2025-04-24 04:11:13,663 INFO Epoch 63, Train Loss: 0.393914
+2025-04-24 04:11:15,521 INFO Epoch 63, Val Loss: 0.358674
+2025-04-24 04:11:46,074 INFO Epoch 64, Train Loss: 0.397767
+2025-04-24 04:11:47,863 INFO Epoch 64, Val Loss: 0.356297
+2025-04-24 04:11:47,890 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch64.pt
+2025-04-24 04:12:18,666 INFO Epoch 65, Train Loss: 0.399328
+2025-04-24 04:12:20,519 INFO Epoch 65, Val Loss: 0.357866
+2025-04-24 04:12:51,198 INFO Epoch 66, Train Loss: 0.398052
+2025-04-24 04:12:53,084 INFO Epoch 66, Val Loss: 0.357480
+2025-04-24 04:13:23,649 INFO Epoch 67, Train Loss: 0.397698
+2025-04-24 04:13:25,465 INFO Epoch 67, Val Loss: 0.357470
+2025-04-24 04:13:55,987 INFO Epoch 68, Train Loss: 0.394016
+2025-04-24 04:13:57,783 INFO Epoch 68, Val Loss: 0.358209
+2025-04-24 04:14:28,128 INFO Epoch 69, Train Loss: 0.398242
+2025-04-24 04:14:29,931 INFO Epoch 69, Val Loss: 0.356984
+2025-04-24 04:15:00,522 INFO Epoch 70, Train Loss: 0.395832
+2025-04-24 04:15:02,304 INFO Epoch 70, Val Loss: 0.356878
+2025-04-24 04:15:32,483 INFO Epoch 71, Train Loss: 0.395726
+2025-04-24 04:15:34,302 INFO Epoch 71, Val Loss: 0.357792
+2025-04-24 04:16:04,749 INFO Epoch 72, Train Loss: 0.394898
+2025-04-24 04:16:06,548 INFO Epoch 72, Val Loss: 0.357194
+2025-04-24 04:16:36,843 INFO Epoch 73, Train Loss: 0.395661
+2025-04-24 04:16:38,708 INFO Epoch 73, Val Loss: 0.356076
+2025-04-24 04:16:38,730 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch73.pt
+2025-04-24 04:17:08,942 INFO Epoch 74, Train Loss: 0.391314
+2025-04-24 04:17:10,709 INFO Epoch 74, Val Loss: 0.355963
+2025-04-24 04:17:10,735 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch74.pt
+2025-04-24 04:17:41,427 INFO Epoch 75, Train Loss: 0.392121
+2025-04-24 04:17:43,240 INFO Epoch 75, Val Loss: 0.356441
+2025-04-24 04:18:13,684 INFO Epoch 76, Train Loss: 0.391030
+2025-04-24 04:18:15,588 INFO Epoch 76, Val Loss: 0.355564
+2025-04-24 04:18:15,606 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch76.pt
+2025-04-24 04:18:45,831 INFO Epoch 77, Train Loss: 0.392704
+2025-04-24 04:18:47,631 INFO Epoch 77, Val Loss: 0.356312
+2025-04-24 04:19:18,581 INFO Epoch 78, Train Loss: 0.393838
+2025-04-24 04:19:20,428 INFO Epoch 78, Val Loss: 0.354762
+2025-04-24 04:19:20,452 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch78.pt
+2025-04-24 04:19:51,010 INFO Epoch 79, Train Loss: 0.390976
+2025-04-24 04:19:52,862 INFO Epoch 79, Val Loss: 0.355274
+2025-04-24 04:20:23,868 INFO Epoch 80, Train Loss: 0.393471
+2025-04-24 04:20:25,642 INFO Epoch 80, Val Loss: 0.354791
+2025-04-24 04:20:56,115 INFO Epoch 81, Train Loss: 0.392035
+2025-04-24 04:20:57,898 INFO Epoch 81, Val Loss: 0.352403
+2025-04-24 04:20:57,922 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch81.pt
+2025-04-24 04:21:28,468 INFO Epoch 82, Train Loss: 0.392789
+2025-04-24 04:21:30,269 INFO Epoch 82, Val Loss: 0.354513
+2025-04-24 04:22:00,599 INFO Epoch 83, Train Loss: 0.393780
+2025-04-24 04:22:02,346 INFO Epoch 83, Val Loss: 0.354441
+2025-04-24 04:22:32,923 INFO Epoch 84, Train Loss: 0.390398
+2025-04-24 04:22:34,763 INFO Epoch 84, Val Loss: 0.354071
+2025-04-24 04:23:05,423 INFO Epoch 85, Train Loss: 0.392540
+2025-04-24 04:23:07,229 INFO Epoch 85, Val Loss: 0.353789
+2025-04-24 04:23:38,043 INFO Epoch 86, Train Loss: 0.393119
+2025-04-24 04:23:39,821 INFO Epoch 86, Val Loss: 0.354498
+2025-04-24 04:24:10,128 INFO Epoch 87, Train Loss: 0.390773
+2025-04-24 04:24:11,969 INFO Epoch 87, Val Loss: 0.353009
+2025-04-24 04:24:42,581 INFO Epoch 88, Train Loss: 0.390123
+2025-04-24 04:24:44,372 INFO Epoch 88, Val Loss: 0.352807
+2025-04-24 04:25:14,830 INFO Epoch 89, Train Loss: 0.389211
+2025-04-24 04:25:16,574 INFO Epoch 89, Val Loss: 0.353625
+2025-04-24 04:25:47,125 INFO Epoch 90, Train Loss: 0.390369
+2025-04-24 04:25:48,939 INFO Epoch 90, Val Loss: 0.353427
+2025-04-24 04:26:19,506 INFO Epoch 91, Train Loss: 0.390630
+2025-04-24 04:26:21,337 INFO Epoch 91, Val Loss: 0.352919
+2025-04-24 04:26:51,667 INFO Epoch 92, Train Loss: 0.391160
+2025-04-24 04:26:53,475 INFO Epoch 92, Val Loss: 0.352444
+2025-04-24 04:27:23,943 INFO Epoch 93, Train Loss: 0.392481
+2025-04-24 04:27:25,752 INFO Epoch 93, Val Loss: 0.352310
+2025-04-24 04:27:25,778 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch93.pt
+2025-04-24 04:27:55,961 INFO Epoch 94, Train Loss: 0.390171
+2025-04-24 04:27:57,771 INFO Epoch 94, Val Loss: 0.351561
+2025-04-24 04:27:57,795 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250424_033452/model_epoch94.pt
+2025-04-24 04:28:28,268 INFO Epoch 95, Train Loss: 0.389218
+2025-04-24 04:28:30,081 INFO Epoch 95, Val Loss: 0.352539
+2025-04-24 04:29:00,724 INFO Epoch 96, Train Loss: 0.390030
+2025-04-24 04:29:02,580 INFO Epoch 96, Val Loss: 0.353386
+2025-04-24 04:29:33,012 INFO Epoch 97, Train Loss: 0.388452
+2025-04-24 04:29:34,897 INFO Epoch 97, Val Loss: 0.352447
+2025-04-24 04:30:05,324 INFO Epoch 98, Train Loss: 0.390855
+2025-04-24 04:30:07,103 INFO Epoch 98, Val Loss: 0.353716
+2025-04-24 04:30:37,759 INFO Epoch 99, Train Loss: 0.390152
+2025-04-24 04:30:39,685 INFO Epoch 99, Val Loss: 0.353271
+2025-04-24 04:31:10,017 INFO Epoch 100, Train Loss: 0.386381
+2025-04-24 04:31:11,855 INFO Epoch 100, Val Loss: 0.351961
+2025-04-24 04:31:11,856 INFO Training complete.

@@ -1,0 +1,13 @@
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 174, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 76, in main
+    train_ds, val_ds = load_pusht_dataset(cfg.data)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/data/dataset.py", line 14, in load_pusht_dataset
+    train_slices, val_slices = load_pusht_slice_train_val(
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/datasets/pusht_dset.py", line 165, in load_pusht_slice_train_val
+    train_dset = PushTDataset(
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/datasets/pusht_dset.py", line 78, in __init__
+    random_indices = np.random.choice(len(self.states), size=min(n,len(self.states)), replace=False)
+  File "numpy/random/mtrand.pyx", line 1028, in numpy.random.mtrand.RandomState.choice
+TypeError: expected a sequence of integers or a single integer, got '800.0'

@@ -1,0 +1,24 @@
+Loaded 80000.0 rollouts
+Loaded 19999.999999999996 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 116, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 67, in main
+    for batch in train_ld:
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 438, in __iter__
+    return self._get_iterator()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 384, in _get_iterator
+    return _MultiProcessingDataLoaderIter(self)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1086, in __init__
+    self._reset(loader, first_iter=True)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1119, in _reset
+    self._try_put_index()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 1353, in _try_put_index
+    index = self._next_index()
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 642, in _next_index
+    return next(self._sampler_iter)  # may raise StopIteration
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/sampler.py", line 247, in __iter__
+    for idx in self.sampler:
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/utils/data/sampler.py", line 196, in __iter__
+    rand_tensor = torch.multinomial(self.weights, self.num_samples, self.replacement, generator=self.generator)
+RuntimeError: number of categories cannot exceed 2^24

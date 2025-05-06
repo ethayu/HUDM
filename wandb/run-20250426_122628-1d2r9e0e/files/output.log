@@ -1,0 +1,18 @@
+Loaded 1000 rollouts
+Loaded 1000 rollouts
+Traceback (most recent call last):
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 144, in <module>
+    main(sys.argv[1])
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py", line 83, in main
+    model = MaskedDynamicsEnsemble(cfg).to(device)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/ensemble.py", line 20, in __init__
+    self.models = nn.ModuleList([
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/ensemble.py", line 21, in <listcomp>
+    build_masked_dynamics_model(cfg)
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 105, in build_masked_dynamics_model
+    return MaskedDynamicsModel(
+  File "/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/models/masked_dynamics.py", line 58, in __init__
+    ).to(self.device)
+  File "/home/aurora/anaconda3/envs/pusht/lib/python3.10/site-packages/torch/nn/modules/module.py", line 1207, in __getattr__
+    raise AttributeError("'{}' object has no attribute '{}'".format(
+AttributeError: 'MaskedDynamicsModel' object has no attribute 'device'

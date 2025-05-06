@@ -1,0 +1,19 @@
+Loaded 10 rollouts
+Loaded 10 rollouts
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+MaskedDynamicsModel: state_dim 8 action_dim 10
+2025-04-17 03:34:01,488 INFO Epoch 1, Train Loss: 0.363418
+2025-04-17 03:34:03,425 INFO Epoch 1, Val Loss: 0.169534
+2025-04-17 03:34:03,451 INFO Saved checkpoint: checkpoints/model_epoch1.pt
+2025-04-17 03:34:10,284 INFO Epoch 2, Train Loss: 0.147804
+2025-04-17 03:34:12,252 INFO Epoch 2, Val Loss: 0.099368
+2025-04-17 03:34:12,273 INFO Saved checkpoint: checkpoints/model_epoch2.pt
+2025-04-17 03:34:12,273 INFO Training complete.

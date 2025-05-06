@@ -1,0 +1,188 @@
+2025-05-04 23:52:44,309 INFO    StreamThr :2121405 [internal.py:wandb_internal():85] W&B internal server running at pid: 2121405, started at: 2025-05-04 23:52:44.309108
+2025-05-04 23:52:44,311 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: status
+2025-05-04 23:52:44,312 INFO    WriterThread:2121405 [datastore.py:open_for_write():87] open: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/run-8b54e6ba.wandb
+2025-05-04 23:52:44,314 DEBUG   SenderThread:2121405 [sender.py:send():391] send: header
+2025-05-04 23:52:44,316 DEBUG   SenderThread:2121405 [sender.py:send():391] send: run
+2025-05-04 23:52:44,521 INFO    SenderThread:2121405 [dir_watcher.py:__init__():211] watching files in: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files
+2025-05-04 23:52:44,522 INFO    SenderThread:2121405 [sender.py:_start_run_threads():1200] run started: 8b54e6ba with start time 1746417164.308853
+2025-05-04 23:52:44,529 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: check_version
+2025-05-04 23:52:44,530 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: check_version
+2025-05-04 23:52:44,587 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: run_start
+2025-05-04 23:52:44,622 DEBUG   HandlerThread:2121405 [system_info.py:__init__():26] System info init
+2025-05-04 23:52:44,622 DEBUG   HandlerThread:2121405 [system_info.py:__init__():41] System info init done
+2025-05-04 23:52:44,622 INFO    HandlerThread:2121405 [system_monitor.py:start():194] Starting system monitor
+2025-05-04 23:52:44,623 INFO    SystemMonitor:2121405 [system_monitor.py:_start():158] Starting system asset monitoring threads
+2025-05-04 23:52:44,623 INFO    HandlerThread:2121405 [system_monitor.py:probe():214] Collecting system info
+2025-05-04 23:52:44,623 INFO    SystemMonitor:2121405 [interfaces.py:start():188] Started cpu monitoring
+2025-05-04 23:52:44,624 INFO    SystemMonitor:2121405 [interfaces.py:start():188] Started disk monitoring
+2025-05-04 23:52:44,625 INFO    SystemMonitor:2121405 [interfaces.py:start():188] Started gpu monitoring
+2025-05-04 23:52:44,625 INFO    SystemMonitor:2121405 [interfaces.py:start():188] Started memory monitoring
+2025-05-04 23:52:44,626 INFO    SystemMonitor:2121405 [interfaces.py:start():188] Started network monitoring
+2025-05-04 23:52:44,691 DEBUG   HandlerThread:2121405 [system_info.py:probe():152] Probing system
+2025-05-04 23:52:44,694 DEBUG   HandlerThread:2121405 [system_info.py:_probe_git():137] Probing git
+2025-05-04 23:52:44,705 DEBUG   HandlerThread:2121405 [system_info.py:_probe_git():145] Probing git done
+2025-05-04 23:52:44,705 DEBUG   HandlerThread:2121405 [system_info.py:probe():200] Probing system done
+2025-05-04 23:52:44,705 DEBUG   HandlerThread:2121405 [system_monitor.py:probe():223] {'os': 'Linux-5.15.0-138-generic-x86_64-with-glibc2.31', 'python': '3.10.14', 'heartbeatAt': '2025-05-05T03:52:44.692111', 'startedAt': '2025-05-05T03:52:44.302364', 'docker': None, 'cuda': None, 'args': ('configs/train.yaml',), 'state': 'running', 'program': '/home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/train.py', 'codePathLocal': 'train.py', 'codePath': 'dynamics_model/new_model/train.py', 'git': {'remote': 'https://jianingq:@github.com/jianingq/handful-of-trials-pytorch.git', 'commit': '9b89794516c852158050d5b6736fe6526842d869'}, 'email': '2424992568@qq.com', 'root': '/home/aurora/handful-of-trials-pytorch', 'host': 'cv-server', 'username': 'aurora', 'executable': '/home/aurora/anaconda3/envs/pusht/bin/python', 'cpu_count': 32, 'cpu_count_logical': 64, 'cpu_freq': {'current': 2713.6090937500003, 'min': 2200.0, 'max': 3700.0}, 'cpu_freq_per_core': [{'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2754.586, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3019.456, 'min': 2200.0, 'max': 3700.0}, {'current': 2646.378, 'min': 2200.0, 'max': 3700.0}, {'current': 2646.304, 'min': 2200.0, 'max': 3700.0}, {'current': 3316.988, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2771.601, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3488.096, 'min': 2200.0, 'max': 3700.0}, {'current': 2654.508, 'min': 2200.0, 'max': 3700.0}, {'current': 2645.862, 'min': 2200.0, 'max': 3700.0}, {'current': 2651.251, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2481.291, 'min': 2200.0, 'max': 3700.0}, {'current': 2308.784, 'min': 2200.0, 'max': 3700.0}, {'current': 2652.577, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3314.471, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3978.715, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3142.284, 'min': 2200.0, 'max': 3700.0}, {'current': 2862.615, 'min': 2200.0, 'max': 3700.0}, {'current': 2754.572, 'min': 2200.0, 'max': 3700.0}, {'current': 2764.568, 'min': 2200.0, 'max': 3700.0}, {'current': 2375.957, 'min': 2200.0, 'max': 3700.0}, {'current': 2646.295, 'min': 2200.0, 'max': 3700.0}, {'current': 2645.713, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2747.458, 'min': 2200.0, 'max': 3700.0}, {'current': 2532.21, 'min': 2200.0, 'max': 3700.0}, {'current': 2506.348, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2650.685, 'min': 2200.0, 'max': 3700.0}, {'current': 2800.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2651.267, 'min': 2200.0, 'max': 3700.0}, {'current': 2566.411, 'min': 2200.0, 'max': 3700.0}, {'current': 2145.438, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2653.098, 'min': 2200.0, 'max': 3700.0}, {'current': 3972.67, 'min': 2200.0, 'max': 3700.0}, {'current': 2424.581, 'min': 2200.0, 'max': 3700.0}, {'current': 2651.124, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2653.124, 'min': 2200.0, 'max': 3700.0}, {'current': 3182.331, 'min': 2200.0, 'max': 3700.0}, {'current': 3700.0, 'min': 2200.0, 'max': 3700.0}, {'current': 3979.488, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}, {'current': 2784.286, 'min': 2200.0, 'max': 3700.0}, {'current': 2200.0, 'min': 2200.0, 'max': 3700.0}], 'disk': {'/': {'total': 1832.2072448730469, 'used': 1703.54146194458}}, 'gpu': 'NVIDIA GeForce RTX 3090', 'gpu_count': 2, 'gpu_devices': [{'name': 'NVIDIA GeForce RTX 3090', 'memory_total': 25769803776}, {'name': 'NVIDIA GeForce RTX 3090', 'memory_total': 25769803776}], 'memory': {'total': 251.56134796142578}}
+2025-05-04 23:52:44,705 INFO    HandlerThread:2121405 [system_monitor.py:probe():224] Finished collecting system info
+2025-05-04 23:52:44,705 INFO    HandlerThread:2121405 [system_monitor.py:probe():227] Publishing system info
+2025-05-04 23:52:44,705 DEBUG   HandlerThread:2121405 [system_info.py:_save_conda():209] Saving list of conda packages installed into the current environment
+2025-05-04 23:52:45,523 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/conda-environment.yaml
+2025-05-04 23:52:51,523 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/conda-environment.yaml
+2025-05-04 23:52:51,632 DEBUG   HandlerThread:2121405 [system_info.py:_save_conda():224] Saving conda packages done
+2025-05-04 23:52:51,634 INFO    HandlerThread:2121405 [system_monitor.py:probe():229] Finished publishing system info
+2025-05-04 23:52:51,640 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: status_report
+2025-05-04 23:52:51,640 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: keepalive
+2025-05-04 23:52:51,641 DEBUG   SenderThread:2121405 [sender.py:send():391] send: files
+2025-05-04 23:52:51,641 INFO    SenderThread:2121405 [sender.py:_save_file():1466] saving file wandb-metadata.json with policy now
+2025-05-04 23:52:51,796 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: python_packages
+2025-05-04 23:52:51,796 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: stop_status
+2025-05-04 23:52:51,797 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: python_packages
+2025-05-04 23:52:51,797 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: stop_status
+2025-05-04 23:52:51,799 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-04 23:52:51,933 DEBUG   SenderThread:2121405 [sender.py:send():391] send: telemetry
+2025-05-04 23:52:51,943 INFO    wandb-upload_0:2121405 [upload_job.py:push():130] Uploaded file /tmp/tmpt8s_wiifwandb/52lvj0tz-wandb-metadata.json
+2025-05-04 23:52:52,145 DEBUG   SenderThread:2121405 [sender.py:send():391] send: exit
+2025-05-04 23:52:52,145 INFO    SenderThread:2121405 [sender.py:send_exit():598] handling exit code: 1
+2025-05-04 23:52:52,145 INFO    SenderThread:2121405 [sender.py:send_exit():600] handling runtime: 7
+2025-05-04 23:52:52,145 INFO    SenderThread:2121405 [sender.py:_save_file():1466] saving file wandb-summary.json with policy end
+2025-05-04 23:52:52,147 INFO    SenderThread:2121405 [sender.py:send_exit():606] send defer
+2025-05-04 23:52:52,147 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,148 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 0
+2025-05-04 23:52:52,148 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,148 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 0
+2025-05-04 23:52:52,148 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 1
+2025-05-04 23:52:52,148 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,148 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 1
+2025-05-04 23:52:52,148 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,148 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 1
+2025-05-04 23:52:52,149 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 2
+2025-05-04 23:52:52,149 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,149 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 2
+2025-05-04 23:52:52,149 INFO    HandlerThread:2121405 [system_monitor.py:finish():203] Stopping system monitor
+2025-05-04 23:52:52,149 INFO    HandlerThread:2121405 [interfaces.py:finish():200] Joined cpu monitor
+2025-05-04 23:52:52,150 INFO    HandlerThread:2121405 [interfaces.py:finish():200] Joined disk monitor
+2025-05-04 23:52:52,150 DEBUG   SystemMonitor:2121405 [system_monitor.py:_start():172] Starting system metrics aggregation loop
+2025-05-04 23:52:52,151 DEBUG   SystemMonitor:2121405 [system_monitor.py:_start():179] Finished system metrics aggregation loop
+2025-05-04 23:52:52,151 DEBUG   SystemMonitor:2121405 [system_monitor.py:_start():183] Publishing last batch of metrics
+2025-05-04 23:52:52,523 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/wandb-metadata.json
+2025-05-04 23:52:52,524 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/output.log
+2025-05-04 23:52:52,524 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/requirements.txt
+2025-05-04 23:52:52,524 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_created():271] file/dir created: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/wandb-summary.json
+2025-05-04 23:52:52,569 INFO    HandlerThread:2121405 [interfaces.py:finish():200] Joined gpu monitor
+2025-05-04 23:52:52,570 INFO    HandlerThread:2121405 [interfaces.py:finish():200] Joined memory monitor
+2025-05-04 23:52:52,570 INFO    HandlerThread:2121405 [interfaces.py:finish():200] Joined network monitor
+2025-05-04 23:52:52,570 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,571 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 2
+2025-05-04 23:52:52,571 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 3
+2025-05-04 23:52:52,571 DEBUG   SenderThread:2121405 [sender.py:send():391] send: stats
+2025-05-04 23:52:52,571 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,572 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 3
+2025-05-04 23:52:52,572 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,572 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 3
+2025-05-04 23:52:52,572 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 4
+2025-05-04 23:52:52,572 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,572 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 4
+2025-05-04 23:52:52,573 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,573 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 4
+2025-05-04 23:52:52,573 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 5
+2025-05-04 23:52:52,573 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,573 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 5
+2025-05-04 23:52:52,573 DEBUG   SenderThread:2121405 [sender.py:send():391] send: summary
+2025-05-04 23:52:52,574 INFO    SenderThread:2121405 [sender.py:_save_file():1466] saving file wandb-summary.json with policy end
+2025-05-04 23:52:52,574 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,574 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 5
+2025-05-04 23:52:52,574 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 6
+2025-05-04 23:52:52,574 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,574 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 6
+2025-05-04 23:52:52,575 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,575 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 6
+2025-05-04 23:52:52,577 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: status_report
+2025-05-04 23:52:52,708 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 7
+2025-05-04 23:52:52,708 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:52,708 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 7
+2025-05-04 23:52:52,709 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:52,709 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 7
+2025-05-04 23:52:53,145 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-04 23:52:53,524 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/config.yaml
+2025-05-04 23:52:53,524 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/wandb-summary.json
+2025-05-04 23:52:54,107 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 8
+2025-05-04 23:52:54,107 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: poll_exit
+2025-05-04 23:52:54,107 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:54,108 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 8
+2025-05-04 23:52:54,108 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:54,108 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 8
+2025-05-04 23:52:54,108 INFO    SenderThread:2121405 [job_builder.py:build():443] Attempting to build job artifact
+2025-05-04 23:52:54,109 INFO    SenderThread:2121405 [job_builder.py:_get_source_type():572] is repo sourced job
+2025-05-04 23:52:54,136 INFO    SenderThread:2121405 [job_builder.py:build():548] adding wandb-job metadata file
+2025-05-04 23:52:54,142 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 9
+2025-05-04 23:52:54,143 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:54,143 DEBUG   SenderThread:2121405 [sender.py:send():391] send: artifact
+2025-05-04 23:52:54,143 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 9
+2025-05-04 23:52:54,145 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-04 23:52:54,456 INFO    SenderThread:2121405 [sender.py:send_artifact():1549] sent artifact job-https___jianingq__github.com_jianingq_handful-of-trials-pytorch.git_dynamics_model_new_model_train.py - {'id': 'QXJ0aWZhY3Q6MTcwODgzODI3Nw==', 'state': 'COMMITTED', 'artifactSequence': {'id': 'QXJ0aWZhY3RDb2xsZWN0aW9uOjYxNDU1MDMxOA==', 'latestArtifact': {'id': 'QXJ0aWZhY3Q6MTcwODgzODI3Nw==', 'versionIndex': 4}}}
+2025-05-04 23:52:54,456 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:54,456 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 9
+2025-05-04 23:52:54,456 INFO    SenderThread:2121405 [dir_watcher.py:finish():358] shutting down directory watcher
+2025-05-04 23:52:54,524 INFO    Thread-12 :2121405 [dir_watcher.py:_on_file_modified():288] file/dir modified: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/output.log
+2025-05-04 23:52:54,524 INFO    SenderThread:2121405 [dir_watcher.py:finish():388] scan: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files
+2025-05-04 23:52:54,525 INFO    SenderThread:2121405 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/config.yaml config.yaml
+2025-05-04 23:52:54,525 INFO    SenderThread:2121405 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/output.log output.log
+2025-05-04 23:52:54,525 INFO    SenderThread:2121405 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/wandb-summary.json wandb-summary.json
+2025-05-04 23:52:54,527 INFO    SenderThread:2121405 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/conda-environment.yaml conda-environment.yaml
+2025-05-04 23:52:54,527 INFO    SenderThread:2121405 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/wandb-metadata.json wandb-metadata.json
+2025-05-04 23:52:54,529 INFO    SenderThread:2121405 [dir_watcher.py:finish():402] scan save: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/requirements.txt requirements.txt
+2025-05-04 23:52:54,531 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 10
+2025-05-04 23:52:54,533 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: poll_exit
+2025-05-04 23:52:54,533 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:54,535 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 10
+2025-05-04 23:52:54,535 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:54,535 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 10
+2025-05-04 23:52:54,536 INFO    SenderThread:2121405 [file_pusher.py:finish():169] shutting down file pusher
+2025-05-04 23:52:54,710 INFO    wandb-upload_0:2121405 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/config.yaml
+2025-05-04 23:52:54,747 INFO    wandb-upload_2:2121405 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/wandb-summary.json
+2025-05-04 23:52:54,749 INFO    wandb-upload_4:2121405 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/requirements.txt
+2025-05-04 23:52:54,750 INFO    wandb-upload_3:2121405 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/conda-environment.yaml
+2025-05-04 23:52:54,769 INFO    wandb-upload_1:2121405 [upload_job.py:push():130] Uploaded file /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/files/output.log
+2025-05-04 23:52:54,970 INFO    Thread-11 (_thread_body):2121405 [sender.py:transition_state():626] send defer: 11
+2025-05-04 23:52:54,970 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:54,970 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 11
+2025-05-04 23:52:54,971 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:54,971 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 11
+2025-05-04 23:52:54,971 INFO    SenderThread:2121405 [file_pusher.py:join():175] waiting for file pusher
+2025-05-04 23:52:54,971 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 12
+2025-05-04 23:52:54,971 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:54,971 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 12
+2025-05-04 23:52:54,972 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:54,972 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 12
+2025-05-04 23:52:54,972 INFO    SenderThread:2121405 [file_stream.py:finish():601] file stream finish called
+2025-05-04 23:52:55,025 INFO    SenderThread:2121405 [file_stream.py:finish():605] file stream finish is done
+2025-05-04 23:52:55,025 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 13
+2025-05-04 23:52:55,026 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:55,026 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 13
+2025-05-04 23:52:55,026 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:55,026 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 13
+2025-05-04 23:52:55,026 INFO    SenderThread:2121405 [sender.py:transition_state():626] send defer: 14
+2025-05-04 23:52:55,026 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: defer
+2025-05-04 23:52:55,026 DEBUG   SenderThread:2121405 [sender.py:send():391] send: final
+2025-05-04 23:52:55,026 INFO    HandlerThread:2121405 [handler.py:handle_request_defer():184] handle defer: 14
+2025-05-04 23:52:55,027 DEBUG   SenderThread:2121405 [sender.py:send():391] send: footer
+2025-05-04 23:52:55,027 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: defer
+2025-05-04 23:52:55,027 INFO    SenderThread:2121405 [sender.py:send_request_defer():622] handle sender defer: 14
+2025-05-04 23:52:55,027 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-04 23:52:55,028 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: poll_exit
+2025-05-04 23:52:55,028 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: server_info
+2025-05-04 23:52:55,028 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: server_info
+2025-05-04 23:52:55,030 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: poll_exit
+2025-05-04 23:52:55,030 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: get_summary
+2025-05-04 23:52:55,030 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: sampled_history
+2025-05-04 23:52:55,030 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: internal_messages
+2025-05-04 23:52:55,083 DEBUG   SenderThread:2121405 [sender.py:send_request():418] send_request: poll_exit
+2025-05-04 23:52:55,084 INFO    MainThread:2121405 [wandb_run.py:_footer_history_summary_info():4076] rendering history
+2025-05-04 23:52:55,084 INFO    MainThread:2121405 [wandb_run.py:_footer_history_summary_info():4108] rendering summary
+2025-05-04 23:52:55,084 INFO    MainThread:2121405 [wandb_run.py:_footer_sync_info():4035] logging synced files
+2025-05-04 23:52:55,085 DEBUG   HandlerThread:2121405 [handler.py:handle_request():158] handle_request: shutdown
+2025-05-04 23:52:55,085 INFO    HandlerThread:2121405 [handler.py:finish():880] shutting down handler
+2025-05-04 23:52:56,030 INFO    WriterThread:2121405 [datastore.py:close():296] close: /home/aurora/handful-of-trials-pytorch/dynamics_model/new_model/wandb/run-20250504_235244-8b54e6ba/run-8b54e6ba.wandb
+2025-05-04 23:52:56,084 INFO    SenderThread:2121405 [sender.py:finish():1631] shutting down sender
+2025-05-04 23:52:56,084 INFO    SenderThread:2121405 [file_pusher.py:finish():169] shutting down file pusher
+2025-05-04 23:52:56,084 INFO    SenderThread:2121405 [file_pusher.py:join():175] waiting for file pusher
