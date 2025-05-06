@@ -1,7 +1,13 @@
 # HUDM — Hierarchical, Uncertainty‑aware Dynamics Models
 
-Research code for dimension‑level dropout in model‑based RL, centred on **PushT** planar manipulation.
+Research code for dimension‑level dropout in model‑based RL, centered on **PushT** planar manipulation.
+---
 
+## 📝 Paper draft
+
+A draft of our accompanying paper describing the methods and experiments in this repository is available here:
+
+👉 **[Draft PDF](./draft.pdf)** — _Hierarchical, Uncertainty-aware Dynamics Models_
 ---
 
 ## 📂 Repository layout
