@@ -1,0 +1,27 @@
+# ---------------- Core ML & math -----------------
+torch>=1.12
+torchvision>=0.13
+numpy>=1.21
+einops>=0.6
+
+# ---------------- Configuration & logging --------
+omegaconf>=2.3
+tqdm>=4.64
+wandb>=0.15
+
+# ---------------- Environment & simulation -------
+gym>=0.21
+pygame>=2.1
+pymunk>=6.2
+shapely>=1.8
+scikit-image>=0.19
+opencv-python>=4.7
+matplotlib>=3.5
+# decord wheels are not currently built for all OS/Python combos.
+# If unavailable, comment this line out or install from source:
+#   pip install git+https://github.com/dmlc/decord.git
+#decord>=0.6
+
+# ---------------- Misc / dataset -----------------
+# Only required if using the PushT video dataset or zarr files
+#zarr>=2.14

@@ -12,16 +12,40 @@ class PushTWrapper(PushTEnv):
             self, 
             with_velocity=True,
             with_target=True,
-            add_noise=0, # 0: no noise, 1: add noise to action, 2: add noise to state
-            noise_std=0.1,
+            add_noise: int = 0,
+            noise_std = 0.1,
         ):
-        super().__init__(
-            with_velocity=with_velocity,
-            with_target=with_target, 
-        )
+        """
+        Args
+        -----
+        with_velocity / with_target : see PushTEnv
+
+        add_noise :
+            0 → no noise (default)
+            1 → additive Gaussian noise is applied to every action dimension
+            2 → additive Gaussian noise is applied to every *state* dimension
+
+        noise_std : float | Sequence[float]
+            Standard deviation(s) of the Gaussian noise.  Can be
+            • scalar → same σ for all dimensions, or
+            • sequence / list / np.ndarray of length = action_dim (mode 1) or
+              state_dim  (mode 2).
+        """
+        super().__init__(with_velocity=with_velocity, with_target=with_target)
         self.action_dim = self.action_space.shape[0]
-        self.add_noise = add_noise
-        self.noise_std = noise_std
+        self.add_noise = add_noise  # 0: none, 1: action noise, 2: state noise
+
+        # --------------------------------------------------------------
+        # Noise standard deviation can be:
+        #   • scalar        → same σ across all dims
+        #   • sequence/list → per-dim σ (length must match action_dim or
+        #                      state_dim depending on noise mode)
+        # We keep the original user-supplied object for reference, actual
+        # vector σ is materialised lazily in the step() call so that we can
+        # raise useful dimension-mismatch errors only when the information
+        # (action_dim / state_dim) is available.
+        # --------------------------------------------------------------
+        self._noise_std_raw = noise_std
         
         # Set state dimension based on velocity option
         if self.with_velocity:
@@ -33,17 +57,50 @@ class PushTWrapper(PushTEnv):
         """
         Override step method to add Gaussian noise to state if enabled
         """
+        """Execute one environment step with optional additive Gaussian noise.
+
+        add_noise == 0  →  deterministic (original PushTEnv step)
+        add_noise == 1  →  noise added to the *action* before stepping
+        add_noise == 2  →  noise added to the *observed next state* afterwards
+
+        When `noise_std` is a sequence its length must match the relevant
+        dimension (action_dim or state_dim).  A scalar standard deviation is
+        broadcast to all dimensions.
+        """
+
+        # ------------------------------------------------------------------
+        def _vector_std(std_raw, dim_required):
+            """Return per-dim σ vector as a np.ndarray of length *dim_required*."""
+            if np.isscalar(std_raw):
+                return float(std_raw)  # scalar ok → broadcast later
+            std_arr = np.asarray(std_raw, dtype=float)
+            assert std_arr.shape[0] == dim_required, (
+                f"noise_std length {std_arr.shape[0]} does not match required "
+                f"dimension {dim_required}")
+            return std_arr
+
+        # ----------------------------- no noise ----------------------------
         if self.add_noise == 0:
+            return super().step(action)
+
+        # ------------------ noise on ACTION --------------------------------
+        if self.add_noise == 1:
+            scale = _vector_std(self._noise_std_raw, self.action_dim)
+            noise = np.random.normal(loc=0.0, scale=scale, size=self.action_dim)
+            action = action + noise
             obs, reward, done, info = super().step(action)
-        else:
-            if self.add_noise == 1:
-                noise = np.random.normal(0, self.noise_std, size=self.action_dim)
-                action = action + noise
+            return obs, reward, done, info
+
+        # ------------------ noise on STATE ---------------------------------
+        if self.add_noise == 2:
             obs, reward, done, info = super().step(action)
-            if self.add_noise == 2:
-                noise = np.random.normal(0, self.noise_std, size=self.state_dim)
-                info['state'] = info['state'] + noise
-        return obs, reward, done, info
+            scale = _vector_std(self._noise_std_raw, self.state_dim)
+            noise = np.random.normal(loc=0.0, scale=scale, size=self.state_dim)
+            info['state'] = info['state'] + noise
+            return obs, reward, done, info
+
+        # Invalid add_noise option
+        raise ValueError(f"Unknown add_noise mode {self.add_noise}; expected 0,1,2")
 
     def sample_random_init_goal_states(self, seed):
         """

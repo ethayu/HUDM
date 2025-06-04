@@ -1,0 +1,18 @@
+plan:
+  # ---------------- Environment -----------------
+  env:
+    with_velocity: true
+    with_target:   true
+    add_noise:     2            # 0=no noise, 1=action, 2=state
+    noise_std:     [1.0, 1.0, 0.5, 0.5, 0.02, 0.0, 0.0]   # per-dim σ (state_dim = 7)
+
+  # ---------------- Planner ---------------------
+  horizon:        10
+  steps:          50
+  pop_size:      128
+  elite_frac:    0.1
+  n_iter:         5
+  n_env_samples:  4
+  var_threshold:  0.5
+
+  render:         true

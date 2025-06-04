@@ -223,7 +223,7 @@ def main(sim_cfg_path: str):
                 else:
                     return torch.norm(final_states[:, 2:4], dim=1)
             planner = CEMPlanner(
-                dynamics_ensemble=model,
+                dynamics_ensemble=None,   # use env sampling instead of learned model
                 cost_fn=cost_fn,
                 action_dim=cfg.model.action_dim,
                 horizon=future_actions.size(1),
@@ -231,13 +231,13 @@ def main(sim_cfg_path: str):
                 elite_frac=cfg.sim.planner_kwargs.elite_frac,
                 n_iter=cfg.sim.planner_kwargs.n_iter,
                 var_threshold=cfg.sim.var_threshold,
-                gt_env=env_gt if cfg.sim.planner_kwargs.use_gt else None,
+                gt_env=env_gt,
                 device=device,
             )
             if cfg.sim.planner_kwargs.get('closed_loop', False):
                 viz = SimulatorVisualizer(env_model, env_gt)
                 while True:
-                    best_seq = planner.plan(process_states(init_state, cfg)[0].cpu().numpy() if cfg.sim.planner_kwargs.use_gt else init_states, init_actions, init_mask, agg_mode=cfg.sim.planner_kwargs.agg_mode, n_impute=cfg.sim.planner_kwargs.n_impute)
+                    best_seq = planner.plan(init_states, init_actions, init_mask, agg_mode=cfg.sim.planner_kwargs.agg_mode, n_impute=cfg.sim.planner_kwargs.n_impute)
                     ret = env_gt.step(best_seq[0])[0]
                     gt_vis = ret['visual']
                     init_state = ret['state']
@@ -247,7 +247,7 @@ def main(sim_cfg_path: str):
                         viz.update(gt_vis, gt_vis, [0, 0, 0, 0, 0, 0, 0])
                     time.sleep(cfg.sim.render_interval)
             else:
-                best_seq = planner.plan(process_states(init_state, cfg)[0].cpu().numpy() if cfg.sim.planner_kwargs.use_gt else init_states, init_actions, init_mask, agg_mode=cfg.sim.planner_kwargs.agg_mode, n_impute=cfg.sim.planner_kwargs.n_impute)
+                best_seq = planner.plan(init_states, init_actions, init_mask, agg_mode=cfg.sim.planner_kwargs.agg_mode, n_impute=cfg.sim.planner_kwargs.n_impute)
                 action_seqs = best_seq.unsqueeze(0)
         else:
             action_seqs = future_actions
