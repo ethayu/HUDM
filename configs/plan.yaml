@@ -1,4 +1,5 @@
 plan:
+  env_id: "pusht"
   # ---------------- Environment -----------------
   env:
     with_velocity: true

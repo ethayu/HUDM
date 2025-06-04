@@ -27,15 +27,27 @@ Other fields are accepted but ignored.  All entries have sensible defaults so
 you can start with an empty YAML and override as needed.
 """
 
+# -----------------------------------------------------------------------------
+# Add the project root to PYTHONPATH so the script works when executed from
+# outside the repository directory (same approach as *simulate.py*).
+# -----------------------------------------------------------------------------
+
 from __future__ import annotations
 
+import os
 import sys
 from typing import Tuple
+
+# Ensure that `pusht`, `planning`, etc. can be imported even when this script is
+# launched via an absolute path from another working directory.
+sys.path.append(os.path.dirname(__file__))
 
 import numpy as np
 import torch
 from omegaconf import OmegaConf, DictConfig
 
+import gym
+from gym.envs.registration import register
 from pusht.pusht_wrapper import PushTWrapper
 from planning.cem import CEMPlanner
 
@@ -131,6 +143,7 @@ def main(cfg_path: str):
 
     # Provide defaults so small configs work --------------------------------
     defaults = {
+        "env_id": "pusht",
         "env": {
             "with_velocity": True,
             "with_target": True,
@@ -150,8 +163,23 @@ def main(cfg_path: str):
     cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))
 
     # ------------- Environment --------------------------------------------
+    # ---------------- Environment loading (same as simulate.py) ----------
+    env_id = cfg.get("env_id", "pusht")
+
+    # Register our wrapper under the requested id (no-op if called twice)
+    try:
+        register(
+            id=env_id,
+            entry_point="pusht.pusht_wrapper:PushTWrapper",
+            max_episode_steps=300,
+            reward_threshold=1.0,
+        )
+    except gym.error.Error:
+        # Already registered
+        pass
+
     env_kwargs = cfg.env
-    env = PushTWrapper(**env_kwargs)
+    env: PushTWrapper = gym.make(env_id, **env_kwargs)
 
     # sample initial / goal states (seed=0 for determinism)
     init_state, goal_state = env.sample_random_init_goal_states(seed=0)
