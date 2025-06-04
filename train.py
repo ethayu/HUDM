@@ -102,7 +102,7 @@ def main(config_path: str):
     # Model and optimizer
     model = MaskedDynamicsEnsemble(cfg).to(device)
     optims = [
-        torch.optim.Adam(model.models[m].parameters(),
+        torch.optim.AdamW(model.models[m].parameters(),
                         lr=cfg.train.learning_rate)
         for m in range(cfg.model.num_models)
     ]

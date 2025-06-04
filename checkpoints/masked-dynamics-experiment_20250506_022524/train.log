@@ -1,0 +1,81 @@
+2025-05-06 02:25:24,599 INFO Config:
+seed: 42
+train:
+  batch_size: 1000
+  epochs: 20
+  learning_rate: 0.0005
+  no_cuda: false
+  log_file: logs/train.log
+  num_workers: 4
+  checkpoint_dir: checkpoints
+  max_mask_prob: 0.5
+  mask_warmup_epochs: 10
+data:
+  path: /home/aurora/handful-of-trials-pytorch/pusht_dataset
+  n_rollout: 20000
+  normalize_action: true
+  split_ratio: 0.8
+  train_frac: 0.8
+  num_hist: 8
+  frameskip: 1
+  with_velocity: true
+  state_mean:
+  - 236.6155
+  - 264.5674
+  - 255.1307
+  - 266.3721
+  - 0.165
+  - 0.6914
+  - -2.93032027
+  - 2.54307914
+  state_std:
+  - 101.1202
+  - 87.0112
+  - 52.7054
+  - 57.4971
+  - 0.4698
+  - 0.5234
+  - 74.84556075
+  - 74.14009094
+model:
+  num_models: 5
+  state_dim: 8
+  action_dim: 2
+  embedding_dim: 4
+  n_heads: 2
+  n_layers: 2
+  feedforward_dim: 16
+  dropout: 0.1
+  mask_curriculum:
+    max_mask_prob: 0.5
+    warmup_epochs: 10
+  var_threshold: 0.25
+wandb:
+  enable: true
+  project: gnn-dynamics
+  run_name: masked-dynamics-experiment
+
+2025-05-06 04:01:18,572 INFO Epoch 1, Train Loss: 0.047844
+2025-05-06 04:01:28,118 INFO Epoch 1, Val Loss: 0.012466
+2025-05-06 04:01:28,138 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250506_022524/model_epoch1.pt
+2025-05-06 05:37:31,716 INFO Epoch 2, Train Loss: 0.031136
+2025-05-06 05:37:41,093 INFO Epoch 2, Val Loss: 0.009419
+2025-05-06 05:37:41,118 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250506_022524/model_epoch2.pt
+2025-05-06 07:14:03,531 INFO Epoch 3, Train Loss: 0.026274
+2025-05-06 07:14:13,203 INFO Epoch 3, Val Loss: 0.008227
+2025-05-06 07:14:13,223 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250506_022524/model_epoch3.pt
+2025-05-06 08:49:10,662 INFO Epoch 4, Train Loss: 0.025410
+2025-05-06 08:49:20,112 INFO Epoch 4, Val Loss: 0.008215
+2025-05-06 08:49:20,135 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250506_022524/model_epoch4.pt
+2025-05-06 10:24:15,947 INFO Epoch 5, Train Loss: 0.024981
+2025-05-06 10:24:25,667 INFO Epoch 5, Val Loss: 0.007979
+2025-05-06 10:24:25,697 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250506_022524/model_epoch5.pt
+2025-05-06 11:59:11,827 INFO Epoch 6, Train Loss: 0.024723
+2025-05-06 11:59:21,334 INFO Epoch 6, Val Loss: 0.008009
+2025-05-06 13:34:12,655 INFO Epoch 7, Train Loss: 0.024536
+2025-05-06 13:34:21,939 INFO Epoch 7, Val Loss: 0.007811
+2025-05-06 13:34:21,958 INFO Saved checkpoint: checkpoints/masked-dynamics-experiment_20250506_022524/model_epoch7.pt
+2025-05-06 15:09:08,667 INFO Epoch 8, Train Loss: 0.024400
+2025-05-06 15:09:18,081 INFO Epoch 8, Val Loss: 0.007891
+2025-05-06 16:44:18,369 INFO Epoch 9, Train Loss: 0.024296
+2025-05-06 16:44:27,915 INFO Epoch 9, Val Loss: 0.007989

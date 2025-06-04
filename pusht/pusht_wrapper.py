@@ -12,13 +12,39 @@ class PushTWrapper(PushTEnv):
             self, 
             with_velocity=True,
             with_target=True,
+            add_noise=0, # 0: no noise, 1: add noise to action, 2: add noise to state
+            noise_std=0.1,
         ):
         super().__init__(
             with_velocity=with_velocity,
             with_target=with_target, 
         )
         self.action_dim = self.action_space.shape[0]
+        self.add_noise = add_noise
+        self.noise_std = noise_std
+        
+        # Set state dimension based on velocity option
+        if self.with_velocity:
+            self.state_dim = 7  # [agent_x, agent_y, T_x, T_y, angle, agent_vx, agent_vy]
+        else:
+            self.state_dim = 5  # [agent_x, agent_y, T_x, T_y, angle]
     
+    def step(self, action):
+        """
+        Override step method to add Gaussian noise to state if enabled
+        """
+        if self.add_noise == 0:
+            obs, reward, done, info = super().step(action)
+        else:
+            if self.add_noise == 1:
+                noise = np.random.normal(0, self.noise_std, size=self.action_dim)
+                action = action + noise
+            obs, reward, done, info = super().step(action)
+            if self.add_noise == 2:
+                noise = np.random.normal(0, self.noise_std, size=self.state_dim)
+                info['state'] = info['state'] + noise
+        return obs, reward, done, info
+
     def sample_random_init_goal_states(self, seed):
         """
         Return two random states: one as the initial state and one as the goal state.

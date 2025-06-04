@@ -62,6 +62,7 @@ class MaskedDynamicsEnsemble(nn.Module):
         
         states_traj = []
         masks_traj  = []
+        vars_traj = []
 
         for k in range(K):
             # Model step
@@ -76,7 +77,6 @@ class MaskedDynamicsEnsemble(nn.Module):
                 m_buf = torch.ones_like(s_buf, dtype=torch.bool)
             pred_mu, pred_var = self.forward(s_buf, a_buf, m_buf)
 
-            # Update mask: keep dims with low ensemble variance
             new_mask = m_buf[:, -1] & (pred_var <= var_threshold)   # (B,D)
 
             # Push next state & mask into buffers
@@ -89,9 +89,10 @@ class MaskedDynamicsEnsemble(nn.Module):
 
             states_traj.append(s_next)
             masks_traj.append(new_mask)
+            vars_traj.append(pred_var)
 
         # shapes → (B,K,D)
         if return_vars:
-            return torch.stack(states_traj, dim=1), torch.stack(masks_traj, dim=1), pred_var
+            return torch.stack(states_traj, dim=1), torch.stack(masks_traj, dim=1), torch.stack(vars_traj, dim=1)
         else:
             return torch.stack(states_traj, dim=1), torch.stack(masks_traj, dim=1)

@@ -39,6 +39,10 @@ model:
   feedforward_dim: 16        
   dropout: 0.1
 
+  # training hyper-params used in the loop
+  mask_curriculum:
+    max_mask_prob: 0.5       # final probability a state-dim token is masked
+    warmup_epochs: 10         # linear ramp-up
   var_threshold: 0.25         # start by dropping dims when ensemble σ² > 0.25
 
 wandb:

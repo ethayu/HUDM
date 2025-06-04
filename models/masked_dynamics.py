@@ -41,7 +41,7 @@ class SequenceAwareMaskedDynamics(nn.Module):
         # --- transformer ----------------------------------------------------
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=E, nhead=n_heads, dim_feedforward=feedforward_dim,
-            dropout=dropout, batch_first=True, norm_first=True)
+            dropout=dropout, batch_first=True, norm_first=False)
         self.transformer = nn.TransformerEncoder(encoder_layer, n_layers)
 
         # --- output head -----------------------------------------------------

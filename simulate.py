@@ -39,16 +39,7 @@ def load_model_and_envs(cfg: DictConfig, device: torch.device):
 
     # point to the *run*-specific folder, not the top‐level checkpoint_dir
     ckpt_root = cfg.train.checkpoint_dir
-    # pick the latest run subdirectory by modification time
-    run_dirs = [
-        os.path.join(ckpt_root, d)
-        for d in os.listdir(ckpt_root)
-        if os.path.isdir(os.path.join(ckpt_root, d))
-    ]
-    if not run_dirs:
-        raise FileNotFoundError(f"No run directories found under {ckpt_root}")
-    latest_run = max(run_dirs, key=os.path.getmtime)
-
+    latest_run = os.path.join(ckpt_root, cfg.sim.checkpoint_dir)
     # load the *model* checkpoint
     ckpt_files = [
         os.path.join(latest_run, f)
@@ -110,15 +101,16 @@ def process_states(raw_states: torch.Tensor, cfg: DictConfig) -> torch.Tensor:
 
 def simulate_rollouts(model, init_states, init_actions, init_mask, action_seqs, var_threshold, device, gt_states=None):
     with torch.no_grad():
-        states_traj, masks_traj = model.rollout_with_dropout(
+        states_traj, masks_traj, vars_traj = model.rollout_with_dropout(
             init_states.to(device),
             init_actions.to(device),
             init_mask.to(device),
             action_seqs.to(device),
             var_threshold,
-            gt_states=gt_states.to(device) if gt_states is not None else None
+            gt_states=gt_states.to(device) if gt_states is not None else None,
+            return_vars=True
         )
-    return states_traj.cpu(), masks_traj.cpu()
+    return states_traj.cpu(), masks_traj.cpu(), vars_traj.cpu()
 
 
 class SimulatorVisualizer:
@@ -176,6 +168,7 @@ def main(sim_cfg_path: str):
     train_cfg_path = os.path.join(candidate_run, "config.yaml")
 
     # if that isn't a valid run folder, fall back to the latest under ckpt_root
+    latest_run = None
     if not (os.path.isdir(candidate_run) and os.path.isfile(train_cfg_path)):
         latest_run = max(run_dirs, key=os.path.getmtime)
         print(f"  → '{candidate_run}' not found; using latest: {latest_run}")
@@ -188,6 +181,8 @@ def main(sim_cfg_path: str):
 
     # merge: train_cfg provides defaults, sim_cfg overrides
     cfg = OmegaConf.merge(train_cfg, sim_cfg)
+    if latest_run:
+        cfg.sim.checkpoint_dir = latest_run.split('/')[-1]  # use the latest run folder
     H = cfg.data.num_hist
 
     device = torch.device('cuda' if torch.cuda.is_available() and not cfg.train.no_cuda else 'cpu')
@@ -257,7 +252,7 @@ def main(sim_cfg_path: str):
         else:
             action_seqs = future_actions
         # rollout
-        states_pred, masks_pred = simulate_rollouts(
+        states_pred, masks_pred, vars_traj = simulate_rollouts(
             model, init_states, init_actions, init_mask, action_seqs,
             cfg.sim.var_threshold, device, state_t if cfg.sim.get('reset_state', False) else None
         )
@@ -290,7 +285,7 @@ def main(sim_cfg_path: str):
                     gt_vis = env_gt.step(pred_action)[0]['visual']
                 else:
                     gt_vis = env_gt.prepare(0, gt_denorm[t].cpu().numpy())[0]['visual']
-                var_vec  = masks_pred[0, t].tolist()
+                var_vec  = vars_traj[0, t].tolist()
                 viz.update(pred_vis, gt_vis, var_vec)
                 time.sleep(cfg.sim.render_interval)
             if not input_queue.empty() and input_queue.get() == '':

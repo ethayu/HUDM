@@ -96,9 +96,8 @@ class CEMPlanner:
                 )
                 final_states = states_traj[:, -1, :]   # (P,D)
                 final_masks  = masks_traj[:, -1, :]    # True = kept
-
                 # ------ get μ,σ² so we can impute dropped dims ----------------
-                mu_pred, var_pred = final_states, pred_vars # (P,D)
+                mu_pred, var_pred = final_states, pred_vars[:, -1, :] # (P,D)
 
                 # ------ multiple imputations & cost aggregation --------------
                 costs_samples = []
