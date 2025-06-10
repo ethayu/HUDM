@@ -70,8 +70,15 @@ def make_cost_fn(goal_state: np.ndarray):
     return _cost
 
 
+# ---------------------------------------------------------------------------
+# Closed-loop CEM planner
+#   env_step     : environment instance we actually step in the real world
+#   env_rollout  : *separate* instance used only for candidate-sequence roll-outs
+# ---------------------------------------------------------------------------
+
 def closed_loop_cem(
-    env: PushTWrapper,
+    env_step: PushTWrapper,
+    env_rollout: PushTWrapper,
     init_state: np.ndarray,
     goal_state: np.ndarray,
     cfg: DictConfig,
@@ -83,13 +90,13 @@ def closed_loop_cem(
     planner = CEMPlanner(
         dynamics_ensemble=None,
         cost_fn=make_cost_fn(goal_state),
-        action_dim=env.action_dim,
+        action_dim=env_step.action_dim,
         horizon=cfg.horizon,
         pop_size=cfg.pop_size,
         elite_frac=cfg.elite_frac,
         n_iter=cfg.n_iter,
         var_threshold=cfg.var_threshold,
-        gt_env=env,
+        gt_env=env_rollout,
         n_env_samples=cfg.n_env_samples,
         device=device,
     )
@@ -98,21 +105,41 @@ def closed_loop_cem(
     # them general in case you want to experiment later.
     H_hist = 1
     state_hist = torch.as_tensor(init_state, dtype=torch.float32, device=device).view(1, H_hist, -1)
-    action_hist = torch.zeros(1, H_hist, env.action_dim, device=device)
-    mask_hist = torch.ones(1, H_hist, env.state_dim, dtype=torch.bool, device=device)
+    action_hist = torch.zeros(1, H_hist, env_step.action_dim, device=device)
+    mask_hist = torch.ones(1, H_hist, env_step.state_dim, dtype=torch.bool, device=device)
 
     trajectory = [init_state.copy()]
 
     cur_state = init_state.copy()
     for t in range(cfg.steps):
-        best_seq = planner.plan(state_hist, action_hist, mask_hist,
-                                agg_mode="average", n_impute=1)
+        # ----------------------------------------------------------
+        # Disable expensive pygame rendering during the many internal
+        # rollouts performed by CEM.  We toggle a `headless` flag understood
+        # by PushTEnv._render_frame so that rgb_array frames become a cheap
+        # 1×1 placeholder.
+        # ----------------------------------------------------------
+        # Disable rendering inside the rollout-only environment (env_rollout)
+        env_rollout.headless = True
+        best_seq = planner.plan(
+            state_hist,
+            action_hist,
+            mask_hist,
+            agg_mode="average",
+            n_impute=1,
+        )
+        env_rollout.headless = False
 
         first_action = best_seq[0].cpu().numpy()
 
-        _, reward, done, info = env.step(first_action)
+        # Execute the chosen action in the *visualisation* env
+        _, reward, done, info = env_step.step(first_action)
         cur_state = info["state"]
         trajectory.append(cur_state.copy())
+
+        # Logging --------------------------------------------------------
+        if t % 1 == 0:  # every step
+            dist = env_step.eval_state(goal_state, cur_state)["state_dist"]
+            print(f"step {t:03d}  dist {dist:6.1f}")
 
         # update histories (keep last H_hist entries)
         state_t = torch.as_tensor(cur_state, dtype=torch.float32, device=device).view(1, 1, -1)
@@ -123,12 +150,17 @@ def closed_loop_cem(
         action_hist = torch.cat([action_hist[:, -H_hist + 1 :], action_t], dim=1)
         mask_hist = torch.cat([mask_hist[:, -H_hist + 1 :], mask_t], dim=1)
 
-        if env.eval_state(goal_state, cur_state)["success"]:
-            return True, trajectory
-
         if cfg.render:
-            import time
-            time.sleep(0.05)
+            try:
+                env_step.render("human")
+            except Exception as e:
+                # Pygame display may fail in headless environments; disable
+                # further rendering but keep the main planning loop running.
+                print(f"[render disabled] {e}")
+                cfg.render = False
+
+        if env_step.eval_state(goal_state, cur_state)["success"]:
+            return True, trajectory
 
     return False, trajectory
 
@@ -179,13 +211,41 @@ def main(cfg_path: str):
         pass
 
     env_kwargs = cfg.env
-    env: PushTWrapper = gym.make(env_id, **env_kwargs)
+    # Gym ≥0.26 includes an automatic environment checker that assumes the
+    # reset() method returns (obs, info) where *info* is a dict. The PushT
+    # environment instead returns (obs, state) with *state* being an ndarray.
+    # Disable the checker so that the legacy signature is accepted.
+    # Visualisation / real‐step environment (full rendering capability)
+    env_vis_wrapped = gym.make(
+        env_id,
+        disable_env_checker=True,   # skip strict checks (reset output etc.)
+        apply_api_compatibility=False,  # keep original (obs, reward, done, info) API
+        **env_kwargs,
+    )
+
+    # Separate **headless** environment for CEM roll-outs ------------------
+    env_rollout_wrapped = gym.make(
+        env_id,
+        disable_env_checker=True,
+        apply_api_compatibility=False,
+        **env_kwargs,
+    )
+
+    # Strip wrappers for both
+    def _unwrap(e):
+        while hasattr(e, "env"):
+            e = e.env
+        return e
+
+    env_vis: PushTWrapper = _unwrap(env_vis_wrapped)
+    env_rollout: PushTWrapper = _unwrap(env_rollout_wrapped)
 
     # sample initial / goal states (seed=0 for determinism)
-    init_state, goal_state = env.sample_random_init_goal_states(seed=0)
-    env.prepare(seed=0, init_state=init_state)
+    init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0)
+    env_vis.prepare(seed=0, init_state=init_state)
+    env_rollout.prepare(seed=0, init_state=init_state)  # sync initial state
 
-    success, traj = closed_loop_cem(env, init_state, goal_state, cfg)
+    success, traj = closed_loop_cem(env_vis, env_rollout, init_state, goal_state, cfg)
 
     print("Reached goal:" if success else "Failed:", success)
 

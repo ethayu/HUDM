@@ -606,6 +606,17 @@ class PushTEnv(gym.Env):
         if self.clock is None and mode == "human":
             self.clock = pygame.time.Clock()
 
+        # --------------------------------------------------------------
+        # Fast-mode headless rendering.  If the environment is used for
+        # **simulation-only** (e.g. thousands of rollouts inside CEM), image
+        # generation via pygame is a huge bottleneck.  Set
+        #    env.headless = True
+        # before calling rollout/step to turn the expensive draw pipeline into
+        # a cheap placeholder that returns a 1×1 black pixel.
+        # --------------------------------------------------------------
+        if mode == "rgb_array" and getattr(self, "headless", False):
+            return np.zeros((1, 1, 3), dtype=np.uint8)
+
         canvas = pygame.Surface((self.window_size, self.window_size))
         canvas.fill((255, 255, 255))
         self.screen = canvas
@@ -740,9 +751,22 @@ class PushTEnv(gym.Env):
             self.goal_color = pygame.Color("White")
         self.goal_pose = np.array([256, 256, np.pi / 4])  # x, y, theta (in radians)
 
-        # Add collision handling
-        self.collision_handeler = self.space.add_collision_handler(0, 0)
-        self.collision_handeler.post_solve = self._handle_collision
+        # --------------------------------------------------------------
+        # Collision handling – API change across pymunk versions.
+        # --------------------------------------------------------------
+        # Older Pymunk (<6.6) exposes `Space.add_collision_handler`, which
+        # returns a handler object whose phase callbacks can be assigned.
+        # Newer versions removed that function in favour of the more generic
+        # `Space.on_collision`.  Support both to remain version-agnostic.
+        if hasattr(self.space, "add_collision_handler"):
+            # Legacy API
+            self.collision_handeler = self.space.add_collision_handler(0, 0)
+            self.collision_handeler.post_solve = self._handle_collision
+        else:
+            # New API – directly register the callback.  Keep an attribute for
+            # interface compatibility even though the returned value is None.
+            self.space.on_collision(0, 0, post_solve=self._handle_collision)
+            self.collision_handeler = None
         self.n_contact_points = 0
 
         self.max_score = 50 * 100
