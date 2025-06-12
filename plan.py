@@ -82,8 +82,11 @@ def closed_loop_cem(
     init_state: np.ndarray,
     goal_state: np.ndarray,
     cfg: DictConfig,
-) -> Tuple[bool, list[np.ndarray]]:
-    """Run closed-loop CEM with parameters from *cfg* and return (success, traj)."""
+) -> Tuple[bool, list[np.ndarray], list[np.ndarray]]:
+    """Run closed-loop CEM with parameters from *cfg* and return
+    (success flag, trajectory of states, RGB frames).  *frames* is an empty
+    list when cfg.save is False.
+    """
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -102,13 +105,19 @@ def closed_loop_cem(
     )
 
     # Buffers: only previous step is needed for planning horizon>0 but we keep
-    # them general in case you want to experiment later.
+    # them general in case we want to experiment later.
     H_hist = 1
     state_hist = torch.as_tensor(init_state, dtype=torch.float32, device=device).view(1, H_hist, -1)
     action_hist = torch.zeros(1, H_hist, env_step.action_dim, device=device)
     mask_hist = torch.ones(1, H_hist, env_step.state_dim, dtype=torch.bool, device=device)
 
-    trajectory = [init_state.copy()]
+    trajectory: list[np.ndarray] = [init_state.copy()]
+
+    # Frames for optional saving ------------------------------------------------
+    frames: list[np.ndarray] = []
+    if cfg.save:
+        # Capture the initial state frame before any action is taken
+        frames.append(env_step.render("rgb_array"))
 
     cur_state = init_state.copy()
     for t in range(cfg.steps):
@@ -132,6 +141,7 @@ def closed_loop_cem(
         first_action = best_seq[0].cpu().numpy()
 
         # Execute the chosen action in the *visualisation* env
+        print(f"Executing action {first_action}")
         _, reward, done, info = env_step.step(first_action)
         cur_state = info["state"]
         trajectory.append(cur_state.copy())
@@ -159,10 +169,15 @@ def closed_loop_cem(
                 print(f"[render disabled] {e}")
                 cfg.render = False
 
-        if env_step.eval_state(goal_state, cur_state)["success"]:
-            return True, trajectory
+        if cfg.save:
+            # Store frame after executing the action so that the video matches
+            # what the user would have seen on screen.
+            frames.append(env_step.render("rgb_array"))
 
-    return False, trajectory
+        if env_step.eval_state(goal_state, cur_state)["success"]:
+            return True, trajectory, frames
+
+    return False, trajectory, frames
 
 
 # ---------------------------------------------------------------------------
@@ -190,6 +205,7 @@ def main(cfg_path: str):
         "n_env_samples": 4,
         "var_threshold": 1.0,
         "render": False,
+        "save": False,
     }
 
     cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))
@@ -245,7 +261,45 @@ def main(cfg_path: str):
     env_vis.prepare(seed=0, init_state=init_state)
     env_rollout.prepare(seed=0, init_state=init_state)  # sync initial state
 
-    success, traj = closed_loop_cem(env_vis, env_rollout, init_state, goal_state, cfg)
+    # ------------------------------------------------------------------
+    # Run planner -------------------------------------------------------
+    # ------------------------------------------------------------------
+
+    save_frames = bool(cfg.save)
+    success, traj, frames = closed_loop_cem(
+        env_vis, env_rollout, init_state, goal_state, cfg
+    )
+
+    # ------------------------------------------------------------------
+    # Persist rollout video if requested --------------------------------
+    # ------------------------------------------------------------------
+    if save_frames:
+        try:
+            import imageio.v2 as imageio  # imageio>=2.9
+        except ModuleNotFoundError:  # pragma: no cover
+            import imageio
+
+        rollout_root = "rollouts"
+        os.makedirs(rollout_root, exist_ok=True)
+
+        from datetime import datetime
+
+        run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(rollout_root, f"plan_{run_ts}")
+        os.makedirs(run_dir, exist_ok=True)
+
+        # Determine filename index so that multiple rollouts in the same run
+        # do not overwrite each other (even though the current script only
+        # generates one rollout).  Counting any existing .mp4 files.
+        existing = [f for f in os.listdir(run_dir) if f.endswith(".gif")]
+        vid_fname = f"rollout_{len(existing):03d}.gif"
+        vid_path = os.path.join(run_dir, vid_fname)
+
+        # Write video to disk ------------------------------------------------
+        fps = 15  # rough real-time rate; PushT runs at 30 but many headless
+        print(f"[save] Writing rollout GIF to {vid_path} …")
+        imageio.mimwrite(vid_path, frames, fps=fps)
+        print(f"[save] Video saved ({len(frames)} frames)")
 
     print("Reached goal:" if success else "Failed:", success)
 

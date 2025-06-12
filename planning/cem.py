@@ -84,6 +84,8 @@ class CEMPlanner:
         3. Aggregating across imputations using agg_mode.
         """
         assert agg_mode in {"max", "min", "average"}, "agg_mode must be max/min/average"
+        self.mu.zero_()
+        self.std.fill_(1.0)
         P = self.pop_size
 
         for _ in range(self.n_iter):
@@ -145,7 +147,6 @@ class CEMPlanner:
                     imputes = final_states + torch.sqrt(var_pred) * noise
                     comp    = torch.where(final_masks, final_states, imputes)
                     costs_samples.append(self.cost_fn(comp))
-
                 costs_stack = torch.stack(costs_samples, dim=0)  # (n_impute,P)
                 if   agg_mode == "max":
                     costs = costs_stack.max(dim=0).values

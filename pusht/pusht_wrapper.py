@@ -102,38 +102,62 @@ class PushTWrapper(PushTEnv):
         # Invalid add_noise option
         raise ValueError(f"Unknown add_noise mode {self.add_noise}; expected 0,1,2")
 
-    def sample_random_init_goal_states(self, seed):
+    def sample_random_init_goal_states(self, seed, random_goal=False):
         """
         Return two random states: one as the initial state and one as the goal state.
         """
         rs = np.random.RandomState(seed)
         
-        def generate_state():
+        def generate_state(return_goal=False):
             if self.with_velocity:
-                return np.array(
-                    [
-                        rs.randint(50, 450),
-                        rs.randint(50, 450),
-                        rs.randint(100, 400),
-                        rs.randint(100, 400),
-                        rs.randn() * 2 * np.pi - np.pi,
-                        0,
-                        0,  # agent velocities default 0
-                    ]
-                )
+                if return_goal:
+                    return np.array(
+                        [
+                            50,
+                            50,
+                            256,
+                            256,
+                            np.pi / 4,
+                            0,
+                            0,  # agent velocities default 0
+                        ]
+                    )
+                else:
+                    return np.array(
+                        [
+                            rs.randint(50, 450),
+                            rs.randint(50, 450),
+                            rs.randint(100, 400),
+                            rs.randint(100, 400),
+                            rs.randn() * 2 * np.pi - np.pi,
+                            0,
+                            0,  # agent velocities default 0
+                        ]
+                    )
             else:
-                return np.array(
-                    [
-                        rs.randint(50, 450),
-                        rs.randint(50, 450),
-                        rs.randint(100, 400),
-                        rs.randint(100, 400),
-                        rs.randn() * 2 * np.pi - np.pi,
+                if return_goal:
+                    return np.array(
+                        [
+                            50,
+                            50,
+                            256,
+                            256,
+                            np.pi / 4,
+                        ]
+                    )
+                else:
+                    return np.array(
+                        [
+                            rs.randint(50, 450),
+                            rs.randint(50, 450),
+                            rs.randint(100, 400),
+                            rs.randint(100, 400),
+                            rs.randn() * 2 * np.pi - np.pi,
                     ]
                 )
         
         init_state = generate_state()
-        goal_state = generate_state()
+        goal_state = generate_state(return_goal=True)
         
         return init_state, goal_state
     
