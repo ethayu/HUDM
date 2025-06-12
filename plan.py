@@ -22,6 +22,7 @@ plan:
   n_env_samples:  4        # roll-outs per candidate in the env-sampling path
   var_threshold:  0.5      # per-dimension variance cutoff
   render:        true
+  replan_every:  1        # execute this many actions before the next plan
 
 Other fields are accepted but ignored.  All entries have sensible defaults so
 you can start with an empty YAML and override as needed.
@@ -120,14 +121,23 @@ def closed_loop_cem(
         frames.append(env_step.render("rgb_array"))
 
     cur_state = init_state.copy()
-    for t in range(cfg.steps):
+    # ------------------------------------------------------------------
+    #  Determine how many actions to execute before re-planning.  The new
+    #  *replan_every* parameter lives under the same `plan:` section in the
+    #  YAML config and defaults to 1 which recovers the previous closed-loop
+    #  behaviour (plan → execute one action → re-plan).
+    # ------------------------------------------------------------------
+    replan_every: int = int(getattr(cfg, "replan_every", 1))
+    replan_every = max(1, replan_every)
+
+    t = 0  # environment step counter
+    while t < cfg.steps:
         # ----------------------------------------------------------
         # Disable expensive pygame rendering during the many internal
         # rollouts performed by CEM.  We toggle a `headless` flag understood
         # by PushTEnv._render_frame so that rgb_array frames become a cheap
         # 1×1 placeholder.
         # ----------------------------------------------------------
-        # Disable rendering inside the rollout-only environment (env_rollout)
         env_rollout.headless = True
         best_seq = planner.plan(
             state_hist,
@@ -138,44 +148,50 @@ def closed_loop_cem(
         )
         env_rollout.headless = False
 
-        first_action = best_seq[0].cpu().numpy()
+        # Execute the first *replan_every* actions from the planned sequence
+        n_exec = min(replan_every, cfg.horizon)
 
-        # Execute the chosen action in the *visualisation* env
-        print(f"Executing action {first_action}")
-        _, reward, done, info = env_step.step(first_action)
-        cur_state = info["state"]
-        trajectory.append(cur_state.copy())
+        for i in range(n_exec):
+            if t >= cfg.steps:
+                break  # safety guard
 
-        # Logging --------------------------------------------------------
-        if t % 1 == 0:  # every step
+            action_i = best_seq[i].cpu().numpy()
+            print(f"Executing action {action_i}")
+
+            # Step the environment with the chosen action
+            _, reward, done, info = env_step.step(action_i)
+            cur_state = info["state"]
+            trajectory.append(cur_state.copy())
+
+            # ---- Logging ------------------------------------------------
             dist = env_step.eval_state(goal_state, cur_state)["state_dist"]
             print(f"step {t:03d}  dist {dist:6.1f}")
 
-        # update histories (keep last H_hist entries)
-        state_t = torch.as_tensor(cur_state, dtype=torch.float32, device=device).view(1, 1, -1)
-        action_t = torch.as_tensor(first_action, dtype=torch.float32, device=device).view(1, 1, -1)
-        mask_t = torch.ones_like(state_t, dtype=torch.bool)
+            # ---- Update histories --------------------------------------
+            state_t = torch.as_tensor(cur_state, dtype=torch.float32, device=device).view(1, 1, -1)
+            action_t = torch.as_tensor(action_i, dtype=torch.float32, device=device).view(1, 1, -1)
+            mask_t = torch.ones_like(state_t, dtype=torch.bool)
 
-        state_hist = torch.cat([state_hist[:, -H_hist + 1 :], state_t], dim=1)
-        action_hist = torch.cat([action_hist[:, -H_hist + 1 :], action_t], dim=1)
-        mask_hist = torch.cat([mask_hist[:, -H_hist + 1 :], mask_t], dim=1)
+            state_hist = torch.cat([state_hist[:, -H_hist + 1 :], state_t], dim=1)
+            action_hist = torch.cat([action_hist[:, -H_hist + 1 :], action_t], dim=1)
+            mask_hist = torch.cat([mask_hist[:, -H_hist + 1 :], mask_t], dim=1)
 
-        if cfg.render:
-            try:
-                env_step.render("human")
-            except Exception as e:
-                # Pygame display may fail in headless environments; disable
-                # further rendering but keep the main planning loop running.
-                print(f"[render disabled] {e}")
-                cfg.render = False
+            # ---- Rendering --------------------------------------------
+            if cfg.render:
+                try:
+                    env_step.render("human")
+                except Exception as e:
+                    print(f"[render disabled] {e}")
+                    cfg.render = False
 
-        if cfg.save:
-            # Store frame after executing the action so that the video matches
-            # what the user would have seen on screen.
-            frames.append(env_step.render("rgb_array"))
+            if cfg.save:
+                frames.append(env_step.render("rgb_array"))
 
-        if env_step.eval_state(goal_state, cur_state)["success"]:
-            return True, trajectory, frames
+            # ---- Success check -----------------------------------------
+            if env_step.eval_state(goal_state, cur_state)["success"]:
+                return True, trajectory, frames
+
+            t += 1  # increment global step counter
 
     return False, trajectory, frames
 
@@ -206,6 +222,7 @@ def main(cfg_path: str):
         "var_threshold": 1.0,
         "render": False,
         "save": False,
+        "replan_every": 1,
     }
 
     cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))

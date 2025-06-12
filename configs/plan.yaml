@@ -16,5 +16,9 @@ plan:
   n_env_samples:  4
   var_threshold:  0.5
 
+  # How many of the first CEM-planned actions to execute before re-planning.
+  # Setting this >1 moves the planner towards a more open-loop behaviour.
+  replan_every:   1
+
   render:         true
   save:           true
