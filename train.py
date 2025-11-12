@@ -10,7 +10,8 @@ import wandb
 from tqdm import tqdm 
 
 from models.ensemble import MaskedDynamicsEnsemble
-from data.dataset import load_pusht_dataset 
+from datasets.pusht_dset import load_pusht_dataset
+from datasets.mixed import build_mixed_pusht_datasets
 
 def mse_loss(pred, target, gate):
     loss = ((pred - target) ** 2) * gate
@@ -40,6 +41,17 @@ def make_random_mask(state_hist, max_p, epoch, warmup, start=10):
 def main(config_path: str):
     # Load configuration
     cfg = OmegaConf.load(config_path)
+
+    # Sanity check: state_dim must match representation
+    use_sincos = bool(getattr(cfg.data, 'use_sincos', True))
+    with_velocity = bool(getattr(cfg.data, 'with_velocity', True))
+    expected_state_dim = 4 + (2 if use_sincos else 1) + (2 if with_velocity else 0)
+    if int(cfg.model.state_dim) != expected_state_dim:
+        raise ValueError(
+            f"Config mismatch: model.state_dim={cfg.model.state_dim}, "
+            f"but expected {expected_state_dim} for use_sincos={use_sincos}, "
+            f"with_velocity={with_velocity}. Update configs/train.yaml accordingly."
+        )
 
     # Determine device
     device = torch.device('cuda' if torch.cuda.is_available() and not cfg.train.no_cuda else 'cpu')
@@ -72,8 +84,11 @@ def main(config_path: str):
             config=OmegaConf.to_container(cfg, resolve=True)
         )
 
-    # Load data
-    train_ds, val_ds = load_pusht_dataset(cfg.data)
+    # Load data (real or mixed with synthetic)
+    if getattr(cfg.data, 'synthetic', None) and getattr(cfg.data.synthetic, 'enable', False):
+        train_ds, val_ds = build_mixed_pusht_datasets(cfg)
+    else:
+        train_ds, val_ds = load_pusht_dataset(cfg.data)
     train_loaders = []
     val_loader    = DataLoader(  # (shared validation set)
         val_ds, batch_size=cfg.train.batch_size,

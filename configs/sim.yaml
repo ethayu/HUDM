@@ -4,9 +4,7 @@ sim:
   var_threshold: 100000
   batch_size: 1
   render_interval: 0.1
-  has_sincos: true   # set to true to use sin/cos angle encoding
-  sin_idx: 4
-  cos_idx: 5
+  # Angle representation follows training config: data.use_sincos
   env_kwargs: {with_velocity: true, with_target: true }    # any gym.make kwargs
   use_planner: true
   planner_kwargs: {pop_size: 128, elite_frac: 0.1, n_iter: 4, use_gt: false, closed_loop: false, agg_mode: "average", n_impute: 1}

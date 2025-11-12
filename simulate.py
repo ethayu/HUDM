@@ -19,6 +19,13 @@ from omegaconf import OmegaConf, DictConfig
 sys.path.append(os.path.dirname(__file__))
 
 from models.ensemble import MaskedDynamicsEnsemble
+from datasets.pusht_dset import (
+    STATE_MEAN_SINCOS,
+    STATE_STD_SINCOS,
+    STATE_MEAN_ANGLE,
+    STATE_STD_ANGLE,
+)
+from datasets.state_repr import sincos_to_angle
 from planning.cem import CEMPlanner
 import gym
 from gym.envs.registration import register
@@ -75,25 +82,20 @@ def process_states(raw_states: torch.Tensor, cfg: DictConfig) -> torch.Tensor:
     orig_shape   = raw_states.shape            # (..., D)
     flat_states  = raw_states.reshape(-1, orig_shape[-1])   # (N, D)
 
-    # ------------------- de-normalise --------------------
-    if hasattr(cfg.data, "state_mean") and hasattr(cfg.data, "state_std"):
-        mean = torch.tensor(cfg.data.state_mean, device=flat_states.device)
-        std  = torch.tensor(cfg.data.state_std,  device=flat_states.device)
-        flat_states = flat_states * std + mean
+    # ------------------- de-normalise (PushT constants) --------------------
+    D = flat_states.size(1)
+    use_sincos = bool(getattr(cfg.data, "use_sincos", True))
+    if use_sincos:
+        mean = STATE_MEAN_SINCOS.to(flat_states.device)[:D]
+        std  = STATE_STD_SINCOS.to(flat_states.device)[:D]
+    else:
+        mean = STATE_MEAN_ANGLE.to(flat_states.device)[:D]
+        std  = STATE_STD_ANGLE.to(flat_states.device)[:D]
+    flat_states = flat_states * std + mean
 
-    # ------------------- sin/cos → θ ---------------------
-    if cfg.sim.get("has_sincos", False):
-        sin_idx, cos_idx = cfg.sim.sin_idx, cfg.sim.cos_idx
-        theta = torch.atan2(flat_states[:, sin_idx],
-                            flat_states[:, cos_idx]) % (2 * torch.pi)
-        theta = theta.unsqueeze(1)
-
-        keep_cols = [i for i in range(flat_states.size(1))
-                     if i not in (sin_idx, cos_idx)]
-        parts = [flat_states[:, i:i+1] for i in keep_cols]
-        insert_pos = min(sin_idx, cos_idx)
-        parts.insert(insert_pos, theta)
-        flat_states = torch.cat(parts, dim=1)
+    # ------------------- sin/cos → θ for env rendering ---------------------
+    if use_sincos:
+        flat_states = sincos_to_angle(flat_states)
 
     # --------------- restore original shape --------------
     return flat_states.reshape(*orig_shape[:-1], -1)
@@ -198,6 +200,7 @@ def main(sim_cfg_path: str):
         num_hist=cfg.data.num_hist,
         frameskip=1,
         with_velocity=cfg.data.with_velocity,
+        use_sincos=bool(getattr(cfg.data, "use_sincos", True)),
     )
     valid_trajs = traj_dset['valid']
 

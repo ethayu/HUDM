@@ -100,6 +100,66 @@ class TrajSlicerDataset(TrajDataset):
         return tuple([obs, act, state])
 
 
+class PadRolloutDataset(Dataset):
+    """
+    Wrap a sliced trajectory dataset (e.g., TrajSlicerDataset with length H+1)
+    into single-step samples with padded history.
+
+    Given each window of length H+1 (num_hist + 1), this yields H+1 samples
+    (for t in [0..H]):
+      - state:      (H, state_dim) history, padded on the left with the
+                    first state for missing steps
+      - action:     (H, action_dim) history, padded with zeros for missing
+                    steps
+      - next_state: (state_dim) the state at time t
+    """
+
+    def __init__(self, slice_dataset: TrajDataset, num_hist: int):
+        self.base = slice_dataset
+        self.num_hist = num_hist
+        # Each slice has a fixed sequence length
+        seq_len = self.base.get_seq_length(0)  # expected = num_hist + 1
+
+        # Precompute index mapping: every t in [0..seq_len) for every slice
+        self.index_map = [
+            (slice_idx, t)
+            for slice_idx in range(len(self.base))
+            for t in range(seq_len)
+        ]
+
+    def __len__(self):
+        return len(self.index_map)
+
+    def __getitem__(self, idx):
+        slice_idx, t = self.index_map[idx]
+        obs, act_seq, state_seq = self.base[slice_idx]
+        H = self.num_hist
+
+        # Build history states (left-pad with the first state)
+        if t >= H:
+            past_states = state_seq[t - H : t]
+        else:
+            missing = H - t
+            first_state = state_seq[0].unsqueeze(0)
+            pad_states = first_state.expand(missing, -1)
+            past_states = torch.cat([pad_states, state_seq[:t]], dim=0)
+
+        # Build history actions (left-pad with zeros)
+        if t >= H:
+            past_actions = act_seq[t - H : t]
+        else:
+            missing = H - t
+            zero_action = torch.zeros_like(act_seq[0]).unsqueeze(0)
+            pad_actions = zero_action.expand(missing, -1)
+            past_actions = torch.cat([pad_actions, act_seq[:t]], dim=0)
+
+        return {
+            "state": past_states.float(),
+            "action": past_actions.float(),
+            "next_state": state_seq[t].float(),
+        }
+
+
 def random_split_traj(
     dataset: TrajDataset,
     lengths: Sequence[int],

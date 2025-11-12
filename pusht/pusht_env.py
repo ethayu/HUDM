@@ -513,12 +513,11 @@ class PushTEnv(gym.Env):
         goal_area = goal_geom.area
         coverage = intersection_area / goal_area
         reward = np.clip(coverage / self.success_threshold, 0, 1)
-        done = False  # coverage > self.success_threshold
+        done = coverage > self.success_threshold
 
         self.coverage_arr.append(coverage)
 
         state = self._get_obs()
-        # visual = self._render_frame("rgb_array")
         visual = self._render_frame("rgb_array")
         proprio = state[:2]
         if self.with_velocity:
@@ -528,9 +527,6 @@ class PushTEnv(gym.Env):
             "proprio": proprio,
             "state": state
         }
-        # observation = (
-        #     einops.rearrange(observation, "H W C -> 1 C H W") / 255.0
-        # )  # VCHW, range [0, 1]
         info = self._get_info()
         info["state"] = state
         info["max_coverage"] = max(self.coverage_arr)

@@ -6,20 +6,25 @@ from torchvision import transforms
 from pathlib import Path
 from einops import rearrange
 from decord import VideoReader
-from typing import Callable, Optional
-from .traj_dset import TrajDataset, TrajSlicerDataset
-from typing import Optional, Callable, Any
+from typing import Optional, Any
+from .traj_dset import TrajDataset, TrajSlicerDataset, PadRolloutDataset
+from .state_repr import angle_to_sincos, ANGLE_INDEX
 decord.bridge.set_bridge("torch")
 
-# precomputed dataset stats
-ACTION_MEAN = torch.tensor([-0.0087, 0.0068])
-ACTION_STD = torch.tensor([0.2019, 0.2002])
-#STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027,  2.54307914])
-#STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094])
-STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 0.1650,   0.6914, -2.93032027,  2.54307914])
-STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 0.4698,   0.5234, 74.84556075, 74.14009094])
-PROPRIO_MEAN = torch.tensor([236.6155, 264.5674, -2.93032027,  2.54307914])
-PROPRIO_STD = torch.tensor([101.1202, 87.0112, 74.84556075, 74.14009094])
+# Fixed normalization stats for PushT (shared across training/simulation)
+ACTION_MEAN = torch.tensor([-0.0087, 0.0068], dtype=torch.float32)
+ACTION_STD  = torch.tensor([0.2019, 0.2002], dtype=torch.float32)
+
+# Angle representation (no sin/cos), dims: 4 base + angle + 2 velocities = 7
+STATE_MEAN_ANGLE = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027, 2.54307914], dtype=torch.float32)
+STATE_STD_ANGLE  = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094], dtype=torch.float32)
+
+# Sin/cos representation, dims: 4 base + sin + cos + 2 velocities = 8
+STATE_MEAN_SINCOS = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 0.1650, 0.6914, -2.93032027, 2.54307914], dtype=torch.float32)
+STATE_STD_SINCOS  = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 0.4698, 0.5234, 74.84556075, 74.14009094], dtype=torch.float32)
+
+PROPRIO_MEAN = torch.tensor([236.6155, 264.5674, -2.93032027, 2.54307914], dtype=torch.float32)
+PROPRIO_STD  = torch.tensor([101.1202, 87.0112, 74.84556075, 74.14009094], dtype=torch.float32)
 
 img_size = 224
 default_transform = transforms.Compose(
@@ -37,6 +42,7 @@ class PushTDataset(TrajDataset):
         relative=True,
         action_scale=100.0,
         with_velocity: bool = True, # agent's velocity
+        use_sincos: bool = True,
     ):  
         self.data_path = Path(data_path)
         self.transform = default_transform
@@ -44,12 +50,8 @@ class PushTDataset(TrajDataset):
         self.normalize_action = normalize_action
         self.states = torch.load(self.data_path / "states.pth")
         self.states = self.states.float()
-        #turn into sin cos representation
-        theta = self.states[:, :, 4]  # Extract the angle (for example, from the first index)
-        # Compute sin(theta) and cos(theta)
-        sin_theta = torch.sin(theta).unsqueeze(-1)
-        cos_theta = torch.cos(theta).unsqueeze(-1)
-        self.states = torch.cat((self.states[:,:,:4], sin_theta, cos_theta), dim=2)
+        if use_sincos:
+            self.states = angle_to_sincos(self.states, angle_idx=ANGLE_INDEX)
 
         if relative:
             self.actions = torch.load(self.data_path / "rel_actions.pth")
@@ -94,12 +96,16 @@ class PushTDataset(TrajDataset):
         self.proprio_dim = self.proprios.shape[-1]
 
         if normalize_action:
-            self.action_mean = ACTION_MEAN
-            self.action_std = ACTION_STD
-            self.state_mean = STATE_MEAN[:self.state_dim]
-            self.state_std = STATE_STD[:self.state_dim]
-            self.proprio_mean = PROPRIO_MEAN[:self.proprio_dim]
-            self.proprio_std = PROPRIO_STD[:self.proprio_dim]
+            self.action_mean = ACTION_MEAN[: self.action_dim]
+            self.action_std  = ACTION_STD[: self.action_dim]
+            if use_sincos:
+                self.state_mean  = STATE_MEAN_SINCOS[: self.state_dim]
+                self.state_std   = STATE_STD_SINCOS[: self.state_dim]
+            else:
+                self.state_mean  = STATE_MEAN_ANGLE[: self.state_dim]
+                self.state_std   = STATE_STD_ANGLE[: self.state_dim]
+            self.proprio_mean = PROPRIO_MEAN[: self.proprio_dim]
+            self.proprio_std  = PROPRIO_STD[: self.proprio_dim]
         else:
             self.action_mean = torch.zeros(self.action_dim)
             self.action_std = torch.ones(self.action_dim)
@@ -161,18 +167,21 @@ def load_pusht_slice_train_val(
     num_pred=0,
     frameskip=0,
     with_velocity=True,
+    use_sincos: bool = True,
 ):
     train_dset = PushTDataset(
         n_rollout=int(n_rollout * split_ratio),
         data_path=data_path + "/train",
         normalize_action=normalize_action,
         with_velocity=with_velocity,
+        use_sincos=use_sincos,
     )
     val_dset = PushTDataset(
         n_rollout=int(n_rollout * (1 - split_ratio)),
         data_path=data_path + "/val",
         normalize_action=normalize_action,
         with_velocity=with_velocity,
+        use_sincos=use_sincos,
     )
 
     num_frames = num_hist + num_pred
@@ -186,3 +195,34 @@ def load_pusht_slice_train_val(
     traj_dset["train"] = train_dset
     traj_dset["valid"] = val_dset
     return datasets, traj_dset
+
+
+def load_pusht_dataset(data_cfg):
+    """
+    Build single-step training and validation datasets for PushT.
+
+    It loads sliced windows of length H+1 (num_hist + 1), then wraps them into
+    single-step samples with left-padded history using PadRolloutDataset.
+
+    Returns (train_dataset, val_dataset) where each item is a dict with keys:
+      - 'state': (H, state_dim)
+      - 'action': (H, action_dim)
+      - 'next_state': (state_dim)
+    """
+    datasets_dict, _ = load_pusht_slice_train_val(
+        n_rollout=data_cfg.n_rollout,
+        data_path=data_cfg.path,
+        normalize_action=data_cfg.normalize_action,
+        split_ratio=data_cfg.split_ratio,
+        num_hist=data_cfg.num_hist,
+        num_pred=1,
+        frameskip=data_cfg.frameskip,
+        with_velocity=data_cfg.with_velocity,
+        use_sincos=getattr(data_cfg, "use_sincos", True),
+    )
+    train_slices = datasets_dict["train"]
+    val_slices = datasets_dict["valid"]
+    return (
+        PadRolloutDataset(train_slices, data_cfg.num_hist),
+        PadRolloutDataset(val_slices, data_cfg.num_hist),
+    )
