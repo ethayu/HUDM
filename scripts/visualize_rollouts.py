@@ -1,154 +1,171 @@
 #!/usr/bin/env python3
 """
-Visualize rollouts from the PushT datasets by rendering de-normalized states
-through the ground-truth environment and saving GIFs.
+Visualize rollouts from Zarr datasets by displaying them in a window.
 
 Usage:
+  # Visualize from world.yaml config with mixed dataset
   python scripts/visualize_rollouts.py \
-      --config configs/train.yaml \
+      --config configs/world.yaml \
       --split valid \
       --count 5 \
-      --outdir rollouts/dataset_vis \
       --fps 15 \
       --source mixed
 
 Notes:
-  - Uses the same representation toggle as training (data.use_sincos).
-  - De-normalizes states using fixed PushT constants.
-  - Does not depend on stored videos; renders frames directly from states.
+  - Works with zarr datasets (data.zarr_path and data.synthetic.zarr_path)
+  - Images are stored directly in zarr, so no state rendering needed
+  - Supports 'real', 'synthetic', or 'mixed' sources
+  - Close the window to advance to the next episode
 """
 
-import os
 import argparse
-from typing import List
+from typing import List, Optional
 
 import numpy as np
-import torch
 from omegaconf import OmegaConf
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 try:
-    import imageio.v2 as imageio  # imageio>=2.9
-except ModuleNotFoundError:  # pragma: no cover
-    import imageio
-
-from gym.envs.registration import register
-from pusht.pusht_wrapper import PushTWrapper
-
-from datasets.pusht_dset import (
-    load_pusht_slice_train_val,
-    STATE_MEAN_SINCOS,
-    STATE_STD_SINCOS,
-    STATE_MEAN_ANGLE,
-    STATE_STD_ANGLE,
-)
-from datasets.state_repr import sincos_to_angle
+    import zarr
+except Exception:
+    zarr = None
 
 
-def denorm_states(states_norm: torch.Tensor, use_sincos: bool) -> torch.Tensor:
-    """De-normalize a (T, D) tensor of states using PushT constants.
-    If use_sincos is True, also convert sin/cos → angle to match env expectation.
+def load_episodes_from_zarr(zarr_path: str, split: str = "train", split_ratio: float = 0.8) -> List[np.ndarray]:
+    """Load full episodes from a zarr dataset.
+    Returns a list of episode arrays, each of shape (T, H, W, C).
     """
-    D = states_norm.size(-1)
-    if use_sincos:
-        mean = STATE_MEAN_SINCOS[:D]
-        std = STATE_STD_SINCOS[:D]
+    if zarr is None:
+        raise ImportError("zarr not installed. pip install zarr")
+    
+    root = zarr.open_group(zarr_path, mode="r")
+    data = root["data"]
+    meta = root["meta"]
+    
+    img = data["img"]  # (N, H, W, C), float32
+    ends = meta["episode_ends"][:]  # (E,), int64
+    
+    # Compute episode start indices
+    starts = np.zeros_like(ends)
+    starts[0] = 0
+    for i in range(1, len(ends)):
+        starts[i] = ends[i - 1] + 1
+    
+    # Split episodes
+    n_ep = len(ends)
+    n_train = int(split_ratio * n_ep)
+    if split.lower() in ("train",):
+        ep_idx = np.arange(0, n_train)
     else:
-        mean = STATE_MEAN_ANGLE[:D]
-        std = STATE_STD_ANGLE[:D]
-    s = states_norm * std + mean
-    if use_sincos:
-        s = sincos_to_angle(s)
-    return s
+        ep_idx = np.arange(n_train, n_ep)
+    
+    episodes = []
+    for ei in ep_idx:
+        s = int(starts[ei])
+        e = int(ends[ei])
+        # Load full episode: images from s to e (inclusive)
+        ep_imgs = img[s : e + 1]  # (T, H, W, C)
+        episodes.append(ep_imgs)
+    
+    return episodes
 
 
-def render_episode(states_denorm: np.ndarray, env: PushTWrapper) -> List[np.ndarray]:
-    """Render a sequence of environment frames from de-normalized states.
-    Returns a list of RGB frames (H, W, C, uint8 or float32).
+def display_episode(episode: np.ndarray, title: str, fps: int = 15):
+    """Display an episode in a window as an animation.
+    episode: (T, H, W, C) array, values in [0, 1] (float32)
     """
-    frames: List[np.ndarray] = []
-    for t in range(states_denorm.shape[0]):
-        obs, _ = env.prepare(seed=t, init_state=states_denorm[t])
-        frames.append(obs['visual'])
-    return frames
+    # Convert to uint8 [0, 255] for display
+    if episode.dtype == np.float32 or episode.dtype == np.float64:
+        episode = np.clip(episode, 0.0, 1.0)
+        episode_display = (episode * 255).astype(np.uint8)
+    else:
+        episode_display = episode.astype(np.uint8)
+    
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax.set_title(title, fontsize=14)
+    ax.axis('off')
+    
+    im = ax.imshow(episode_display[0])
+    
+    frame_text = ax.text(0.02, 0.98, f'Frame 0/{len(episode)-1}', 
+                        transform=ax.transAxes, fontsize=12,
+                        verticalalignment='top',
+                        bbox=dict(boxstyle='round', facecolor='black', alpha=0.7),
+                        color='white')
+    
+    def update_frame(frame_idx):
+        im.set_array(episode_display[frame_idx])
+        frame_text.set_text(f'Frame {frame_idx}/{len(episode)-1}')
+        return im, frame_text
+    
+    interval = 1000 / fps  # milliseconds per frame
+    anim = animation.FuncAnimation(fig, update_frame, frames=len(episode),
+                                  interval=interval, blit=True, repeat=True)
+    
+    plt.tight_layout()
+    plt.show()
+    return anim
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument('--config', required=True, help='Path to training or sim config with data.* fields')
+    ap.add_argument('--config', required=True, help='Path to world.yaml config')
     ap.add_argument('--split', choices=['train','valid','val'], default='valid')
     ap.add_argument('--count', type=int, default=3, help='Number of episodes to visualize')
-    ap.add_argument('--outdir', type=str, default='rollouts/dataset_vis')
-    ap.add_argument('--fps', type=int, default=15)
-    ap.add_argument('--source', choices=['real','synthetic','mixed'], default='real', help='Which dataset to visualize')
+    ap.add_argument('--fps', type=int, default=15, help='Frames per second for playback')
+    ap.add_argument('--source', choices=['real','synthetic','mixed'], default='real',
+                    help='Which dataset to visualize')
     args = ap.parse_args()
 
     cfg = OmegaConf.load(args.config)
     data = cfg.data
-    use_sincos = bool(getattr(data, 'use_sincos', True))
-    with_velocity = bool(getattr(data, 'with_velocity', True))
-
-    # Helper to load trajectories from a given root
-    def load_trajs_at(root_path: str):
-        _, td = load_pusht_slice_train_val(
-            n_rollout=data.n_rollout,
-            data_path=root_path,
-            normalize_action=data.normalize_action,
-            split_ratio=data.split_ratio,
-            num_hist=0,
-            num_pred=0,
-            frameskip=1,
-            with_velocity=with_velocity,
-            use_sincos=use_sincos,
-        )
-        return td
-
+    split_ratio = float(data.split_ratio)
     split_name = 'valid' if args.split in ('valid','val') else 'train'
 
-    # Choose source(s)
-    real_traj = load_trajs_at(data.path)[split_name]
-    synth_traj = None
-    if getattr(data, 'synthetic', None) and getattr(data.synthetic, 'path', None):
-        synth_traj = load_trajs_at(data.synthetic.path)[split_name]
-
-    # Register env and instantiate one instance for rendering
-    try:
-        register(
-            id='pusht',
-            entry_point='pusht.pusht_wrapper:PushTWrapper',
-            max_episode_steps=300,
-            reward_threshold=1.0,
+    # Load real episodes
+    real_episodes = load_episodes_from_zarr(data.zarr_path, split=split_name, split_ratio=split_ratio)
+    
+    # Load synthetic episodes if available
+    synth_episodes = None
+    if getattr(data, 'synthetic', None) and getattr(data.synthetic, 'zarr_path', None):
+        synth_episodes = load_episodes_from_zarr(
+            data.synthetic.zarr_path, 
+            split=split_name, 
+            split_ratio=split_ratio
         )
-    except Exception:
-        pass
-    env = PushTWrapper(with_velocity=with_velocity, with_target=True, add_noise=0)
 
-    os.makedirs(args.outdir, exist_ok=True)
-
-    def dump_from(traj, tag: str, max_count: int):
-        n = min(max_count, len(traj))
-        for i in range(n):
-            _, _, state_seq, _ = traj[i]
-            state_t = torch.as_tensor(state_seq, dtype=torch.float32)
-            state_denorm = denorm_states(state_t, use_sincos=use_sincos).cpu().numpy()
-            frames = render_episode(state_denorm, env)
-            out_path = os.path.join(args.outdir, f"{split_name}_{tag}_ep{i:03d}.gif")
-            imageio.mimwrite(out_path, frames, fps=args.fps)
-            print(f"Wrote {out_path}  ({len(frames)} frames)")
-
-    os.makedirs(args.outdir, exist_ok=True)
+    # Collect episodes to display
+    episodes_to_show = []
+    titles = []
+    
     if args.source == 'real':
-        dump_from(real_traj, 'real', args.count)
+        n = min(args.count, len(real_episodes))
+        episodes_to_show = real_episodes[:n]
+        titles = [f'Real Episode {i+1}/{n}' for i in range(n)]
     elif args.source == 'synthetic':
-        if synth_traj is None:
-            raise SystemExit('No synthetic.path configured in data.synthetic.path')
-        dump_from(synth_traj, 'synth', args.count)
-    else:
-        if synth_traj is None:
-            raise SystemExit('No synthetic.path configured in data.synthetic.path for mixed source')
+        if synth_episodes is None:
+            raise SystemExit('No synthetic.zarr_path configured in data.synthetic.zarr_path')
+        n = min(args.count, len(synth_episodes))
+        episodes_to_show = synth_episodes[:n]
+        titles = [f'Synthetic Episode {i+1}/{n}' for i in range(n)]
+    else:  # mixed
+        if synth_episodes is None:
+            raise SystemExit('No synthetic.zarr_path configured in data.synthetic.zarr_path for mixed source')
         half = max(1, args.count // 2)
-        dump_from(real_traj, 'real', half)
-        dump_from(synth_traj, 'synth', args.count - half)
+        n_real = min(half, len(real_episodes))
+        n_synth = min(args.count - half, len(synth_episodes))
+        episodes_to_show = real_episodes[:n_real] + synth_episodes[:n_synth]
+        titles = ([f'Real Episode {i+1}/{n_real}' for i in range(n_real)] +
+                 [f'Synthetic Episode {i+1}/{n_synth}' for i in range(n_synth)])
+    
+    # Display each episode
+    print(f"Displaying {len(episodes_to_show)} episodes. Close window to advance to next episode.")
+    for i, (ep, title) in enumerate(zip(episodes_to_show, titles)):
+        print(f"\n[{i+1}/{len(episodes_to_show)}] {title} ({len(ep)} frames)")
+        display_episode(ep, title, fps=args.fps)
 
 
 if __name__ == '__main__':
     main()
+

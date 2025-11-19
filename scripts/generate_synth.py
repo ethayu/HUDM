@@ -1,29 +1,50 @@
 #!/usr/bin/env python3
 """
 Generate synthetic PushT rollouts by stepping the ground-truth environment and
-save them in the same .pth format expected by datasets/pusht_dset.py.
+save them in Zarr format for world-model training.
 
 Usage:
-  python scripts/generate_synth.py --out synthetic/pusht_dataset --train_eps 200 --val_eps 50 \
-      --len_min 50 --len_max 160 --policy ou --ou-theta 0.15 --ou-sigma 0.2 --seed 0 --with_velocity
+  # Basic OU policy
+  python scripts/generate_synth.py synthetic/pusht_synth.zarr \
+      --train_eps 200 --val_eps 50 \
+      --len_min 50 --len_max 160 \
+      --policy ou --ou-theta 0.15 --ou-sigma 0.2 \
+      --seed 0 --with_velocity --img-size 96
+  
+  # Advanced policy (OU + goal-directed toward T block)
+  python scripts/generate_synth.py synthetic/pusht_synth.zarr \
+      --train_eps 200 --val_eps 50 \
+      --len_min 50 --len_max 160 \
+      --policy advanced --ou-theta 0.15 --ou-sigma 0.2 \
+      --seed 0 --with_velocity --img-size 96
 
 Notes:
-  - The saved dataset layout mirrors the real dataset: <out>/{train,val}/{states,rel_actions,abs_actions,velocities}.pth, seq_lengths.pkl, shapes.pkl
-  - Actions are saved as relative actions (rel_actions.pth). You can switch to absolute by --abs.
-  - States are stored in angle representation (5D). Training will convert to sin/cos if configured.
+  - Outputs a Zarr store with images and actions, compatible with datasets/zarr_rollouts.py
+  - The Zarr store contains: data/img, data/action, meta/episode_ends
+  - Images are stored as float32 in [0, 1] range
+  - Actions are stored as float32
+  - Train/val split is handled via split_ratio when loading the dataset
 """
 
 import os
+import sys
 import math
 import argparse
-import pickle
-from typing import List, Optional
+from typing import List, Optional, Tuple
+
+# Add project root to Python path so imports work
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import numpy as np
-import torch
 
 from gym.envs.registration import register
 from pusht.pusht_wrapper import PushTWrapper
+from PIL import Image
+
+try:
+    import zarr
+except Exception:
+    zarr = None
 
 
 def rollout_episode(
@@ -36,17 +57,23 @@ def rollout_episode(
     ou_sigma: float = 0.2,
     ou_dt: float = 1.0,
     ou_mu: Optional[np.ndarray] = None,
-):
+    collect_frames: bool = False,
+    img_size: int = 96,
+) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
     init_state, goal = env.sample_random_init_goal_states(seed=int(rng.integers(0, 1_000_000)))
     obs, state0 = env.prepare(seed=int(rng.integers(0, 1_000_000)), init_state=init_state)
 
     states = [state0]
     actions = []
+    frames = []
 
     # OU state init
     x = np.zeros(env.action_dim, dtype=np.float32)
     mu = np.zeros(env.action_dim, dtype=np.float32) if ou_mu is None else np.asarray(ou_mu, dtype=np.float32)
 
+    # Environment bounds (walls at 5 and 506, so safe range is roughly [15, 491])
+    env_bounds = (15.0, 491.0)
+    
     for t in range(T):
         if policy == 'ou':
             # Ornstein–Uhlenbeck: x <- x + theta*(mu - x)*dt + sigma*sqrt(dt)*N(0,1)
@@ -55,82 +82,140 @@ def rollout_episode(
             act = x * action_scale
         elif policy == 'random':
             act = rng.normal(0.0, 1.0, size=env.action_dim).astype(np.float32) * action_scale
+        elif policy == 'advanced':
+            # Advanced policy: OU-style with goal-directed behavior toward T block
+            # Get current state: [agent_x, agent_y, block_x, block_y, block_angle, ...]
+            current_state = states[-1]  # Most recent state
+            agent_pos = current_state[:2]
+            block_pos = current_state[2:4]
+            
+            # Decide whether to be goal-directed (40% of the time)
+            goal_directed_prob = 0.4
+            is_goal_directed = rng.random() < goal_directed_prob
+            
+            if is_goal_directed and t > 5:  # Start goal-directed after a few steps
+                # Compute direction toward block to create meaningful interactions
+                # We want to approach the block from a good angle for pushing
+                agent_to_block = block_pos - agent_pos
+                agent_to_block_norm = np.linalg.norm(agent_to_block)
+                
+                if agent_to_block_norm > 1e-6:
+                    # Base direction: toward the block
+                    direction = agent_to_block / agent_to_block_norm
+                    
+                    # Add perpendicular component for better pushing angles
+                    # This creates circular/arc movements around the block
+                    perp = np.array([-direction[1], direction[0]])
+                    perp_weight = rng.uniform(-0.3, 0.3)  # Vary the approach angle
+                    
+                    # Combine direction toward block with perpendicular component
+                    desired_direction = direction + perp * perp_weight
+                    desired_norm = np.linalg.norm(desired_direction)
+                    
+                    if desired_norm > 1e-6:
+                        desired_direction = desired_direction / desired_norm
+                        # Scale by distance factor: move faster when far, slower when close
+                        distance_factor = min(1.0, agent_to_block_norm / 100.0)
+                        mu_goal = desired_direction * 0.6 * distance_factor  # Bias toward block
+                    else:
+                        mu_goal = mu
+                else:
+                    # Already very close, use exploration
+                    mu_goal = mu
+            else:
+                # Pure exploration mode - but still keep within bounds
+                # Use OU with zero mean but add boundary repulsion
+                agent_pos_normalized = (agent_pos - 256.0) / 256.0  # Center and normalize
+                # Soft boundary repulsion: push away from walls
+                boundary_repulsion = np.zeros(2, dtype=np.float32)
+                if agent_pos[0] < 100:
+                    boundary_repulsion[0] = 0.5  # Push right
+                elif agent_pos[0] > 412:
+                    boundary_repulsion[0] = -0.5  # Push left
+                if agent_pos[1] < 100:
+                    boundary_repulsion[1] = 0.5  # Push down
+                elif agent_pos[1] > 412:
+                    boundary_repulsion[1] = -0.5  # Push up
+                
+                mu_goal = boundary_repulsion
+            
+            # OU process with goal-directed mean
+            noise = rng.normal(0.0, 1.0, size=env.action_dim).astype(np.float32)
+            x = x + ou_theta * (mu_goal - x) * ou_dt + ou_sigma * math.sqrt(ou_dt) * noise
+            
+            # Actions are relative (velocities), scaled by action_scale
+            act = x * action_scale
+            
+            # Check if action would take agent out of bounds and dampen if needed
+            next_pos = agent_pos + act
+            if next_pos[0] < env_bounds[0] or next_pos[0] > env_bounds[1]:
+                act[0] *= 0.03  # Dampen x component
+            if next_pos[1] < env_bounds[0] or next_pos[1] > env_bounds[1]:
+                act[1] *= 0.03  # Dampen y component
         else:
-            # Placeholder for more advanced policies (e.g., CEM planner)
+            # Fallback to random
             act = rng.normal(0.0, 1.0, size=env.action_dim).astype(np.float32) * action_scale
 
         actions.append(act.astype(np.float32))
-        _, _, done, info = env.step(act)
+        obs, _, done, info = env.step(act)
         states.append(info['state'].astype(np.float32))
+        if collect_frames:
+            fr = obs['visual']
+            # resize to img_size x img_size and normalise to [0,1]
+            im = Image.fromarray(fr.astype(np.uint8)) if fr.dtype != np.uint8 else Image.fromarray(fr)
+            im = im.resize((img_size, img_size), Image.BILINEAR)
+            frames.append(np.asarray(im).astype(np.float32) / 255.0)
         if done:
             break
 
     actions = np.asarray(actions, dtype=np.float32)
     states = np.asarray(states, dtype=np.float32)
-    return states, actions
-
-
-def pad_stack(seqs: List[np.ndarray], pad_last: int) -> np.ndarray:
-    """Pad variable-length sequences to the same length along axis 0 using zeros.
-    pad_last is the target length.
-    """
-    dims = seqs[0].shape[1:]
-    out = np.zeros((len(seqs), pad_last) + dims, dtype=seqs[0].dtype)
-    for i, s in enumerate(seqs):
-        L = min(s.shape[0], pad_last)
-        out[i, :L] = s[:L]
-    return out
-
-
-def save_split(root: str, states_list: List[np.ndarray], actions_list: List[np.ndarray], with_velocity: bool):
-    os.makedirs(root, exist_ok=True)
-    lengths = [len(s) for s in states_list]
-    T_max = max(lengths)
-
-    # states include angle (+ velocities if enabled); we store angle-only in states.pth and velocities separately
-    states_arr = pad_stack([s[:, :5] for s in states_list], pad_last=T_max)
-    if with_velocity:
-        vels_arr = pad_stack([s[:, 5:7] for s in states_list], pad_last=T_max)
+    if collect_frames:
+        frames = np.asarray(frames, dtype=np.float32)
     else:
-        vels_arr = None
+        frames = None
+    return states, actions, frames
 
-    # actions: make length match states by padding a zero at the end
-    A = actions_list[0].shape[-1]
-    acts_padded = []
-    for a, L in zip(actions_list, lengths):
-        ap = np.zeros((L + 1, A), dtype=np.float32)
-        ap[:L] = a
-        acts_padded.append(ap)
-    actions_arr = pad_stack(acts_padded, pad_last=T_max)
 
-    # Save tensors
-    torch.save(torch.from_numpy(states_arr), os.path.join(root, 'states.pth'))
-    torch.save(torch.from_numpy(actions_arr), os.path.join(root, 'rel_actions.pth'))
-    if vels_arr is not None:
-        torch.save(torch.from_numpy(vels_arr), os.path.join(root, 'velocities.pth'))
+def save_zarr(zarr_out: str, frames_list: List[np.ndarray], actions_list: List[np.ndarray]):
+    if zarr is None:
+        raise ImportError("zarr is not installed. Try: pip install zarr")
+    # Flatten episodes; ensure per-episode frames match action count (post-step frames)
+    # frames_list[i].shape == (Li, H, W, 3); actions_list[i].shape == (Li, A)
+    lengths = [min(f.shape[0], a.shape[0]) for f, a in zip(frames_list, actions_list)]
+    frames = np.concatenate([f[:L] for f, L in zip(frames_list, lengths)], axis=0)
+    actions = np.concatenate([a[:L] for a, L in zip(actions_list, lengths)], axis=0)
+    ends = np.cumsum(lengths) - 1
 
-    with open(os.path.join(root, 'seq_lengths.pkl'), 'wb') as f:
-        pickle.dump(lengths, f)
-    with open(os.path.join(root, 'shapes.pkl'), 'wb') as f:
-        pickle.dump(['T'] * len(lengths), f)
+    root = zarr.group(zarr_out, overwrite=True)
+    g_data = root.create_group('data')
+    g_meta = root.create_group('meta')
+    # Create arrays
+    g_data.create('img', data=frames.astype(np.float32), chunks=(min(160, frames.shape[0]),) + frames.shape[1:])
+    g_data.create('action', data=actions.astype(np.float32), chunks=(min(160, actions.shape[0]), actions.shape[1]))
+    g_meta.create('episode_ends', data=ends.astype(np.int64), chunks=(max(1, len(ends)),))
+    # minimal attrs
+    root.attrs.update({})
 
 
 def main():
     p = argparse.ArgumentParser()
-    p.add_argument('--out', required=True, help='Output root (e.g., synthetic/pusht_dataset)')
-    p.add_argument('--train_eps', type=int, default=200)
-    p.add_argument('--val_eps', type=int, default=50)
-    p.add_argument('--len_min', type=int, default=50)
-    p.add_argument('--len_max', type=int, default=160)
-    p.add_argument('--policy', choices=['ou','random'], default='ou')
-    p.add_argument('--seed', type=int, default=0)
-    p.add_argument('--with_velocity', action='store_true')
-    p.add_argument('--action_scale', type=float, default=100.0)
+    p.add_argument('zarr_out', help='Output Zarr store path (e.g., synthetic/pusht_synth.zarr)')
+    p.add_argument('--train_eps', type=int, default=200, help='Number of training episodes to generate')
+    p.add_argument('--val_eps', type=int, default=50, help='Number of validation episodes to generate')
+    p.add_argument('--len_min', type=int, default=50, help='Minimum episode length')
+    p.add_argument('--len_max', type=int, default=160, help='Maximum episode length')
+    p.add_argument('--policy', choices=['ou','random','advanced'], default='ou', 
+                   help='Action policy: ou (Ornstein-Uhlenbeck), random, or advanced (OU + goal-directed toward T block)')
+    p.add_argument('--seed', type=int, default=0, help='Random seed')
+    p.add_argument('--with_velocity', action='store_true', help='Include velocity in state representation')
+    p.add_argument('--action_scale', type=float, default=1.0, help='Action scaling factor (default 100.0 for PushT)')
     # OU params
-    p.add_argument('--ou-theta', type=float, default=0.15)
-    p.add_argument('--ou-sigma', type=float, default=0.2)
-    p.add_argument('--ou-dt', type=float, default=1.0)
-    p.add_argument('--ou-mu', type=str, default=None, help='comma-separated list for per-dim mean; default zeros')
+    p.add_argument('--ou-theta', type=float, default=0.15, help='OU process mean reversion rate')
+    p.add_argument('--ou-sigma', type=float, default=0.2, help='OU process volatility')
+    p.add_argument('--ou-dt', type=float, default=1.0, help='OU process time step')
+    p.add_argument('--ou-mu', type=str, default=None, help='OU process mean (comma-separated per-dim or scalar)')
+    p.add_argument('--img-size', type=int, default=96, help='Image size (width and height)')
     args = p.parse_args()
 
     # Register env id if needed
@@ -157,10 +242,10 @@ def main():
         return np.asarray(vals, dtype=np.float32)
 
     def gen_split(n_eps: int):
-        states_list, acts_list = [], []
+        acts_list, frames_list = [], []
         for _ in range(n_eps):
             T = int(rng.integers(args.len_min, args.len_max + 1))
-            states, actions = rollout_episode(
+            _, actions, frames = rollout_episode(
                 env,
                 T=T,
                 policy=args.policy,
@@ -170,18 +255,26 @@ def main():
                 ou_sigma=args.ou_sigma,
                 ou_dt=args.ou_dt,
                 ou_mu=_parse_mu(args.ou_mu, env.action_dim),
+                collect_frames=True,  # Always collect frames for zarr output
+                img_size=args.img_size,
             )
-            states_list.append(states)
             acts_list.append(actions)
-        return states_list, acts_list
+            frames_list.append(frames)
+        return acts_list, frames_list
 
-    train_states, train_actions = gen_split(args.train_eps)
-    val_states, val_actions = gen_split(args.val_eps)
+    train_actions, train_frames = gen_split(args.train_eps)
+    val_actions, val_frames = gen_split(args.val_eps)
 
-    save_split(os.path.join(args.out, 'train'), train_states, train_actions, args.with_velocity)
-    save_split(os.path.join(args.out, 'val'),   val_states,   val_actions,   args.with_velocity)
-
-    print('Saved synthetic dataset to', args.out)
+    # Save a single Zarr with both train and val concatenated
+    # Train/val separation is handled via split_ratio when loading the dataset
+    frames_all = train_frames + val_frames
+    actions_all = train_actions + val_actions
+    save_zarr(args.zarr_out, frames_all, actions_all)
+    print(f'Saved synthetic Zarr store to {args.zarr_out}')
+    print(f'  Training episodes: {args.train_eps}')
+    print(f'  Validation episodes: {args.val_eps}')
+    print(f'  Total frames: {sum(len(f) for f in frames_all)}')
+    print(f'  Total actions: {sum(len(a) for a in actions_all)}')
 
 
 if __name__ == '__main__':
