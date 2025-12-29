@@ -5,6 +5,19 @@ from omegaconf import DictConfig
 from .zarr_rollouts import ZarrPushTWindows
 
 
+def _assert_zarr_schema(zarr_path: str) -> None:
+    try:
+        import zarr
+    except Exception as exc:
+        raise ImportError("zarr not installed. pip install zarr") from exc
+    root = zarr.open_group(zarr_path, mode="r")
+    data = root["data"]
+    required = {"img", "action", "state"}
+    missing = [key for key in required if key not in data]
+    if missing:
+        raise ValueError(f"{zarr_path} missing required arrays: {missing}")
+
+
 def _subset_indices(n: int, k: int, seed: int, replace: bool) -> torch.Tensor:
     g = torch.Generator().manual_seed(seed)
     if replace:
@@ -16,6 +29,7 @@ def _subset_indices(n: int, k: int, seed: int, replace: bool) -> torch.Tensor:
 
 def build_mixed_zarr_windows(cfg: DictConfig):
     data = cfg.data
+    _assert_zarr_schema(data.zarr_path)
     # Real datasets
     real_train = ZarrPushTWindows(data.zarr_path, split='train', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
     real_val   = ZarrPushTWindows(data.zarr_path, split='valid', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
@@ -24,6 +38,7 @@ def build_mixed_zarr_windows(cfg: DictConfig):
     if not s_cfg or not getattr(s_cfg, 'enable', False):
         return real_train, real_val
 
+    _assert_zarr_schema(s_cfg.zarr_path)
     # Synthetic datasets
     synth_train = ZarrPushTWindows(s_cfg.zarr_path, split='train', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
     synth_val   = ZarrPushTWindows(s_cfg.zarr_path, split='valid', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
@@ -58,4 +73,3 @@ def build_mixed_zarr_windows(cfg: DictConfig):
         mixed_val = ConcatDataset([Subset(real_val, idx_r), Subset(synth_val, idx_s)])
 
     return mixed_train, mixed_val
-

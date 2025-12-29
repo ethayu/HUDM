@@ -19,10 +19,11 @@ Usage:
       --seed 0 --with_velocity --img-size 96
 
 Notes:
-  - Outputs a Zarr store with images and actions, compatible with datasets/zarr_rollouts.py
-  - The Zarr store contains: data/img, data/action, meta/episode_ends
-  - Images are stored as float32 in [0, 1] range
-  - Actions are stored as float32
+  - Outputs a Zarr store compatible with datasets/zarr_rollouts.py
+  - The Zarr store contains: data/img, data/action, data/state, meta/episode_ends
+  - Images are stored as float32 in [0, 255] range
+  - Actions are absolute pixel targets (float32)
+  - States are the pre-action environment state (float32)
   - Train/val split is handled via split_ratio when loading the dataset
 """
 
@@ -61,9 +62,9 @@ def rollout_episode(
     img_size: int = 96,
 ) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
     init_state, goal = env.sample_random_init_goal_states(seed=int(rng.integers(0, 1_000_000)))
-    obs, state0 = env.prepare(seed=int(rng.integers(0, 1_000_000)), init_state=init_state)
+    obs, state = env.prepare(seed=int(rng.integers(0, 1_000_000)), init_state=init_state)
 
-    states = [state0]
+    states = []
     actions = []
     frames = []
 
@@ -75,6 +76,10 @@ def rollout_episode(
     env_bounds = (15.0, 491.0)
     
     for t in range(T):
+        current_state = state
+        agent_pos = current_state[:2]
+        block_pos = current_state[2:4]
+
         if policy == 'ou':
             # Ornstein–Uhlenbeck: x <- x + theta*(mu - x)*dt + sigma*sqrt(dt)*N(0,1)
             noise = rng.normal(0.0, 1.0, size=env.action_dim).astype(np.float32)
@@ -85,10 +90,6 @@ def rollout_episode(
         elif policy == 'advanced':
             # Advanced policy: OU-style with goal-directed behavior toward T block
             # Get current state: [agent_x, agent_y, block_x, block_y, block_angle, ...]
-            current_state = states[-1]  # Most recent state
-            agent_pos = current_state[:2]
-            block_pos = current_state[2:4]
-            
             # Decide whether to be goal-directed (40% of the time)
             goal_directed_prob = 0.4
             is_goal_directed = rng.random() < goal_directed_prob
@@ -156,15 +157,25 @@ def rollout_episode(
             # Fallback to random
             act = rng.normal(0.0, 1.0, size=env.action_dim).astype(np.float32) * action_scale
 
-        actions.append(act.astype(np.float32))
-        obs, _, done, info = env.step(act)
-        states.append(info['state'].astype(np.float32))
+        # Save pre-step state and corresponding absolute action target
+        if env.relative:
+            action_abs = agent_pos + act * env.action_scale
+        else:
+            action_abs = act * env.action_scale
+
+        actions.append(action_abs.astype(np.float32))
+        states.append(current_state.astype(np.float32))
+
         if collect_frames:
             fr = obs['visual']
-            # resize to img_size x img_size and normalise to [0,1]
             im = Image.fromarray(fr.astype(np.uint8)) if fr.dtype != np.uint8 else Image.fromarray(fr)
             im = im.resize((img_size, img_size), Image.BILINEAR)
-            frames.append(np.asarray(im).astype(np.float32) / 255.0)
+            frames.append(np.asarray(im).astype(np.float32))
+
+        obs, _, done, info = env.step(act)
+        state = info['state'].astype(np.float32)
+        if collect_frames:
+            pass
         if done:
             break
 
@@ -177,14 +188,23 @@ def rollout_episode(
     return states, actions, frames
 
 
-def save_zarr(zarr_out: str, frames_list: List[np.ndarray], actions_list: List[np.ndarray]):
+def save_zarr(
+    zarr_out: str,
+    frames_list: List[np.ndarray],
+    actions_list: List[np.ndarray],
+    states_list: List[np.ndarray],
+):
     if zarr is None:
         raise ImportError("zarr is not installed. Try: pip install zarr")
-    # Flatten episodes; ensure per-episode frames match action count (post-step frames)
+    # Flatten episodes; ensure per-episode frames match action count (pre-step frames)
     # frames_list[i].shape == (Li, H, W, 3); actions_list[i].shape == (Li, A)
-    lengths = [min(f.shape[0], a.shape[0]) for f, a in zip(frames_list, actions_list)]
+    lengths = [
+        min(f.shape[0], a.shape[0], s.shape[0])
+        for f, a, s in zip(frames_list, actions_list, states_list)
+    ]
     frames = np.concatenate([f[:L] for f, L in zip(frames_list, lengths)], axis=0)
     actions = np.concatenate([a[:L] for a, L in zip(actions_list, lengths)], axis=0)
+    states = np.concatenate([s[:L] for s, L in zip(states_list, lengths)], axis=0)
     ends = np.cumsum(lengths) - 1
 
     root = zarr.group(zarr_out, overwrite=True)
@@ -193,6 +213,7 @@ def save_zarr(zarr_out: str, frames_list: List[np.ndarray], actions_list: List[n
     # Create arrays
     g_data.create('img', data=frames.astype(np.float32), chunks=(min(160, frames.shape[0]),) + frames.shape[1:])
     g_data.create('action', data=actions.astype(np.float32), chunks=(min(160, actions.shape[0]), actions.shape[1]))
+    g_data.create('state', data=states.astype(np.float32), chunks=(min(160, states.shape[0]), states.shape[1]))
     g_meta.create('episode_ends', data=ends.astype(np.int64), chunks=(max(1, len(ends)),))
     # minimal attrs
     root.attrs.update({})
@@ -242,10 +263,10 @@ def main():
         return np.asarray(vals, dtype=np.float32)
 
     def gen_split(n_eps: int):
-        acts_list, frames_list = [], []
+        acts_list, frames_list, states_list = [], [], []
         for _ in range(n_eps):
             T = int(rng.integers(args.len_min, args.len_max + 1))
-            _, actions, frames = rollout_episode(
+            states, actions, frames = rollout_episode(
                 env,
                 T=T,
                 policy=args.policy,
@@ -260,16 +281,18 @@ def main():
             )
             acts_list.append(actions)
             frames_list.append(frames)
-        return acts_list, frames_list
+            states_list.append(states)
+        return acts_list, frames_list, states_list
 
-    train_actions, train_frames = gen_split(args.train_eps)
-    val_actions, val_frames = gen_split(args.val_eps)
+    train_actions, train_frames, train_states = gen_split(args.train_eps)
+    val_actions, val_frames, val_states = gen_split(args.val_eps)
 
     # Save a single Zarr with both train and val concatenated
     # Train/val separation is handled via split_ratio when loading the dataset
     frames_all = train_frames + val_frames
     actions_all = train_actions + val_actions
-    save_zarr(args.zarr_out, frames_all, actions_all)
+    states_all = train_states + val_states
+    save_zarr(args.zarr_out, frames_all, actions_all, states_all)
     print(f'Saved synthetic Zarr store to {args.zarr_out}')
     print(f'  Training episodes: {args.train_eps}')
     print(f'  Validation episodes: {args.val_eps}')

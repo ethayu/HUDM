@@ -73,14 +73,20 @@ def load_episodes_from_zarr(zarr_path: str, split: str = "train", split_ratio: f
 
 def display_episode(episode: np.ndarray, title: str, fps: int = 15):
     """Display an episode in a window as an animation.
-    episode: (T, H, W, C) array, values in [0, 1] (float32)
+    episode: (T, H, W, C) array, values in [0, 1] or [0, 255] (float32)
     """
+    def to_uint8(frames: np.ndarray) -> np.ndarray:
+        if np.issubdtype(frames.dtype, np.floating):
+            fmax = float(np.nanmax(frames))
+            if fmax > 1.5:
+                frames = np.clip(frames, 0.0, 255.0)
+                return frames.astype(np.uint8)
+            frames = np.clip(frames, 0.0, 1.0)
+            return (frames * 255.0).astype(np.uint8)
+        return frames.astype(np.uint8)
+
     # Convert to uint8 [0, 255] for display
-    if episode.dtype == np.float32 or episode.dtype == np.float64:
-        episode = np.clip(episode, 0.0, 1.0)
-        episode_display = (episode * 255).astype(np.uint8)
-    else:
-        episode_display = episode.astype(np.uint8)
+    episode_display = to_uint8(episode)
     
     fig, ax = plt.subplots(figsize=(8, 8))
     ax.set_title(title, fontsize=14)
@@ -168,4 +174,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-

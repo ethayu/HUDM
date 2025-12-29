@@ -4,7 +4,6 @@ from typing import Tuple, List, Optional
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
 
 try:
     import zarr
@@ -20,11 +19,13 @@ class ZarrPushTWindows(Dataset):
       - x_t:      (3, H, W)
       - x_t1:     (3, H, W)
       - x_tfut:   (3, H, W)  # at t+T
-      - a_t:      (A,)
-      - a_seq:    (T, A)     # actions from t..t+T-1
+      - a_t:      (A,)       # relative action, scaled by action_scale (not clipped)
+      - a_seq:    (T, A)     # relative actions from t..t+T-1, scaled by action_scale (not clipped)
 
     Windows are uniformly sampled over time indices within split episodes.
     """
+
+    _ACTION_SCALE = 100.0
 
     def __init__(
         self,
@@ -32,9 +33,9 @@ class ZarrPushTWindows(Dataset):
         split: str = "train",
         split_ratio: float = 0.8,
         horizon_T: int = 8,
-        transform: Optional[transforms.Compose] = None,
         image_key: str = "img",
         action_key: str = "action",
+        state_key: str = "state",
         meta_episode_key: str = "episode_ends",
     ):
         if zarr is None:
@@ -43,12 +44,8 @@ class ZarrPushTWindows(Dataset):
         self.T = int(horizon_T)
         self.image_key = image_key
         self.action_key = action_key
+        self.state_key = state_key
         self.meta_episode_key = meta_episode_key
-        self.transform = transform or transforms.Compose([
-            transforms.ToTensor(),  # expects HWC [0,255] or [0,1]; will convert to [0,1]
-            transforms.Resize((96, 96)),
-            transforms.Normalize([0.5, 0.5, 0.5], [0.5, 0.5, 0.5]),  # to [-1,1]
-        ])
 
         # Open Zarr arrays
         root = zarr.open_group(zarr_root, mode="r")
@@ -56,6 +53,7 @@ class ZarrPushTWindows(Dataset):
         meta = root["meta"]
         self.img = data[self.image_key]       # (N, H, W, C), float32
         self.act = data[self.action_key]      # (N, A), float32
+        self.state = data[self.state_key]     # (N, 5), float32
         self.ends = meta[self.meta_episode_key][:]  # (E,), int64 ends
 
         # Compute episode start indices
@@ -87,26 +85,30 @@ class ZarrPushTWindows(Dataset):
     def __len__(self):
         return len(self.indices)
 
+    @staticmethod
+    def _img_to_tensor(img: np.ndarray) -> torch.Tensor:
+        img = np.clip(img, 0.0, 255.0).astype(np.float32)
+        img = img / 255.0
+        img = img * 2.0 - 1.0
+        return torch.from_numpy(img).permute(2, 0, 1)
+
     def __getitem__(self, idx: int):
         ei, t = self.indices[idx]
-        s = int(self.starts[ei])
         # Direct indexing over flattened arrays
         x_t   = self.img[t]
         x_t1  = self.img[t + 1]
         x_tf  = self.img[t + self.T]
-        a_seq = self.act[t : t + self.T]
-        a_t   = a_seq[0]
+        a_seq_abs = self.act[t : t + self.T]
+        agent_pos = self.state[t : t + self.T, :2]
+
+        # Absolute pixel targets -> relative delta -> normalize by action_scale.
+        a_seq = (a_seq_abs - agent_pos) / self._ACTION_SCALE
+        a_t = a_seq[0]
 
         # Convert images to tensors in [-1,1]
-        # If x are already float32 in [0,1], ToTensor would scale [0,255] differently;
-        # we handle both by clipping and normalising via torchvision pipeline.
-        x_t   = np.clip(x_t, 0.0, 1.0)
-        x_t1  = np.clip(x_t1, 0.0, 1.0)
-        x_tf  = np.clip(x_tf, 0.0, 1.0)
-
-        x_t   = self.transform((x_t * 255).astype(np.uint8))
-        x_t1  = self.transform((x_t1 * 255).astype(np.uint8))
-        x_tf  = self.transform((x_tf * 255).astype(np.uint8))
+        x_t = self._img_to_tensor(x_t)
+        x_t1 = self._img_to_tensor(x_t1)
+        x_tf = self._img_to_tensor(x_tf)
 
         sample = {
             "x_t": x_t,
@@ -116,4 +118,3 @@ class ZarrPushTWindows(Dataset):
             "a_seq": torch.from_numpy(a_seq.astype(np.float32)),
         }
         return sample
-
