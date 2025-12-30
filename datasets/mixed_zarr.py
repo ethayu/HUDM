@@ -2,7 +2,7 @@ import copy
 import torch
 from torch.utils.data import ConcatDataset, Subset
 from omegaconf import DictConfig
-from .zarr_rollouts import ZarrPushTWindows
+from .zarr_episodes import ZarrPushTEpisodes
 
 
 def _assert_zarr_schema(zarr_path: str) -> None:
@@ -27,12 +27,12 @@ def _subset_indices(n: int, k: int, seed: int, replace: bool) -> torch.Tensor:
         return torch.randperm(n, generator=g)[:k]
 
 
-def build_mixed_zarr_windows(cfg: DictConfig):
+def build_mixed_zarr_episodes(cfg: DictConfig):
     data = cfg.data
     _assert_zarr_schema(data.zarr_path)
     # Real datasets
-    real_train = ZarrPushTWindows(data.zarr_path, split='train', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
-    real_val   = ZarrPushTWindows(data.zarr_path, split='valid', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
+    real_train = ZarrPushTEpisodes(data.zarr_path, split='train', split_ratio=data.split_ratio)
+    real_val = ZarrPushTEpisodes(data.zarr_path, split='valid', split_ratio=data.split_ratio)
 
     s_cfg = getattr(data, 'synthetic', None)
     if not s_cfg or not getattr(s_cfg, 'enable', False):
@@ -40,8 +40,8 @@ def build_mixed_zarr_windows(cfg: DictConfig):
 
     _assert_zarr_schema(s_cfg.zarr_path)
     # Synthetic datasets
-    synth_train = ZarrPushTWindows(s_cfg.zarr_path, split='train', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
-    synth_val   = ZarrPushTWindows(s_cfg.zarr_path, split='valid', split_ratio=data.split_ratio, horizon_T=data.horizon_T)
+    synth_train = ZarrPushTEpisodes(s_cfg.zarr_path, split='train', split_ratio=data.split_ratio)
+    synth_val = ZarrPushTEpisodes(s_cfg.zarr_path, split='valid', split_ratio=data.split_ratio)
 
     total_target = getattr(s_cfg, 'total_train', None)
     frac = float(getattr(s_cfg, 'frac', 0.5))
@@ -54,7 +54,7 @@ def build_mixed_zarr_windows(cfg: DictConfig):
     n_real = max(0, total_target - n_synth)
 
     idx_real = _subset_indices(len(real_train), n_real, seed=seed, replace=(n_real > len(real_train)))
-    idx_synth = _subset_indices(len(synth_train), n_synth, seed=seed+1, replace=(n_synth > len(synth_train)))
+    idx_synth = _subset_indices(len(synth_train), n_synth, seed=seed + 1, replace=(n_synth > len(synth_train)))
 
     mixed_train = ConcatDataset([
         Subset(real_train, idx_real),
@@ -68,8 +68,8 @@ def build_mixed_zarr_windows(cfg: DictConfig):
         mixed_val = synth_val
     else:
         n = min(len(real_val), len(synth_val))
-        idx_r = _subset_indices(len(real_val), n, seed=seed+2, replace=False)
-        idx_s = _subset_indices(len(synth_val), n, seed=seed+3, replace=False)
+        idx_r = _subset_indices(len(real_val), n, seed=seed + 2, replace=False)
+        idx_s = _subset_indices(len(synth_val), n, seed=seed + 3, replace=False)
         mixed_val = ConcatDataset([Subset(real_val, idx_r), Subset(synth_val, idx_s)])
 
     return mixed_train, mixed_val

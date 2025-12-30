@@ -17,7 +17,7 @@ HUDM/
 ├─ checkpoints_world/     # saved world model runs (each with world.yaml & .pt weights)
 ├─ configs/               # experiment YAMLs (world.yaml)
 ├─ datasets/              # Zarr dataset utilities
-│   ├─ zarr_rollouts.py  # Zarr-backed image+action windows for world training
+│   ├─ zarr_episodes.py  # Zarr-backed full-episode dataset for world training
 │   └─ mixed_zarr.py     # Optional mixing of real + synthetic Zarr datasets
 ├─ models/                # world model components
 │   └─ world/             # CNN encoder, upconv decoders, tiny transformer dynamics

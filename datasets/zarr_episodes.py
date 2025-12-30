@@ -1,5 +1,4 @@
-import os
-from typing import Tuple, List, Optional
+from typing import List
 
 import numpy as np
 import torch
@@ -11,18 +10,14 @@ except Exception:
     zarr = None  # lazily checked at __init__
 
 
-class ZarrPushTWindows(Dataset):
+class ZarrPushTEpisodes(Dataset):
     """
-    Windowed dataset over a PushT Zarr store producing image sequences and actions.
+    Episode dataset over a PushT Zarr store.
 
     Each item returns a dict with:
-      - x_t:      (3, H, W)
-      - x_t1:     (3, H, W)
-      - x_tfut:   (3, H, W)  # at t+T
-      - a_t:      (A,)       # relative action, scaled by action_scale (not clipped)
-      - a_seq:    (T, A)     # relative actions from t..t+T-1, scaled by action_scale (not clipped)
-
-    Windows are uniformly sampled over time indices within split episodes.
+      - x: (T, 3, H, W)   images normalized to [-1, 1]
+      - a: (T-1, A)       relative actions normalized by action_scale
+      - length: T
     """
 
     _ACTION_SCALE = 100.0
@@ -32,7 +27,6 @@ class ZarrPushTWindows(Dataset):
         zarr_root: str,
         split: str = "train",
         split_ratio: float = 0.8,
-        horizon_T: int = 8,
         image_key: str = "img",
         action_key: str = "action",
         state_key: str = "state",
@@ -41,7 +35,6 @@ class ZarrPushTWindows(Dataset):
         if zarr is None:
             raise ImportError("zarr not installed. pip install zarr")
         self.store_path = zarr_root
-        self.T = int(horizon_T)
         self.image_key = image_key
         self.action_key = action_key
         self.state_key = state_key
@@ -70,20 +63,8 @@ class ZarrPushTWindows(Dataset):
         else:
             self.ep_idx = np.arange(n_train, n_ep)
 
-        # Precompute all valid (episode, t) windows within chosen split
-        self.indices: List[Tuple[int, int]] = []
-        for ei in self.ep_idx:
-            s = int(self.starts[ei])
-            e = int(self.ends[ei])
-            # valid t satisfy t+T <= e (since x_tfut is at t+T)
-            max_t = e - self.T
-            if max_t < s:
-                continue
-            for t in range(s, max_t + 1):
-                self.indices.append((ei, t))
-
     def __len__(self):
-        return len(self.indices)
+        return len(self.ep_idx)
 
     @staticmethod
     def _img_to_tensor(img: np.ndarray) -> torch.Tensor:
@@ -93,28 +74,48 @@ class ZarrPushTWindows(Dataset):
         return torch.from_numpy(img).permute(2, 0, 1)
 
     def __getitem__(self, idx: int):
-        ei, t = self.indices[idx]
-        # Direct indexing over flattened arrays
-        x_t   = self.img[t]
-        x_t1  = self.img[t + 1]
-        x_tf  = self.img[t + self.T]
-        a_seq_abs = self.act[t : t + self.T]
-        agent_pos = self.state[t : t + self.T, :2]
+        ei = self.ep_idx[idx]
+        s = int(self.starts[ei])
+        e = int(self.ends[ei])
+        # Frames and states
+        x = self.img[s : e + 1]
+        state = self.state[s : e + 1]
+        # Actions align with transitions s_t -> s_{t+1}
+        a_abs = self.act[s:e]
+        agent_pos = state[:-1, :2]
+        a = (a_abs - agent_pos) / self._ACTION_SCALE
 
-        # Absolute pixel targets -> relative delta -> normalize by action_scale.
-        a_seq = (a_seq_abs - agent_pos) / self._ACTION_SCALE
-        a_t = a_seq[0]
+        x_t = torch.stack([self._img_to_tensor(frame) for frame in x], dim=0)
+        a_t = torch.from_numpy(a.astype(np.float32))
 
-        # Convert images to tensors in [-1,1]
-        x_t = self._img_to_tensor(x_t)
-        x_t1 = self._img_to_tensor(x_t1)
-        x_tf = self._img_to_tensor(x_tf)
-
-        sample = {
-            "x_t": x_t,
-            "x_t1": x_t1,
-            "x_tfut": x_tf,
-            "a_t": torch.from_numpy(a_t.astype(np.float32)),
-            "a_seq": torch.from_numpy(a_seq.astype(np.float32)),
+        return {
+            "x": x_t,
+            "a": a_t,
+            "length": x_t.shape[0],
         }
-        return sample
+
+
+def collate_episodes(batch: List[dict]) -> dict:
+    lengths = [item["length"] for item in batch]
+    max_len = max(lengths)
+    bsz = len(batch)
+    c, h, w = batch[0]["x"].shape[1:]
+    a_dim = batch[0]["a"].shape[1] if batch[0]["a"].numel() > 0 else 2
+
+    x = torch.zeros((bsz, max_len, c, h, w), dtype=batch[0]["x"].dtype)
+    a = torch.zeros((bsz, max_len - 1, a_dim), dtype=batch[0]["a"].dtype)
+    mask = torch.zeros((bsz, max_len), dtype=torch.bool)
+
+    for i, item in enumerate(batch):
+        L = item["length"]
+        x[i, :L] = item["x"]
+        mask[i, :L] = True
+        if L > 1:
+            a[i, : L - 1] = item["a"]
+
+    return {
+        "x": x,
+        "a": a,
+        "mask": mask,
+        "lengths": torch.tensor(lengths, dtype=torch.long),
+    }

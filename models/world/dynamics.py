@@ -35,8 +35,7 @@ class TinyTransformerDynamics(nn.Module):
         delta = self.head(cls)
         return z_k + delta  # residual prediction
 
-    @torch.no_grad()
-    def rollout(self, z0_k: torch.Tensor, a_seq: torch.Tensor, detach_each_step: bool = True) -> torch.Tensor:
+    def rollout(self, z0_k: torch.Tensor, a_seq: torch.Tensor, detach_each_step: bool = False) -> torch.Tensor:
         """
         Predict z at t+T given initial z_t and action sequence a_{t:t+T-1}.
         If detach_each_step is True, breaks gradients between steps (no BPTT >1).
@@ -45,9 +44,7 @@ class TinyTransformerDynamics(nn.Module):
         B, T, A = a_seq.shape
         z = z0_k
         for i in range(T):
-            z_next = self.step(z, a_seq[:, i, :])
             if detach_each_step:
-                z = z_next.detach()
-            else:
-                z = z_next
+                z = z.detach()
+            z = self.step(z, a_seq[:, i, :])
         return z

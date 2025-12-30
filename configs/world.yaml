@@ -16,9 +16,11 @@ data:
 model:
   D: 512
   K: [64, 128, 256, 512]
+  decoder_mode: "per_level"   # per_level | shared
+  dynamics_mode: "per_level"  # per_level | shared
 
 train:
-  batch_size: 64
+  batch_size: 8
   num_workers: 4
   no_cuda: false
   checkpoint_dir: checkpoints_world
@@ -28,10 +30,12 @@ optim:
   lr: 0.0003
 
 loss:
-  beta_null: 0.1
+  recon_weight: 1.0
+  teacher_weight: 1.0
+  rollout_weight: 1.0
 
 schedule:
-  max_epochs_per_level: 30
+  max_epochs: 30
   patience: 5
   min_delta: 0.001
 

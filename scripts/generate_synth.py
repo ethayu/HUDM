@@ -19,7 +19,7 @@ Usage:
       --seed 0 --with_velocity --img-size 96
 
 Notes:
-  - Outputs a Zarr store compatible with datasets/zarr_rollouts.py
+  - Outputs a Zarr store compatible with datasets/zarr_episodes.py
   - The Zarr store contains: data/img, data/action, data/state, meta/episode_ends
   - Images are stored as float32 in [0, 255] range
   - Actions are absolute pixel targets (float32)
