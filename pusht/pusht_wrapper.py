@@ -157,7 +157,17 @@ class PushTWrapper(PushTEnv):
                 )
         
         init_state = generate_state()
-        goal_state = generate_state(return_goal=True)
+        goal_state = init_state +(
+                        [
+                            rs.randint(0, 10),
+                            rs.randint(0, 10),
+                            rs.randint(0, 10),
+                            rs.randint(0, 10),
+                            rs.randn() * 0.05,
+                            0,
+                            0
+                    ]
+                ) #generate_state(return_goal=not(random_goal))
         
         return init_state, goal_state
     

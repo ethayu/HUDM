@@ -8,6 +8,7 @@ sequence according to a provided cost function.
 import torch
 import numpy as np
 from typing import Callable, Optional
+import matplotlib.pyplot as plt
 
 class CEMPlanner:
     def __init__(
@@ -65,7 +66,7 @@ class CEMPlanner:
         # Initialize sampling distribution parameters
         # Mean and std for each timestep and action dimension
         self.mu = torch.zeros(horizon, action_dim, device=self.device)
-        self.std = torch.ones(horizon, action_dim, device=self.device)
+        self.std = torch.ones(horizon, action_dim, device=self.device)*5
 
     def plan(
         self,
@@ -88,7 +89,7 @@ class CEMPlanner:
         self.std.fill_(1.0)
         P = self.pop_size
 
-        for _ in range(self.n_iter):
+        for nn in range(self.n_iter):
 
             # -------- sample candidate action sequences -------------------
             actions = torch.normal(
@@ -157,23 +158,32 @@ class CEMPlanner:
 
             else:
                 # ---- Use learned ensemble (original behaviour) ----------
-                s_hist = state_hist.expand(P, -1, -1).clone()   # (P,H,D)
-                a_hist = action_hist.expand(P, -1, -1).clone()  # (P,H,A)
-                m_hist = mask_hist.expand(P, -1, -1).clone()    # (P,H,D)
+                s_hist = state_hist.expand(P, -1, -1).clone()[:,-1,:]   # (P,H,D)
 
-                states_traj, masks_traj, pred_vars = self.model.rollout_with_dropout(
-                    s_hist, a_hist, m_hist, actions, self.var_threshold, return_vars=True
-                )
-                final_states = states_traj[:, -1, :]
-                final_masks  = masks_traj[:, -1, :]
-                mu_pred, var_pred = final_states, pred_vars[:, -1, :]
+                s_flat = s_hist.view(P, -1)
+
+                z = self.model.encoder(s_flat)
+
+                pred_roll_z_k = []
+                pred_roll_s_k = []
+                for li, k in enumerate(self.model.K):
+                    preds_z = []
+                    preds_s = []
+                    z_prev = z[:, :k]
+                    for t in range(self.horizon):
+                        z_prev = self.model.dynamics[li].step(z_prev, actions[:, t, :])
+                        preds_z.append(z_prev)
+                        pred_s = self.model.decoders[li](z_prev)
+                        preds_s.append(pred_s)
+                    pred_roll_z = torch.stack(preds_z, dim=1)
+                    pred_roll_s = torch.stack(preds_s, dim=1)
+                    pred_roll_z_k.append(pred_roll_z)
+                    pred_roll_s_k.append(pred_roll_s) #largest dimension, #candidate, time, D ; 4,10,50,7
 
                 # multiple imputations
                 costs_samples = []
-                for _ in range(n_impute):
-                    noise   = torch.randn_like(mu_pred)
-                    imputes = mu_pred + torch.sqrt(var_pred) * noise
-                    comp    = torch.where(final_masks, final_states, imputes)
+                for k in range(len(self.model.K)):
+                    comp = pred_roll_s_k[k][ :, -1, :]
                     costs_samples.append(self.cost_fn(comp))
 
                 costs_stack = torch.stack(costs_samples, dim=0)
@@ -182,15 +192,33 @@ class CEMPlanner:
                 elif agg_mode == "min":
                     costs = costs_stack.min(dim=0).values
                 else:
+                    #costs = costs_stack[-1]
                     costs = costs_stack.mean(dim=0)
 
             # -------------------------------------------------- CEM update
             elite_idxs    = costs.topk(self.n_elite, largest=False).indices
-            elite_actions = actions[elite_idxs]           # (E,horizon,A)
+            elite_actions = actions[elite_idxs,0]           # (E,horizon,A)
             if self.use_gt:
                 elite_actions = elite_actions.to(self.device)
-
+            import pdb; pdb.set_trace()
             self.mu  = elite_actions.mean(dim=0)
             self.std = elite_actions.std(dim=0) + 1e-6
+            # Compute average cost over samples (dim=1)
+            avg_cost = costs_stack.mean(dim=1).data.cpu().numpy()  # shape: (4,)
 
-        return self.mu.cpu().detach()
+            # Plot
+            k = torch.arange(len(avg_cost))
+
+            plt.figure()
+            plt.plot(k, avg_cost)
+            plt.xlabel("k")
+            plt.ylabel(f"Average cost per sample")
+            plt.title(f"Average Cost vs. k at iter {nn}")
+            # Save figure
+            plt.savefig(f"avg_cost_vs_k_iter{nn}.png", dpi=200, bbox_inches="tight")
+            plt.close()
+
+            #plot the costs at each iter
+
+
+        return self.mu.cpu().detach(), costs_stack

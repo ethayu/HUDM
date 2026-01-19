@@ -2,3 +2,30 @@
 wandb/
 *.pyc
 rollouts/
+.tmp*
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# ===== OS =====
+.DS_Store
+
+# ===== Training outputs =====
+checkpoints*/
+models*/
+synthetic*/
+wandb/
+logs/
+
+# ===== Plots & figures =====
+*.png
+*.jpg
+*.pdf
+
+# ===== Data artifacts =====
+datasets/**/*.zarr
+datasets/**/*.zip
+datasets/**/*.npz

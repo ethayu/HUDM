@@ -38,7 +38,7 @@ from __future__ import annotations
 import os
 import sys
 from typing import Tuple
-
+from models.world.model import HierWorldModel
 # Ensure that `pusht`, `planning`, etc. can be imported even when this script is
 # launched via an absolute path from another working directory.
 sys.path.append(os.path.dirname(__file__))
@@ -83,6 +83,7 @@ def closed_loop_cem(
     init_state: np.ndarray,
     goal_state: np.ndarray,
     cfg: DictConfig,
+    dynamics_ensemble: HierWorldModel
 ) -> Tuple[bool, list[np.ndarray], list[np.ndarray]]:
     """Run closed-loop CEM with parameters from *cfg* and return
     (success flag, trajectory of states, RGB frames).  *frames* is an empty
@@ -92,7 +93,7 @@ def closed_loop_cem(
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     planner = CEMPlanner(
-        dynamics_ensemble=None,
+        dynamics_ensemble=dynamics_ensemble,
         cost_fn=make_cost_fn(goal_state),
         action_dim=env_step.action_dim,
         horizon=cfg.horizon,
@@ -100,7 +101,7 @@ def closed_loop_cem(
         elite_frac=cfg.elite_frac,
         n_iter=cfg.n_iter,
         var_threshold=cfg.var_threshold,
-        gt_env=env_rollout,
+        gt_env=None,#env_rollout,
         n_env_samples=cfg.n_env_samples,
         device=device,
     )
@@ -251,16 +252,16 @@ def main(cfg_path: str):
     # Visualisation / real‐step environment (full rendering capability)
     env_vis_wrapped = gym.make(
         env_id,
-        disable_env_checker=True,   # skip strict checks (reset output etc.)
-        apply_api_compatibility=False,  # keep original (obs, reward, done, info) API
+        #disable_env_checker=True,   # skip strict checks (reset output etc.)
+        #apply_api_compatibility=False,  # keep original (obs, reward, done, info) API
         **env_kwargs,
     )
 
     # Separate **headless** environment for CEM roll-outs ------------------
     env_rollout_wrapped = gym.make(
         env_id,
-        disable_env_checker=True,
-        apply_api_compatibility=False,
+        #disable_env_checker=True,
+        #apply_api_compatibility=False,
         **env_kwargs,
     )
 
@@ -274,7 +275,7 @@ def main(cfg_path: str):
     env_rollout: PushTWrapper = _unwrap(env_rollout_wrapped)
 
     # sample initial / goal states (seed=0 for determinism)
-    init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0)
+    init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0,random_goal=True)
     env_vis.prepare(seed=0, init_state=init_state)
     env_rollout.prepare(seed=0, init_state=init_state)  # sync initial state
 
@@ -282,10 +283,51 @@ def main(cfg_path: str):
     # Run planner -------------------------------------------------------
     # ------------------------------------------------------------------
 
+     # Attempt to locate latest run dir
+    ckpt_root = "/home/aurora/HUDM-mwm/checkpoints_world"
+    run_dirs = [os.path.join(ckpt_root, d) for d in os.listdir(ckpt_root) if os.path.isdir(os.path.join(ckpt_root, d))]
+    if not run_dirs:
+        print('No checkpoint run directories found; using random weights')
+        dynamics_ensemble = None
+    else:
+        latest = max(run_dirs, key=os.path.getmtime)
+        print("loaded :", latest)
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        model_cfg = OmegaConf.load(os.path.join(latest, 'world.yaml'))
+        #load_model
+        
+        dynamics_ensemble = HierWorldModel(
+            K=list(model_cfg.model.K),
+            D=int(model_cfg.model.D),
+            action_dim=model_cfg.data.action_dim,
+            decoder_mode=str(getattr(model_cfg.model, "decoder_mode", "per_level")),
+            dynamics_mode=str(getattr(model_cfg.model, "dynamics_mode", "per_level")),
+        ).to(device)
+
+        enc_p = os.path.join(latest, 'encoder.pt')
+        if os.path.isfile(enc_p):
+            dynamics_ensemble.encoder.load_state_dict(torch.load(enc_p, map_location=device))
+        decoder_mode = str(getattr(model_cfg.model, "decoder_mode", "per_level"))
+        if decoder_mode == "shared":
+            dp = os.path.join(latest, "decoder.pt")
+            if os.path.isfile(dp):
+                dynamics_ensemble.decoder.load_state_dict(torch.load(dp, map_location=device))
+        else:
+            for li in range(len(model_cfg.model.K)):
+                dp = os.path.join(latest, f'decoder_l{li}.pt')
+                if os.path.isfile(dp):
+                    dynamics_ensemble.decoders[li].load_state_dict(torch.load(dp, map_location=device))
+
+        dynamics_ensemble.eval()
+        
+
     save_frames = bool(cfg.save)
     success, traj, frames = closed_loop_cem(
-        env_vis, env_rollout, init_state, goal_state, cfg
+        env_vis, env_rollout, init_state, goal_state, cfg, dynamics_ensemble=dynamics_ensemble
     )
+
+    env_vis.prepare(seed=0, init_state=goal_state)
+    gt_goal = env_vis.render("rgb_array")
 
     # ------------------------------------------------------------------
     # Persist rollout video if requested --------------------------------
@@ -308,8 +350,8 @@ def main(cfg_path: str):
         # Determine filename index so that multiple rollouts in the same run
         # do not overwrite each other (even though the current script only
         # generates one rollout).  Counting any existing .mp4 files.
-        existing = [f for f in os.listdir(run_dir) if f.endswith(".gif")]
-        vid_fname = f"rollout_{len(existing):03d}.gif"
+        existing = [f for f in os.listdir(run_dir) if f.endswith(".mp4")]
+        vid_fname = f"rollout_{len(existing):03d}.mp4"
         vid_path = os.path.join(run_dir, vid_fname)
 
         # Write video to disk ------------------------------------------------
@@ -317,6 +359,10 @@ def main(cfg_path: str):
         print(f"[save] Writing rollout GIF to {vid_path} …")
         imageio.mimwrite(vid_path, frames, fps=fps)
         print(f"[save] Video saved ({len(frames)} frames)")
+
+        #Save gt goal
+        gt_path = os.path.join(run_dir, "gt_goal.png")
+        imageio.imwrite(gt_path, gt_goal)
 
     print("Reached goal:" if success else "Failed:", success)
 
