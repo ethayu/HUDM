@@ -59,7 +59,7 @@ def run_epoch(
         x_flat = x.view(B * L, C, H, W)
         s_flat = s.view(B * L, -1)
 
-        z_flat = model.encoder(s_flat)
+        z_flat = model.encoder(x_flat)
         z = z_flat.view(B, L, -1)
         mask_flat = mask.view(B * L)
 
@@ -84,7 +84,16 @@ def run_epoch(
             else:
                 z_pad_flat = model._pad_prefix(z_flat, k)
                 x_hat_flat = model.decoder(z_pad_flat)
-            recon = F.mse_loss(x_hat_flat[mask_flat], s_flat[mask_flat])
+            if cfg.model.input == "images":
+                recon = F.mse_loss(x_hat_flat[mask_flat], x_flat[mask_flat])
+            elif cfg.model.input == "state":
+                recon = F.mse_loss(x_hat_flat[mask_flat], s_flat[mask_flat])
+            elif cfg.model.input == "mixed":
+                recon = F.smooth_l1_loss(x_hat_flat[mask_flat], s_flat[mask_flat])
+                #recon = F.mse_loss(x_hat_flat[mask_flat], s_flat[mask_flat])
+            else:
+                raise ValueError(f"Invalid input mode: {model.input}")
+            
 
             # Teacher forcing loss over all steps
             if model.dynamics_mode == "per_level":

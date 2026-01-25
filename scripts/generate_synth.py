@@ -61,7 +61,7 @@ def rollout_episode(
     img_size: int = 96,
 ) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
     init_state, goal = env.sample_random_init_goal_states(seed=int(rng.integers(0, 1_000_000)))
-    obs, state0 = env.prepare(seed=int(rng.integers(0, 1_000_000)), init_state=init_state)
+    obs, state0 = env.prepare(seed=0, init_state=init_state)
 
     states = [state0]
     actions = []

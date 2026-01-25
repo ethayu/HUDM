@@ -14,9 +14,9 @@ data:
     val_source: "synthetic"  # Validation source: "real", "synthetic", or "mixed"
 
 model:
-  input: "state" # "state" | "images"
-  D: 512
-  K: [64, 128, 256, 512]
+  input: "mixed" # "state" | "images" | "mixed"
+  D: 256
+  K: [32, 64, 128, 256] #, 512]
   decoder_mode: "per_level"   # per_level | shared
   dynamics_mode: "per_level"  # per_level | shared
 

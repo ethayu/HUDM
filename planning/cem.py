@@ -10,6 +10,11 @@ import numpy as np
 from typing import Callable, Optional
 import matplotlib.pyplot as plt
 
+ACTION_MEAN = torch.tensor([-0.0087, 0.0068])
+ACTION_STD = torch.tensor([0.2019, 0.2002])
+STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027,  2.54307914])
+STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094])
+
 class CEMPlanner:
     def __init__(
         self,
@@ -22,6 +27,7 @@ class CEMPlanner:
         n_iter: int = 5,
         var_threshold: float = 0.1,
         gt_env: Optional[object] = None,      # optional ground-truth env for sampling
+        gt_actions: Optional[np.ndarray] = None,
         n_env_samples: int = 4,               # number of env rollouts per candidate when no learned model
         device: Optional[torch.device] = None,
     ):
@@ -58,8 +64,9 @@ class CEMPlanner:
         if dynamics_ensemble is not None and not self.use_env_sampling:
             # standard model-based planning
             self.use_env_sampling = False
+        import pdb; pdb.set_trace()
         self.use_gt = self.use_env_sampling  # backward compat alias
-
+        self.gt_actions = gt_actions
         # Rollout sampling parameters
         self.n_env_samples = max(1, n_env_samples)
 
@@ -72,9 +79,11 @@ class CEMPlanner:
         self,
         state_hist:  torch.Tensor,   # (1,H,D)
         action_hist: torch.Tensor,   # (1,H,A)
+        obs_hist: torch.Tensor,   # (1,H,)
         mask_hist:   torch.Tensor,   # (1,H,D)
         agg_mode: str = "average",   # {"max","min","average"}
-        n_impute: int = 4            # ≥1
+        n_impute: int = 4,            # ≥1
+        gt_goal: np.ndarray = None
     ) -> torch.Tensor:
         """
         Run CEM and return the best action sequence.
@@ -97,6 +106,10 @@ class CEMPlanner:
                 self.std.unsqueeze(0).expand(P, -1, -1)
             ).to(self.device)  # (P, horizon, A)
 
+            #insert gt actions
+            if self.gt_actions is not None:
+                actions[0] = self.gt_actions
+
             if self.use_env_sampling:
                 # ----------------------------------------------------------
                 #  Evaluate each candidate by empirical env rollouts
@@ -115,6 +128,7 @@ class CEMPlanner:
                     sample_states = []  # (S, horizon, D)
                     for s_idx in range(self.n_env_samples):
                         seed = np.random.randint(0, 2**31 - 1)
+                        self.gt_env.prepare(seed=seed, init_state=state_hist_np)
                         _, states = self.gt_env.rollout(seed, state_hist_np, act_seq_np)
                         # states returned shape (horizon+1, D); discard first
                         sample_states.append(states[1:])
@@ -142,19 +156,8 @@ class CEMPlanner:
                 var_pred     = torch.stack(var_last_list,     dim=0)  # (P,D)
 
                 # Imputation & cost aggregation ---------------------------
-                costs_samples = []
-                for _ in range(n_impute):
-                    noise   = torch.randn_like(final_states)
-                    imputes = final_states + torch.sqrt(var_pred) * noise
-                    comp    = torch.where(final_masks, final_states, imputes)
-                    costs_samples.append(self.cost_fn(comp))
-                costs_stack = torch.stack(costs_samples, dim=0)  # (n_impute,P)
-                if   agg_mode == "max":
-                    costs = costs_stack.max(dim=0).values
-                elif agg_mode == "min":
-                    costs = costs_stack.min(dim=0).values
-                else:
-                    costs = costs_stack.mean(dim=0)
+                costs = self.cost_fn(final_states)  # (P,)
+                #import pdb; pdb.set_trace()
 
             else:
                 # ---- Use learned ensemble (original behaviour) ----------
@@ -162,10 +165,18 @@ class CEMPlanner:
 
                 s_flat = s_hist.view(P, -1)
 
-                z = self.model.encoder(s_flat)
+                obs_hist = obs_hist.expand(P, -1, -1, -1, -1).clone()[:,-1,:]   # (P,H,)
+
+                z = self.model.encoder(obs_hist)
 
                 pred_roll_z_k = []
                 pred_roll_s_k = []
+
+                import pdb; pdb.set_trace()
+        
+                #actions_input = actions- (a_abs - agent_pos) / self._ACTION_SCALE
+                #a_t = (a_t - ACTION_MEAN) / ACTION_STD
+                #state_t = (state_t - STATE_MEAN) / STATE_STD
                 for li, k in enumerate(self.model.K):
                     preds_z = []
                     preds_s = []
@@ -174,6 +185,7 @@ class CEMPlanner:
                         z_prev = self.model.dynamics[li].step(z_prev, actions[:, t, :])
                         preds_z.append(z_prev)
                         pred_s = self.model.decoders[li](z_prev)
+
                         preds_s.append(pred_s)
                     pred_roll_z = torch.stack(preds_z, dim=1)
                     pred_roll_s = torch.stack(preds_s, dim=1)
@@ -196,16 +208,17 @@ class CEMPlanner:
                     costs = costs_stack.mean(dim=0)
 
             # -------------------------------------------------- CEM update
-            elite_idxs    = costs.topk(self.n_elite, largest=False).indices
-            elite_actions = actions[elite_idxs,0]           # (E,horizon,A)
+            elite_idxs   = costs.topk(self.n_elite, largest=False).indices
+            #import pdb; pdb.set_trace()
+            elite_actions = actions[elite_idxs]           # (E,horizon,A)
             if self.use_gt:
                 elite_actions = elite_actions.to(self.device)
-            import pdb; pdb.set_trace()
             self.mu  = elite_actions.mean(dim=0)
             self.std = elite_actions.std(dim=0) + 1e-6
+            
             # Compute average cost over samples (dim=1)
-            avg_cost = costs_stack.mean(dim=1).data.cpu().numpy()  # shape: (4,)
-
+            avg_cost = costs.mean(dim=0).data.cpu().numpy()  # shape: (4,)
+            """
             # Plot
             k = torch.arange(len(avg_cost))
 
@@ -217,8 +230,9 @@ class CEMPlanner:
             # Save figure
             plt.savefig(f"avg_cost_vs_k_iter{nn}.png", dpi=200, bbox_inches="tight")
             plt.close()
+            """
 
             #plot the costs at each iter
 
 
-        return self.mu.cpu().detach(), costs_stack
+        return self.mu.cpu().detach()#, costs_stack

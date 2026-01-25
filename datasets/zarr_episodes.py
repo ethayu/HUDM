@@ -3,13 +3,16 @@ from typing import List
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-
+import random
 try:
     import zarr
 except Exception:
     zarr = None  # lazily checked at __init__
 
-
+ACTION_MEAN = torch.tensor([-0.0087, 0.0068])
+ACTION_STD = torch.tensor([0.2019, 0.2002])
+STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027,  2.54307914])
+STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094])
 class ZarrPushTEpisodes(Dataset):
     """
     Episode dataset over a PushT Zarr store.
@@ -87,18 +90,39 @@ class ZarrPushTEpisodes(Dataset):
         #print(agent_pos.shape, a_abs.shape,s,e,self.act.shape,state.shape)
         #if agent_pos.shape != a_abs.shape:
         #    import pdb; pdb.set_trace()
-        a = (a_abs - agent_pos) / self._ACTION_SCALE
+        a = a_abs# (a_abs - agent_pos) / self._ACTION_SCALE #
 
         x_t = torch.stack([self._img_to_tensor(frame) for frame in x], dim=0)
         a_t = torch.from_numpy(a.astype(np.float32))
         state_t = torch.from_numpy(state.astype(np.float32))
 
+        a_t = (a_t - ACTION_MEAN) / ACTION_STD
+        state_t = (state_t - STATE_MEAN) / STATE_STD
         return {
             "x": x_t,
             "a": a_t,
             "state": state_t,
             "length": x_t.shape[0],
         }
+
+    def sample_traj_segment_from_dset(self, traj_len):
+        states = []
+        actions = []
+        observations = []
+        env_info = []
+        # sample init_states from dset
+        traj_len = traj_len+1
+        max_offset = -1
+        while max_offset < 0:  # filter out traj that are not long enough
+            traj_id = random.randint(0, len(self.ep_idx) - 1)
+            traj_dict = self.__getitem__(traj_id)
+            max_offset = traj_dict["state"].shape[0] - traj_len
+        states = traj_dict["state"].numpy()
+        offset = random.randint(0, max_offset)
+        states = states[offset : offset + traj_len]
+        actions = traj_dict["a"][offset : offset + traj_len - 1]
+        observations = traj_dict["x"][offset : offset + traj_len]
+        return observations, states, actions
 
 
 def collate_episodes(batch: List[dict]) -> dict:

@@ -51,7 +51,7 @@ import gym
 from gym.envs.registration import register
 from pusht.pusht_wrapper import PushTWrapper
 from planning.cem import CEMPlanner
-
+from datasets.zarr_episodes import ZarrPushTEpisodes
 
 # ---------------------------------------------------------------------------
 # Helper functions
@@ -63,10 +63,11 @@ def make_cost_fn(goal_state: np.ndarray):
 
     def _cost(states: torch.Tensor) -> torch.Tensor:
         goal = torch.as_tensor(goal_state, dtype=states.dtype, device=states.device)
+        eef_err = torch.norm(states[:, :2] - goal[:2], dim=1)
         pos_err = torch.norm(states[:, 2:4] - goal[2:4], dim=1)
         ang_err = torch.abs(torch.atan2(torch.sin(states[:, 4] - goal[4]),
                                         torch.cos(states[:, 4] - goal[4])))
-        return pos_err + 0.1 * ang_err
+        return pos_err + 0.1 * ang_err + eef_err
 
     return _cost
 
@@ -82,8 +83,10 @@ def closed_loop_cem(
     env_rollout: PushTWrapper,
     init_state: np.ndarray,
     goal_state: np.ndarray,
+    init_obs: np.ndarray,
     cfg: DictConfig,
-    dynamics_ensemble: HierWorldModel
+    dynamics_ensemble: HierWorldModel,
+    gt_actions: np.ndarray
 ) -> Tuple[bool, list[np.ndarray], list[np.ndarray]]:
     """Run closed-loop CEM with parameters from *cfg* and return
     (success flag, trajectory of states, RGB frames).  *frames* is an empty
@@ -96,12 +99,13 @@ def closed_loop_cem(
         dynamics_ensemble=dynamics_ensemble,
         cost_fn=make_cost_fn(goal_state),
         action_dim=env_step.action_dim,
-        horizon=cfg.horizon,
+        horizon=cfg.planning_horizon,
         pop_size=cfg.pop_size,
         elite_frac=cfg.elite_frac,
         n_iter=cfg.n_iter,
         var_threshold=cfg.var_threshold,
-        gt_env=None,#env_rollout,
+        gt_env=None,
+        gt_actions=gt_actions,
         n_env_samples=cfg.n_env_samples,
         device=device,
     )
@@ -111,6 +115,7 @@ def closed_loop_cem(
     H_hist = 1
     state_hist = torch.as_tensor(init_state, dtype=torch.float32, device=device).view(1, H_hist, -1)
     action_hist = torch.zeros(1, H_hist, env_step.action_dim, device=device)
+    obs_hist = torch.as_tensor(init_obs, dtype=torch.float32, device=device).unsqueeze(0).unsqueeze(0)
     mask_hist = torch.ones(1, H_hist, env_step.state_dim, dtype=torch.bool, device=device)
 
     trajectory: list[np.ndarray] = [init_state.copy()]
@@ -143,15 +148,19 @@ def closed_loop_cem(
         best_seq = planner.plan(
             state_hist,
             action_hist,
+            obs_hist,
             mask_hist,
             agg_mode="average",
             n_impute=1,
+            gt_goal=goal_state,
         )
         env_rollout.headless = False
 
         # Execute the first *replan_every* actions from the planned sequence
-        n_exec = min(replan_every, cfg.horizon)
-
+        n_exec = min(replan_every, cfg.planning_horizon)
+        pos_diffs = []
+        angle_diffs = []
+        eef_diffs = []
         for i in range(n_exec):
             if t >= cfg.steps:
                 break  # safety guard
@@ -165,9 +174,14 @@ def closed_loop_cem(
             trajectory.append(cur_state.copy())
 
             # ---- Logging ------------------------------------------------
-            dist = env_step.eval_state(goal_state, cur_state)["state_dist"]
-            print(f"step {t:03d}  dist {dist:6.1f}")
-
+            dist = env_step.eval_state(goal_state, cur_state)
+            pd = dist["pos_diff"]
+            ad = dist["angle_diff"] 
+            ed = dist["eef_diff"]
+            print(f"step {t:03d}  pos_diff {pd:6.1f} angle_diff {ad:6.1f} eef_diff {ed:6.1f}")
+            pos_diffs.append(pd)
+            angle_diffs.append(ad)
+            eef_diffs.append(ed)
             # ---- Update histories --------------------------------------
             state_t = torch.as_tensor(cur_state, dtype=torch.float32, device=device).view(1, 1, -1)
             action_t = torch.as_tensor(action_i, dtype=torch.float32, device=device).view(1, 1, -1)
@@ -176,7 +190,7 @@ def closed_loop_cem(
             state_hist = torch.cat([state_hist[:, -H_hist + 1 :], state_t], dim=1)
             action_hist = torch.cat([action_hist[:, -H_hist + 1 :], action_t], dim=1)
             mask_hist = torch.cat([mask_hist[:, -H_hist + 1 :], mask_t], dim=1)
-
+        
             # ---- Rendering --------------------------------------------
             if cfg.render:
                 try:
@@ -190,11 +204,11 @@ def closed_loop_cem(
 
             # ---- Success check -----------------------------------------
             if env_step.eval_state(goal_state, cur_state)["success"]:
-                return True, trajectory, frames
+                return True, trajectory, frames, pos_diffs, angle_diffs, eef_diffs
 
             t += 1  # increment global step counter
 
-    return False, trajectory, frames
+    return False, trajectory, frames, pos_diffs, angle_diffs, eef_diffs
 
 
 # ---------------------------------------------------------------------------
@@ -214,7 +228,8 @@ def main(cfg_path: str):
             "add_noise": 0,
             "noise_std": 0.0,
         },
-        "horizon": 10,
+        "planning_horizon": 5,
+        "sample_horizon": 5,
         "steps": 50,
         "pop_size": 128,
         "elite_frac": 0.1,
@@ -271,12 +286,33 @@ def main(cfg_path: str):
             e = e.env
         return e
 
-    env_vis: PushTWrapper = _unwrap(env_vis_wrapped)
-    env_rollout: PushTWrapper = _unwrap(env_rollout_wrapped)
+    env_vis: PushTWrapper = PushTWrapper(with_velocity=True, with_target=True, add_noise=0)#_unwrap(env_vis_wrapped)
+    env_rollout: PushTWrapper = PushTWrapper(with_velocity=True, with_target=True, add_noise=0)#_unwrap(env_rollout_wrapped)
 
     # sample initial / goal states (seed=0 for determinism)
-    init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0,random_goal=True)
+    #init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0,random_goal=True)
+    # sample from synthetic dataset
+    va_ds = ZarrPushTEpisodes(cfg.zarr_path, split='valid', split_ratio=cfg.split_ratio)
+    observations, states, actions = va_ds.sample_traj_segment_from_dset(cfg.sample_horizon)
+
+    env_vis.prepare(seed=0, init_state=states[0])
+    dataset_gt_frames = []
+    dataset_gt_frames.append(env_vis.render("rgb_array"))
+    for i in range(len(states)):
+        env_vis.prepare(seed=0, init_state=states[i])
+        dataset_gt_frames.append(env_vis.render("rgb_array"))
+
+    _, states = env_vis.rollout(seed=0, init_state=states[0], actions=actions)
+    gt_frames = []
+    for i in range(len(states)):
+        env_vis.prepare(seed=0, init_state=states[i])
+        gt_frames.append(env_vis.render("rgb_array"))
+
+    init_state = states[0]
+    goal_state = states[-1]
+    init_obs = observations[0]
     env_vis.prepare(seed=0, init_state=init_state)
+    gt_start = env_vis.render("rgb_array")
     env_rollout.prepare(seed=0, init_state=init_state)  # sync initial state
 
     # ------------------------------------------------------------------
@@ -322,8 +358,8 @@ def main(cfg_path: str):
         
 
     save_frames = bool(cfg.save)
-    success, traj, frames = closed_loop_cem(
-        env_vis, env_rollout, init_state, goal_state, cfg, dynamics_ensemble=dynamics_ensemble
+    success, traj, frames, pos_diffs, angle_diffs, eef_diffs = closed_loop_cem(
+        env_vis, env_rollout, init_state, goal_state, init_obs,cfg, dynamics_ensemble=dynamics_ensemble, gt_actions=None#actions
     )
 
     env_vis.prepare(seed=0, init_state=goal_state)
@@ -360,9 +396,43 @@ def main(cfg_path: str):
         imageio.mimwrite(vid_path, frames, fps=fps)
         print(f"[save] Video saved ({len(frames)} frames)")
 
-        #Save gt goal
-        gt_path = os.path.join(run_dir, "gt_goal.png")
-        imageio.imwrite(gt_path, gt_goal)
+        #Save gt frames
+        gt_vid_path = os.path.join(run_dir, "gt_frames.mp4")
+        imageio.mimwrite(gt_vid_path, gt_frames, fps=fps)
+        print(f"[save] GT frames saved ({len(gt_frames)} frames)")
+
+        #Save dataset gt frames
+        dataset_gt_vid_path = os.path.join(run_dir, "dataset_gt_frames.mp4")
+        imageio.mimwrite(dataset_gt_vid_path, dataset_gt_frames, fps=fps)
+        print(f"[save] Dataset GT frames saved ({len(dataset_gt_frames)} frames)")
+
+        #Save gt goal and start overlaid on the same image
+        # Overlay gt_start and gt_goal with alpha blending
+        # Ensure both images are the same shape
+        if gt_start.shape == gt_goal.shape:
+            # Use start as base, overlay goal with 60% opacity for better visibility
+            alpha = 0.6  # transparency for the goal overlay
+            overlay = (gt_start.astype(np.float32) * (1 - alpha) + 
+                      gt_goal.astype(np.float32) * alpha).astype(np.uint8)
+        else:
+            # If shapes don't match, just use goal (fallback)
+            overlay = gt_goal
+        
+        gt_path = os.path.join(run_dir, "gt_start_goal_overlay.png")
+        imageio.imwrite(gt_path, overlay)
+
+        #plot pos_diffs and angle_diffs
+        import matplotlib.pyplot as plt
+        #xaxis is the step number
+        plt.xlabel('Step')
+        plt.ylabel('Distance')
+        plt.title('Positional, Angular and End-effector Distance vs Step')
+        plt.plot(range(len(pos_diffs)), pos_diffs, label='pos_diffs')
+        plt.plot(range(len(angle_diffs)), angle_diffs, label='angle_diffs')
+        plt.plot(range(len(eef_diffs)), eef_diffs, label='eef_diffs')
+        plt.legend()
+        plt.savefig(os.path.join(run_dir, "pos_diffs_angle_diffs_eef_diffs.png"))
+        plt.close() 
 
     print("Reached goal:" if success else "Failed:", success)
 
