@@ -170,8 +170,9 @@ def main(cfg_path: str):
     if getattr(cfg.data, 'synthetic', None) and getattr(cfg.data.synthetic, 'enable', False):
         tr_ds, va_ds = build_mixed_zarr_episodes(cfg)
     else:
-        tr_ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='train', split_ratio=cfg.data.split_ratio)
-        va_ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='valid', split_ratio=cfg.data.split_ratio)
+        action_mode = str(getattr(cfg.data, "action_mode", "relative"))
+        tr_ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='train', split_ratio=cfg.data.split_ratio, action_mode=action_mode)
+        va_ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='valid', split_ratio=cfg.data.split_ratio, action_mode=action_mode)
     tr_loader = DataLoader(
         tr_ds,
         batch_size=cfg.train.batch_size,

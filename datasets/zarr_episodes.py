@@ -16,7 +16,7 @@ class ZarrPushTEpisodes(Dataset):
 
     Each item returns a dict with:
       - x: (T, 3, H, W)   images normalized to [-1, 1]
-      - a: (T-1, A)       relative actions normalized by action_scale
+      - a: (T-1, A)       actions (relative or absolute, see action_mode)
       - length: T
     """
 
@@ -27,6 +27,7 @@ class ZarrPushTEpisodes(Dataset):
         zarr_root: str,
         split: str = "train",
         split_ratio: float = 0.8,
+        action_mode: str = "relative",  # "relative" | "absolute"
         image_key: str = "img",
         action_key: str = "action",
         state_key: str = "state",
@@ -35,6 +36,9 @@ class ZarrPushTEpisodes(Dataset):
         if zarr is None:
             raise ImportError("zarr not installed. pip install zarr")
         self.store_path = zarr_root
+        if action_mode not in {"relative", "absolute"}:
+            raise ValueError(f"action_mode must be 'relative' or 'absolute', got {action_mode}")
+        self.action_mode = action_mode
         self.image_key = image_key
         self.action_key = action_key
         self.state_key = state_key
@@ -83,7 +87,10 @@ class ZarrPushTEpisodes(Dataset):
         # Actions align with transitions s_t -> s_{t+1}
         a_abs = self.act[s:e]
         agent_pos = state[:-1, :2]
-        a = (a_abs - agent_pos) / self._ACTION_SCALE
+        if self.action_mode == "relative":
+            a = (a_abs - agent_pos) / self._ACTION_SCALE
+        else:
+            a = a_abs
 
         x_t = torch.stack([self._img_to_tensor(frame) for frame in x], dim=0)
         a_t = torch.from_numpy(a.astype(np.float32))

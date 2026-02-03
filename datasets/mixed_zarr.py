@@ -30,9 +30,20 @@ def _subset_indices(n: int, k: int, seed: int, replace: bool) -> torch.Tensor:
 def build_mixed_zarr_episodes(cfg: DictConfig):
     data = cfg.data
     _assert_zarr_schema(data.zarr_path)
+    action_mode = str(getattr(data, "action_mode", "relative"))
     # Real datasets
-    real_train = ZarrPushTEpisodes(data.zarr_path, split='train', split_ratio=data.split_ratio)
-    real_val = ZarrPushTEpisodes(data.zarr_path, split='valid', split_ratio=data.split_ratio)
+    real_train = ZarrPushTEpisodes(
+        data.zarr_path,
+        split='train',
+        split_ratio=data.split_ratio,
+        action_mode=action_mode,
+    )
+    real_val = ZarrPushTEpisodes(
+        data.zarr_path,
+        split='valid',
+        split_ratio=data.split_ratio,
+        action_mode=action_mode,
+    )
 
     s_cfg = getattr(data, 'synthetic', None)
     if not s_cfg or not getattr(s_cfg, 'enable', False):
@@ -40,8 +51,18 @@ def build_mixed_zarr_episodes(cfg: DictConfig):
 
     _assert_zarr_schema(s_cfg.zarr_path)
     # Synthetic datasets
-    synth_train = ZarrPushTEpisodes(s_cfg.zarr_path, split='train', split_ratio=data.split_ratio)
-    synth_val = ZarrPushTEpisodes(s_cfg.zarr_path, split='valid', split_ratio=data.split_ratio)
+    synth_train = ZarrPushTEpisodes(
+        s_cfg.zarr_path,
+        split='train',
+        split_ratio=data.split_ratio,
+        action_mode=action_mode,
+    )
+    synth_val = ZarrPushTEpisodes(
+        s_cfg.zarr_path,
+        split='valid',
+        split_ratio=data.split_ratio,
+        action_mode=action_mode,
+    )
 
     total_target = getattr(s_cfg, 'total_train', None)
     frac = float(getattr(s_cfg, 'frac', 0.5))
