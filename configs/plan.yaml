@@ -9,16 +9,34 @@ plan:
 
   # ---------------- Planner ---------------------
   horizon:        50
-  steps:          20
-  pop_size:      10
+  steps:          100
+  pop_size:      1000
   elite_frac:    0.3
   n_iter:         10
   n_env_samples:  4
   var_threshold:  0.5
+  use_gt_env:     true
+  # Optional action clipping for CEM samples (None = no clipping)
+  action_low:     null
+  action_high:    null
+  # Debug option: use pixel L2 cost (requires use_gt_env: true)
+  pixel_cost:     true
+  fidelity:
+    enabled: false
+    mode: "blur_avgpool"       # blur_avgpool | blur_quantize
+    apply_to_goal: false
+    task_start: 0.0            # 0=low fidelity, 1=high fidelity
+    task_end: 1.0
+    cem_start: 0.0             # 0=low fidelity, 1=high fidelity
+    cem_end: 1.0
+    blur_sigma_max: 2.0
+    pool_scale_max: 4
+    quantize_levels_min: 8
+    quantize_levels_max: 256
 
   # How many of the first CEM-planned actions to execute before re-planning.
   # Setting this >1 moves the planner towards a more open-loop behaviour.
-  replan_every:   1
+  replan_every:   20
 
   render:         true
   save:           true

@@ -59,14 +59,15 @@ from planning.cem import CEMPlanner
 
 
 def make_cost_fn(goal_state: np.ndarray):
-    """L2 distance (xy) + small weighted angle error."""
+    """L2 distance (block xy + eef xy) + small weighted angle error."""
 
     def _cost(states: torch.Tensor) -> torch.Tensor:
         goal = torch.as_tensor(goal_state, dtype=states.dtype, device=states.device)
+        eef_err = torch.norm(states[:, :2] - goal[:2], dim=1)
         pos_err = torch.norm(states[:, 2:4] - goal[2:4], dim=1)
         ang_err = torch.abs(torch.atan2(torch.sin(states[:, 4] - goal[4]),
                                         torch.cos(states[:, 4] - goal[4])))
-        return pos_err + 0.1 * ang_err
+        return pos_err + 0.1 * ang_err + eef_err
 
     return _cost
 
@@ -83,6 +84,7 @@ def closed_loop_cem(
     init_state: np.ndarray,
     goal_state: np.ndarray,
     cfg: DictConfig,
+    goal_image: np.ndarray | None = None,
 ) -> Tuple[bool, list[np.ndarray], list[np.ndarray]]:
     """Run closed-loop CEM with parameters from *cfg* and return
     (success flag, trajectory of states, RGB frames).  *frames* is an empty
@@ -96,11 +98,16 @@ def closed_loop_cem(
         cost_fn=make_cost_fn(goal_state),
         action_dim=env_step.action_dim,
         horizon=cfg.horizon,
+        action_low=getattr(cfg, "action_low", None),
+        action_high=getattr(cfg, "action_high", None),
+        pixel_cost=bool(getattr(cfg, "pixel_cost", False)),
+        goal_image=goal_image,
+        fidelity_cfg=cfg.get("fidelity", {}),
         pop_size=cfg.pop_size,
         elite_frac=cfg.elite_frac,
         n_iter=cfg.n_iter,
         var_threshold=cfg.var_threshold,
-        gt_env=env_rollout,
+        gt_env=env_rollout if cfg.use_gt_env else None,
         n_env_samples=cfg.n_env_samples,
         device=device,
     )
@@ -129,6 +136,8 @@ def closed_loop_cem(
     # ------------------------------------------------------------------
     replan_every: int = int(getattr(cfg, "replan_every", 1))
     replan_every = max(1, replan_every)
+    n_replans = max(1, int(np.ceil(cfg.steps / replan_every)))
+    replan_idx = 0
 
     t = 0  # environment step counter
     while t < cfg.steps:
@@ -138,15 +147,17 @@ def closed_loop_cem(
         # by PushTEnv._render_frame so that rgb_array frames become a cheap
         # 1×1 placeholder.
         # ----------------------------------------------------------
-        env_rollout.headless = True
+        env_rollout.headless = not bool(getattr(cfg, "pixel_cost", False))
         best_seq = planner.plan(
             state_hist,
             action_hist,
             mask_hist,
             agg_mode="average",
             n_impute=1,
+            task_progress=0.0 if n_replans <= 1 else replan_idx / (n_replans - 1),
         )
         env_rollout.headless = False
+        replan_idx += 1
 
         # Execute the first *replan_every* actions from the planned sequence
         n_exec = min(replan_every, cfg.horizon)
@@ -223,9 +234,28 @@ def main(cfg_path: str):
         "render": False,
         "save": False,
         "replan_every": 1,
+        "use_gt_env": True,
+        "action_low": None,
+        "action_high": None,
+        "pixel_cost": False,
+        "fidelity": {
+            "enabled": False,
+            "mode": "blur_avgpool",  # blur_avgpool | blur_quantize
+            "apply_to_goal": False,
+            "task_start": 0.0,
+            "task_end": 1.0,
+            "cem_start": 0.0,
+            "cem_end": 1.0,
+            "blur_sigma_max": 2.0,
+            "pool_scale_max": 4,
+            "quantize_levels_min": 8,
+            "quantize_levels_max": 256,
+        },
     }
 
     cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))
+    if cfg.pixel_cost and not cfg.use_gt_env:
+        raise ValueError("pixel_cost requires use_gt_env: true (GT env rollouts).")
 
     # ------------- Environment --------------------------------------------
     # ---------------- Environment loading (same as simulate.py) ----------
@@ -275,6 +305,12 @@ def main(cfg_path: str):
 
     # sample initial / goal states (seed=0 for determinism)
     init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0)
+
+    goal_image = None
+    if cfg.pixel_cost:
+        goal_obs, _ = env_vis.prepare(seed=0, init_state=goal_state)
+        goal_image = goal_obs["visual"]
+
     env_vis.prepare(seed=0, init_state=init_state)
     env_rollout.prepare(seed=0, init_state=init_state)  # sync initial state
 
@@ -284,7 +320,7 @@ def main(cfg_path: str):
 
     save_frames = bool(cfg.save)
     success, traj, frames = closed_loop_cem(
-        env_vis, env_rollout, init_state, goal_state, cfg
+        env_vis, env_rollout, init_state, goal_state, cfg, goal_image=goal_image
     )
 
     # ------------------------------------------------------------------
