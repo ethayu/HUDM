@@ -6,11 +6,16 @@ import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from omegaconf import OmegaConf
-import wandb
+
+try:
+    import wandb
+except Exception:
+    wandb = None
 
 from models.world.model import HierWorldModel
 from datasets.zarr_episodes import ZarrPushTEpisodes, collate_episodes
 from datasets.mixed_zarr import build_mixed_zarr_episodes
+from validate_cfg import validate_world_cfg
 
 
 def make_run_dir(root: str, tag: str) -> str:
@@ -151,13 +156,61 @@ def save_checkpoint(model: HierWorldModel, run_dir: str) -> None:
 
 
 def main(cfg_path: str):
-    cfg = OmegaConf.load(cfg_path)
+    cfg_root = OmegaConf.load(cfg_path)
+    defaults = {
+        "seed": 42,
+        "data": {
+            "zarr_path": "pusht/pusht_cchi_v7_replay.zarr",
+            "split_ratio": 0.8,
+            "action_dim": 2,
+            "action_mode": "relative",
+            "synthetic": {
+                "enable": False,
+                "zarr_path": "synthetic/pusht_synth.zarr",
+                "frac": 0.5,
+                "total_train": None,
+                "seed": 0,
+                "val_source": "real",
+            },
+        },
+        "model": {
+            "D": 512,
+            "K": [64, 128, 256, 512],
+            "decoder_mode": "per_level",
+            "dynamics_mode": "per_level",
+        },
+        "train": {
+            "batch_size": 8,
+            "num_workers": 4,
+            "no_cuda": False,
+            "checkpoint_dir": "checkpoints_world",
+            "run_name": "world_baseline",
+        },
+        "optim": {"lr": 3e-4},
+        "loss": {
+            "recon_weight": 1.0,
+            "teacher_weight": 1.0,
+            "rollout_weight": 1.0,
+        },
+        "schedule": {
+            "max_epochs": 30,
+            "patience": 5,
+            "min_delta": 1e-3,
+        },
+        "wandb": {
+            "enable": False,
+            "project": "hudm-world",
+            "run_name": "world-baseline",
+        },
+    }
+    cfg = OmegaConf.merge(defaults, cfg_root)
+    validate_world_cfg(cfg, wandb_available=(wandb is not None))
     device = torch.device('cuda' if torch.cuda.is_available() and not cfg.train.no_cuda else 'cpu')
+    action_mode = str(getattr(cfg.data, "action_mode", "relative"))
 
     # Build model
-    K: List[int] = list(cfg.model.K)
+    K: List[int] = [int(k) for k in list(cfg.model.K)]
     D: int = int(cfg.model.D)
-    assert max(K) == D, "Largest K must equal D"
     wm = HierWorldModel(
         K=K,
         D=D,
@@ -170,7 +223,6 @@ def main(cfg_path: str):
     if getattr(cfg.data, 'synthetic', None) and getattr(cfg.data.synthetic, 'enable', False):
         tr_ds, va_ds = build_mixed_zarr_episodes(cfg)
     else:
-        action_mode = str(getattr(cfg.data, "action_mode", "relative"))
         tr_ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='train', split_ratio=cfg.data.split_ratio, action_mode=action_mode)
         va_ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='valid', split_ratio=cfg.data.split_ratio, action_mode=action_mode)
     tr_loader = DataLoader(
@@ -216,7 +268,7 @@ def main(cfg_path: str):
             val_loss, val_logs = run_epoch(wm, va_loader, cfg, device, train=False)
 
         print(f"epoch {epoch}  train {train_loss:.4f}  val {val_loss:.4f}")
-        if cfg.get('wandb', {}).get('enable', False):
+        if cfg.get('wandb', {}).get('enable', False) and wandb is not None:
             wandb.log({
                 "train/loss": train_loss,
                 "val/loss": val_loss,

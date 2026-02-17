@@ -230,7 +230,7 @@ def main():
                    help='Action policy: ou (Ornstein-Uhlenbeck), random, or advanced (OU + goal-directed toward T block)')
     p.add_argument('--seed', type=int, default=0, help='Random seed')
     p.add_argument('--with_velocity', action='store_true', help='Include velocity in state representation')
-    p.add_argument('--action_scale', type=float, default=1.0, help='Action scaling factor (default 100.0 for PushT)')
+    p.add_argument('--action_scale', type=float, default=1.0, help='Relative action scaling before env.action_scale is applied')
     # OU params
     p.add_argument('--ou-theta', type=float, default=0.15, help='OU process mean reversion rate')
     p.add_argument('--ou-sigma', type=float, default=0.2, help='OU process volatility')

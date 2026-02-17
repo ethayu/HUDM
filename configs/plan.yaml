@@ -1,42 +1,104 @@
 plan:
+  backend: "gt_env"   # wm | gt_env
   env_id: "pusht"
-  # ---------------- Environment -----------------
+
   env:
     with_velocity: true
-    with_target:   true
-    add_noise:     0            # 0=no noise, 1=action, 2=state
-    noise_std:     [0.5, 0.5]   # per-dim σ 
+    with_target: true
+    add_noise: 0
+    noise_std: [0.5, 0.5]
 
-  # ---------------- Planner ---------------------
-  horizon:        50
-  steps:          100
-  pop_size:      1000
-  elite_frac:    0.3
-  n_iter:         10
-  n_env_samples:  4
-  var_threshold:  0.5
-  use_gt_env:     true
-  # Optional action clipping for CEM samples (None = no clipping)
-  action_low:     null
-  action_high:    null
-  # Debug option: use pixel L2 cost (requires use_gt_env: true)
-  pixel_cost:     true
+  world_model:
+    # Optional override. If null, the planner loads world.yaml from run_dir
+    # (or from the first ensemble member).
+    config_path: null
+    run_dir: null
+    checkpoint_root: "checkpoints_world"
+    device: "auto"   # auto | cpu | cuda
+    ensemble:
+      enabled: false
+      run_dirs: []    # when enabled, provide >=2 run directories
+
+  mpc:
+    steps: 15
+    horizon: 10
+    replan_every: 5
+
+  cem:
+    pop_size: 500
+    elite_frac: 0.2
+    n_iter: 3
+    init_std: 1.0
+    warm_start: true
+    action_low: null
+    action_high: null
+
+  objective:
+    latent_metric: "l2"      # l1 | l2
+    terminal_weight: 1.0
+    running_weight: 0.0
+    action_l2_weight: 0.0
+    # gt_env backend costs (final-state objective):
+    eef_weight: 1.0
+    block_pos_weight: 1.0
+    block_angle_weight: 0.1
+    state_l2_weight: 0.0
+
+  # Fidelity schedules are discrete over level indices in model.K:
+  # 0 = coarsest level, len(K)-1 = finest level.
+  # Use integer indices or tokens:
+  # - "coarsest", "finest" for any stage
+  # - "base" for CEM/rollout fields
+  #   * in CEM fields: resolves to the current MPC-stage level
+  #   * in rollout fields: resolves to the current CEM-iteration level
   fidelity:
-    enabled: false
-    mode: "blur_avgpool"       # blur_avgpool | blur_quantize
-    apply_to_goal: false
-    task_start: 0.0            # 0=low fidelity, 1=high fidelity
-    task_end: 1.0
-    cem_start: 0.0             # 0=low fidelity, 1=high fidelity
-    cem_end: 1.0
-    blur_sigma_max: 2.0
-    pool_scale_max: 4
-    quantize_levels_min: 8
-    quantize_levels_max: 256
+    enabled: true
+    num_levels: 4   # used by gt_env backend; wm backend uses len(model.K)
+    mpc:
+      mode: "fixed"            # fixed | linear
+      level: "finest"          # used when mode=fixed
+      start_level: 2   # used when mode=linear
+      end_level: 3       # used when mode=linear
+    cem:
+      mode: "fixed"            # fixed | linear
+      level: "base"             # used when mode=fixed
+      start_level: "base"       # used when mode=linear
+      end_level: "finest"       # used when mode=linear
+    rollout:
+      mode: "fixed"        # fixed | linear | uncertainty_downshift
+      level: "base"        # used when mode=fixed
+      start_level: "base"  # used when mode=linear
+      end_level: "coarsest" # used when mode=linear
+      uncertainty:
+        criterion: "mean"  # mean | percentile
+        threshold: 0.05
+        percentile: 0.8
+        min_level: "coarsest"
+        max_downshifts_per_step: 1
 
-  # How many of the first CEM-planned actions to execute before re-planning.
-  # Setting this >1 moves the planner towards a more open-loop behaviour.
-  replan_every:   20
+  gt_env:
+    rollout_samples: 1
+    objective_space: "image"  # image | state
+    progress: true            # per-CEM-iteration rollout progress bar
+    progress_leave: false     # keep bars after completion
+    fidelity_env:
+      mode: "blur_avgpool"      # blur_avgpool | blur_quantize
+      blur_sigma_max: 2.0
+      pool_scale_max: 4
+      quantize_levels_min: 8
+      quantize_levels_max: 256
+      action_noise_std_max: 1.0
+      downsample_output: true
+      min_downsample_size: 12
 
-  render:         true
-  save:           true
+  init_goal:
+    source: "dataset"      # random | dataset
+    dataset:
+      zarr_path: "/Users/ethanyu/VSCodeProjects/HUDM/pusht/pusht_cchi_v7_replay.zarr"     # if null, falls back to world_model config data.zarr_path
+      split: "valid"
+      split_ratio: null   # if null, uses world split ratio (or 0.8 without world config)
+      trajectory_len: 15
+      seed: 1
+
+  render: true
+  save: true

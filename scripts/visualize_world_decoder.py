@@ -11,10 +11,14 @@ Usage:
 
 import os
 import argparse
+import sys
 import numpy as np
 import torch
 from omegaconf import OmegaConf
 from torchvision.utils import make_grid, save_image
+
+# Ensure repo root is on PYTHONPATH when running this script directly.
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from models.world.model import HierWorldModel
 from datasets.zarr_episodes import ZarrPushTEpisodes
@@ -42,7 +46,13 @@ def main():
 
     # Attempt to locate latest run dir
     ckpt_root = cfg.train.checkpoint_dir
-    run_dirs = [os.path.join(ckpt_root, d) for d in os.listdir(ckpt_root) if os.path.isdir(os.path.join(ckpt_root, d))]
+    run_dirs = []
+    if os.path.isdir(ckpt_root):
+        run_dirs = [
+            os.path.join(ckpt_root, d)
+            for d in os.listdir(ckpt_root)
+            if os.path.isdir(os.path.join(ckpt_root, d))
+        ]
     if not run_dirs:
         print('No checkpoint run directories found; using random weights')
     else:
@@ -63,7 +73,13 @@ def main():
 
     wm.eval()
 
-    ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='valid', split_ratio=cfg.data.split_ratio)
+    action_mode = str(getattr(cfg.data, "action_mode", "relative"))
+    ds = ZarrPushTEpisodes(
+        cfg.data.zarr_path,
+        split='valid',
+        split_ratio=cfg.data.split_ratio,
+        action_mode=action_mode,
+    )
     # collect N samples from mid-episode frames
     idxs = np.linspace(0, len(ds) - 1, num=min(args.count, len(ds)), dtype=int)
     xs = []
@@ -97,7 +113,9 @@ def main():
 
     # Stack rows vertically
     full = torch.cat(rows, dim=1)
-    os.makedirs(os.path.dirname(args.out), exist_ok=True)
+    out_dir = os.path.dirname(args.out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     save_image(full, args.out)
     print('Saved', args.out)
 

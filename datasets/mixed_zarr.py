@@ -19,6 +19,10 @@ def _assert_zarr_schema(zarr_path: str) -> None:
 
 
 def _subset_indices(n: int, k: int, seed: int, replace: bool) -> torch.Tensor:
+    if k <= 0:
+        return torch.empty((0,), dtype=torch.long)
+    if n <= 0:
+        raise ValueError("Cannot sample from an empty dataset.")
     g = torch.Generator().manual_seed(seed)
     if replace:
         return torch.randint(high=n, size=(k,), generator=g)
@@ -66,11 +70,15 @@ def build_mixed_zarr_episodes(cfg: DictConfig):
 
     total_target = getattr(s_cfg, 'total_train', None)
     frac = float(getattr(s_cfg, 'frac', 0.5))
+    if not (0.0 <= frac <= 1.0):
+        raise ValueError(f"data.synthetic.frac must be in [0,1], got {frac}")
     seed = int(getattr(s_cfg, 'seed', 0))
 
     if total_target is None:
         total_target = len(real_train)
     total_target = int(total_target)
+    if total_target <= 0:
+        raise ValueError(f"data.synthetic.total_train must be > 0, got {total_target}")
     n_synth = int(round(frac * total_target))
     n_real = max(0, total_target - n_synth)
 

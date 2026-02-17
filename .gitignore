@@ -3,3 +3,4 @@ wandb/
 *.pyc
 rollouts/
 .tmp*
+.DS_Store

@@ -435,9 +435,11 @@ class PushTEnv(gym.Env):
         self.with_target = with_target
         self.reset_to_state = reset_to_state
         self.coverage_arr = []
+        self.start_pose = None
+        self.start_color = pygame.Color("DodgerBlue")
 
     def reset(self):
-        self._setup()
+        self._setup(goal_pose=self.goal_pose)
         if self.block_cog is not None:
             self.block.center_of_gravity = self.block_cog
         if self.damping is not None:
@@ -534,8 +536,8 @@ class PushTEnv(gym.Env):
 
         return observation, reward, done, info
 
-    def render(self, mode):
-        return self._render_frame(mode)
+    def render(self, mode, include_start_pose: bool = False):
+        return self._render_frame(mode, include_start_pose=include_start_pose)
     
     def capture_frame(self):
         # Capture and return the current frame
@@ -594,7 +596,7 @@ class PushTEnv(gym.Env):
         }
         return info
 
-    def _render_frame(self, mode):
+    def _render_frame(self, mode, include_start_pose: bool = False):
         if self.window is None and mode == "human":
             pygame.init()
             pygame.display.init()
@@ -630,6 +632,19 @@ class PushTEnv(gym.Env):
             ]
             goal_points += [goal_points[0]]
             pygame.draw.polygon(canvas, self.goal_color, goal_points)
+
+        # Draw start pose outline (optional visualization overlay).
+        if include_start_pose and (self.start_pose is not None):
+            start_body = self._get_goal_pose_body(self.start_pose)
+            for shape in self.block.shapes:
+                start_points = [
+                    pymunk.pygame_util.to_pygame(
+                        start_body.local_to_world(v), draw_options.surface
+                    )
+                    for v in shape.get_vertices()
+                ]
+                if len(start_points) >= 2:
+                    pygame.draw.lines(canvas, self.start_color, True, start_points, width=3)
 
         # Draw agent and block.
         self.space.debug_draw(draw_options)
@@ -721,7 +736,10 @@ class PushTEnv(gym.Env):
     def set_task_goal(self, goal):
         self.goal_pose = goal
 
-    def _setup(self):
+    def set_task_start(self, start):
+        self.start_pose = np.asarray(start, dtype=np.float32)
+
+    def _setup(self, goal_pose=None):
         self.space = pymunk.Space()
         self.space.gravity = 0, 0
         self.space.damping = 0
@@ -745,7 +763,10 @@ class PushTEnv(gym.Env):
             self.goal_color = pygame.Color("LightGreen")
         else:
             self.goal_color = pygame.Color("White")
-        self.goal_pose = np.array([256, 256, np.pi / 4])  # x, y, theta (in radians)
+        if goal_pose is not None:
+            self.goal_pose = goal_pose
+        else:
+            self.goal_pose = np.array([256, 256, np.pi / 4])  # x, y, theta (in radians)
 
         # --------------------------------------------------------------
         # Collision handling – API change across pymunk versions.
@@ -801,8 +822,7 @@ class PushTEnv(gym.Env):
         scale=30,
         color="LightSlateGray",
         mask=pymunk.ShapeFilter.ALL_MASKS(),
-    ):  
-        scale=30
+    ):
         mass = 1
         length = 4
         vertices1 = [

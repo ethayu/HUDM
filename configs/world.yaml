@@ -3,9 +3,8 @@ seed: 42
 data:
   zarr_path: "pusht/pusht_cchi_v7_replay.zarr"
   split_ratio: 0.8
-  horizon_T: 8
   action_dim: 2
-  action_mode: "relative"   # "relative" | "absolute"
+  action_mode: "relative"   # train_world currently supports only "relative"
   synthetic:
     enable: true
     zarr_path: "synthetic/pusht_synth.zarr"  # Path to your synthetic zarr dataset

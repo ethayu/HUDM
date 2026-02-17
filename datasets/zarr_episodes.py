@@ -36,6 +36,8 @@ class ZarrPushTEpisodes(Dataset):
         if zarr is None:
             raise ImportError("zarr not installed. pip install zarr")
         self.store_path = zarr_root
+        if not (0.0 < float(split_ratio) < 1.0):
+            raise ValueError(f"split_ratio must be in (0,1), got {split_ratio}")
         if action_mode not in {"relative", "absolute"}:
             raise ValueError(f"action_mode must be 'relative' or 'absolute', got {action_mode}")
         self.action_mode = action_mode
@@ -52,6 +54,10 @@ class ZarrPushTEpisodes(Dataset):
         self.act = data[self.action_key]      # (N, A), float32
         self.state = data[self.state_key]     # (N, 5), float32
         self.ends = meta[self.meta_episode_key][:]  # (E,), int64 ends
+        if len(self.ends) == 0:
+            raise ValueError(f"No episodes found in {zarr_root}")
+        if not np.all(self.ends[1:] > self.ends[:-1]):
+            raise ValueError(f"episode_ends in {zarr_root} must be strictly increasing")
 
         # Compute episode start indices
         self.starts = np.zeros_like(self.ends)
@@ -70,13 +76,6 @@ class ZarrPushTEpisodes(Dataset):
     def __len__(self):
         return len(self.ep_idx)
 
-    @staticmethod
-    def _img_to_tensor(img: np.ndarray) -> torch.Tensor:
-        img = np.clip(img, 0.0, 255.0).astype(np.float32)
-        img = img / 255.0
-        img = img * 2.0 - 1.0
-        return torch.from_numpy(img).permute(2, 0, 1)
-
     def __getitem__(self, idx: int):
         ei = self.ep_idx[idx]
         s = int(self.starts[ei])
@@ -92,7 +91,10 @@ class ZarrPushTEpisodes(Dataset):
         else:
             a = a_abs
 
-        x_t = torch.stack([self._img_to_tensor(frame) for frame in x], dim=0)
+        x = np.clip(x, 0.0, 255.0).astype(np.float32)
+        x = x / 255.0
+        x = x * 2.0 - 1.0
+        x_t = torch.from_numpy(x).permute(0, 3, 1, 2)
         a_t = torch.from_numpy(a.astype(np.float32))
 
         return {

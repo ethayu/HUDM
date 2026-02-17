@@ -5,10 +5,11 @@ Usage:
     python scripts/test_ensemble.py
 """
 import sys
+import os
 import torch
 
-# Add src to path
-sys.path.append('src')
+# Add repo root to path so this script works from any cwd.
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from models.ensemble import MaskedDynamicsEnsemble
 

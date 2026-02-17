@@ -2,6 +2,9 @@
 """
 Ensemble wrapper around SequenceAwareMaskedDynamicsModel
 with variance-based per-dimension dropout.
+
+Legacy baseline path (state-space dynamics). The canonical planning path
+in this repo is now latent-space world-model planning.
 """
 
 import torch
@@ -44,11 +47,10 @@ class MaskedDynamicsEnsemble(nn.Module):
         actions: torch.Tensor,           # (B, K, A) planned controls
         var_threshold: float,
         return_vars: bool = False,
-        gt_states: Optional[torch.Tensor] = None,  # (B, K, D) ground truth states
+        gt_states: Optional[torch.Tensor] = None,  # (B, K, D) ground-truth states
     ):
         B, K, A = actions.shape
         D, H    = self.state_dim, self.window_H
-        M       = self.num_models
         
         if init_mask_hist is None:
             init_mask_hist = torch.ones_like(init_state_hist, dtype=torch.bool)
@@ -64,16 +66,24 @@ class MaskedDynamicsEnsemble(nn.Module):
         masks_traj  = []
         vars_traj = []
 
+        if gt_states is not None:
+            if gt_states.dim() != 3:
+                raise ValueError(f"gt_states must be (B,K,D), got shape {tuple(gt_states.shape)}")
+            if gt_states.shape[0] != B or gt_states.shape[1] != K or gt_states.shape[2] != D:
+                raise ValueError(
+                    f"gt_states shape mismatch: expected ({B},{K},{D}), got {tuple(gt_states.shape)}"
+                )
+
         for k in range(K):
             # Model step
             if gt_states is not None:
                 if k >= H - 1:
-                    s_buf = gt_states[k - H + 1:k + 1].unsqueeze(0) # (B,H,D)
+                    s_buf = gt_states[:, k - H + 1:k + 1, :]  # (B,H,D)
                 else:
                     missing = H - k - 1
-                    first_state = gt_states[0]
-                    pad_states = first_state.expand(1, missing, -1)
-                    s_buf = torch.cat([pad_states, gt_states[:k + 1].unsqueeze(0)], dim=1)
+                    first_state = gt_states[:, :1, :]  # (B,1,D)
+                    pad_states = first_state.expand(B, missing, D)
+                    s_buf = torch.cat([pad_states, gt_states[:, :k + 1, :]], dim=1)
                 m_buf = torch.ones_like(s_buf, dtype=torch.bool)
             pred_mu, pred_var = self.forward(s_buf, a_buf, m_buf)
 

@@ -1,222 +1,538 @@
-"""plan.py — Closed-loop CEM planning via a YAML configuration file.
+"""plan.py — Closed-loop latent-space MPC-CEM planning with a world model.
 
-Example usage
--------------
+Usage
+-----
 python plan.py configs/plan.yaml
-
-The configuration structure intentionally mirrors *configs/sim.yaml* for
-consistency, but only the relevant fields are required:
-
-plan:
-  env:                     # kwargs forwarded to PushTWrapper
-    add_noise: 2
-    noise_std: [1.0,1.0,0.5,0.5,0.02,0,0]
-    with_velocity: true
-    with_target:  true
-
-  horizon:        10       # planning horizon
-  steps:          50       # max environment steps
-  pop_size:      128
-  elite_frac:    0.1
-  n_iter:         5
-  n_env_samples:  4        # roll-outs per candidate in the env-sampling path
-  var_threshold:  0.5      # per-dimension variance cutoff
-  render:        true
-  replan_every:  1        # execute this many actions before the next plan
-
-Other fields are accepted but ignored.  All entries have sensible defaults so
-you can start with an empty YAML and override as needed.
 """
-
-# -----------------------------------------------------------------------------
-# Add the project root to PYTHONPATH so the script works when executed from
-# outside the repository directory (same approach as *simulate.py*).
-# -----------------------------------------------------------------------------
 
 from __future__ import annotations
 
 import os
 import sys
-from typing import Tuple
+import json
+from datetime import datetime
+from typing import Any, Dict, Tuple
 
-# Ensure that `pusht`, `planning`, etc. can be imported even when this script is
-# launched via an absolute path from another working directory.
-sys.path.append(os.path.dirname(__file__))
-
+import cv2
+import gym
 import numpy as np
 import torch
-from omegaconf import OmegaConf, DictConfig
-
-import gym
 from gym.envs.registration import register
+from omegaconf import DictConfig, OmegaConf
+
+# Ensure local imports work even when launched via an absolute path.
+sys.path.append(os.path.dirname(__file__))
+
+from models.world.ensemble import WorldModelEnsemble
+from models.world.model import HierWorldModel
+from planning.gt_env_cem import GTEnvCEMPlanner
+from planning.latent_cem import LatentCEMPlanner
 from pusht.pusht_wrapper import PushTWrapper
-from planning.cem import CEMPlanner
+from validate_cfg import validate_plan_cfg
 
 
-# ---------------------------------------------------------------------------
-# Helper functions
-# ---------------------------------------------------------------------------
+def _unwrap_env(env):
+    while hasattr(env, "env"):
+        env = env.env
+    return env
 
 
-def make_cost_fn(goal_state: np.ndarray):
-    """L2 distance (block xy + eef xy) + small weighted angle error."""
-
-    def _cost(states: torch.Tensor) -> torch.Tensor:
-        goal = torch.as_tensor(goal_state, dtype=states.dtype, device=states.device)
-        eef_err = torch.norm(states[:, :2] - goal[:2], dim=1)
-        pos_err = torch.norm(states[:, 2:4] - goal[2:4], dim=1)
-        ang_err = torch.abs(torch.atan2(torch.sin(states[:, 4] - goal[4]),
-                                        torch.cos(states[:, 4] - goal[4])))
-        return pos_err + 0.1 * ang_err + eef_err
-
-    return _cost
+def _image_to_model_tensor(img: np.ndarray, device: torch.device) -> torch.Tensor:
+    x = torch.as_tensor(img, dtype=torch.float32, device=device)
+    if x.ndim == 3:
+        x = x.unsqueeze(0)  # (1,H,W,C)
+    if x.shape[-1] == 3:
+        x = x.permute(0, 3, 1, 2)  # (1,C,H,W)
+    if float(x.max()) > 1.5:
+        x = x / 255.0
+    x = x * 2.0 - 1.0
+    return x
 
 
-# ---------------------------------------------------------------------------
-# Closed-loop CEM planner
-#   env_step     : environment instance we actually step in the real world
-#   env_rollout  : *separate* instance used only for candidate-sequence roll-outs
-# ---------------------------------------------------------------------------
+def _resolve_device(device_cfg: str) -> torch.device:
+    device_cfg = str(device_cfg).lower()
+    if device_cfg == "cpu":
+        return torch.device("cpu")
+    if device_cfg == "cuda":
+        if not torch.cuda.is_available():
+            raise ValueError("plan.world_model.device=cuda requested, but CUDA is unavailable.")
+        return torch.device("cuda")
+    if device_cfg != "auto":
+        raise ValueError(
+            f"plan.world_model.device must be one of auto|cpu|cuda, got '{device_cfg}'."
+        )
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def closed_loop_cem(
-    env_step: PushTWrapper,
-    env_rollout: PushTWrapper,
+
+def _format_bits_human(bits: int) -> str:
+    value = float(max(0, int(bits)))
+    units = ["b", "Kb", "Mb", "Gb", "Tb"]
+    unit_idx = 0
+    while value >= 1000.0 and unit_idx < len(units) - 1:
+        value /= 1000.0
+        unit_idx += 1
+    return f"{value:.2f} {units[unit_idx]}"
+
+
+def _latest_run_dir(root: str) -> str:
+    if not os.path.isdir(root):
+        raise FileNotFoundError(f"Checkpoint root does not exist: {root}")
+    run_dirs = [
+        os.path.join(root, d)
+        for d in os.listdir(root)
+        if os.path.isdir(os.path.join(root, d))
+    ]
+    if not run_dirs:
+        raise FileNotFoundError(f"No run directories found under {root}")
+    return max(run_dirs, key=os.path.getmtime)
+
+
+def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.device) -> HierWorldModel:
+    if not os.path.isdir(run_dir):
+        raise FileNotFoundError(f"World-model run directory not found: {run_dir}")
+
+    wm = HierWorldModel(
+        K=list(wm_cfg.model.K),
+        D=int(wm_cfg.model.D),
+        action_dim=int(wm_cfg.data.action_dim),
+        decoder_mode=str(getattr(wm_cfg.model, "decoder_mode", "per_level")),
+        dynamics_mode=str(getattr(wm_cfg.model, "dynamics_mode", "per_level")),
+    ).to(device)
+
+    enc_path = os.path.join(run_dir, "encoder.pt")
+    if not os.path.isfile(enc_path):
+        raise FileNotFoundError(f"Missing encoder checkpoint: {enc_path}")
+    wm.encoder.load_state_dict(torch.load(enc_path, map_location=device))
+
+    dynamics_mode = str(getattr(wm_cfg.model, "dynamics_mode", "per_level"))
+    if dynamics_mode == "per_level":
+        for li in range(len(wm.K)):
+            dyn_path = os.path.join(run_dir, f"dyn_l{li}.pt")
+            if not os.path.isfile(dyn_path):
+                raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
+            wm.dynamics[li].load_state_dict(torch.load(dyn_path, map_location=device))
+    else:
+        dyn_path = os.path.join(run_dir, "dyn.pt")
+        if not os.path.isfile(dyn_path):
+            raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
+        wm.dynamics.load_state_dict(torch.load(dyn_path, map_location=device))
+
+    wm.eval()
+    return wm
+
+
+def _wm_signature(wm_cfg: DictConfig) -> dict:
+    return {
+        "K": list(wm_cfg.model.K),
+        "D": int(wm_cfg.model.D),
+        "action_dim": int(wm_cfg.data.action_dim),
+        "decoder_mode": str(getattr(wm_cfg.model, "decoder_mode", "per_level")),
+        "dynamics_mode": str(getattr(wm_cfg.model, "dynamics_mode", "per_level")),
+    }
+
+
+def _load_run_world_cfg(run_dir: str) -> tuple[DictConfig, str]:
+    cfg_path = os.path.join(run_dir, "world.yaml")
+    if not os.path.isfile(cfg_path):
+        raise FileNotFoundError(
+            f"Missing world config in run directory: {cfg_path}. "
+            "Set plan.world_model.config_path explicitly or provide run dirs with world.yaml."
+        )
+    return OmegaConf.load(cfg_path), cfg_path
+
+
+def _assert_world_cfg_compatible(base_sig: dict, other_cfg: DictConfig, label: str) -> None:
+    other_sig = _wm_signature(other_cfg)
+    if other_sig != base_sig:
+        raise ValueError(
+            f"World-model config mismatch for {label}.\n"
+            f"Expected: {base_sig}\n"
+            f"Found:    {other_sig}"
+        )
+
+
+def _load_world_model(plan_cfg: DictConfig) -> tuple[object, DictConfig, str, torch.device]:
+    device = _resolve_device(str(plan_cfg.world_model.device))
+    config_path = plan_cfg.world_model.config_path
+    if config_path is not None:
+        config_path = str(config_path)
+        if not os.path.isfile(config_path):
+            raise FileNotFoundError(f"World-model config not found: {config_path}")
+        cfg_override = OmegaConf.load(config_path)
+    else:
+        cfg_override = None
+
+    ens_cfg = plan_cfg.world_model.get("ensemble", {})
+    ens_enabled = bool(getattr(ens_cfg, "enabled", False))
+    if ens_enabled:
+        run_dirs = list(getattr(ens_cfg, "run_dirs", []))
+        run_dirs = [str(rd) for rd in run_dirs]
+        if cfg_override is None:
+            wm_cfg, _ = _load_run_world_cfg(run_dirs[0])
+        else:
+            wm_cfg = cfg_override
+        base_sig = _wm_signature(wm_cfg)
+        members = []
+        for rd in run_dirs:
+            if not os.path.isdir(rd):
+                raise FileNotFoundError(f"World-model run directory not found: {rd}")
+            run_cfg_path = os.path.join(rd, "world.yaml")
+            if os.path.isfile(run_cfg_path):
+                run_cfg = OmegaConf.load(run_cfg_path)
+                _assert_world_cfg_compatible(base_sig, run_cfg, label=rd)
+            members.append(_load_world_model_member(wm_cfg, rd, device))
+        wm_backend = WorldModelEnsemble(members).to(device)
+        run_desc = ", ".join(run_dirs)
+        return wm_backend, wm_cfg, run_desc, device
+
+    run_dir = plan_cfg.world_model.run_dir
+    if run_dir is None:
+        checkpoint_root = str(getattr(plan_cfg.world_model, "checkpoint_root", "checkpoints_world"))
+        run_dir = _latest_run_dir(checkpoint_root)
+    run_dir = str(run_dir)
+    if cfg_override is None:
+        wm_cfg, _ = _load_run_world_cfg(run_dir)
+    else:
+        wm_cfg = cfg_override
+        run_cfg_path = os.path.join(run_dir, "world.yaml")
+        if os.path.isfile(run_cfg_path):
+            run_cfg = OmegaConf.load(run_cfg_path)
+            _assert_world_cfg_compatible(_wm_signature(wm_cfg), run_cfg, label=run_dir)
+    wm = _load_world_model_member(wm_cfg, run_dir, device)
+    return wm, wm_cfg, run_dir, device
+
+
+@torch.no_grad()
+def _encode_visual(wm: object, img: np.ndarray, device: torch.device) -> torch.Tensor:
+    x = _image_to_model_tensor(img, device=device)
+    return wm.encode(x)
+
+
+def _sample_init_goal_states(
+    env: PushTWrapper,
+    cfg: DictConfig,
+    wm_cfg: DictConfig | None,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    src = str(cfg.init_goal.source).lower()
+    if src == "random":
+        init_state, goal_state = env.sample_random_init_goal_states(seed=0)
+        meta = {"source": "random"}
+        return init_state, goal_state, meta
+
+    ds_cfg = cfg.init_goal.dataset
+    zarr_path = ds_cfg.zarr_path
+    if zarr_path is None:
+        if wm_cfg is not None and getattr(wm_cfg, "data", None) is not None:
+            zarr_path = wm_cfg.data.zarr_path
+        else:
+            raise ValueError(
+                "plan.init_goal.dataset.zarr_path must be set when backend=gt_env "
+                "and no world config is available."
+            )
+    split_ratio = ds_cfg.split_ratio
+    if split_ratio is None:
+        split_ratio = 0.8 if wm_cfg is None else float(getattr(wm_cfg.data, "split_ratio", 0.8))
+
+    init_state, goal_state, meta = env.sample_dataset_init_goal_states(
+        dataset=str(zarr_path),
+        trajectory_len=int(ds_cfg.trajectory_len),
+        split=str(ds_cfg.split),
+        split_ratio=float(split_ratio),
+        seed=int(ds_cfg.seed),
+    )
+    print(
+        "[init_goal] source=dataset "
+        f"episode={meta['episode_index']} start={meta['start_index']} "
+        f"goal={meta['goal_index']} len={meta['trajectory_len']} split={meta['split']}"
+    )
+    meta = dict(meta)
+    meta["source"] = "dataset"
+    meta["zarr_path"] = str(zarr_path)
+    meta["split_ratio"] = float(split_ratio)
+    return init_state, goal_state, meta
+
+
+def _set_goal_pose(env: PushTWrapper, goal_state: np.ndarray) -> None:
+    goal_state = np.asarray(goal_state, dtype=np.float32)
+    if goal_state.shape[0] < 5:
+        raise ValueError(f"goal_state must have at least 5 dims, got {goal_state.shape}")
+    
+    env.set_task_goal(goal_state[2:5])
+
+
+def _set_start_pose(env: PushTWrapper, init_state: np.ndarray) -> None:
+    init_state = np.asarray(init_state, dtype=np.float32)
+    if init_state.shape[0] < 5:
+        raise ValueError(f"init_state must have at least 5 dims, got {init_state.shape}")
+    if hasattr(env, "set_task_start"):
+        env.set_task_start(init_state[2:5])
+
+
+def _set_execution_fidelity_finest(env: PushTWrapper) -> None:
+    """
+    Reset planning-time fidelity to finest so execution/rendering is comparable and
+    unaffected by the last planner rollout's coarse-level settings.
+    """
+    if hasattr(env, "_planning_fidelity_num_levels") and hasattr(env, "set_planning_fidelity_level"):
+        n_levels = int(getattr(env, "_planning_fidelity_num_levels", 1))
+        env.set_planning_fidelity_level(max(0, n_levels - 1))
+
+
+def _rollout_level_for_exec_step(info: object, exec_step_in_replan: int) -> int:
+    levels = list(getattr(info, "rollout_level_indices", []))
+    if exec_step_in_replan < len(levels):
+        return int(levels[exec_step_in_replan])
+    base = getattr(info, "base_level_idx", None)
+    if base is None:
+        return 0
+    return int(base)
+
+
+def _planner_view_frame(
+    env: PushTWrapper,
+    base_visual: np.ndarray,
+    level_idx: int,
+    target_hw: tuple[int, int],
+) -> np.ndarray:
+    """
+    Approximate "what planner saw" at a chosen fidelity level, while keeping
+    saved GIF frame size fixed for readability.
+    """
+    img = np.asarray(base_visual)
+    out = img
+
+    # Reuse env fidelity transform at requested level without leaving env in
+    # a different execution fidelity state.
+    if (
+        hasattr(env, "set_planning_fidelity_level")
+        and hasattr(env, "_apply_planning_fidelity_visual")
+        and hasattr(env, "_planning_fidelity_level_idx")
+    ):
+        prev_idx = int(getattr(env, "_planning_fidelity_level_idx", 0))
+        try:
+            env.set_planning_fidelity_level(int(level_idx))
+            out = env._apply_planning_fidelity_visual(img)
+        finally:
+            env.set_planning_fidelity_level(prev_idx)
+
+    h_t, w_t = int(target_hw[0]), int(target_hw[1])
+    if out.shape[0] != h_t or out.shape[1] != w_t:
+        out = cv2.resize(out, (w_t, h_t), interpolation=cv2.INTER_NEAREST)
+    return out
+
+
+def _render_dataset_gt_frames(
+    env: PushTWrapper,
+    sample_meta: Dict[str, Any],
     init_state: np.ndarray,
     goal_state: np.ndarray,
-    cfg: DictConfig,
-    goal_image: np.ndarray | None = None,
-) -> Tuple[bool, list[np.ndarray], list[np.ndarray]]:
-    """Run closed-loop CEM with parameters from *cfg* and return
-    (success flag, trajectory of states, RGB frames).  *frames* is an empty
-    list when cfg.save is False.
+) -> list[np.ndarray]:
     """
+    Render GT reference from the sampled dataset state trajectory, with the same
+    goal overlay as planned rollouts for apples-to-apples visual comparison.
+    """
+    if str(sample_meta.get("source", "")).lower() != "dataset":
+        return []
+    zarr_path = sample_meta.get("zarr_path")
+    if zarr_path is None:
+        print("[save][gt] skipped: missing dataset zarr path in sample metadata.")
+        return []
+    start_idx = int(sample_meta.get("start_index", -1))
+    goal_idx = int(sample_meta.get("goal_index", -1))
+    if start_idx < 0 or goal_idx <= start_idx:
+        print("[save][gt] skipped: invalid dataset index range in sample metadata.")
+        return []
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    try:
+        import zarr
+    except Exception as exc:
+        print(f"[save][gt] skipped: zarr import failed ({exc}).")
+        return []
 
-    planner = CEMPlanner(
-        dynamics_ensemble=None,
-        cost_fn=make_cost_fn(goal_state),
-        action_dim=env_step.action_dim,
-        horizon=cfg.horizon,
-        action_low=getattr(cfg, "action_low", None),
-        action_high=getattr(cfg, "action_high", None),
-        pixel_cost=bool(getattr(cfg, "pixel_cost", False)),
-        goal_image=goal_image,
-        fidelity_cfg=cfg.get("fidelity", {}),
-        pop_size=cfg.pop_size,
-        elite_frac=cfg.elite_frac,
-        n_iter=cfg.n_iter,
-        var_threshold=cfg.var_threshold,
-        gt_env=env_rollout if cfg.use_gt_env else None,
-        n_env_samples=cfg.n_env_samples,
-        device=device,
-    )
-
-    # Buffers: only previous step is needed for planning horizon>0 but we keep
-    # them general in case we want to experiment later.
-    H_hist = 1
-    state_hist = torch.as_tensor(init_state, dtype=torch.float32, device=device).view(1, H_hist, -1)
-    action_hist = torch.zeros(1, H_hist, env_step.action_dim, device=device)
-    mask_hist = torch.ones(1, H_hist, env_step.state_dim, dtype=torch.bool, device=device)
-
-    trajectory: list[np.ndarray] = [init_state.copy()]
-
-    # Frames for optional saving ------------------------------------------------
+    root = zarr.open_group(str(zarr_path), mode="r")
+    state_arr = np.asarray(root["data"]["state"][start_idx:goal_idx + 1], dtype=np.float32)
+    if int(state_arr.shape[0]) <= 0:
+        print("[save][gt] skipped: empty state segment.")
+        return []
     frames: list[np.ndarray] = []
-    if cfg.save:
-        # Capture the initial state frame before any action is taken
-        frames.append(env_step.render("rgb_array"))
+    _set_execution_fidelity_finest(env)
+    _set_start_pose(env, init_state)
+    for s in state_arr:
+        s = np.asarray(s, dtype=np.float32)
+        if s.shape[0] < int(getattr(env, "state_dim", s.shape[0])):
+            pad = int(getattr(env, "state_dim", s.shape[0])) - s.shape[0]
+            s = np.concatenate([s, np.zeros((pad,), dtype=np.float32)], axis=0)
+        env.prepare(seed=0, init_state=s[: int(getattr(env, "state_dim", s.shape[0]))])
+        _set_goal_pose(env, goal_state)
+        frames.append(env.render("rgb_array", include_start_pose=True))
+    return frames
 
-    cur_state = init_state.copy()
-    # ------------------------------------------------------------------
-    #  Determine how many actions to execute before re-planning.  The new
-    #  *replan_every* parameter lives under the same `plan:` section in the
-    #  YAML config and defaults to 1 which recovers the previous closed-loop
-    #  behaviour (plan → execute one action → re-plan).
-    # ------------------------------------------------------------------
-    replan_every: int = int(getattr(cfg, "replan_every", 1))
-    replan_every = max(1, replan_every)
-    n_replans = max(1, int(np.ceil(cfg.steps / replan_every)))
+
+def _run_closed_loop(
+    env: PushTWrapper,
+    wm: object | None,
+    planner: object,
+    backend: str,
+    cfg: DictConfig,
+    init_state: np.ndarray,
+    goal_state: np.ndarray,
+    device: torch.device,
+) -> Tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray], dict]:
+    _set_start_pose(env, init_state)
+    z_goal = None
+    if backend == "wm":
+        if wm is None:
+            raise ValueError("backend='wm' requires a loaded world model.")
+        # prepare() resets env internals (including goal pose), so apply sampled
+        # goal afterward and refresh the rendered observation.
+        goal_obs, _ = env.prepare(seed=0, init_state=goal_state)
+        _set_goal_pose(env, goal_state)
+        goal_obs["visual"] = env.render("rgb_array", include_start_pose=False)
+        z_goal = _encode_visual(wm, goal_obs["visual"], device)
+    # Reset env to initial state for actual execution.
+    obs, cur_state = env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
+    _set_execution_fidelity_finest(env)
+    obs["visual"] = env.render("rgb_array", include_start_pose=False)
+
+    trajectory = [cur_state.copy()]
+    frames: list[np.ndarray] = []
+    planner_frames: list[np.ndarray] = []
+    if bool(cfg.save):
+        frames.append(env.render("rgb_array", include_start_pose=True))
+
+    # Early exit if the reset state already satisfies the goal condition.
+    initial_metrics = env.eval_state(goal_state, cur_state)
+    if bool(initial_metrics["success"]):
+        stats = {
+            "plans": 0,
+            "bits_used_total": 0,
+            "plan_time_total_sec": 0.0,
+        }
+        return True, trajectory, frames, planner_frames, stats
+
+    steps = int(cfg.mpc.steps)
+    horizon = int(cfg.mpc.horizon)
+    replan_every = int(cfg.mpc.replan_every)
+    n_replans = max(1, int(np.ceil(steps / replan_every)))
+
+    render_enabled = bool(cfg.render)
+    t = 0
     replan_idx = 0
+    total_plan_bits = 0
+    total_plan_time = 0.0
+    n_plans = 0
+    prev_exec_steps = 0
+    while t < steps:
+        mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
+        if backend == "wm":
+            z_cur = _encode_visual(wm, obs["visual"], device)
+            action_seq, info = planner.plan(
+                z_cur,
+                z_goal,
+                mpc_progress=mpc_progress,
+                warm_start_steps=int(prev_exec_steps),
+            )
+        else:
+            action_seq, info = planner.plan(
+                init_state=cur_state,
+                goal_state=goal_state,
+                mpc_progress=mpc_progress,
+                seed=int(1009 * replan_idx + 7919 * t),
+                warm_start_steps=int(prev_exec_steps),
+            )
+            # GT-env planner rollouts reuse env and mutate/reset it internally.
+            # Restore the true execution state/goal before applying planned actions.
+            obs, cur_state = env.prepare(seed=0, init_state=cur_state, goal_state=goal_state)
+            _set_execution_fidelity_finest(env)
+            obs["visual"] = env.render("rgb_array", include_start_pose=False)
 
-    t = 0  # environment step counter
-    while t < cfg.steps:
-        # ----------------------------------------------------------
-        # Disable expensive pygame rendering during the many internal
-        # rollouts performed by CEM.  We toggle a `headless` flag understood
-        # by PushTEnv._render_frame so that rgb_array frames become a cheap
-        # 1×1 placeholder.
-        # ----------------------------------------------------------
-        env_rollout.headless = not bool(getattr(cfg, "pixel_cost", False))
-        best_seq = planner.plan(
-            state_hist,
-            action_hist,
-            mask_hist,
-            agg_mode="average",
-            n_impute=1,
-            task_progress=0.0 if n_replans <= 1 else replan_idx / (n_replans - 1),
-        )
-        env_rollout.headless = False
-        replan_idx += 1
+        bits_used = int(getattr(info, "bits_used_estimate", 0))
+        plan_time = float(getattr(info, "plan_time_sec", 0.0))
+        total_plan_bits += bits_used
+        total_plan_time += plan_time
+        n_plans += 1
+        if bits_used > 0 or plan_time > 0:
+            print(
+                f"[plan] replan {replan_idx:03d}  backend {backend}  "
+                f"bits {bits_used} ({_format_bits_human(bits_used)})  "
+                f"time {plan_time:.3f}s"
+            )
 
-        # Execute the first *replan_every* actions from the planned sequence
-        n_exec = min(replan_every, cfg.horizon)
+        # Add first planner-view frame (t=0) after the first plan is available.
+        if bool(cfg.save) and backend == "gt_env" and len(planner_frames) == 0:
+            init_level = _rollout_level_for_exec_step(info, exec_step_in_replan=0)
+            planner_frames.append(
+                _planner_view_frame(
+                    env=env,
+                    base_visual=np.asarray(obs["visual"]),
+                    level_idx=init_level,
+                    target_hw=frames[0].shape[:2] if len(frames) > 0 else np.asarray(obs["visual"]).shape[:2],
+                )
+            )
 
+        n_exec = min(replan_every, horizon, steps - t)
         for i in range(n_exec):
-            if t >= cfg.steps:
-                break  # safety guard
-
-            action_i = best_seq[i].cpu().numpy()
-            print(f"Executing action {action_i}")
-
-            # Step the environment with the chosen action
-            _, reward, done, info = env_step.step(action_i)
-            cur_state = info["state"]
+            action = np.asarray(action_seq[i].numpy(), dtype=np.float32)
+            obs, _, done, step_info = env.step(action)
+            cur_state = step_info["state"]
             trajectory.append(cur_state.copy())
 
-            # ---- Logging ------------------------------------------------
-            dist = env_step.eval_state(goal_state, cur_state)["state_dist"]
-            print(f"step {t:03d}  dist {dist:6.1f}")
+            metrics = env.eval_state(goal_state, cur_state)
+            dist = metrics["state_dist"]
+            base_k = getattr(info, "base_k", None)
+            level_idx = int(getattr(info, "base_level_idx", -1))
+            k_str = "-" if base_k is None else str(base_k)
+            print(
+                f"step {t + 1:03d}  dist {dist:6.1f}  "
+                f"level_idx {level_idx}  k {k_str}"
+            )
 
-            # ---- Update histories --------------------------------------
-            state_t = torch.as_tensor(cur_state, dtype=torch.float32, device=device).view(1, 1, -1)
-            action_t = torch.as_tensor(action_i, dtype=torch.float32, device=device).view(1, 1, -1)
-            mask_t = torch.ones_like(state_t, dtype=torch.bool)
-
-            state_hist = torch.cat([state_hist[:, -H_hist + 1 :], state_t], dim=1)
-            action_hist = torch.cat([action_hist[:, -H_hist + 1 :], action_t], dim=1)
-            mask_hist = torch.cat([mask_hist[:, -H_hist + 1 :], mask_t], dim=1)
-
-            # ---- Rendering --------------------------------------------
-            if cfg.render:
+            if render_enabled:
                 try:
-                    env_step.render("human")
-                except Exception as e:
-                    print(f"[render disabled] {e}")
-                    cfg.render = False
+                    env.render("human", include_start_pose=True)
+                except Exception as exc:
+                    print(f"[render disabled] {exc}")
+                    render_enabled = False
 
-            if cfg.save:
-                frames.append(env_step.render("rgb_array"))
+            if bool(cfg.save):
+                frames.append(env.render("rgb_array", include_start_pose=True))
+                if backend == "gt_env":
+                    li_exec = _rollout_level_for_exec_step(info, exec_step_in_replan=i)
+                    planner_frames.append(
+                        _planner_view_frame(
+                            env=env,
+                            base_visual=np.asarray(obs["visual"]),
+                            level_idx=li_exec,
+                            target_hw=frames[-1].shape[:2],
+                        )
+                    )
 
-            # ---- Success check -----------------------------------------
-            if env_step.eval_state(goal_state, cur_state)["success"]:
-                return True, trajectory, frames
+            # Use either geometric success check or environment terminal signal.
+            if bool(metrics["success"]) or bool(done):
+                stats = {
+                    "plans": n_plans,
+                    "bits_used_total": total_plan_bits,
+                    "plan_time_total_sec": total_plan_time,
+                }
+                return True, trajectory, frames, planner_frames, stats
 
-            t += 1  # increment global step counter
+            t += 1
 
-    return False, trajectory, frames
+        prev_exec_steps = int(n_exec)
+        replan_idx += 1
+
+    stats = {
+        "plans": n_plans,
+        "bits_used_total": total_plan_bits,
+        "plan_time_total_sec": total_plan_time,
+    }
+    return False, trajectory, frames, planner_frames, stats
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
-
-
-def main(cfg_path: str):
+def main(cfg_path: str) -> None:
     cfg_root = OmegaConf.load(cfg_path)
-
-    # Provide defaults so small configs work --------------------------------
     defaults = {
+        "backend": "wm",  # wm | gt_env
         "env_id": "pusht",
         "env": {
             "with_velocity": True,
@@ -224,141 +540,277 @@ def main(cfg_path: str):
             "add_noise": 0,
             "noise_std": 0.0,
         },
-        "horizon": 10,
-        "steps": 50,
-        "pop_size": 128,
-        "elite_frac": 0.1,
-        "n_iter": 5,
-        "n_env_samples": 4,
-        "var_threshold": 1.0,
+        "world_model": {
+            # If config_path is null, world config is loaded from run_dir/world.yaml
+            # (or first ensemble member's world.yaml).
+            "config_path": None,
+            "run_dir": None,   # used in single-model mode
+            "checkpoint_root": "checkpoints_world",  # used if run_dir is null
+            "device": "auto",  # auto | cpu | cuda
+            "ensemble": {
+                "enabled": False,
+                "run_dirs": [],
+            },
+        },
+        "mpc": {
+            "steps": 50,
+            "horizon": 20,
+            "replan_every": 1,
+        },
+        "cem": {
+            "pop_size": 256,
+            "elite_frac": 0.1,
+            "n_iter": 5,
+            "init_std": 1.0,
+            "warm_start": True,
+            "action_low": None,
+            "action_high": None,
+        },
+        "objective": {
+            "latent_metric": "l2",  # l1 | l2
+            "terminal_weight": 1.0,
+            "running_weight": 0.0,
+            "action_l2_weight": 0.0,
+        },
+        "fidelity": {
+            "enabled": True,
+            "num_levels": 4,  # used by gt_env backend; wm backend derives count from model.K
+            # Level indices are over model.K (0=coarsest, len(K)-1=finest).
+            # Use integer indices or tokens: "coarsest", "finest", "base".
+            # "base" is valid for CEM and rollout fields; it refers to the
+            # current MPC-stage level in CEM fields and current CEM level in rollout fields.
+            "mpc": {
+                "mode": "linear",      # fixed | linear
+                "level": "finest",     # used when mode=fixed
+                "start_level": "coarsest",
+                "end_level": "finest",
+            },
+            "cem": {
+                "mode": "linear",      # fixed | linear
+                "level": "base",       # used when mode=fixed
+                "start_level": "base",
+                "end_level": "finest",
+            },
+            "rollout": {
+                "mode": "fixed",     # fixed | linear | uncertainty_downshift
+                "level": "base",     # used when mode=fixed
+                "start_level": "base",
+                "end_level": "coarsest",
+                "uncertainty": {
+                    "criterion": "mean",   # mean | percentile
+                    "threshold": 0.05,
+                    "percentile": 0.8,
+                    "min_level": "coarsest",
+                    "max_downshifts_per_step": 1,
+                },
+            },
+        },
+        "gt_env": {
+            "rollout_samples": 1,
+            "objective_space": "image",  # image | state
+            "progress": True,
+            "progress_leave": False,
+            "fidelity_env": {
+                "mode": "blur_avgpool",      # blur_avgpool | blur_quantize
+                "blur_sigma_max": 2.0,
+                "pool_scale_max": 4,
+                "quantize_levels_min": 8,
+                "quantize_levels_max": 256,
+                "action_noise_std_max": 0.0,
+                "downsample_output": False,
+                "min_downsample_size": 12,
+            },
+        },
+        "init_goal": {
+            "source": "random",  # random | dataset
+            "dataset": {
+                "zarr_path": None,      # if None, falls back to world config data.zarr_path
+                "split": "valid",
+                "split_ratio": None,    # if None, falls back to world config split_ratio (or 0.8)
+                "trajectory_len": 20,
+                "seed": 0,
+            },
+        },
         "render": False,
         "save": False,
-        "replan_every": 1,
-        "use_gt_env": True,
-        "action_low": None,
-        "action_high": None,
-        "pixel_cost": False,
-        "fidelity": {
-            "enabled": False,
-            "mode": "blur_avgpool",  # blur_avgpool | blur_quantize
-            "apply_to_goal": False,
-            "task_start": 0.0,
-            "task_end": 1.0,
-            "cem_start": 0.0,
-            "cem_end": 1.0,
-            "blur_sigma_max": 2.0,
-            "pool_scale_max": 4,
-            "quantize_levels_min": 8,
-            "quantize_levels_max": 256,
-        },
     }
-
     cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))
-    if cfg.pixel_cost and not cfg.use_gt_env:
-        raise ValueError("pixel_cost requires use_gt_env: true (GT env rollouts).")
+    validate_plan_cfg(cfg)
 
-    # ------------- Environment --------------------------------------------
-    # ---------------- Environment loading (same as simulate.py) ----------
-    env_id = cfg.get("env_id", "pusht")
-
-    # Register our wrapper under the requested id (no-op if called twice)
+    # Register env id.
     try:
         register(
-            id=env_id,
+            id=str(cfg.env_id),
             entry_point="pusht.pusht_wrapper:PushTWrapper",
             max_episode_steps=300,
             reward_threshold=1.0,
         )
     except gym.error.Error:
-        # Already registered
         pass
 
-    env_kwargs = cfg.env
-    # Gym ≥0.26 includes an automatic environment checker that assumes the
-    # reset() method returns (obs, info) where *info* is a dict. The PushT
-    # environment instead returns (obs, state) with *state* being an ndarray.
-    # Disable the checker so that the legacy signature is accepted.
-    # Visualisation / real‐step environment (full rendering capability)
-    env_vis_wrapped = gym.make(
-        env_id,
-        disable_env_checker=True,   # skip strict checks (reset output etc.)
-        apply_api_compatibility=False,  # keep original (obs, reward, done, info) API
-        **env_kwargs,
-    )
-
-    # Separate **headless** environment for CEM roll-outs ------------------
-    env_rollout_wrapped = gym.make(
-        env_id,
+    env_wrapped = gym.make(
+        str(cfg.env_id),
         disable_env_checker=True,
         apply_api_compatibility=False,
-        **env_kwargs,
+        render_action=True,
+        **cfg.env,
+    )
+    env: PushTWrapper = _unwrap_env(env_wrapped)
+    backend = str(cfg.backend).lower()
+    device = _resolve_device(str(cfg.world_model.device))
+    wm = None
+    wm_cfg = None
+    run_desc = "gt_env"
+
+    if backend == "wm":
+        wm, wm_cfg, run_desc, device = _load_world_model(cfg)
+
+        # Validate environment/model interface.
+        model_action_dim = int(wm_cfg.data.action_dim)
+        if int(env.action_dim) != model_action_dim:
+            raise ValueError(
+                f"Action-dim mismatch: env.action_dim={env.action_dim}, world-model action_dim={model_action_dim}"
+            )
+        if not bool(cfg.env.with_velocity):
+            # World config default uses velocity-aware state/image trajectories for PushT in this repo.
+            print("[warn] plan.env.with_velocity=false may mismatch the world model's training distribution.")
+        # Align fidelity num_levels to the loaded model levels for consistency.
+        cfg.fidelity.num_levels = len(wm.K)
+
+        planner = LatentCEMPlanner(
+            world_model=wm,
+            horizon=int(cfg.mpc.horizon),
+            action_dim=int(env.action_dim),
+            pop_size=int(cfg.cem.pop_size),
+            elite_frac=float(cfg.cem.elite_frac),
+            n_iter=int(cfg.cem.n_iter),
+            init_std=float(cfg.cem.init_std),
+            warm_start=bool(cfg.cem.warm_start),
+            action_low=cfg.cem.action_low,
+            action_high=cfg.cem.action_high,
+            objective_cfg=OmegaConf.to_container(cfg.objective, resolve=True),
+            fidelity_cfg=OmegaConf.to_container(cfg.fidelity, resolve=True),
+            drop_tail_on_coarsen=True,
+            device=device,
+        )
+    else:
+        planner = GTEnvCEMPlanner(
+            env=env,
+            horizon=int(cfg.mpc.horizon),
+            action_dim=int(env.action_dim),
+            pop_size=int(cfg.cem.pop_size),
+            elite_frac=float(cfg.cem.elite_frac),
+            n_iter=int(cfg.cem.n_iter),
+            init_std=float(cfg.cem.init_std),
+            warm_start=bool(cfg.cem.warm_start),
+            action_low=cfg.cem.action_low,
+            action_high=cfg.cem.action_high,
+            objective_cfg=OmegaConf.to_container(cfg.objective, resolve=True),
+            fidelity_cfg=OmegaConf.to_container(cfg.fidelity, resolve=True),
+            gt_env_cfg=OmegaConf.to_container(cfg.gt_env, resolve=True),
+            device=device,
+        )
+
+    init_state, goal_state, sample_meta = _sample_init_goal_states(env, cfg, wm_cfg=wm_cfg)
+
+    if str(sample_meta.get("source", "")).lower() == "dataset":
+        gt_len = int(sample_meta.get("trajectory_len", -1))
+        plan_steps = int(cfg.mpc.steps)
+        if gt_len > 0 and gt_len != plan_steps:
+            print(
+                "[warn] Dataset GT trajectory length differs from plan.mpc.steps: "
+                f"gt_len={gt_len}, planned_steps={plan_steps}. "
+                "Set them equal for length-matched visual comparison."
+            )
+    print(f"[backend] {backend}")
+    print(f"[world_model] loaded from {run_desc}")
+    if wm is not None and hasattr(wm, "num_members"):
+        print(f"[ensemble] members={wm.num_members}")
+    if wm is not None:
+        print(f"[levels] K={wm.K}")
+    else:
+        print(f"[levels] num_levels={int(cfg.fidelity.num_levels)} (gt_env)")
+        print(f"[gt_env] objective_space={str(cfg.gt_env.objective_space).lower()}")
+        print(f"[gt_env] progress={bool(cfg.gt_env.progress)}")
+
+    success, traj, frames, planner_frames, run_stats = _run_closed_loop(
+        env=env,
+        wm=wm,
+        planner=planner,
+        backend=backend,
+        cfg=cfg,
+        init_state=init_state,
+        goal_state=goal_state,
+        device=device,
     )
 
-    # Strip wrappers for both
-    def _unwrap(e):
-        while hasattr(e, "env"):
-            e = e.env
-        return e
-
-    env_vis: PushTWrapper = _unwrap(env_vis_wrapped)
-    env_rollout: PushTWrapper = _unwrap(env_rollout_wrapped)
-
-    # sample initial / goal states (seed=0 for determinism)
-    init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0)
-
-    goal_image = None
-    if cfg.pixel_cost:
-        goal_obs, _ = env_vis.prepare(seed=0, init_state=goal_state)
-        goal_image = goal_obs["visual"]
-
-    env_vis.prepare(seed=0, init_state=init_state)
-    env_rollout.prepare(seed=0, init_state=init_state)  # sync initial state
-
-    # ------------------------------------------------------------------
-    # Run planner -------------------------------------------------------
-    # ------------------------------------------------------------------
-
-    save_frames = bool(cfg.save)
-    success, traj, frames = closed_loop_cem(
-        env_vis, env_rollout, init_state, goal_state, cfg, goal_image=goal_image
-    )
-
-    # ------------------------------------------------------------------
-    # Persist rollout video if requested --------------------------------
-    # ------------------------------------------------------------------
-    if save_frames:
+    if bool(cfg.save):
         try:
-            import imageio.v2 as imageio  # imageio>=2.9
-        except ModuleNotFoundError:  # pragma: no cover
+            import imageio.v2 as imageio
+        except ModuleNotFoundError:
             import imageio
 
         rollout_root = "rollouts"
         os.makedirs(rollout_root, exist_ok=True)
-
-        from datetime import datetime
-
         run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_dir = os.path.join(rollout_root, f"plan_{run_ts}")
+        run_dir = os.path.join(rollout_root, f"plan_{backend}_{run_ts}")
         os.makedirs(run_dir, exist_ok=True)
-
-        # Determine filename index so that multiple rollouts in the same run
-        # do not overwrite each other (even though the current script only
-        # generates one rollout).  Counting any existing .mp4 files.
-        existing = [f for f in os.listdir(run_dir) if f.endswith(".gif")]
-        vid_fname = f"rollout_{len(existing):03d}.gif"
-        vid_path = os.path.join(run_dir, vid_fname)
-
-        # Write video to disk ------------------------------------------------
-        fps = 15  # rough real-time rate; PushT runs at 30 but many headless
-        print(f"[save] Writing rollout GIF to {vid_path} …")
-        imageio.mimwrite(vid_path, frames, fps=fps)
+        source = str(sample_meta.get("source", "unknown"))
+        out_path = os.path.join(run_dir, "planned.gif")
+        print(f"[save] Writing rollout GIF to {out_path}")
+        imageio.mimwrite(out_path, frames, fps=15)
         print(f"[save] Video saved ({len(frames)} frames)")
 
-    print("Reached goal:" if success else "Failed:", success)
+        meta = {
+            "created_at": run_ts,
+            "backend": backend,
+            "source": source,
+            "success": bool(success),
+            "planned_steps": int(len(traj) - 1),
+            "plans": int(run_stats["plans"]),
+            "bits_used_total": int(run_stats["bits_used_total"]),
+            "bits_used_total_human": _format_bits_human(int(run_stats["bits_used_total"])),
+            "plan_time_total_sec": float(run_stats["plan_time_total_sec"]),
+            "init_state": np.asarray(init_state, dtype=np.float32).tolist(),
+            "goal_state": np.asarray(goal_state, dtype=np.float32).tolist(),
+            "sample": sample_meta,
+            "plan_config": OmegaConf.to_container(cfg, resolve=True),
+        }
+        meta_path = os.path.join(run_dir, "metadata.json")
+        with open(meta_path, "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
+        print(f"[save] Metadata written to {meta_path}")
+
+        if source == "dataset":
+            gt_frames = _render_dataset_gt_frames(
+                env=env,
+                sample_meta=sample_meta,
+                init_state=init_state,
+                goal_state=goal_state,
+            )
+            if len(gt_frames) > 0:
+                gt_path = os.path.join(run_dir, "gt.gif")
+                print(f"[save] Writing dataset GT GIF to {gt_path}")
+                imageio.mimwrite(gt_path, gt_frames, fps=15)
+                print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
+
+        if backend == "gt_env" and len(planner_frames) > 0:
+            planner_path = os.path.join(run_dir, "planner_view.gif")
+            print(f"[save] Writing planner-view GIF to {planner_path}")
+            imageio.mimwrite(planner_path, planner_frames, fps=15)
+            print(f"[save] Planner-view video saved ({len(planner_frames)} frames)")
+
+    print(
+        f"[planning_stats] plans={run_stats['plans']}  "
+        f"bits_used_total={run_stats['bits_used_total']} "
+        f"({ _format_bits_human(int(run_stats['bits_used_total'])) })  "
+        f"plan_time_total_sec={run_stats['plan_time_total_sec']:.3f}"
+    )
+    print("Reached goal:", success)
 
 
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         print("Usage: python plan.py <path/to/config.yaml>")
-        sys.exit(1)
+        raise SystemExit(1)
     main(sys.argv[1])
