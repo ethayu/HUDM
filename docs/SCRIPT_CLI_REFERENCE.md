@@ -123,3 +123,39 @@ python scripts/test_ensemble.py
 ```
 
 No CLI flags.
+
+## `scripts/debug_planning_backend.py`
+
+Interactive/scripted backend debugger for planning backends.
+
+```bash
+python scripts/debug_planning_backend.py --config configs/plan.yaml --backend particle_sim --keyboard
+```
+
+Options:
+
+| Flag | Type | Default | Description |
+|---|---|---:|---|
+| `--config` | path | `configs/plan.yaml` | Planner config path. |
+| `--backend` | `gt_env\|particle_sim` | from config | Backend to debug. |
+| `--seed` | int | `0` | Seed for init/goal sampling. |
+| `--fidelity-level` | int | `-1` | Initial fidelity level index (`-1` = finest). |
+| `--actions` | str | `\"\"` | Scripted actions: `ax,ay;ax,ay;...`. |
+| `--keyboard` | flag | off | Enable live key control. |
+| `--max-steps` | int | `200` | Max steps to run. |
+| `--key-action-mag` | float | `0.25` | Action magnitude used by WASD keys. |
+| `--fps` | float | `12.0` | Render/update rate. |
+| `--render-size` | int | `224` | Backend render resolution before display upsampling. |
+| `--display-size` | int | `560` | Displayed image side length in pixels. |
+| `--panel-width` | int | `430` | Side HUD panel width in pixels. |
+| `--font-scale` | float | `0.58` | HUD font scale. |
+| `--save` | path | `\"\"` | Optional GIF output path. |
+| `--no-window` | flag | off | Disable OpenCV window output. |
+
+Keyboard controls:
+
+- `W/A/S/D`: move pusher.
+- `[` / `]` (or `-` / `=`): decrease/increase fidelity level.
+- `0-9`: jump directly to fidelity level index.
+- `R`: reset episode.
+- `Q` or `Esc`: quit.

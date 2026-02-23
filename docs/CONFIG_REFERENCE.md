@@ -80,15 +80,16 @@ The fields below are the source of truth for the current implementation.
 
 | Field | Type | Notes |
 |---|---|---|
-| `backend` | str | Planning backend: `wm` (learned world model) or `gt_env` (ground-truth env propagation). |
+| `backend` | str | Planning backend: `wm` (learned world model), `gt_env` (ground-truth env propagation), or `particle_sim` (Warp particle propagation). |
 | `env_id` | str | Gym env id (default PushT wrapper id). |
 | `env` | mapping | Env constructor kwargs. |
 | `world_model` | mapping | Checkpoint/model-loading setup. |
 | `mpc` | mapping | Closed-loop control schedule. |
 | `cem` | mapping | CEM optimizer settings. |
-| `objective` | mapping | Planner cost weights/metric (latent for `wm`, image/state for `gt_env`). |
+| `objective` | mapping | Planner cost weights/metric (latent for `wm`, image/state for `gt_env` and `particle_sim`). |
 | `fidelity` | mapping | Multi-resolution schedules across MPC/CEM/rollout. |
 | `gt_env` | mapping | Ground-truth env backend rollout/fidelity settings. |
+| `particle_env` | mapping | Warp particle backend rollout/fidelity settings. |
 | `init_goal` | mapping | Initial/goal state sampling configuration. |
 | `render` | bool | Enable interactive render. |
 | `save` | bool | Save rollout GIF under `rollouts/`. |
@@ -169,7 +170,7 @@ Level fields accept either:
 | Field | Type | Valid values | Notes |
 |---|---|---|---|
 | `enabled` | bool | `true/false` | If false, always use finest level. |
-| `num_levels` | int | `>0` | Used by `gt_env` backend. (`wm` backend uses `len(model.K)`). |
+| `num_levels` | int | `>0` | Used by `gt_env` and `particle_sim` backends. (`wm` backend uses `len(model.K)`). |
 | `mpc.mode` | str | `fixed`\|`linear` | Replan-level schedule mode. |
 | `mpc.level` | int\|token | used in `fixed` mode | Requested fixed MPC level. |
 | `mpc.start_level` | int\|token | used in `linear` mode | Start level over MPC progress. |
@@ -208,6 +209,8 @@ Uncertainty score definition for candidate population:
 - `ensemble.enabled=true` with `world_model.run_dir` set.
 - `ensemble.enabled=false` with non-empty `ensemble.run_dirs`.
 - `backend=gt_env` with `fidelity.rollout.mode=uncertainty_downshift`.
+- `backend=particle_sim` with `fidelity.rollout.mode` other than `fixed`.
+- `backend=particle_sim` with `fidelity.num_levels != len(particle_env.fidelity_env.spacings)`.
 - `rollout.mode=uncertainty_downshift` with non-ensemble world model.
 - Unknown fidelity modes or out-of-range level indices.
 
@@ -229,6 +232,34 @@ Only used when `backend: gt_env`.
 | `fidelity_env.action_noise_std_max` | float | `>=0` | Coarsest-level action noise std (linearly decays to 0 at finest). |
 | `fidelity_env.downsample_output` | bool | `true/false` | If true, returns genuinely lower-resolution images at coarse levels. |
 | `fidelity_env.min_downsample_size` | int | `>=4` | Smallest output side length used at coarsest level when downsampling is enabled. |
+
+### `particle_env`
+
+Only used when `backend: particle_sim`.
+
+| Field | Type | Valid values | Notes |
+|---|---|---|---|
+| `rollout_samples` | int | `>0` | Number of stochastic particle rollouts per candidate action sequence. |
+| `objective_space` | str | `image`\|`state` | `state`: optimize pose-based PushT metrics. `image`: optimize rendered visual distance. |
+| `progress` | bool | `true/false` | Show per-CEM-iteration rollout progress bar for particle planning. |
+| `progress_leave` | bool | `true/false` | Keep completed progress bars in terminal output. |
+| `fidelity_env.spacings` | list[float] | positive values | Coarsest->finest spacing per fidelity level (larger spacing => fewer particles). Length must equal `fidelity.num_levels`. |
+| `fidelity_env.device` | str | `auto`\|`cpu`\|`cuda`\|`cuda:N` | Warp device selection. |
+| `fidelity_env.{xmin,xmax,ymin,ymax}` | float | any real | World bounds for particle simulator. |
+| `fidelity_env.particle_radius` | float | `>0` | Radius used for particle contact/rendering. |
+| `fidelity_env.stem_w` | float | `>0` | T stem width in world units. |
+| `fidelity_env.stem_h` | float | `>0` | T stem height in world units. |
+| `fidelity_env.bar_w` | float | `>0` | T bar width in world units. |
+| `fidelity_env.bar_h` | float | `>0` | T bar height in world units. |
+| `fidelity_env.pusher_radius` | float | `>0` | Kinematic pusher radius in world units. |
+| `fidelity_env.pusher_speed` | float | `>0` | Max pusher speed (world units/sec). |
+| `fidelity_env.frame_dt` | float | `>0` | Control-step dt for one backend step. |
+| `fidelity_env.substeps` | int | `>=1` | Substeps per control frame. |
+| `fidelity_env.iters` | int | `>=1` | Solver iterations per substep. |
+| `fidelity_env.mu` | float | `>=0` | Position-level friction factor for pusher contact. |
+| `fidelity_env.lin_damp` | float | any real | Linear damping during prediction. |
+| `fidelity_env.vel_damp` | float | any real | Velocity damping during finalize. |
+| `fidelity_env.alpha_rigid` | float | `>=0` | Shape-matching projection blend (`1.0` = rigid). |
 
 ### `init_goal`
 

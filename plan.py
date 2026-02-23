@@ -27,6 +27,8 @@ from models.world.ensemble import WorldModelEnsemble
 from models.world.model import HierWorldModel
 from planning.gt_env_cem import GTEnvCEMPlanner
 from planning.latent_cem import LatentCEMPlanner
+from planning.particle_cem import ParticleCEMPlanner
+from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_wrapper import PushTWrapper
 from validate_cfg import validate_plan_cfg
 
@@ -226,7 +228,7 @@ def _sample_init_goal_states(
             zarr_path = wm_cfg.data.zarr_path
         else:
             raise ValueError(
-                "plan.init_goal.dataset.zarr_path must be set when backend=gt_env "
+                "plan.init_goal.dataset.zarr_path must be set when backend is gt_env or particle_sim "
                 "and no world config is available."
             )
     split_ratio = ds_cfg.split_ratio
@@ -432,7 +434,7 @@ def _run_closed_loop(
                 mpc_progress=mpc_progress,
                 warm_start_steps=int(prev_exec_steps),
             )
-        else:
+        elif backend == "gt_env":
             action_seq, info = planner.plan(
                 init_state=cur_state,
                 goal_state=goal_state,
@@ -445,6 +447,14 @@ def _run_closed_loop(
             obs, cur_state = env.prepare(seed=0, init_state=cur_state, goal_state=goal_state)
             _set_execution_fidelity_finest(env)
             obs["visual"] = env.render("rgb_array", include_start_pose=False)
+        else:
+            action_seq, info = planner.plan(
+                init_state=cur_state,
+                goal_state=goal_state,
+                mpc_progress=mpc_progress,
+                seed=int(1009 * replan_idx + 7919 * t),
+                warm_start_steps=int(prev_exec_steps),
+            )
 
         bits_used = int(getattr(info, "bits_used_estimate", 0))
         plan_time = float(getattr(info, "plan_time_sec", 0.0))
@@ -480,11 +490,15 @@ def _run_closed_loop(
             metrics = env.eval_state(goal_state, cur_state)
             dist = metrics["state_dist"]
             base_k = getattr(info, "base_k", None)
+            base_spacing = getattr(info, "base_spacing", None)
+            base_np = getattr(info, "base_num_particles", None)
             level_idx = int(getattr(info, "base_level_idx", -1))
             k_str = "-" if base_k is None else str(base_k)
+            spacing_str = "-" if base_spacing is None else f"{float(base_spacing):.4f}"
+            np_str = "-" if base_np is None else str(int(base_np))
             print(
                 f"step {t + 1:03d}  dist {dist:6.1f}  "
-                f"level_idx {level_idx}  k {k_str}"
+                f"level_idx {level_idx}  k {k_str}  spacing {spacing_str}  n_particles {np_str}"
             )
 
             if render_enabled:
@@ -532,7 +546,7 @@ def _run_closed_loop(
 def main(cfg_path: str) -> None:
     cfg_root = OmegaConf.load(cfg_path)
     defaults = {
-        "backend": "wm",  # wm | gt_env
+        "backend": "wm",  # wm | gt_env | particle_sim
         "env_id": "pusht",
         "env": {
             "with_velocity": True,
@@ -574,7 +588,7 @@ def main(cfg_path: str) -> None:
         },
         "fidelity": {
             "enabled": True,
-            "num_levels": 4,  # used by gt_env backend; wm backend derives count from model.K
+            "num_levels": 4,  # used by gt_env / particle_sim; wm backend derives count from model.K
             # Level indices are over model.K (0=coarsest, len(K)-1=finest).
             # Use integer indices or tokens: "coarsest", "finest", "base".
             # "base" is valid for CEM and rollout fields; it refers to the
@@ -621,6 +635,35 @@ def main(cfg_path: str) -> None:
                 "min_downsample_size": 12,
             },
         },
+        "particle_env": {
+            "rollout_samples": 1,
+            "objective_space": "state",  # image | state
+            "progress": True,
+            "progress_leave": False,
+            "fidelity_env": {
+                # Coarsest -> finest. Larger spacing => fewer particles.
+                "spacings": [0.020, 0.016, 0.013, 0.010],
+                "device": "auto",  # auto | cpu | cuda | cuda:0
+                "xmin": -0.25,
+                "xmax": 0.25,
+                "ymin": -0.25,
+                "ymax": 0.25,
+                "particle_radius": 0.006,
+                "stem_w": 0.05,
+                "stem_h": 0.10,
+                "bar_w": 0.12,
+                "bar_h": 0.04,
+                "pusher_radius": 0.015,
+                "pusher_speed": 0.6,
+                "frame_dt": 0.1,
+                "substeps": 16,
+                "iters": 8,
+                "mu": 0.6,
+                "lin_damp": 0.995,
+                "vel_damp": 0.999,
+                "alpha_rigid": 1.0,
+            },
+        },
         "init_goal": {
             "source": "random",  # random | dataset
             "dataset": {
@@ -660,7 +703,7 @@ def main(cfg_path: str) -> None:
     device = _resolve_device(str(cfg.world_model.device))
     wm = None
     wm_cfg = None
-    run_desc = "gt_env"
+    run_desc = backend
 
     if backend == "wm":
         wm, wm_cfg, run_desc, device = _load_world_model(cfg)
@@ -693,7 +736,7 @@ def main(cfg_path: str) -> None:
             drop_tail_on_coarsen=True,
             device=device,
         )
-    else:
+    elif backend == "gt_env":
         planner = GTEnvCEMPlanner(
             env=env,
             horizon=int(cfg.mpc.horizon),
@@ -710,6 +753,36 @@ def main(cfg_path: str) -> None:
             gt_env_cfg=OmegaConf.to_container(cfg.gt_env, resolve=True),
             device=device,
         )
+    else:
+        spacings = list(cfg.particle_env.fidelity_env.spacings)
+        cfg.fidelity.num_levels = len(spacings)
+        particle_backend = PushTParticleBackend(
+            with_velocity=bool(cfg.env.with_velocity),
+            with_target=bool(cfg.env.with_target),
+            render_size=int(getattr(env, "render_size", 96)),
+            relative=bool(getattr(env, "relative", True)),
+            action_scale=float(getattr(env, "action_scale", 100.0)),
+            device=str(cfg.particle_env.fidelity_env.device),
+            fidelity_spacings=[float(s) for s in spacings],
+            warp_cfg=OmegaConf.to_container(cfg.particle_env.fidelity_env, resolve=True),
+            seed=int(getattr(cfg.init_goal.dataset, "seed", 0)),
+        )
+        planner = ParticleCEMPlanner(
+            particle_backend=particle_backend,
+            horizon=int(cfg.mpc.horizon),
+            action_dim=int(env.action_dim),
+            pop_size=int(cfg.cem.pop_size),
+            elite_frac=float(cfg.cem.elite_frac),
+            n_iter=int(cfg.cem.n_iter),
+            init_std=float(cfg.cem.init_std),
+            warm_start=bool(cfg.cem.warm_start),
+            action_low=cfg.cem.action_low,
+            action_high=cfg.cem.action_high,
+            objective_cfg=OmegaConf.to_container(cfg.objective, resolve=True),
+            fidelity_cfg=OmegaConf.to_container(cfg.fidelity, resolve=True),
+            particle_env_cfg=OmegaConf.to_container(cfg.particle_env, resolve=True),
+            device=device,
+        )
 
     init_state, goal_state, sample_meta = _sample_init_goal_states(env, cfg, wm_cfg=wm_cfg)
 
@@ -723,15 +796,23 @@ def main(cfg_path: str) -> None:
                 "Set them equal for length-matched visual comparison."
             )
     print(f"[backend] {backend}")
-    print(f"[world_model] loaded from {run_desc}")
+    if wm is not None:
+        print(f"[world_model] loaded from {run_desc}")
+    else:
+        print("[world_model] not used")
     if wm is not None and hasattr(wm, "num_members"):
         print(f"[ensemble] members={wm.num_members}")
     if wm is not None:
         print(f"[levels] K={wm.K}")
-    else:
+    elif backend == "gt_env":
         print(f"[levels] num_levels={int(cfg.fidelity.num_levels)} (gt_env)")
         print(f"[gt_env] objective_space={str(cfg.gt_env.objective_space).lower()}")
         print(f"[gt_env] progress={bool(cfg.gt_env.progress)}")
+    else:
+        print(f"[levels] num_levels={int(cfg.fidelity.num_levels)} (particle_sim)")
+        print(f"[particle] objective_space={str(cfg.particle_env.objective_space).lower()}")
+        print(f"[particle] spacings={list(cfg.particle_env.fidelity_env.spacings)}")
+        print(f"[particle] progress={bool(cfg.particle_env.progress)}")
 
     success, traj, frames, planner_frames, run_stats = _run_closed_loop(
         env=env,

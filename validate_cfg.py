@@ -27,6 +27,7 @@ def validate_plan_cfg(cfg) -> None:
             "objective",
             "fidelity",
             "gt_env",
+            "particle_env",
             "init_goal",
             "render",
             "save",
@@ -96,6 +97,37 @@ def validate_plan_cfg(cfg) -> None:
         },
         "plan.gt_env.fidelity_env",
     )
+    _reject_unknown_keys(
+        cfg.particle_env,
+        {"rollout_samples", "objective_space", "progress", "progress_leave", "fidelity_env"},
+        "plan.particle_env",
+    )
+    _reject_unknown_keys(
+        cfg.particle_env.fidelity_env,
+        {
+            "spacings",
+            "device",
+            "xmin",
+            "xmax",
+            "ymin",
+            "ymax",
+            "particle_radius",
+            "stem_w",
+            "stem_h",
+            "bar_w",
+            "bar_h",
+            "pusher_radius",
+            "pusher_speed",
+            "frame_dt",
+            "substeps",
+            "iters",
+            "mu",
+            "lin_damp",
+            "vel_damp",
+            "alpha_rigid",
+        },
+        "plan.particle_env.fidelity_env",
+    )
     _reject_unknown_keys(cfg.init_goal, {"source", "dataset"}, "plan.init_goal")
     _reject_unknown_keys(
         cfg.init_goal.dataset,
@@ -104,8 +136,8 @@ def validate_plan_cfg(cfg) -> None:
     )
 
     backend = str(cfg.backend).lower()
-    if backend not in {"wm", "gt_env"}:
-        raise ValueError(f"plan.backend must be 'wm' or 'gt_env', got {cfg.backend}")
+    if backend not in {"wm", "gt_env", "particle_sim"}:
+        raise ValueError(f"plan.backend must be 'wm', 'gt_env', or 'particle_sim', got {cfg.backend}")
     if int(cfg.mpc.steps) <= 0:
         raise ValueError(f"plan.mpc.steps must be > 0, got {cfg.mpc.steps}")
     if int(cfg.mpc.horizon) <= 0:
@@ -134,11 +166,37 @@ def validate_plan_cfg(cfg) -> None:
         raise ValueError(
             f"plan.gt_env.objective_space must be 'image' or 'state', got {cfg.gt_env.objective_space}"
         )
+    if int(cfg.particle_env.rollout_samples) <= 0:
+        raise ValueError(
+            f"plan.particle_env.rollout_samples must be > 0, got {cfg.particle_env.rollout_samples}"
+        )
+    particle_objective_space = str(getattr(cfg.particle_env, "objective_space", "state")).lower()
+    if particle_objective_space not in {"image", "state"}:
+        raise ValueError(
+            "plan.particle_env.objective_space must be 'image' or 'state', "
+            f"got {cfg.particle_env.objective_space}"
+        )
+    spacings = list(getattr(cfg.particle_env.fidelity_env, "spacings", []))
+    if len(spacings) <= 0:
+        raise ValueError("plan.particle_env.fidelity_env.spacings must contain at least one value.")
+    for i, s in enumerate(spacings):
+        if float(s) <= 0.0:
+            raise ValueError(
+                f"plan.particle_env.fidelity_env.spacings[{i}] must be > 0, got {s}"
+            )
     if int(cfg.fidelity.num_levels) <= 0:
         raise ValueError(f"plan.fidelity.num_levels must be > 0, got {cfg.fidelity.num_levels}")
     if backend == "gt_env" and str(cfg.fidelity.rollout.mode).lower() == "uncertainty_downshift":
         raise ValueError(
             "plan.fidelity.rollout.mode=uncertainty_downshift is only supported for backend='wm'."
+        )
+    if backend == "particle_sim" and str(cfg.fidelity.rollout.mode).lower() != "fixed":
+        raise ValueError("backend='particle_sim' currently requires plan.fidelity.rollout.mode='fixed'.")
+    if backend == "particle_sim" and int(cfg.fidelity.num_levels) != len(spacings):
+        raise ValueError(
+            "plan.fidelity.num_levels must equal "
+            "len(plan.particle_env.fidelity_env.spacings) for backend='particle_sim'. "
+            f"Got num_levels={cfg.fidelity.num_levels}, spacings={len(spacings)}."
         )
 
     init_src = str(cfg.init_goal.source).lower()

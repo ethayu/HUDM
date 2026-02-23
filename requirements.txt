@@ -19,6 +19,8 @@ opencv-python>=4.7
 matplotlib>=3.5
 psutil>=5.9
 zarr>=2.14
+# Optional: required only for backend=particle_sim (Warp particle simulator)
+# warp-lang>=1.5.0
 # decord wheels are not currently built for all OS/Python combos.
 # If unavailable, comment this line out or install from source:
 #   pip install git+https://github.com/dmlc/decord.git
