@@ -13,12 +13,13 @@ import os
 import argparse
 import numpy as np
 import torch
+import torch.nn.functional as F
 from omegaconf import OmegaConf
 from torchvision.utils import make_grid, save_image
 
 from models.world.model import HierWorldModel
 from datasets.zarr_episodes import ZarrPushTEpisodes
-
+from datasets.mixed_zarr import build_mixed_zarr_episodes
 
 @torch.no_grad()
 def main():
@@ -41,6 +42,7 @@ def main():
     ).to(device)
 
     # Attempt to locate latest run dir
+    epoch = 200
     ckpt_root = cfg.train.checkpoint_dir
     run_dirs = [os.path.join(ckpt_root, d) for d in os.listdir(ckpt_root) if os.path.isdir(os.path.join(ckpt_root, d))]
     if not run_dirs:
@@ -48,23 +50,23 @@ def main():
     else:
         latest = max(run_dirs, key=os.path.getmtime)
         print("loaded :", latest)
-        enc_p = os.path.join(latest, 'encoder.pt')
+        enc_p = os.path.join(latest, f'encoder_epoch{epoch}.pt')
         if os.path.isfile(enc_p):
             wm.encoder.load_state_dict(torch.load(enc_p, map_location=device))
         decoder_mode = str(getattr(cfg.model, "decoder_mode", "per_level"))
         if decoder_mode == "shared":
-            dp = os.path.join(latest, "decoder.pt")
+            dp = os.path.join(latest, f"decoder_epoch{epoch}.pt")
             if os.path.isfile(dp):
                 wm.decoder.load_state_dict(torch.load(dp, map_location=device))
         else:
             for li in range(len(cfg.model.K)):
-                dp = os.path.join(latest, f'decoder_l{li}.pt')
+                dp = os.path.join(latest, f'decoder_l{li}_epoch{epoch}.pt')
                 if os.path.isfile(dp):
                     wm.decoders[li].load_state_dict(torch.load(dp, map_location=device))
 
     wm.eval()
 
-    ds = ZarrPushTEpisodes(cfg.data.zarr_path, split='valid', split_ratio=cfg.data.split_ratio)
+    _, ds = build_mixed_zarr_episodes(cfg)
     # collect N samples from mid-episode frames
     idxs = np.linspace(0, len(ds) - 1, num=min(args.count, len(ds)), dtype=int)
     xs = []
@@ -79,7 +81,9 @@ def main():
         for li, k in enumerate(cfg.model.K):
             recon = wm.decode(li, z).squeeze(0).cpu()
             recons_by_level[li].append(recon)
-
+            loss = F.mse_loss(recon, x_seq[t_mid])
+            print(f"level {li} loss: {loss.item()}")
+            import pdb; pdb.set_trace()
     # Create grid: for each level a row of [GT | Recon] pairs
     rows = []
     # normalised in [-1,1]; save_image expects [0,1], but make_grid handles; we will clamp after denorm

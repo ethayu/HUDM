@@ -72,8 +72,7 @@ class ZarrPushTEpisodes(Dataset):
 
     @staticmethod
     def _img_to_tensor(img: np.ndarray) -> torch.Tensor:
-        img = np.clip(img, 0.0, 255.0).astype(np.float32)
-        img = img / 255.0
+        #img = np.clip(img, 0.0, 1.0).astype(np.float32)
         img = img * 2.0 - 1.0
         return torch.from_numpy(img).permute(2, 0, 1)
 
@@ -96,8 +95,8 @@ class ZarrPushTEpisodes(Dataset):
         a_t = torch.from_numpy(a.astype(np.float32))
         state_t = torch.from_numpy(state.astype(np.float32))
 
-        a_t = (a_t - ACTION_MEAN) / ACTION_STD
-        state_t = (state_t - STATE_MEAN) / STATE_STD
+        #a_t = (a_t - ACTION_MEAN) / ACTION_STD
+        #state_t = (state_t - STATE_MEAN) / STATE_STD
         return {
             "x": x_t,
             "a": a_t,
@@ -125,9 +124,10 @@ class ZarrPushTEpisodes(Dataset):
         return observations, states, actions
 
 
-def collate_episodes(batch: List[dict]) -> dict:
+def collate_episodes(batch: List[dict], length) -> dict:
     lengths = [item["length"] for item in batch]
     max_len = max(lengths)
+
     bsz = len(batch)
     c, h, w = batch[0]["x"].shape[1:]
     a_dim = batch[0]["a"].shape[1] if batch[0]["a"].numel() > 0 else 2
@@ -139,12 +139,13 @@ def collate_episodes(batch: List[dict]) -> dict:
     mask = torch.zeros((bsz, max_len), dtype=torch.bool)
 
     for i, item in enumerate(batch):
-        L = item["length"]
-        x[i, :L] = item["x"]
-        state[i, :L] = item["state"]
+        L = length#item["length"]
+        start = random.randint(0, item["x"].shape[0] - L)
+        x[i, :L] = item["x"][start:start+L]
+        state[i, :L] = item["state"][start:start+L]
         mask[i, :L] = True
         if L > 1:
-            a[i, : L - 1] = item["a"]
+            a[i, : L - 1] = item["a"][start:start+L-1]
 
     return {
         "x": x,

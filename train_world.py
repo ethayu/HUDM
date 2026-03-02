@@ -51,7 +51,7 @@ def run_epoch(
     for batch in loader:
         x = batch["x"].to(device)          # (B,L,C,H,W)
         a = batch["a"].to(device)          # (B,L-1,A)
-        s = batch["s"].to(device)      # (B,L,D)
+        s = batch["s"][:,:,:5].to(device)      # (B,L,D)
         mask = batch["mask"].to(device)    # (B,L)
         B, L = mask.shape
         C, H, W = x.shape[2:]
@@ -66,12 +66,15 @@ def run_epoch(
 
         # Null action at t=0
         a_null = torch.zeros((B, 1, a.shape[-1]), device=device, dtype=a.dtype)
-        a_full = torch.cat([a_null, a], dim=1)  # (B,L,A)
+        a_full = a #torch.cat([a,a_null], dim=1)  # (B,L-1,A)
 
         # Teacher forcing inputs/targets
-        z_in = torch.cat([z[:, :1, :], z[:, :-1, :]], dim=1)  # (B,L,D)
-        z_in_flat = z_in.view(B * L, -1)
-        a_full_flat = a_full.view(B * L, -1)
+        z_in = z[:, :-1, :]  # (B,L-1,D)
+
+        z_in_flat = z_in.reshape(B * (L-1), -1)
+        z_out = z[:, 1:, :]  # (B,L-1,D)
+
+        a_full_flat = a_full.view(B * (L-1), -1)
 
         loss = torch.zeros((), device=device)
         logs: Dict[str, float] = {}
@@ -93,37 +96,36 @@ def run_epoch(
                 #recon = F.mse_loss(x_hat_flat[mask_flat], s_flat[mask_flat])
             else:
                 raise ValueError(f"Invalid input mode: {model.input}")
-            
 
             # Teacher forcing loss over all steps
             if model.dynamics_mode == "per_level":
                 z_in_k_flat = z_in_flat[:, :k]
                 pred_flat = model.dynamics[li].step(z_in_k_flat, a_full_flat)
-                pred = pred_flat.view(B, L, k)
+                pred = pred_flat.view(B, L-1, k)
             else:
                 z_in_pad_flat = model._pad_prefix(z_in_flat, k)
                 pred_full_flat = model.dynamics.step(z_in_pad_flat, a_full_flat)
-                pred = pred_full_flat[:, :k].view(B, L, k)
-            teacher = masked_mse(pred, z[:, :, :k], mask)
+                pred = pred_full_flat[:, :k].view(B, L-1, k)
+            teacher = masked_mse(pred, z_out[:, :, :k], mask[:,1:])
 
             # Autoregressive rollout loss (null at t=0)
             if model.dynamics_mode == "per_level":
                 z_prev = z[:, 0, :k]
                 preds = []
-                for t in range(L):
+                for t in range(L-1):
                     z_prev = model.dynamics[li].step(z_prev, a_full[:, t, :])
                     preds.append(z_prev)
                 pred_roll = torch.stack(preds, dim=1)  # (B,L,k)
             else:
                 z_prev = model._pad_prefix(z[:, 0, :], k)
                 preds = []
-                for t in range(L):
+                for t in range(L-1):
                     z_prev = model.dynamics.step(z_prev, a_full[:, t, :])
                     if k < model.D:
                         z_prev = torch.cat([z_prev[..., :k], z_prev.new_zeros(z_prev[..., k:].shape)], dim=-1)
                     preds.append(z_prev[..., :k])
                 pred_roll = torch.stack(preds, dim=1)
-            rollout = masked_mse(pred_roll, z[:, :, :k], mask)
+            rollout = masked_mse(pred_roll, z_out[:, :, :k], mask[:,1:])
 
             loss = loss + recon_w * recon + teacher_w * teacher + rollout_w * rollout
 
@@ -149,18 +151,18 @@ def run_epoch(
     return avg_loss, avg_logs
 
 
-def save_checkpoint(model: HierWorldModel, run_dir: str) -> None:
-    torch.save(model.encoder.state_dict(), os.path.join(run_dir, "encoder.pt"))
+def save_checkpoint(model: HierWorldModel, run_dir: str, epoch: int) -> None:
+    torch.save(model.encoder.state_dict(), os.path.join(run_dir, f"encoder_epoch{epoch}.pt"))
     if model.decoder_mode == "per_level":
         for li in range(len(model.K)):
-            torch.save(model.decoders[li].state_dict(), os.path.join(run_dir, f"decoder_l{li}.pt"))
+            torch.save(model.decoders[li].state_dict(), os.path.join(run_dir, f"decoder_l{li}_epoch{epoch}.pt"))
     else:
-        torch.save(model.decoder.state_dict(), os.path.join(run_dir, "decoder.pt"))
+        torch.save(model.decoder.state_dict(), os.path.join(run_dir, "decoder_epoch{epoch}.pt"))
     if model.dynamics_mode == "per_level":
         for li in range(len(model.K)):
-            torch.save(model.dynamics[li].state_dict(), os.path.join(run_dir, f"dyn_l{li}.pt"))
+            torch.save(model.dynamics[li].state_dict(), os.path.join(run_dir, f"dyn_l{li}_epoch{epoch}.pt"))
     else:
-        torch.save(model.dynamics.state_dict(), os.path.join(run_dir, "dyn.pt"))
+        torch.save(model.dynamics.state_dict(), os.path.join(run_dir, f"dyn_epoch{epoch}.pt"))
 
 
 def main(cfg_path: str):
@@ -175,6 +177,7 @@ def main(cfg_path: str):
         K=K,
         D=D,
         action_dim=cfg.data.action_dim,
+        input=cfg.model.input,
         decoder_mode=str(getattr(cfg.model, "decoder_mode", "per_level")),
         dynamics_mode=str(getattr(cfg.model, "dynamics_mode", "per_level")),
     ).to(device)
@@ -190,7 +193,7 @@ def main(cfg_path: str):
         batch_size=cfg.train.batch_size,
         shuffle=True,
         num_workers=cfg.train.num_workers,
-        collate_fn=collate_episodes,
+        collate_fn=lambda batch: collate_episodes(batch, cfg.train.horizon),
     )
 
     va_loader = DataLoader(
@@ -198,7 +201,7 @@ def main(cfg_path: str):
         batch_size=cfg.train.batch_size,
         shuffle=False,
         num_workers=cfg.train.num_workers,
-        collate_fn=collate_episodes,
+        collate_fn=lambda batch: collate_episodes(batch, cfg.train.horizon),
     )
     #batch = next(iter(va_loader))
     
@@ -238,17 +241,20 @@ def main(cfg_path: str):
                 **{f"val/{k}": v for k, v in val_logs.items()},
                 "epoch": epoch,
             })
-
-        if val_loss + min_delta < best_val:
-            best_val = val_loss
-            no_improve = 0
-            save_checkpoint(wm, run_dir)
-        else:
-            no_improve += 1
-            if no_improve >= patience:
-                print("converged (patience reached)")
-                break
-
+        if epoch % 20 == 0:
+            if val_loss + min_delta < best_val:
+                best_val = val_loss
+                no_improve = 0
+                save_checkpoint(wm, run_dir, epoch)
+                print("best checkpoint saved at epoch", epoch)
+            else:
+                no_improve += 1
+                if no_improve >= patience:
+                    print("converged (patience reached)")
+                    no_improve = 0
+                    #break
+        if epoch == max_epochs-1:
+            save_checkpoint(wm, run_dir, epoch)
     print("Training complete.")
 
 

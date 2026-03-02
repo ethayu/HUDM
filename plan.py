@@ -71,6 +71,16 @@ def make_cost_fn(goal_state: np.ndarray):
 
     return _cost
 
+def make_cost_fn_embedding_space():
+    """L2 distance (xy) + small weighted angle error."""
+
+    def _cost(states: torch.Tensor, goal_state: torch.Tensor) -> torch.Tensor:
+        goal = goal_state
+        return torch.norm(states - goal, dim=1)
+
+    return _cost
+
+
 
 # ---------------------------------------------------------------------------
 # Closed-loop CEM planner
@@ -83,6 +93,7 @@ def closed_loop_cem(
     env_rollout: PushTWrapper,
     init_state: np.ndarray,
     goal_state: np.ndarray,
+    goal_obs: np.ndarray,
     init_obs: np.ndarray,
     cfg: DictConfig,
     dynamics_ensemble: HierWorldModel,
@@ -97,14 +108,14 @@ def closed_loop_cem(
 
     planner = CEMPlanner(
         dynamics_ensemble=dynamics_ensemble,
-        cost_fn=make_cost_fn(goal_state),
+        cost_fn=make_cost_fn_embedding_space(),#make_cost_fn(goal_state),
         action_dim=env_step.action_dim,
         horizon=cfg.planning_horizon,
         pop_size=cfg.pop_size,
         elite_frac=cfg.elite_frac,
         n_iter=cfg.n_iter,
         var_threshold=cfg.var_threshold,
-        gt_env=None,
+        gt_env=env_rollout,#None,
         gt_actions=gt_actions,
         n_env_samples=cfg.n_env_samples,
         device=device,
@@ -144,7 +155,7 @@ def closed_loop_cem(
         # by PushTEnv._render_frame so that rgb_array frames become a cheap
         # 1×1 placeholder.
         # ----------------------------------------------------------
-        env_rollout.headless = True
+        #env_rollout.headless = True
         best_seq = planner.plan(
             state_hist,
             action_hist,
@@ -152,12 +163,13 @@ def closed_loop_cem(
             mask_hist,
             agg_mode="average",
             n_impute=1,
-            gt_goal=goal_state,
+            gt_goal=goal_obs,
         )
-        env_rollout.headless = False
+        #env_rollout.headless = False
 
         # Execute the first *replan_every* actions from the planned sequence
         n_exec = min(replan_every, cfg.planning_horizon)
+        
         pos_diffs = []
         angle_diffs = []
         eef_diffs = []
@@ -171,9 +183,11 @@ def closed_loop_cem(
             # Step the environment with the chosen action
             _, reward, done, info = env_step.step(action_i)
             cur_state = info["state"]
+
             trajectory.append(cur_state.copy())
 
             # ---- Logging ------------------------------------------------
+            #import pdb; pdb.set_trace()
             dist = env_step.eval_state(goal_state, cur_state)
             pd = dist["pos_diff"]
             ad = dist["angle_diff"] 
@@ -293,15 +307,16 @@ def main(cfg_path: str):
     #init_state, goal_state = env_vis.sample_random_init_goal_states(seed=0,random_goal=True)
     # sample from synthetic dataset
     va_ds = ZarrPushTEpisodes(cfg.zarr_path, split='valid', split_ratio=cfg.split_ratio)
-    observations, states, actions = va_ds.sample_traj_segment_from_dset(cfg.sample_horizon)
 
+    observations, states, actions = va_ds.sample_traj_segment_from_dset(cfg.sample_horizon)
+    """
     env_vis.prepare(seed=0, init_state=states[0])
     dataset_gt_frames = []
     dataset_gt_frames.append(env_vis.render("rgb_array"))
     for i in range(len(states)):
         env_vis.prepare(seed=0, init_state=states[i])
         dataset_gt_frames.append(env_vis.render("rgb_array"))
-
+    """
     _, states = env_vis.rollout(seed=0, init_state=states[0], actions=actions)
     gt_frames = []
     for i in range(len(states)):
@@ -309,7 +324,8 @@ def main(cfg_path: str):
         gt_frames.append(env_vis.render("rgb_array"))
 
     init_state = states[0]
-    goal_state = states[-1]
+    goal_state = states[-1]#observations[-1] #
+    goal_obs = observations[-1]
     init_obs = observations[0]
     env_vis.prepare(seed=0, init_state=init_state)
     gt_start = env_vis.render("rgb_array")
@@ -326,7 +342,8 @@ def main(cfg_path: str):
         print('No checkpoint run directories found; using random weights')
         dynamics_ensemble = None
     else:
-        latest = max(run_dirs, key=os.path.getmtime)
+        epoch = 200
+        latest = max(run_dirs, key=os.path.getmtime)#"/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260202_230210"#
         print("loaded :", latest)
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         model_cfg = OmegaConf.load(os.path.join(latest, 'world.yaml'))
@@ -335,31 +352,35 @@ def main(cfg_path: str):
         dynamics_ensemble = HierWorldModel(
             K=list(model_cfg.model.K),
             D=int(model_cfg.model.D),
+            input=str(getattr(model_cfg.model, "input")),
             action_dim=model_cfg.data.action_dim,
             decoder_mode=str(getattr(model_cfg.model, "decoder_mode", "per_level")),
             dynamics_mode=str(getattr(model_cfg.model, "dynamics_mode", "per_level")),
         ).to(device)
 
-        enc_p = os.path.join(latest, 'encoder.pt')
+        enc_p = os.path.join(latest, f'encoder_epoch{epoch}.pt')
         if os.path.isfile(enc_p):
             dynamics_ensemble.encoder.load_state_dict(torch.load(enc_p, map_location=device))
         decoder_mode = str(getattr(model_cfg.model, "decoder_mode", "per_level"))
         if decoder_mode == "shared":
-            dp = os.path.join(latest, "decoder.pt")
+            dp = os.path.join(latest, f"decoder_epoch{epoch}.pt")
+            dyp = os.path.join(latest, f"dyn_epoch{epoch}.pt")
             if os.path.isfile(dp):
                 dynamics_ensemble.decoder.load_state_dict(torch.load(dp, map_location=device))
+                dynamics_ensemble.dynamics.load_state_dict(torch.load(dyp, map_location=device))
         else:
             for li in range(len(model_cfg.model.K)):
-                dp = os.path.join(latest, f'decoder_l{li}.pt')
+                dp = os.path.join(latest, f'decoder_l{li}_epoch{epoch}.pt')
+                dyp = os.path.join(latest, f'dyn_l{li}_epoch{epoch}.pt')
                 if os.path.isfile(dp):
                     dynamics_ensemble.decoders[li].load_state_dict(torch.load(dp, map_location=device))
-
+                    dynamics_ensemble.dynamics[li].load_state_dict(torch.load(dyp, map_location=device))
         dynamics_ensemble.eval()
         
 
     save_frames = bool(cfg.save)
     success, traj, frames, pos_diffs, angle_diffs, eef_diffs = closed_loop_cem(
-        env_vis, env_rollout, init_state, goal_state, init_obs,cfg, dynamics_ensemble=dynamics_ensemble, gt_actions=None#actions
+        env_vis, env_rollout, init_state, goal_state, goal_obs, init_obs,cfg, dynamics_ensemble=dynamics_ensemble, gt_actions=None#actions
     )
 
     env_vis.prepare(seed=0, init_state=goal_state)
@@ -397,15 +418,17 @@ def main(cfg_path: str):
         print(f"[save] Video saved ({len(frames)} frames)")
 
         #Save gt frames
+        """
         gt_vid_path = os.path.join(run_dir, "gt_frames.mp4")
         imageio.mimwrite(gt_vid_path, gt_frames, fps=fps)
         print(f"[save] GT frames saved ({len(gt_frames)} frames)")
-
+        """
         #Save dataset gt frames
-        dataset_gt_vid_path = os.path.join(run_dir, "dataset_gt_frames.mp4")
-        imageio.mimwrite(dataset_gt_vid_path, dataset_gt_frames, fps=fps)
-        print(f"[save] Dataset GT frames saved ({len(dataset_gt_frames)} frames)")
 
+        dataset_gt_vid_path = os.path.join(run_dir, "gt_frames.mp4")
+        imageio.mimwrite(dataset_gt_vid_path, gt_frames, fps=fps)
+        print(f"[save] Dataset GT frames saved ({len(observations)} frames)")
+        
         #Save gt goal and start overlaid on the same image
         # Overlay gt_start and gt_goal with alpha blending
         # Ensure both images are the same shape

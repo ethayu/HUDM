@@ -9,12 +9,13 @@ import torch
 import numpy as np
 from typing import Callable, Optional
 import matplotlib.pyplot as plt
+from PIL import Image
+from torchvision.utils import make_grid, save_image
 
-ACTION_MEAN = torch.tensor([-0.0087, 0.0068])
-ACTION_STD = torch.tensor([0.2019, 0.2002])
+ACTION_MEAN = torch.tensor([-0.0087, 0.0068]).cuda()
+ACTION_STD = torch.tensor([0.2019, 0.2002]).cuda()
 STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027,  2.54307914])
 STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094])
-
 class CEMPlanner:
     def __init__(
         self,
@@ -64,7 +65,8 @@ class CEMPlanner:
         if dynamics_ensemble is not None and not self.use_env_sampling:
             # standard model-based planning
             self.use_env_sampling = False
-        import pdb; pdb.set_trace()
+        self.use_env_sampling = False
+
         self.use_gt = self.use_env_sampling  # backward compat alias
         self.gt_actions = gt_actions
         # Rollout sampling parameters
@@ -73,7 +75,15 @@ class CEMPlanner:
         # Initialize sampling distribution parameters
         # Mean and std for each timestep and action dimension
         self.mu = torch.zeros(horizon, action_dim, device=self.device)
-        self.std = torch.ones(horizon, action_dim, device=self.device)*5
+        self.std = torch.ones(horizon, action_dim, device=self.device)
+    
+    def preprocess_obs(self, obs: np.ndarray) -> torch.Tensor:
+        img_size = 96
+        im = Image.fromarray(obs.astype(np.uint8)) if obs.dtype != np.uint8 else Image.fromarray(obs)
+        im = im.resize((img_size, img_size), Image.BILINEAR)
+        return (np.asarray(im).astype(np.float32) / 255.0) * 2.0 - 1.0
+    def denorm(self,x):
+        return (x * 0.5 + 0.5).clamp(0,1)
 
     def plan(
         self,
@@ -115,6 +125,7 @@ class CEMPlanner:
                 #  Evaluate each candidate by empirical env rollouts
                 # ----------------------------------------------------------
                 final_states_list = []
+                final_obses_list = []
                 final_masks_list  = []
                 var_last_list     = []
 
@@ -129,10 +140,16 @@ class CEMPlanner:
                     for s_idx in range(self.n_env_samples):
                         seed = np.random.randint(0, 2**31 - 1)
                         self.gt_env.prepare(seed=seed, init_state=state_hist_np)
-                        _, states = self.gt_env.rollout(seed, state_hist_np, act_seq_np)
+                        obses, states = self.gt_env.rollout(seed, state_hist_np, act_seq_np)
                         # states returned shape (horizon+1, D); discard first
                         sample_states.append(states[1:])
-
+                        """
+                        if(p==0):
+                            a = [torch.tensor(self.preprocess_obs(obs), device=self.device).permute(2,0,1) for obs in obses["visual"]]
+                            a = torch.stack(a, dim=0)
+                            a = self.denorm(a)
+                            save_image(a, f"gt_rollout_ep0.png")
+                        """
                     sample_states = np.stack(sample_states, axis=0)  # (S,K,D)
 
                     mu_pred_np  = sample_states.mean(axis=0)          # (K,D)
@@ -148,67 +165,100 @@ class CEMPlanner:
                     masks = np.stack(masks, axis=0)  # (K,D)
 
                     final_states_list.append(torch.tensor(mu_pred_np[-1], device=self.device))
+                    final_obses_list.append(torch.tensor(self.preprocess_obs(obses["visual"][-1]), device=self.device).permute(2,0,1))
                     final_masks_list.append(torch.tensor(masks[-1],  device=self.device, dtype=torch.bool))
                     var_last_list.append(torch.tensor(var_pred_np[-1], device=self.device))
 
                 final_states = torch.stack(final_states_list, dim=0)  # (P,D)
                 final_masks  = torch.stack(final_masks_list,  dim=0)  # (P,D)
+                final_obses  = torch.stack(final_obses_list,  dim=0)  # (P,H,)
                 var_pred     = torch.stack(var_last_list,     dim=0)  # (P,D)
+                #import pdb; pdb.set_trace()
 
                 # Imputation & cost aggregation ---------------------------
-                costs = self.cost_fn(final_states)  # (P,)
-                #import pdb; pdb.set_trace()
+                # normalised in [-1,1]; save_image expects [0,1], but make_grid handles; we will clamp after denorm
+                
+                gt_goal_embedding = self.model.encoder(gt_goal.unsqueeze(0).cuda())
+                final_states_embedding = self.model.encoder(final_obses.float().cuda())
+                
+                recon = self.model.decode(2, final_states_embedding).squeeze(0)
+                gt_recon = self.model.decode(2, gt_goal_embedding).squeeze(0)
+                """
+                B, L, A = actions.shape
+                actions = (actions - ACTION_MEAN) / ACTION_STD
+                a_null = torch.zeros((B, 1, A), device=self.device, dtype=actions.dtype)
+                a_full = torch.cat([actions,a_null], dim=1)  # (B,L,A)  
+                a_full_flat = a_full.view(B * (L+1), -1)
+
+                obs_hist = obs_hist.expand(P, -1, -1, -1, -1).clone()[:,-1,:]   # (P,H,)
+                z = self.model.encoder(obs_hist)
+
+                for li, k in enumerate(self.model.K):
+                    z_prev = z[:, :k]
+                    preds = []
+                    for t in range(L):
+                        z_prev = self.model.dynamics[li].step(z_prev, a_full[:, t, :])
+                        preds.append(z_prev)
+                    pred_roll = torch.stack(preds, dim=1)  # (B,L,k)
+
+                    recon_s = []
+                    for t in range(L):
+                        recon_s.append(self.model.decode(li, pred_roll[:,t]))
+                    recon_s = torch.stack(recon_s, dim=1)  # (B,L,k)
+                    save_image(self.denorm(recon_s[0]), f"recon_rollout_level{li}_ep0.png")
+                    import pdb; pdb.set_trace()
+                """
+                #save_image(denorm(recon), f"recon_level{level}.png")
+                #save_image(denorm((final_obses)), "gt.png")
+                
+            
+                #diff = (gt_goal.unsqueeze(0).cuda() - final_obses)
+                #costs = torch.linalg.norm(diff.flatten(start_dim=1), ord=2, dim=1)
+                #costs = self.cost_fn(final_states_embedding, gt_goal_embedding)  # (P,)
+                #diff = (denorm(recon.cuda()) - denorm(gt_recon.cuda()))
+                diff = (gt_goal_embedding - final_states_embedding)
+                costs = torch.linalg.norm(diff.flatten(start_dim=1), ord=2, dim=1)
+                print("costs", costs)
 
             else:
                 # ---- Use learned ensemble (original behaviour) ----------
                 s_hist = state_hist.expand(P, -1, -1).clone()[:,-1,:]   # (P,H,D)
 
-                s_flat = s_hist.view(P, -1)
-
                 obs_hist = obs_hist.expand(P, -1, -1, -1, -1).clone()[:,-1,:]   # (P,H,)
 
                 z = self.model.encoder(obs_hist)
 
+
                 pred_roll_z_k = []
                 pred_roll_s_k = []
 
-                import pdb; pdb.set_trace()
-        
-                #actions_input = actions- (a_abs - agent_pos) / self._ACTION_SCALE
-                #a_t = (a_t - ACTION_MEAN) / ACTION_STD
-                #state_t = (state_t - STATE_MEAN) / STATE_STD
+                gt_goal_embedding = self.model.encoder(gt_goal.unsqueeze(0).cuda())
+
+                actions = (actions - ACTION_MEAN) / ACTION_STD
+                costs_samples = []
                 for li, k in enumerate(self.model.K):
                     preds_z = []
                     preds_s = []
                     z_prev = z[:, :k]
-                    for t in range(self.horizon):
+                    for t in range(actions.shape[1]):
                         z_prev = self.model.dynamics[li].step(z_prev, actions[:, t, :])
                         preds_z.append(z_prev)
                         pred_s = self.model.decoders[li](z_prev)
-
                         preds_s.append(pred_s)
                     pred_roll_z = torch.stack(preds_z, dim=1)
                     pred_roll_s = torch.stack(preds_s, dim=1)
                     pred_roll_z_k.append(pred_roll_z)
                     pred_roll_s_k.append(pred_roll_s) #largest dimension, #candidate, time, D ; 4,10,50,7
+                    final_states_embedding = pred_roll_z[:, -1, :]
+                    diff = (gt_goal_embedding[:,:k] - final_states_embedding)
+                    costs_samples.append(torch.linalg.norm(diff.flatten(start_dim=1), ord=2, dim=1))
 
-                # multiple imputations
-                costs_samples = []
-                for k in range(len(self.model.K)):
-                    comp = pred_roll_s_k[k][ :, -1, :]
-                    costs_samples.append(self.cost_fn(comp))
-
-                costs_stack = torch.stack(costs_samples, dim=0)
-                if agg_mode == "max":
-                    costs = costs_stack.max(dim=0).values
-                elif agg_mode == "min":
-                    costs = costs_stack.min(dim=0).values
-                else:
-                    #costs = costs_stack[-1]
-                    costs = costs_stack.mean(dim=0)
+                costs = torch.mean(torch.stack(costs_samples, dim=1), dim=1)
 
             # -------------------------------------------------- CEM update
             elite_idxs   = costs.topk(self.n_elite, largest=False).indices
+            print("elite costs", costs[elite_idxs[0]])
+            actions = actions*ACTION_STD+ACTION_MEAN
             #import pdb; pdb.set_trace()
             elite_actions = actions[elite_idxs]           # (E,horizon,A)
             if self.use_gt:

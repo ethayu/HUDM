@@ -14,7 +14,7 @@ data:
     val_source: "synthetic"  # Validation source: "real", "synthetic", or "mixed"
 
 model:
-  input: "mixed" # "state" | "images" | "mixed"
+  input: "images" # "state" | "images" | "mixed"
   D: 256
   K: [32, 64, 128, 256] #, 512]
   decoder_mode: "per_level"   # per_level | shared
@@ -22,6 +22,7 @@ model:
 
 train:
   batch_size: 8
+  horizon: 50
   num_workers: 4
   no_cuda: false
   checkpoint_dir: checkpoints_world
@@ -31,14 +32,14 @@ optim:
   lr: 0.0003
 
 loss:
-  recon_weight: 1.0
+  recon_weight: 10.0
   teacher_weight: 1.0
-  rollout_weight: 1.0
+  rollout_weight: .1
 
 schedule:
-  max_epochs: 100
+  max_epochs: 200
   patience: 5
-  min_delta: 0.001
+  min_delta: 0.000001
 
 wandb:
   enable: true
