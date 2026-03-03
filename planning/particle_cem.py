@@ -225,8 +225,9 @@ class ParticleCEMPlanner:
                 visual = obs_t.get("visual", None)
                 if visual is None:
                     raise ValueError("particle_sim image objective requires visual observations.")
+                
                 img_t = self._to_float_image(visual)
-                d = self._image_distance(img_t, goal_visual_by_level[int(level_idx)])
+                d = self._image_distance(img_t, goal_visual_by_level[int(level_idx)]/255.)
                 final_dist = float(d)
                 if self.running_weight > 0.0:
                     running_dists.append(float(d))

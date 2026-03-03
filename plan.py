@@ -8,6 +8,7 @@ python plan.py configs/plan.yaml
 from __future__ import annotations
 
 import os
+import random
 import sys
 import json
 from datetime import datetime
@@ -240,7 +241,7 @@ def _sample_init_goal_states(
         trajectory_len=int(ds_cfg.trajectory_len),
         split=str(ds_cfg.split),
         split_ratio=float(split_ratio),
-        seed=int(ds_cfg.seed),
+        seed=random.randrange(1_000_000),#int(ds_cfg.seed),
     )
     print(
         "[init_goal] source=dataset "
@@ -693,8 +694,8 @@ def main(cfg_path: str) -> None:
 
     env_wrapped = gym.make(
         str(cfg.env_id),
-        disable_env_checker=True,
-        apply_api_compatibility=False,
+        #disable_env_checker=True,
+        #apply_api_compatibility=False,
         render_action=True,
         **cfg.env,
     )

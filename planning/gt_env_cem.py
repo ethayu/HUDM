@@ -234,7 +234,7 @@ class GTEnvCEMPlanner:
                 bits_used += int(np.prod(visual.shape)) * 8
                 if self.objective_space == "image":
                     img_t = self._to_float_image(visual)
-                    d = self._image_distance(img_t, goal_visual_by_level[int(level_idx)])
+                    d = self._image_distance(img_t, goal_visual_by_level[int(level_idx)]/255.)
                     final_dist = float(d)
                     if self.running_weight > 0.0:
                         running_dists.append(float(d))

@@ -21,13 +21,13 @@ plan:
 
   mpc:
     steps: 15
-    horizon: 10
-    replan_every: 5
+    horizon: 20
+    replan_every: 15
 
   cem:
-    pop_size: 500
-    elite_frac: 0.2
-    n_iter: 3
+    pop_size: 200
+    elite_frac: 0.3
+    n_iter: 10
     init_std: 1.0
     warm_start: true
     action_low: null
@@ -122,7 +122,7 @@ plan:
   init_goal:
     source: "dataset"      # random | dataset
     dataset:
-      zarr_path: "/Users/ethanyu/VSCodeProjects/HUDM/pusht/pusht_cchi_v7_replay.zarr"     # if null, falls back to world_model config data.zarr_path
+      zarr_path:  "/home/aurora/HUDM-mwm/synthetic/pusht_synth.zarr"     # if null, falls back to world_model config data.zarr_path
       split: "valid"
       split_ratio: null   # if null, uses world split ratio (or 0.8 without world config)
       trajectory_len: 15
