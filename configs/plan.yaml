@@ -1,5 +1,5 @@
 plan:
-  backend: "gt_env"   # wm | gt_env | particle_sim
+  backend: "wm"   # wm | gt_env | particle_sim
   env_id: "pusht"
 
   env:
@@ -12,8 +12,9 @@ plan:
     # Optional override. If null, the planner loads world.yaml from run_dir
     # (or from the first ensemble member).
     config_path: null
-    run_dir: null
-    checkpoint_root: "checkpoints_world"
+    run_dir: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260213_235405"
+    epoch: 200
+    checkpoint_root: "/home/aurora/HUDM-mwm/checkpoints_world"
     device: "auto"   # auto | cpu | cuda
     ensemble:
       enabled: false
@@ -25,7 +26,7 @@ plan:
     replan_every: 15
 
   cem:
-    pop_size: 200
+    pop_size: 1000
     elite_frac: 0.3
     n_iter: 10
     init_std: 1.0
@@ -55,12 +56,12 @@ plan:
     enabled: true
     num_levels: 4   # used by gt_env / particle_sim backends; wm backend uses len(model.K)
     mpc:
-      mode: "fixed"            # fixed | linear
-      level: "finest"          # used when mode=fixed
-      start_level: 2   # used when mode=linear
+      mode: "linear"            # fixed | linear
+      level: "finest" #"finest"          # used when mode=fixed
+      start_level: 0   # used when mode=linear
       end_level: 3       # used when mode=linear
     cem:
-      mode: "fixed"            # fixed | linear
+      mode: "linear"            # fixed | linear
       level: "base"             # used when mode=fixed
       start_level: "base"       # used when mode=linear
       end_level: "finest"       # used when mode=linear
@@ -87,7 +88,7 @@ plan:
       pool_scale_max: 4
       quantize_levels_min: 8
       quantize_levels_max: 256
-      action_noise_std_max: 1.0
+      action_noise_std_max: 0.0
       downsample_output: true
       min_downsample_size: 12
 
@@ -126,7 +127,7 @@ plan:
       split: "valid"
       split_ratio: null   # if null, uses world split ratio (or 0.8 without world config)
       trajectory_len: 15
-      seed: 1
+      seed: 50
 
   render: true
   save: true

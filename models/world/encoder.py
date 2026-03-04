@@ -23,3 +23,17 @@ class CNNEncoder(nn.Module):
         z = self.proj(h)
         return z
 
+class StateEncoder(nn.Module):
+    def __init__(self, input_dim: int = 7, hidden_dim: int = 32, out_dim: int = 512):
+        super().__init__()
+        self.fc = self.net = nn.Sequential(
+            nn.Linear(input_dim, hidden_dim),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, hidden_dim*2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim*2, out_dim)
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        z = self.fc(x)
+        return z

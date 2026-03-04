@@ -249,7 +249,6 @@ class SharedCEMCore:
                 low = -float("inf") if self.action_low is None else float(self.action_low)
                 high = float("inf") if self.action_high is None else float(self.action_high)
                 actions = actions.clamp(min=low, max=high)
-
             costs, levels_used, bits_used = evaluate_population(
                 actions,
                 int(base_level_idx),

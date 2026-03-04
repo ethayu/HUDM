@@ -3,24 +3,26 @@ seed: 42
 data:
   zarr_path: "pusht/pusht_cchi_v7_replay.zarr"
   split_ratio: 0.8
+  horizon_T: 8
   action_dim: 2
-  action_mode: "relative"   # train_world currently supports only "relative"
   synthetic:
     enable: true
     zarr_path: "synthetic/pusht_synth.zarr"  # Path to your synthetic zarr dataset
-    frac: 0.5  # Fraction of synthetic data in the mix (0.5 = 50% synthetic, 50% real)
+    frac: 1  # Fraction of synthetic data in the mix (0.5 = 50% synthetic, 50% real)
     total_train: null  # Total training samples (null = use len(real_train))
     seed: 0  # Random seed for sampling
-    val_source: "mixed"  # Validation source: "real", "synthetic", or "mixed"
+    val_source: "synthetic"  # Validation source: "real", "synthetic", or "mixed"
 
 model:
-  D: 512
-  K: [64, 128, 256, 512]
+  input: "images" # "state" | "images" | "mixed"
+  D: 256
+  K: [32, 64, 128, 256] #, 512]
   decoder_mode: "per_level"   # per_level | shared
   dynamics_mode: "per_level"  # per_level | shared
 
 train:
   batch_size: 8
+  horizon: 50
   num_workers: 4
   no_cuda: false
   checkpoint_dir: checkpoints_world
@@ -30,16 +32,16 @@ optim:
   lr: 0.0003
 
 loss:
-  recon_weight: 1.0
+  recon_weight: 10.0
   teacher_weight: 1.0
-  rollout_weight: 1.0
+  rollout_weight: .1
 
 schedule:
-  max_epochs: 30
+  max_epochs: 200
   patience: 5
-  min_delta: 0.001
+  min_delta: 0.000001
 
 wandb:
-  enable: false
+  enable: true
   project: "hudm-world"
   run_name: "world-baseline"

@@ -90,7 +90,7 @@ def _latest_run_dir(root: str) -> str:
     return max(run_dirs, key=os.path.getmtime)
 
 
-def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.device) -> HierWorldModel:
+def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.device, epoch: int) -> HierWorldModel:
     if not os.path.isdir(run_dir):
         raise FileNotFoundError(f"World-model run directory not found: {run_dir}")
 
@@ -102,7 +102,7 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
         dynamics_mode=str(getattr(wm_cfg.model, "dynamics_mode", "per_level")),
     ).to(device)
 
-    enc_path = os.path.join(run_dir, "encoder.pt")
+    enc_path = os.path.join(run_dir, f"encoder_epoch{epoch}.pt")
     if not os.path.isfile(enc_path):
         raise FileNotFoundError(f"Missing encoder checkpoint: {enc_path}")
     wm.encoder.load_state_dict(torch.load(enc_path, map_location=device))
@@ -110,12 +110,12 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
     dynamics_mode = str(getattr(wm_cfg.model, "dynamics_mode", "per_level"))
     if dynamics_mode == "per_level":
         for li in range(len(wm.K)):
-            dyn_path = os.path.join(run_dir, f"dyn_l{li}.pt")
+            dyn_path = os.path.join(run_dir, f"dyn_l{li}_epoch{epoch}.pt")
             if not os.path.isfile(dyn_path):
                 raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
             wm.dynamics[li].load_state_dict(torch.load(dyn_path, map_location=device))
     else:
-        dyn_path = os.path.join(run_dir, "dyn.pt")
+        dyn_path = os.path.join(run_dir, f"dyn_epoch{epoch}.pt")
         if not os.path.isfile(dyn_path):
             raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
         wm.dynamics.load_state_dict(torch.load(dyn_path, map_location=device))
@@ -201,7 +201,7 @@ def _load_world_model(plan_cfg: DictConfig) -> tuple[object, DictConfig, str, to
         if os.path.isfile(run_cfg_path):
             run_cfg = OmegaConf.load(run_cfg_path)
             _assert_world_cfg_compatible(_wm_signature(wm_cfg), run_cfg, label=run_dir)
-    wm = _load_world_model_member(wm_cfg, run_dir, device)
+    wm = _load_world_model_member(wm_cfg, run_dir, device, epoch=plan_cfg.world_model.epoch)
     return wm, wm_cfg, run_dir, device
 
 
@@ -241,7 +241,7 @@ def _sample_init_goal_states(
         trajectory_len=int(ds_cfg.trajectory_len),
         split=str(ds_cfg.split),
         split_ratio=float(split_ratio),
-        seed=random.randrange(1_000_000),#int(ds_cfg.seed),
+        seed=int(ds_cfg.seed),
     )
     print(
         "[init_goal] source=dataset "
@@ -283,6 +283,7 @@ def _set_execution_fidelity_finest(env: PushTWrapper) -> None:
 
 def _rollout_level_for_exec_step(info: object, exec_step_in_replan: int) -> int:
     levels = list(getattr(info, "rollout_level_indices", []))
+    #import pdb; pdb.set_trace()
     if exec_step_in_replan < len(levels):
         return int(levels[exec_step_in_replan])
     base = getattr(info, "base_level_idx", None)
@@ -360,7 +361,11 @@ def _render_dataset_gt_frames(
     frames: list[np.ndarray] = []
     _set_execution_fidelity_finest(env)
     _set_start_pose(env, init_state)
-    for s in state_arr:
+
+    #re rollout the trajectory
+    _, states = env.rollout(seed=0, init_state=state_arr[0], actions=sample_meta['actions'])
+    
+    for s in states:#state_arr:
         s = np.asarray(s, dtype=np.float32)
         if s.shape[0] < int(getattr(env, "state_dim", s.shape[0])):
             pad = int(getattr(env, "state_dim", s.shape[0])) - s.shape[0]
@@ -411,7 +416,7 @@ def _run_closed_loop(
             "bits_used_total": 0,
             "plan_time_total_sec": 0.0,
         }
-        return True, trajectory, frames, planner_frames, stats
+        return True, trajectory, frames, planner_frames, stats,[],[],[]
 
     steps = int(cfg.mpc.steps)
     horizon = int(cfg.mpc.horizon)
@@ -482,6 +487,9 @@ def _run_closed_loop(
             )
 
         n_exec = min(replan_every, horizon, steps - t)
+        pos_diffs = []
+        angle_diffs = []
+        eef_diffs = []
         for i in range(n_exec):
             action = np.asarray(action_seq[i].numpy(), dtype=np.float32)
             obs, _, done, step_info = env.step(action)
@@ -489,6 +497,12 @@ def _run_closed_loop(
             trajectory.append(cur_state.copy())
 
             metrics = env.eval_state(goal_state, cur_state)
+            pd = metrics["pos_diff"]
+            ad = metrics["angle_diff"] 
+            ed = metrics["eef_diff"]
+            pos_diffs.append(pd)
+            angle_diffs.append(ad)
+            eef_diffs.append(ed)
             dist = metrics["state_dist"]
             base_k = getattr(info, "base_k", None)
             base_spacing = getattr(info, "base_spacing", None)
@@ -499,7 +513,7 @@ def _run_closed_loop(
             np_str = "-" if base_np is None else str(int(base_np))
             print(
                 f"step {t + 1:03d}  dist {dist:6.1f}  "
-                f"level_idx {level_idx}  k {k_str}  spacing {spacing_str}  n_particles {np_str}"
+                f"level_idx {level_idx}  pos_diff {pd:6.1f} angle_diff {ad:6.1f} eef_diff {ed:6.1f} k {k_str}  spacing {spacing_str}  n_particles {np_str}"
             )
 
             if render_enabled:
@@ -529,7 +543,7 @@ def _run_closed_loop(
                     "bits_used_total": total_plan_bits,
                     "plan_time_total_sec": total_plan_time,
                 }
-                return True, trajectory, frames, planner_frames, stats
+                return True, trajectory, frames, planner_frames, stats, pos_diffs, angle_diffs, eef_diffs
 
             t += 1
 
@@ -541,7 +555,7 @@ def _run_closed_loop(
         "bits_used_total": total_plan_bits,
         "plan_time_total_sec": total_plan_time,
     }
-    return False, trajectory, frames, planner_frames, stats
+    return False, trajectory, frames, planner_frames, stats, pos_diffs, angle_diffs, eef_diffs
 
 
 def main(cfg_path: str) -> None:
@@ -696,7 +710,7 @@ def main(cfg_path: str) -> None:
         str(cfg.env_id),
         #disable_env_checker=True,
         #apply_api_compatibility=False,
-        render_action=True,
+        render_action=False,
         **cfg.env,
     )
     env: PushTWrapper = _unwrap_env(env_wrapped)
@@ -815,7 +829,7 @@ def main(cfg_path: str) -> None:
         print(f"[particle] spacings={list(cfg.particle_env.fidelity_env.spacings)}")
         print(f"[particle] progress={bool(cfg.particle_env.progress)}")
 
-    success, traj, frames, planner_frames, run_stats = _run_closed_loop(
+    success, traj, frames, planner_frames, run_stats, pos_diffs, angle_diffs, eef_diffs = _run_closed_loop(
         env=env,
         wm=wm,
         planner=planner,
@@ -838,10 +852,22 @@ def main(cfg_path: str) -> None:
         run_dir = os.path.join(rollout_root, f"plan_{backend}_{run_ts}")
         os.makedirs(run_dir, exist_ok=True)
         source = str(sample_meta.get("source", "unknown"))
-        out_path = os.path.join(run_dir, "planned.gif")
+        out_path = os.path.join(run_dir, "planned.mp4")
         print(f"[save] Writing rollout GIF to {out_path}")
         imageio.mimwrite(out_path, frames, fps=15)
         print(f"[save] Video saved ({len(frames)} frames)")
+
+        import matplotlib.pyplot as plt
+        #xaxis is the step number
+        plt.xlabel('Step')
+        plt.ylabel('Distance')
+        plt.title('Positional, Angular and End-effector Distance vs Step')
+        plt.plot(range(len(pos_diffs)), pos_diffs, label='pos_diffs')
+        plt.plot(range(len(angle_diffs)), angle_diffs, label='angle_diffs')
+        plt.plot(range(len(eef_diffs)), eef_diffs, label='eef_diffs')
+        plt.legend()
+        plt.savefig(os.path.join(run_dir, "pos_diffs_angle_diffs_eef_diffs.png"))
+        plt.close() 
 
         meta = {
             "created_at": run_ts,
@@ -859,9 +885,9 @@ def main(cfg_path: str) -> None:
             "plan_config": OmegaConf.to_container(cfg, resolve=True),
         }
         meta_path = os.path.join(run_dir, "metadata.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2)
-        print(f"[save] Metadata written to {meta_path}")
+        #with open(meta_path, "w", encoding="utf-8") as f:
+        #    json.dump(meta, f, indent=2)
+        #print(f"[save] Metadata written to {meta_path}")
 
         if source == "dataset":
             gt_frames = _render_dataset_gt_frames(
@@ -871,13 +897,13 @@ def main(cfg_path: str) -> None:
                 goal_state=goal_state,
             )
             if len(gt_frames) > 0:
-                gt_path = os.path.join(run_dir, "gt.gif")
+                gt_path = os.path.join(run_dir, "gt.mp4")
                 print(f"[save] Writing dataset GT GIF to {gt_path}")
                 imageio.mimwrite(gt_path, gt_frames, fps=15)
                 print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
 
         if backend == "gt_env" and len(planner_frames) > 0:
-            planner_path = os.path.join(run_dir, "planner_view.gif")
+            planner_path = os.path.join(run_dir, "planner_view.mp4")
             print(f"[save] Writing planner-view GIF to {planner_path}")
             imageio.mimwrite(planner_path, planner_frames, fps=15)
             print(f"[save] Planner-view video saved ({len(planner_frames)} frames)")
