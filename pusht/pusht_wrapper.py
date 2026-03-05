@@ -10,7 +10,7 @@ class PushTWrapper(PushTEnv):
             self, 
             with_velocity=True,
             with_target=True,
-            render_size=96,
+            render_size=512,
             relative=True,
             action_scale=100,
             add_noise: int = 0,
@@ -159,6 +159,7 @@ class PushTWrapper(PushTEnv):
         min_block_pos_delta: float = 10.0,
         min_block_angle_delta: float = np.pi / 9.0,
         max_resample_tries: int = 512,
+        require_agent_in_frame: bool = True,
     ):
         if trajectory_len <= 0:
             raise ValueError(f"trajectory_len must be > 0, got {trajectory_len}")
@@ -271,6 +272,9 @@ class PushTWrapper(PushTEnv):
                 "reconstruct_goal_state must be one of {0,1,2,3}, "
                 f"got {reconstruct_goal_state}"
             )
+        frame_min = 0.0
+        frame_max = float(getattr(self, "window_size", 512))
+        require_agent_visible = bool(require_agent_in_frame)
 
         def _pad_and_trim_state(x: np.ndarray) -> np.ndarray:
             s = np.asarray(x, dtype=np.float32)
@@ -281,6 +285,13 @@ class PushTWrapper(PushTEnv):
                     f"Dataset state dim ({s.shape[0]}) is smaller than env.state_dim ({self.state_dim})."
                 )
             return s[: self.state_dim]
+
+        def _agent_in_frame(state: np.ndarray) -> bool:
+            s = np.asarray(state, dtype=np.float32)
+            if s.shape[0] < 2:
+                return False
+            xy = s[:2]
+            return bool(np.all(xy >= frame_min) and np.all(xy <= frame_max))
 
         def _convert_rollout_actions(
             action_seg_raw: np.ndarray,
@@ -432,9 +443,14 @@ class PushTWrapper(PushTEnv):
             pos_diff = float(np.linalg.norm(goal_state[2:4] - init_state[2:4]))
             ang_diff = float(np.abs(goal_state[4] - init_state[4]))
             ang_diff = float(np.minimum(ang_diff, 2.0 * np.pi - ang_diff))
+            init_agent_in_frame = _agent_in_frame(init_state)
+            goal_agent_in_frame = _agent_in_frame(goal_state)
+            agent_visible = (not require_agent_visible) or (
+                init_agent_in_frame and goal_agent_in_frame
+            )
 
             # Avoid trivially solved tasks at reset: require meaningful block-pose change.
-            if (pos_diff >= pos_thresh) or (ang_diff >= ang_thresh):
+            if agent_visible and ((pos_diff >= pos_thresh) or (ang_diff >= ang_thresh)):
                 meta = {
                     "episode_index": int(ei),
                     "start_index": int(start_idx),
@@ -451,6 +467,9 @@ class PushTWrapper(PushTEnv):
                     "action_source": rollout_action_source,
                     "action_mode": rollout_action_mode,
                     "force_gt_action_replay": bool(reconstruct_mode == 3),
+                    "init_agent_in_frame": bool(init_agent_in_frame),
+                    "goal_agent_in_frame": bool(goal_agent_in_frame),
+                    "require_agent_in_frame": bool(require_agent_visible),
                 }
                 if action_seg is not None and used_action_rollout:
                     meta["actions"] = np.asarray(action_seg, dtype=np.float32).tolist()
@@ -465,6 +484,8 @@ class PushTWrapper(PushTEnv):
                 pos_diff / (pos_thresh + 1e-8),
                 ang_diff / (ang_thresh + 1e-8),
             )
+            if not agent_visible:
+                score -= 1e6
             if score > fallback_score:
                 fallback_score = score
                 fallback = (
@@ -484,6 +505,8 @@ class PushTWrapper(PushTEnv):
                     None
                     if (state_seq_rollout is None or (not used_action_rollout) or reconstruct_mode != 3)
                     else np.asarray(state_seq_rollout, dtype=np.float32).tolist(),
+                    bool(init_agent_in_frame),
+                    bool(goal_agent_in_frame),
                 )
 
         if fallback is not None:
@@ -502,6 +525,8 @@ class PushTWrapper(PushTEnv):
                 fallback_action_mode,
                 action_seg_list,
                 state_seq_rollout_list,
+                fallback_init_agent_in_frame,
+                fallback_goal_agent_in_frame,
             ) = fallback
             meta = {
                 "episode_index": int(ei),
@@ -520,6 +545,9 @@ class PushTWrapper(PushTEnv):
                 "action_source": str(fallback_action_source),
                 "action_mode": str(fallback_action_mode),
                 "force_gt_action_replay": bool(int(fallback_reconstruct_mode) == 3),
+                "init_agent_in_frame": bool(fallback_init_agent_in_frame),
+                "goal_agent_in_frame": bool(fallback_goal_agent_in_frame),
+                "require_agent_in_frame": bool(require_agent_visible),
             }
             if action_seg_list is not None:
                 meta["actions"] = action_seg_list

@@ -36,7 +36,7 @@ def validate_plan_cfg(cfg) -> None:
     )
     _reject_unknown_keys(
         cfg.env,
-        {"with_velocity", "with_target", "add_noise", "noise_std"},
+        {"with_velocity", "with_target", "add_noise", "noise_std", "render_size"},
         "plan.env",
     )
     _reject_unknown_keys(
@@ -165,6 +165,8 @@ def validate_plan_cfg(cfg) -> None:
         raise ValueError(f"plan.cem.n_iter must be > 0, got {cfg.cem.n_iter}")
     if float(cfg.cem.init_std) <= 0.0:
         raise ValueError(f"plan.cem.init_std must be > 0, got {cfg.cem.init_std}")
+    if int(getattr(cfg.env, "render_size", 512)) <= 0:
+        raise ValueError(f"plan.env.render_size must be > 0, got {cfg.env.render_size}")
     if not isinstance(cfg.cem.warm_start, bool):
         raise ValueError(f"plan.cem.warm_start must be a bool, got {type(cfg.cem.warm_start).__name__}")
     if int(cfg.gt_env.rollout_samples) <= 0:

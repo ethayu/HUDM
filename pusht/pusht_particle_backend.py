@@ -34,7 +34,7 @@ class PushTParticleBackend:
         self,
         with_velocity: bool = True,
         with_target: bool = True,
-        render_size: int = 96,
+        render_size: int = 512,
         relative: bool = True,
         action_scale: float = 100.0,
         device: str = "auto",

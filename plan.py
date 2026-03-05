@@ -355,7 +355,12 @@ def _resize_image_hw(img: np.ndarray, target_hw: tuple[int, int]) -> np.ndarray:
     return out
 
 
-def _write_video_mp4(path: str, frames: list[np.ndarray], fps: int = 15) -> None:
+def _write_video_mp4(
+    path: str,
+    frames: list[np.ndarray],
+    fps: int = 15,
+    output_size: int = 512,
+) -> None:
     if len(frames) == 0:
         raise ValueError(f"No frames to write for {path}")
 
@@ -366,15 +371,21 @@ def _write_video_mp4(path: str, frames: list[np.ndarray], fps: int = 15) -> None
         raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {first.shape}")
     if first.shape[2] == 1:
         first = np.repeat(first, 3, axis=2)
-    h, w = int(first.shape[0]), int(first.shape[1])
+    out_hw = int(output_size)
+    if out_hw <= 0:
+        raise ValueError(f"output_size must be > 0, got {output_size}")
+    h, w = out_hw, out_hw
     writer = cv2.VideoWriter(
         str(path),
-        cv2.VideoWriter_fourcc(*"mp4v"),
+        cv2.VideoWriter_fourcc(*"avc1"),  # H.264/AVC
         float(max(1, int(fps))),
         (w, h),
     )
     if not writer.isOpened():
-        raise RuntimeError(f"Failed to open MP4 writer for {path}")
+        raise RuntimeError(
+            f"Failed to open H.264/AVC MP4 writer for {path}. "
+            "Ensure your OpenCV build has FFmpeg/x264 encoding support."
+        )
 
     try:
         for fr in frames:
@@ -916,6 +927,7 @@ def main(cfg_path: str) -> None:
             "with_target": True,
             "add_noise": 0,
             "noise_std": 0.0,
+            "render_size": 512,
         },
         "world_model": {
             # If config_path is null, world config is loaded from run_dir/world.yaml
@@ -1126,7 +1138,7 @@ def main(cfg_path: str) -> None:
         particle_backend = PushTParticleBackend(
             with_velocity=bool(cfg.env.with_velocity),
             with_target=bool(cfg.env.with_target),
-            render_size=int(getattr(env, "render_size", 96)),
+            render_size=int(getattr(env, "render_size", 512)),
             relative=bool(getattr(env, "relative", True)),
             action_scale=float(getattr(env, "action_scale", 100.0)),
             device=str(cfg.particle_env.fidelity_env.device),
