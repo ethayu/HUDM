@@ -169,7 +169,8 @@ class PushTWrapper(PushTEnv):
             except Exception as exc:
                 raise ImportError("zarr not installed. pip install zarr") from exc
             root = zarr.open_group(dataset, mode="r")
-            state_arr = root["data"]["state"]             
+            state_arr = root["data"]["state"]
+            action_arr = root["data"].get("action", None)
             ends = np.asarray(root["meta"]["episode_ends"][:], dtype=np.int64)
             starts = np.zeros_like(ends)
             starts[0] = 0
@@ -177,6 +178,9 @@ class PushTWrapper(PushTEnv):
                 starts[i] = ends[i - 1] + 1
         else:
             state_arr = dataset.state
+            action_arr = getattr(dataset, "action", None)
+            if action_arr is None:
+                action_arr = getattr(dataset, "actions", None)
             ends = np.asarray(dataset.ends, dtype=np.int64)
             starts = np.asarray(dataset.starts, dtype=np.int64)
 
@@ -232,6 +236,18 @@ class PushTWrapper(PushTEnv):
 
             init_state = _pad_and_trim_state(state_arr[start_idx])
             goal_state = _pad_and_trim_state(state_arr[goal_idx])
+            action_seg = None
+            used_action_rollout = False
+            if action_arr is not None:
+                try:
+                    action_seg = np.asarray(action_arr[start_idx:goal_idx], dtype=np.float32)
+                    if int(action_seg.shape[0]) == int(trajectory_len):
+                        _, states = self.rollout(seed=0, init_state=init_state.copy(), actions=action_seg)
+                        goal_state = _pad_and_trim_state(states[-1])
+                        used_action_rollout = True
+                except Exception:
+                    used_action_rollout = False
+                    action_seg = None
 
             pos_diff = float(np.linalg.norm(goal_state[2:4] - init_state[2:4]))
             ang_diff = float(np.abs(goal_state[4] - init_state[4]))
@@ -248,7 +264,10 @@ class PushTWrapper(PushTEnv):
                     "pos_diff": pos_diff,
                     "angle_diff": ang_diff,
                     "resample_tries": int(attempt_idx + 1),
+                    "used_action_rollout": bool(used_action_rollout),
                 }
+                if action_seg is not None:
+                    meta["actions"] = np.asarray(action_seg, dtype=np.float32).tolist()
                 return init_state, goal_state, meta
 
             score = max(
@@ -266,10 +285,23 @@ class PushTWrapper(PushTEnv):
                     pos_diff,
                     ang_diff,
                     attempt_idx + 1,
+                    used_action_rollout,
+                    None if action_seg is None else np.asarray(action_seg, dtype=np.float32).tolist(),
                 )
 
         if fallback is not None:
-            init_state, goal_state, ei, start_idx, goal_idx, pos_diff, ang_diff, n_used = fallback
+            (
+                init_state,
+                goal_state,
+                ei,
+                start_idx,
+                goal_idx,
+                pos_diff,
+                ang_diff,
+                n_used,
+                used_action_rollout,
+                action_seg_list,
+            ) = fallback
             meta = {
                 "episode_index": int(ei),
                 "start_index": int(start_idx),
@@ -280,7 +312,10 @@ class PushTWrapper(PushTEnv):
                 "angle_diff": float(ang_diff),
                 "resample_tries": int(n_used),
                 "fallback": True,
+                "used_action_rollout": bool(used_action_rollout),
             }
+            if action_seg_list is not None:
+                meta["actions"] = action_seg_list
             return init_state, goal_state, meta
 
         raise RuntimeError(
@@ -314,7 +349,6 @@ class PushTWrapper(PushTEnv):
                     f"dimension {dim_required}"
                 )
             return std_arr
-
         # Planning-fidelity action noise (coarser level -> more noise).
         if self._planning_fidelity_enabled:
             std_max = float(self._planning_fidelity_cfg.get("action_noise_std_max", 0.0))
@@ -425,7 +459,7 @@ class PushTWrapper(PushTEnv):
         pos_diff = np.linalg.norm(goal_state[2:4] - cur_state[2:4])
         angle_diff = np.abs(goal_state[4] - cur_state[4])
         angle_diff = np.minimum(angle_diff, 2 * np.pi - angle_diff)
-        success = pos_diff < 10 and angle_diff < np.pi / 9 #and eef_diff < 20
+        success = pos_diff < 20 and angle_diff < np.pi / 9 #and eef_diff < 20
         state_dist = np.linalg.norm(goal_state - cur_state)
         return {
             'success': success,

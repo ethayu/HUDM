@@ -15,7 +15,7 @@ try:
     from tqdm.auto import tqdm as _tqdm
 except Exception:
     _tqdm = None
-
+import imageio
 
 @dataclass
 class GTEnvCEMInfo:
@@ -221,7 +221,7 @@ class GTEnvCEMPlanner:
         bits_used = 0
         running_dists: List[float] = []
         final_dist = 0.0
-
+        rollout_frames = []
         for t in range(self.horizon):
             level_idx = rollout_levels[t]
             if hasattr(self.env, "set_planning_fidelity_level"):
@@ -230,6 +230,7 @@ class GTEnvCEMPlanner:
             obs_t, _, done, info = self.env.step(actions[t])
             state = info["state"]
             visual = obs_t.get("visual", None)
+            rollout_frames.append(visual)
             if visual is not None and hasattr(visual, "shape"):
                 bits_used += int(np.prod(visual.shape)) * 8
                 if self.objective_space == "image":
@@ -240,6 +241,7 @@ class GTEnvCEMPlanner:
                         running_dists.append(float(d))
             if done:
                 break
+        #imageio.mimwrite("rollout_frames.mp4", rollout_frames)
 
         if self.objective_space == "image":
             cost = self._image_cost(final_dist=final_dist, running_dists=running_dists, actions=actions)

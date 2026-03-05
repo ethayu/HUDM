@@ -41,7 +41,7 @@ def validate_plan_cfg(cfg) -> None:
     )
     _reject_unknown_keys(
         cfg.world_model,
-        {"config_path", "run_dir", "checkpoint_root", "device", "ensemble"},
+        {"config_path", "run_dir", "epoch","checkpoint_root", "device", "ensemble"},
         "plan.world_model",
     )
     _reject_unknown_keys(cfg.world_model.ensemble, {"enabled", "run_dirs"}, "plan.world_model.ensemble")

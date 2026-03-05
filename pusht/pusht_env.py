@@ -665,6 +665,7 @@ class PushTEnv(gym.Env):
                 coord = (action / 512 * 96).astype(np.int32)
                 marker_size = int(8 / 96 * self.render_size)
                 thickness = int(1 / 96 * self.render_size)
+                """
                 cv2.drawMarker(
                     img,
                     coord,
@@ -673,6 +674,7 @@ class PushTEnv(gym.Env):
                     markerSize=marker_size,
                     thickness=thickness,
                 )
+                """
         return img
 
     def close(self):
@@ -1313,6 +1315,6 @@ class PushTKeypointsEnv(PushTEnv):
         img = super()._render_frame(mode)
         if self.draw_keypoints:
             self.kp_manager.draw_keypoints(
-                img, self.draw_kp_map, radius=int(img.shape[0] / 96)
+                img, self.draw_kp_map, radius=int(img.shape[0] / render_size)
             )
         return img

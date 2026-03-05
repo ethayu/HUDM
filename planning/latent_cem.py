@@ -9,6 +9,12 @@ import torch
 from planning.cem_core import SharedCEMCore
 
 
+
+ACTION_MEAN = torch.tensor([-0.0087, 0.0068]).cuda()
+ACTION_STD = torch.tensor([0.2019, 0.2002]).cuda()
+STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027,  2.54307914])
+STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094])
+
 @dataclass
 class LatentCEMInfo:
     base_level_idx: int
@@ -128,6 +134,7 @@ class LatentCEMPlanner:
         if hasattr(self.world_model, "predict_next_stats"):
             mu, var = self.world_model.predict_next_stats(level, z, a_t)
             return mu, torch.clamp_min(var, 0.0)
+        a_t = (a_t - ACTION_MEAN) / ACTION_STD
         mu = self.world_model.predict_next(level, z, a_t)
         var = torch.zeros_like(mu)
         return mu, var

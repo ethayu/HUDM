@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 from typing import List
 
-from .encoder import CNNEncoder
-from .decoder import UpconvDecoder
+from .encoder import CNNEncoder, StateEncoder
+from .decoder import UpconvDecoder, StateDecoder
 from .dynamics import TinyTransformerDynamics
 
 
@@ -13,6 +13,7 @@ class HierWorldModel(nn.Module):
         K: List[int],
         D: int,
         action_dim: int = 2,
+        input: str = "images",
         decoder_mode: str = "per_level",
         dynamics_mode: str = "per_level",
     ):
@@ -26,15 +27,38 @@ class HierWorldModel(nn.Module):
         self.D = D
         self.decoder_mode = decoder_mode
         self.dynamics_mode = dynamics_mode
-        self.encoder = CNNEncoder(out_dim=D)
-        if decoder_mode == "per_level":
-            self.decoders = nn.ModuleList([UpconvDecoder(in_dim=k) for k in K])
-        else:
-            self.decoder = UpconvDecoder(in_dim=D)
-        if dynamics_mode == "per_level":
-            self.dynamics = nn.ModuleList([TinyTransformerDynamics(k_dim=k, action_dim=action_dim) for k in K])
-        else:
-            self.dynamics = TinyTransformerDynamics(k_dim=D, action_dim=action_dim)
+        print(f"input: {input}")
+        if input == "images":
+            self.encoder = CNNEncoder(out_dim=D)
+            if decoder_mode == "per_level":
+                self.decoders = nn.ModuleList([UpconvDecoder(in_dim=k) for k in K])
+            else:
+                self.decoder = UpconvDecoder(in_dim=D)
+            if dynamics_mode == "per_level":
+                self.dynamics = nn.ModuleList([TinyTransformerDynamics(k_dim=k, action_dim=action_dim) for k in K])
+            else:
+                self.dynamics = TinyTransformerDynamics(k_dim=D, action_dim=action_dim)
+
+        elif input == "state":
+            self.encoder = StateEncoder(out_dim=D)
+            if decoder_mode == "per_level":
+                self.decoders = nn.ModuleList([StateDecoder(in_dim=k) for k in K])
+            else:
+                self.decoder = StateDecoder(in_dim=D)
+            if dynamics_mode == "per_level":
+                self.dynamics = nn.ModuleList([TinyTransformerDynamics(k_dim=k, action_dim=action_dim) for k in K])
+            else:
+                self.dynamics = TinyTransformerDynamics(k_dim=D, action_dim=action_dim)
+        else: # "mixed"
+            self.encoder = CNNEncoder(out_dim=D)
+            if decoder_mode == "per_level":
+                self.decoders = nn.ModuleList([StateDecoder(in_dim=k) for k in K])
+            else:
+                self.decoder = StateDecoder(in_dim=D)
+            if dynamics_mode == "per_level":
+                self.dynamics = nn.ModuleList([TinyTransformerDynamics(k_dim=k, action_dim=action_dim) for k in K])
+            else:
+                self.dynamics = TinyTransformerDynamics(k_dim=D, action_dim=action_dim)
 
     def encode(self, x: torch.Tensor) -> torch.Tensor:
         return self.encoder(x)
