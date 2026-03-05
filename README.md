@@ -100,13 +100,13 @@ Key planner controls in `configs/plan.yaml`:
 - `cem.*`: CEM population and sampling controls.
 - `objective.*`: cost weights/metric (latent-space for `wm`, image- or state-space for `gt_env` / `particle_sim`).
 - `gt_env.*`: env-propagation controls (`objective_space`, rollout samples, rollout progress bar, env-side fidelity/noise).
-- `particle_env.*`: Warp-particle controls (`objective_space`, rollout samples, per-level `fidelity_env.spacings`, and solver/device knobs).
+- `particle_env.*`: Warp-particle controls (`objective_space`, rollout samples, per-level `fidelity_env.spacings`, and solver/device knobs including auto radius scaling via `particle_radius: null` and optional forced single-particle coarsest level).
 - `init_goal.*`: random or dataset-trajectory init/goal sampling.
 - `fidelity.mpc`, `fidelity.cem`, `fidelity.rollout`: unified schedule blocks with `mode` (`fixed`/`linear`, plus `uncertainty_downshift` for rollout).
 - `fidelity`: stage-independent scheduling (MPC sets replan-stage base; CEM schedules within replan; rollout schedules within trajectory).
 - `fidelity.rollout.uncertainty.criterion`: choose `mean` or `percentile` when using `uncertainty_downshift`.
 
-Debug a single backend interactively (scripted actions and/or keyboard controls):
+Debug a single backend interactively (scripted actions and/or realtime keyboard controls):
 
 ```bash
 python scripts/debug_planning_backend.py --config configs/plan.yaml --backend particle_sim --keyboard

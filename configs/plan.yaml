@@ -1,5 +1,5 @@
 plan:
-  backend: "gt_env"   # wm | gt_env | particle_sim
+  backend: "particle_sim"   # wm | gt_env | particle_sim
   env_id: "pusht"
 
   env:
@@ -21,13 +21,13 @@ plan:
 
   mpc:
     steps: 15
-    horizon: 20
+    horizon: 15
     replan_every: 15
 
   cem:
-    pop_size: 200
+    pop_size: 10
     elite_frac: 0.3
-    n_iter: 10
+    n_iter: 2
     init_std: 1.0
     warm_start: true
     action_low: null
@@ -37,7 +37,7 @@ plan:
     latent_metric: "l2"      # l1 | l2
     terminal_weight: 1.0
     running_weight: 0.0
-    action_l2_weight: 0.0
+    action_l2_weight: 0.1
     # gt_env backend costs (final-state objective):
     eef_weight: 1.0
     block_pos_weight: 1.0
@@ -53,7 +53,7 @@ plan:
   #   * in rollout fields: resolves to the current CEM-iteration level
   fidelity:
     enabled: true
-    num_levels: 4   # used by gt_env / particle_sim backends; wm backend uses len(model.K)
+    num_levels: 12   # used by gt_env / particle_sim backends; wm backend uses len(model.K)
     mpc:
       mode: "fixed"            # fixed | linear
       level: "finest"          # used when mode=fixed
@@ -78,7 +78,7 @@ plan:
 
   gt_env:
     rollout_samples: 1
-    objective_space: "image"  # image | state
+    objective_space: "state"  # image | state
     progress: true            # per-CEM-iteration rollout progress bar
     progress_leave: false     # keep bars after completion
     fidelity_env:
@@ -98,23 +98,31 @@ plan:
     progress_leave: false      # keep bars after completion
     fidelity_env:
       # Coarsest -> finest (larger spacing => fewer particles).
-      spacings: [0.020, 0.016, 0.013, 0.010]
+      spacings: [0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.020, 0.016, 0.013, 0.010]
       device: "auto"           # auto | cpu | cuda | cuda:0
       xmin: -0.25
       xmax: 0.25
       ymin: -0.25
       ymax: 0.25
-      particle_radius: 0.006
+      min_particles: 1
+      coarsest_single_particle: true
+      particle_radius: null      # null => auto-scale particle radius with level/N
+      radius_scale: 1.0
+      radius_clip_spacing: false
       stem_w: 0.05
       stem_h: 0.10
       bar_w: 0.12
       bar_h: 0.04
       pusher_radius: 0.015
       pusher_speed: 0.6
-      frame_dt: 0.1
+      pusher_interp_substeps: true
+      frame_dt: 0.0166666667
       substeps: 16
       iters: 8
       mu: 0.6
+      contact_alpha: 0.35
+      ground_friction_accel: 1000000.0
+      rest_speed_eps: 0.5
       lin_damp: 0.995
       vel_damp: 0.999
       alpha_rigid: 1.0
@@ -122,11 +130,11 @@ plan:
   init_goal:
     source: "dataset"      # random | dataset
     dataset:
-      zarr_path:  "/home/aurora/HUDM-mwm/synthetic/pusht_synth.zarr"     # if null, falls back to world_model config data.zarr_path
+      zarr_path:  "/Users/ethanyu/VSCodeProjects/HUDM/synthetic/pusht_synth.zarr"     # if null, falls back to world_model config data.zarr_path
       split: "valid"
       split_ratio: null   # if null, uses world split ratio (or 0.8 without world config)
       trajectory_len: 15
-      seed: 1
+      seed: "random"
 
   render: true
   save: true

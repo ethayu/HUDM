@@ -141,8 +141,8 @@ Options:
 | `--seed` | int | `0` | Seed for init/goal sampling. |
 | `--fidelity-level` | int | `-1` | Initial fidelity level index (`-1` = finest). |
 | `--actions` | str | `\"\"` | Scripted actions: `ax,ay;ax,ay;...`. |
-| `--keyboard` | flag | off | Enable live key control. |
-| `--max-steps` | int | `200` | Max steps to run. |
+| `--keyboard` | flag | off | Enable realtime key control (one env step per frame at `--fps`). |
+| `--max-steps` | int | `0` | Max steps to run; `<=0` means no limit. |
 | `--key-action-mag` | float | `0.25` | Action magnitude used by WASD keys. |
 | `--fps` | float | `12.0` | Render/update rate. |
 | `--render-size` | int | `224` | Backend render resolution before display upsampling. |
@@ -151,10 +151,12 @@ Options:
 | `--font-scale` | float | `0.58` | HUD font scale. |
 | `--save` | path | `\"\"` | Optional GIF output path. |
 | `--no-window` | flag | off | Disable OpenCV window output. |
+| `--stop-on-done` | flag | off | Stop automatically when the backend returns `done=true`. |
 
 Keyboard controls:
 
-- `W/A/S/D`: move pusher.
+- `W/A/S/D`: move pusher for the current frame.
+- no key press: apply no-op action for the current frame.
 - `[` / `]` (or `-` / `=`): decrease/increase fidelity level.
 - `0-9`: jump directly to fidelity level index.
 - `R`: reset episode.

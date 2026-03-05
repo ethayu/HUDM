@@ -246,17 +246,25 @@ Only used when `backend: particle_sim`.
 | `fidelity_env.spacings` | list[float] | positive values | Coarsest->finest spacing per fidelity level (larger spacing => fewer particles). Length must equal `fidelity.num_levels`. |
 | `fidelity_env.device` | str | `auto`\|`cpu`\|`cuda`\|`cuda:N` | Warp device selection. |
 | `fidelity_env.{xmin,xmax,ymin,ymax}` | float | any real | World bounds for particle simulator. |
-| `fidelity_env.particle_radius` | float | `>0` | Radius used for particle contact/rendering. |
+| `fidelity_env.min_particles` | int | `>=1` | Minimum sampled particles; very coarse levels can collapse to `N=1`. |
+| `fidelity_env.coarsest_single_particle` | bool | `true/false` | If true, the coarsest level (`spacings[0]`) is forced to one particle (`N=1`). |
+| `fidelity_env.particle_radius` | float\|null | `>0` or `null` | `null` enables auto radius scaling from particle count (`N`); float forces fixed radius. |
+| `fidelity_env.radius_scale` | float | `>0` | Multiplier for auto-scaled radius when `particle_radius=null`. |
+| `fidelity_env.radius_clip_spacing` | bool | `true/false` | Clamp auto radius relative to spacing (`N>1`) for stability. |
 | `fidelity_env.stem_w` | float | `>0` | T stem width in world units. |
 | `fidelity_env.stem_h` | float | `>0` | T stem height in world units. |
 | `fidelity_env.bar_w` | float | `>0` | T bar width in world units. |
 | `fidelity_env.bar_h` | float | `>0` | T bar height in world units. |
 | `fidelity_env.pusher_radius` | float | `>0` | Kinematic pusher radius in world units. |
 | `fidelity_env.pusher_speed` | float | `>0` | Max pusher speed (world units/sec). |
+| `fidelity_env.pusher_interp_substeps` | bool | `true/false` | If true, pusher motion is interpolated across solver substeps to avoid impulsive contacts. |
 | `fidelity_env.frame_dt` | float | `>0` | Control-step dt for one backend step. |
 | `fidelity_env.substeps` | int | `>=1` | Substeps per control frame. |
 | `fidelity_env.iters` | int | `>=1` | Solver iterations per substep. |
 | `fidelity_env.mu` | float | `>=0` | Position-level friction factor for pusher contact. |
+| `fidelity_env.contact_alpha` | float | `(0,1]` | Contact projection gain; lower values reduce bounce from light touches. |
+| `fidelity_env.ground_friction_accel` | float | `>=0` | Per-particle ground-friction deceleration (world units/s²) applied each substep. |
+| `fidelity_env.rest_speed_eps` | float | `>=0` | Static-friction threshold; particle speeds below this are snapped to zero. |
 | `fidelity_env.lin_damp` | float | any real | Linear damping during prediction. |
 | `fidelity_env.vel_damp` | float | any real | Velocity damping during finalize. |
 | `fidelity_env.alpha_rigid` | float | `>=0` | Shape-matching projection blend (`1.0` = rigid). |
