@@ -280,4 +280,5 @@ Controls where planning initial/goal states come from.
 | `dataset.split` | str | `train`\|`valid`\|`val` | Split used for dataset-based state sampling. |
 | `dataset.split_ratio` | float\|null | `(0,1)` or `null` | Episode split ratio; fallback to world split ratio (or 0.8). |
 | `dataset.trajectory_len` | int | `>0` | Number of transitions between sampled start and goal states. |
-| `dataset.seed` | int | any int | Sampling seed for episode and start index selection. |
+| `dataset.seed` | int\|str | int or `"random"` | Sampling seed for episode and start index selection. |
+| `dataset.reconstruct_goal_state` | int | `0`\|`1`\|`2`\|`3` | `0`: do not reconstruct goal. `1`: reconstruct from actions and error if it differs from stored state. `2`: reconstruct from actions and use reconstructed goal. `3`: force action replay as canonical GT trajectory (stored in metadata), and use replayed goal state. |

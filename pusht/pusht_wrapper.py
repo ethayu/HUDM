@@ -155,6 +155,7 @@ class PushTWrapper(PushTEnv):
         split: str = "valid",
         split_ratio: float = 0.8,
         seed: int = 0,
+        reconstruct_goal_state: int = 0,
         min_block_pos_delta: float = 10.0,
         min_block_angle_delta: float = np.pi / 9.0,
         max_resample_tries: int = 512,
@@ -163,6 +164,12 @@ class PushTWrapper(PushTEnv):
             raise ValueError(f"trajectory_len must be > 0, got {trajectory_len}")
 
         # Accept either a zarr path or a dataset-like object with state/starts/ends arrays.
+        action_format = "unknown"
+        action_abs_format = "unknown"
+        action_scale_from_data = float(self.action_scale)
+        action_relative_from_data = bool(self.relative)
+        action_arr = None
+        action_abs_arr = None
         if isinstance(dataset, str):
             try:
                 import zarr
@@ -171,6 +178,19 @@ class PushTWrapper(PushTEnv):
             root = zarr.open_group(dataset, mode="r")
             state_arr = root["data"]["state"]
             action_arr = root["data"].get("action", None)
+            action_abs_arr = root["data"].get("action_abs", None)
+            action_format = str(root.attrs.get("action_format", "unknown")).strip().lower()
+            action_abs_format = str(root.attrs.get("action_abs_format", "unknown")).strip().lower()
+            if "env_action_scale" in root.attrs:
+                try:
+                    action_scale_from_data = float(root.attrs["env_action_scale"])
+                except Exception:
+                    action_scale_from_data = float(self.action_scale)
+            if "env_relative" in root.attrs:
+                try:
+                    action_relative_from_data = bool(root.attrs["env_relative"])
+                except Exception:
+                    action_relative_from_data = bool(self.relative)
             ends = np.asarray(root["meta"]["episode_ends"][:], dtype=np.int64)
             starts = np.zeros_like(ends)
             starts[0] = 0
@@ -181,8 +201,37 @@ class PushTWrapper(PushTEnv):
             action_arr = getattr(dataset, "action", None)
             if action_arr is None:
                 action_arr = getattr(dataset, "actions", None)
+            action_abs_arr = getattr(dataset, "action_abs", None)
+            if action_abs_arr is None:
+                action_abs_arr = getattr(dataset, "actions_abs", None)
+            action_format = str(getattr(dataset, "action_format", "unknown")).strip().lower()
+            action_abs_format = str(getattr(dataset, "action_abs_format", "unknown")).strip().lower()
+            if hasattr(dataset, "env_action_scale"):
+                try:
+                    action_scale_from_data = float(getattr(dataset, "env_action_scale"))
+                except Exception:
+                    action_scale_from_data = float(self.action_scale)
+            if hasattr(dataset, "env_relative"):
+                try:
+                    action_relative_from_data = bool(getattr(dataset, "env_relative"))
+                except Exception:
+                    action_relative_from_data = bool(self.relative)
             ends = np.asarray(dataset.ends, dtype=np.int64)
             starts = np.asarray(dataset.starts, dtype=np.int64)
+
+        def _normalize_action_format(fmt: str) -> str:
+            fl = str(fmt).strip().lower()
+            if fl in {"env_input", "relative_input", "relative"}:
+                return "env_input"
+            if fl in {"absolute_target", "absolute", "abs_target"}:
+                return "absolute_target"
+            return "unknown"
+
+        action_format = _normalize_action_format(action_format)
+        action_abs_format = _normalize_action_format(action_abs_format)
+        if action_abs_arr is not None and action_abs_format == "unknown":
+            # Backward-compatible default: data/action_abs denotes absolute targets.
+            action_abs_format = "absolute_target"
 
         n_ep = len(ends)
         if n_ep == 0:
@@ -216,6 +265,12 @@ class PushTWrapper(PushTEnv):
         if ang_thresh < 0.0:
             raise ValueError(f"min_block_angle_delta must be >= 0, got {min_block_angle_delta}")
         n_tries = max(1, int(max_resample_tries))
+        reconstruct_mode = int(reconstruct_goal_state)
+        if reconstruct_mode not in {0, 1, 2, 3}:
+            raise ValueError(
+                "reconstruct_goal_state must be one of {0,1,2,3}, "
+                f"got {reconstruct_goal_state}"
+            )
 
         def _pad_and_trim_state(x: np.ndarray) -> np.ndarray:
             s = np.asarray(x, dtype=np.float32)
@@ -227,6 +282,110 @@ class PushTWrapper(PushTEnv):
                 )
             return s[: self.state_dim]
 
+        def _convert_rollout_actions(
+            action_seg_raw: np.ndarray,
+            state_seg_pre: np.ndarray,
+            mode: str,
+        ) -> tuple[np.ndarray, str]:
+            a_raw = np.asarray(action_seg_raw, dtype=np.float32)
+            s_pre = np.asarray(state_seg_pre, dtype=np.float32)
+            if a_raw.shape[0] != s_pre.shape[0]:
+                raise ValueError(
+                    "state/action segment length mismatch for reconstruction, "
+                    f"state_len={int(s_pre.shape[0])}, action_len={int(a_raw.shape[0])}."
+                )
+
+            if mode == "env_input":
+                return a_raw.copy(), "env_input"
+            if mode == "absolute_target":
+                denom = max(1e-8, float(action_scale_from_data))
+                if bool(action_relative_from_data):
+                    return (a_raw - s_pre[:, :2]) / denom, "absolute_target->env_input"
+                return a_raw / denom, "absolute_target->env_input_nonrelative"
+            raise ValueError(f"Unsupported action conversion mode: {mode}")
+
+        def _rollout_goal_from_segment(
+            init_state: np.ndarray,
+            action_segment_raw: np.ndarray,
+            state_segment_pre: np.ndarray,
+            conversion_mode: str,
+        ) -> tuple[np.ndarray, np.ndarray, np.ndarray, str]:
+            rollout_actions, conversion_label = _convert_rollout_actions(
+                action_seg_raw=action_segment_raw,
+                state_seg_pre=state_segment_pre,
+                mode=conversion_mode,
+            )
+            _, states = self.rollout(seed=0, init_state=init_state.copy(), actions=rollout_actions)
+            states_arr = np.asarray(states, dtype=np.float32)
+            return _pad_and_trim_state(states_arr[-1]), rollout_actions, states_arr, conversion_label
+
+        rollout_action_mode = "none"
+        rollout_action_source = "none"
+        rollout_action_arr = None
+        if reconstruct_mode in {1, 2, 3}:
+            if action_format in {"env_input", "absolute_target"} and action_arr is not None:
+                rollout_action_mode = action_format
+                rollout_action_source = "action"
+                rollout_action_arr = action_arr
+            elif action_abs_arr is not None:
+                if action_abs_format != "absolute_target":
+                    raise ValueError(
+                        "data/action_abs exists but action_abs_format is unsupported; "
+                        f"expected absolute_target, got {action_abs_format!r}."
+                    )
+                rollout_action_mode = "absolute_target"
+                rollout_action_source = "action_abs"
+                rollout_action_arr = action_abs_arr
+            elif action_arr is not None:
+                # Legacy datasets may not provide attrs. Infer once, using a small probe set.
+                probe_count = min(8, len(candidates))
+                if probe_count <= 0:
+                    raise ValueError("Unable to infer action format: dataset has no valid probe candidates.")
+                infer_rng = np.random.default_rng(seed=seed + 13579)
+                probe_idx = infer_rng.integers(0, len(candidates), size=probe_count)
+                fmt_errors = {"env_input": [], "absolute_target": []}
+                for ci in np.asarray(probe_idx, dtype=np.int64):
+                    _, ps, pe = candidates[int(ci)]
+                    p_start = int(infer_rng.integers(ps, pe - trajectory_len + 1))
+                    p_goal = p_start + trajectory_len
+                    p_init = _pad_and_trim_state(state_arr[p_start])
+                    p_goal_state = _pad_and_trim_state(state_arr[p_goal])
+                    p_actions = np.asarray(action_arr[p_start:p_goal], dtype=np.float32)
+                    p_states = np.asarray(state_arr[p_start:p_goal], dtype=np.float32)
+                    if int(p_actions.shape[0]) != int(trajectory_len):
+                        continue
+                    for fmt in ("env_input", "absolute_target"):
+                        try:
+                            p_recon, _, _, _ = _rollout_goal_from_segment(
+                                init_state=p_init,
+                                action_segment_raw=p_actions,
+                                state_segment_pre=p_states,
+                                conversion_mode=fmt,
+                            )
+                            err = float(np.max(np.abs(p_recon - p_goal_state)))
+                        except Exception:
+                            err = float("inf")
+                        fmt_errors[fmt].append(err)
+                env_err = float(np.median(fmt_errors["env_input"])) if fmt_errors["env_input"] else float("inf")
+                abs_err = (
+                    float(np.median(fmt_errors["absolute_target"]))
+                    if fmt_errors["absolute_target"]
+                    else float("inf")
+                )
+                if (not np.isfinite(env_err)) and (not np.isfinite(abs_err)):
+                    raise ValueError(
+                        "Unable to infer action format for reconstruction from legacy dataset. "
+                        "Provide zarr attrs (`action_format`) or an `action_abs` array."
+                    )
+                rollout_action_mode = "absolute_target" if abs_err < env_err else "env_input"
+                rollout_action_source = "action"
+                rollout_action_arr = action_arr
+            else:
+                raise ValueError(
+                    "reconstruct_goal_state requires dataset actions, but neither `action` nor "
+                    "`action_abs` arrays were found."
+                )
+
         fallback = None
         fallback_score = -np.inf
         for attempt_idx in range(n_tries):
@@ -235,19 +394,40 @@ class PushTWrapper(PushTEnv):
             goal_idx = start_idx + trajectory_len
 
             init_state = _pad_and_trim_state(state_arr[start_idx])
-            goal_state = _pad_and_trim_state(state_arr[goal_idx])
+            goal_state_stored = _pad_and_trim_state(state_arr[goal_idx])
+            goal_state = goal_state_stored.copy()
             action_seg = None
+            conversion_label = None
+            state_seq_rollout = None
             used_action_rollout = False
-            if action_arr is not None:
-                try:
-                    action_seg = np.asarray(action_arr[start_idx:goal_idx], dtype=np.float32)
-                    if int(action_seg.shape[0]) == int(trajectory_len):
-                        _, states = self.rollout(seed=0, init_state=init_state.copy(), actions=action_seg)
-                        goal_state = _pad_and_trim_state(states[-1])
-                        used_action_rollout = True
-                except Exception:
-                    used_action_rollout = False
-                    action_seg = None
+            if reconstruct_mode in {1, 2, 3}:
+                action_seg_raw = np.asarray(rollout_action_arr[start_idx:goal_idx], dtype=np.float32)
+                if int(action_seg_raw.shape[0]) != int(trajectory_len):
+                    raise ValueError(
+                        "reconstruct_goal_state requires action segment length equal to trajectory_len, "
+                        f"got len={int(action_seg_raw.shape[0])}, trajectory_len={int(trajectory_len)}"
+                    )
+                state_seg_pre = np.asarray(state_arr[start_idx:goal_idx], dtype=np.float32)
+                goal_state_recon, action_seg, state_seq_rollout, conversion_label = _rollout_goal_from_segment(
+                    init_state=init_state,
+                    action_segment_raw=action_seg_raw,
+                    state_segment_pre=state_seg_pre,
+                    conversion_mode=rollout_action_mode,
+                )
+                goal_state_recon = _pad_and_trim_state(state_seq_rollout[-1])
+                max_abs_diff = float(np.max(np.abs(goal_state_recon - goal_state_stored)))
+                if reconstruct_mode == 1:
+                    if not np.allclose(goal_state_recon, goal_state_stored, atol=1e-4, rtol=1e-4):
+                        raise ValueError(
+                            "reconstruct_goal_state=1 mismatch: reconstructed goal state differs from stored "
+                            f"(episode={int(ei)}, start={int(start_idx)}, goal={int(goal_idx)}, "
+                            f"max_abs_diff={max_abs_diff:.6g}, action_mode={rollout_action_mode}, "
+                            f"action_source={rollout_action_source})."
+                        )
+                    goal_state = goal_state_stored
+                else:
+                    goal_state = goal_state_recon
+                    used_action_rollout = True
 
             pos_diff = float(np.linalg.norm(goal_state[2:4] - init_state[2:4]))
             ang_diff = float(np.abs(goal_state[4] - init_state[4]))
@@ -265,9 +445,20 @@ class PushTWrapper(PushTEnv):
                     "angle_diff": ang_diff,
                     "resample_tries": int(attempt_idx + 1),
                     "used_action_rollout": bool(used_action_rollout),
+                    "reconstruct_goal_state": reconstruct_mode,
+                    "action_format": action_format,
+                    "action_abs_format": action_abs_format,
+                    "action_source": rollout_action_source,
+                    "action_mode": rollout_action_mode,
+                    "force_gt_action_replay": bool(reconstruct_mode == 3),
                 }
-                if action_seg is not None:
+                if action_seg is not None and used_action_rollout:
                     meta["actions"] = np.asarray(action_seg, dtype=np.float32).tolist()
+                    if conversion_label is not None:
+                        meta["action_conversion"] = str(conversion_label)
+                    if (reconstruct_mode == 3) and (state_seq_rollout is not None):
+                        meta["gt_state_trajectory"] = np.asarray(state_seq_rollout, dtype=np.float32).tolist()
+                        meta["gt_state_trajectory_source"] = "action_rollout"
                 return init_state, goal_state, meta
 
             score = max(
@@ -286,7 +477,13 @@ class PushTWrapper(PushTEnv):
                     ang_diff,
                     attempt_idx + 1,
                     used_action_rollout,
-                    None if action_seg is None else np.asarray(action_seg, dtype=np.float32).tolist(),
+                    reconstruct_mode,
+                    rollout_action_source,
+                    rollout_action_mode,
+                    None if (action_seg is None or (not used_action_rollout)) else np.asarray(action_seg, dtype=np.float32).tolist(),
+                    None
+                    if (state_seq_rollout is None or (not used_action_rollout) or reconstruct_mode != 3)
+                    else np.asarray(state_seq_rollout, dtype=np.float32).tolist(),
                 )
 
         if fallback is not None:
@@ -300,7 +497,11 @@ class PushTWrapper(PushTEnv):
                 ang_diff,
                 n_used,
                 used_action_rollout,
+                fallback_reconstruct_mode,
+                fallback_action_source,
+                fallback_action_mode,
                 action_seg_list,
+                state_seq_rollout_list,
             ) = fallback
             meta = {
                 "episode_index": int(ei),
@@ -313,9 +514,18 @@ class PushTWrapper(PushTEnv):
                 "resample_tries": int(n_used),
                 "fallback": True,
                 "used_action_rollout": bool(used_action_rollout),
+                "reconstruct_goal_state": int(fallback_reconstruct_mode),
+                "action_format": action_format,
+                "action_abs_format": action_abs_format,
+                "action_source": str(fallback_action_source),
+                "action_mode": str(fallback_action_mode),
+                "force_gt_action_replay": bool(int(fallback_reconstruct_mode) == 3),
             }
             if action_seg_list is not None:
                 meta["actions"] = action_seg_list
+            if state_seq_rollout_list is not None:
+                meta["gt_state_trajectory"] = state_seq_rollout_list
+                meta["gt_state_trajectory_source"] = "action_rollout"
             return init_state, goal_state, meta
 
         raise RuntimeError(

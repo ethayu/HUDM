@@ -11,8 +11,7 @@ except Exception:
 
 ACTION_MEAN = torch.tensor([-0.0087, 0.0068])
 ACTION_STD = torch.tensor([0.2019, 0.2002])
-STATE_MEAN = torch.tensor([236.6155, 264.5674, 255.1307, 266.3721, 1.9584, -2.93032027,  2.54307914])
-STATE_STD = torch.tensor([101.1202, 87.0112, 52.7054, 57.4971, 1.7556, 74.84556075, 74.14009094])
+
 class ZarrPushTEpisodes(Dataset):
     """
     Episode dataset over a PushT Zarr store.
@@ -47,9 +46,17 @@ class ZarrPushTEpisodes(Dataset):
         root = zarr.open_group(zarr_root, mode="r")
         data = root["data"]
         meta = root["meta"]
+        attrs = root.attrs
         self.img = data[self.image_key]       # (N, H, W, C), float32
         self.act = data[self.action_key]      # (N, A), float32
+        self.action = self.act
+        self.actions = self.act
         self.state = data[self.state_key]     # (N, 5), float32
+        self.action_abs = data.get("action_abs", None)
+        self.action_format = str(attrs.get("action_format", "unknown")).strip().lower()
+        self.action_abs_format = str(attrs.get("action_abs_format", "unknown")).strip().lower()
+        self.env_action_scale = float(attrs.get("env_action_scale", self._ACTION_SCALE))
+        self.env_relative = bool(attrs.get("env_relative", True))
         self.ends = meta[self.meta_episode_key][:]  # (E,), int64 ends
         self.ends[-1] = self.ends[-1] - 1
 
@@ -94,9 +101,9 @@ class ZarrPushTEpisodes(Dataset):
         x_t = torch.stack([self._img_to_tensor(frame) for frame in x], dim=0)
         a_t = torch.from_numpy(a.astype(np.float32))
         state_t = torch.from_numpy(state.astype(np.float32))
-
         #a_t = (a_t - ACTION_MEAN) / ACTION_STD
         #state_t = (state_t - STATE_MEAN) / STATE_STD
+
         return {
             "x": x_t,
             "a": a_t,

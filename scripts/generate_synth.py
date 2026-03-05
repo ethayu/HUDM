@@ -20,9 +20,10 @@ Usage:
 
 Notes:
   - Outputs a Zarr store compatible with datasets/zarr_episodes.py
-  - The Zarr store contains: data/img, data/action, data/state, meta/episode_ends
+  - The Zarr store contains: data/img, data/action, data/state, data/action_abs, meta/episode_ends
   - Images are stored as float32 in [0, 255] range
-  - Actions are absolute pixel targets (float32)
+  - data/action stores replay-safe env input actions (relative controls before env.action_scale)
+  - data/action_abs stores absolute action targets for reference/debug
   - States are the pre-action environment state (float32)
   - Train/val split is handled via split_ratio when loading the dataset
 """
@@ -60,12 +61,13 @@ def rollout_episode(
     ou_mu: Optional[np.ndarray] = None,
     collect_frames: bool = False,
     img_size: int = 96,
-) -> Tuple[np.ndarray, np.ndarray, Optional[np.ndarray]]:
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Optional[np.ndarray]]:
     init_state, goal = env.sample_random_init_goal_states(seed=int(rng.integers(0, 1_000_000)))
     obs, state = env.prepare(seed=int(rng.integers(0, 1_000_000)), init_state=init_state)
 
     states = []
     actions = []
+    actions_abs = []
     frames = []
 
     # OU state init
@@ -163,7 +165,8 @@ def rollout_episode(
         else:
             action_abs = act * env.action_scale
 
-        actions.append(action_abs.astype(np.float32))
+        actions.append(act.astype(np.float32))
+        actions_abs.append(action_abs.astype(np.float32))
         states.append(current_state.astype(np.float32))
 
         if collect_frames:
@@ -180,30 +183,35 @@ def rollout_episode(
             break
 
     actions = np.asarray(actions, dtype=np.float32)
+    actions_abs = np.asarray(actions_abs, dtype=np.float32)
     states = np.asarray(states, dtype=np.float32)
     if collect_frames:
         frames = np.asarray(frames, dtype=np.float32)
     else:
         frames = None
-    return states, actions, frames
+    return states, actions, actions_abs, frames
 
 
 def save_zarr(
     zarr_out: str,
     frames_list: List[np.ndarray],
     actions_list: List[np.ndarray],
+    actions_abs_list: List[np.ndarray],
     states_list: List[np.ndarray],
+    env_action_scale: float,
+    env_relative: bool,
 ):
     if zarr is None:
         raise ImportError("zarr is not installed. Try: pip install zarr")
     # Flatten episodes; ensure per-episode frames match action count (pre-step frames)
     # frames_list[i].shape == (Li, H, W, 3); actions_list[i].shape == (Li, A)
     lengths = [
-        min(f.shape[0], a.shape[0], s.shape[0])
-        for f, a, s in zip(frames_list, actions_list, states_list)
+        min(f.shape[0], a.shape[0], a_abs.shape[0], s.shape[0])
+        for f, a, a_abs, s in zip(frames_list, actions_list, actions_abs_list, states_list)
     ]
     frames = np.concatenate([f[:L] for f, L in zip(frames_list, lengths)], axis=0)
     actions = np.concatenate([a[:L] for a, L in zip(actions_list, lengths)], axis=0)
+    actions_abs = np.concatenate([a[:L] for a, L in zip(actions_abs_list, lengths)], axis=0)
     states = np.concatenate([s[:L] for s, L in zip(states_list, lengths)], axis=0)
     ends = np.cumsum(lengths) - 1
 
@@ -213,10 +221,15 @@ def save_zarr(
     # Create arrays
     g_data.create('img', data=frames.astype(np.float32), chunks=(min(160, frames.shape[0]),) + frames.shape[1:])
     g_data.create('action', data=actions.astype(np.float32), chunks=(min(160, actions.shape[0]), actions.shape[1]))
+    g_data.create('action_abs', data=actions_abs.astype(np.float32), chunks=(min(160, actions_abs.shape[0]), actions_abs.shape[1]))
     g_data.create('state', data=states.astype(np.float32), chunks=(min(160, states.shape[0]), states.shape[1]))
     g_meta.create('episode_ends', data=ends.astype(np.int64), chunks=(max(1, len(ends)),))
-    # minimal attrs
-    root.attrs.update({})
+    root.attrs.update({
+        "action_format": "env_input",
+        "action_abs_format": "absolute_target",
+        "env_action_scale": float(env_action_scale),
+        "env_relative": bool(env_relative),
+    })
 
 
 def main():
@@ -263,10 +276,10 @@ def main():
         return np.asarray(vals, dtype=np.float32)
 
     def gen_split(n_eps: int):
-        acts_list, frames_list, states_list = [], [], []
+        acts_list, acts_abs_list, frames_list, states_list = [], [], [], []
         for _ in range(n_eps):
             T = int(rng.integers(args.len_min, args.len_max + 1))
-            states, actions, frames = rollout_episode(
+            states, actions, actions_abs, frames = rollout_episode(
                 env,
                 T=T,
                 policy=args.policy,
@@ -280,19 +293,29 @@ def main():
                 img_size=args.img_size,
             )
             acts_list.append(actions)
+            acts_abs_list.append(actions_abs)
             frames_list.append(frames)
             states_list.append(states)
-        return acts_list, frames_list, states_list
+        return acts_list, acts_abs_list, frames_list, states_list
 
-    train_actions, train_frames, train_states = gen_split(args.train_eps)
-    val_actions, val_frames, val_states = gen_split(args.val_eps)
+    train_actions, train_actions_abs, train_frames, train_states = gen_split(args.train_eps)
+    val_actions, val_actions_abs, val_frames, val_states = gen_split(args.val_eps)
 
     # Save a single Zarr with both train and val concatenated
     # Train/val separation is handled via split_ratio when loading the dataset
     frames_all = train_frames + val_frames
     actions_all = train_actions + val_actions
+    actions_abs_all = train_actions_abs + val_actions_abs
     states_all = train_states + val_states
-    save_zarr(args.zarr_out, frames_all, actions_all, states_all)
+    save_zarr(
+        args.zarr_out,
+        frames_all,
+        actions_all,
+        actions_abs_all,
+        states_all,
+        env_action_scale=float(env.action_scale),
+        env_relative=bool(env.relative),
+    )
     print(f'Saved synthetic Zarr store to {args.zarr_out}')
     print(f'  Training episodes: {args.train_eps}')
     print(f'  Validation episodes: {args.val_eps}')

@@ -139,7 +139,7 @@ def validate_plan_cfg(cfg) -> None:
     _reject_unknown_keys(cfg.init_goal, {"source", "dataset"}, "plan.init_goal")
     _reject_unknown_keys(
         cfg.init_goal.dataset,
-        {"zarr_path", "split", "split_ratio", "trajectory_len", "seed"},
+        {"zarr_path", "split", "split_ratio", "trajectory_len", "seed", "reconstruct_goal_state"},
         "plan.init_goal.dataset",
     )
 
@@ -277,6 +277,12 @@ def validate_plan_cfg(cfg) -> None:
                 "plan.init_goal.dataset.seed must be an int or the string 'random', "
                 f"got {cfg.init_goal.dataset.seed!r}"
             ) from exc
+    recon_mode = int(getattr(cfg.init_goal.dataset, "reconstruct_goal_state", 0))
+    if recon_mode not in {0, 1, 2, 3}:
+        raise ValueError(
+            "plan.init_goal.dataset.reconstruct_goal_state must be one of {0,1,2,3}, "
+            f"got {cfg.init_goal.dataset.reconstruct_goal_state!r}"
+        )
 
     ens_enabled = bool(getattr(cfg.world_model.ensemble, "enabled", False))
     run_dir = cfg.world_model.run_dir

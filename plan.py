@@ -305,6 +305,7 @@ def _sample_init_goal_states(
         split=str(ds_cfg.split),
         split_ratio=float(split_ratio),
         seed=sample_seed,
+        reconstruct_goal_state=int(getattr(ds_cfg, "reconstruct_goal_state", 0)),
     )
     print(
         "[init_goal] source=dataset "
@@ -501,24 +502,48 @@ def _render_dataset_gt_frames(
     frames: list[np.ndarray] = []
     _set_execution_fidelity_finest(env)
     _set_start_pose(env, init_state)
+    state_dim = int(getattr(env, "state_dim", np.asarray(init_state).shape[0]))
 
+    def _state_to_env_dim(x: np.ndarray) -> np.ndarray:
+        s = np.asarray(x, dtype=np.float32)
+        if s.shape[0] < state_dim:
+            pad = state_dim - s.shape[0]
+            s = np.concatenate([s, np.zeros((pad,), dtype=np.float32)], axis=0)
+        return s[:state_dim]
+
+    force_replay = bool(sample_meta.get("force_gt_action_replay", False)) or int(
+        sample_meta.get("reconstruct_goal_state", 0)
+    ) == 3
     actions = sample_meta.get("actions", None)
-    if actions is not None:
+    gt_state_traj = sample_meta.get("gt_state_trajectory", None)
+    if gt_state_traj is not None:
+        state_seq = np.asarray(gt_state_traj, dtype=np.float32)
+    elif actions is not None:
         try:
-            _, states = env.rollout(seed=0, init_state=state_arr[0], actions=np.asarray(actions, dtype=np.float32))
+            init_roll = _state_to_env_dim(np.asarray(init_state, dtype=np.float32))
+            _, states = env.rollout(
+                seed=0,
+                init_state=init_roll,
+                actions=np.asarray(actions, dtype=np.float32),
+            )
             state_seq = states
         except Exception as exc:
+            if force_replay:
+                raise RuntimeError(
+                    f"Forced GT action replay failed while rendering gt.gif: {exc}"
+                ) from exc
             print(f"[save][gt] action-rollout fallback to dataset states ({exc}).")
             state_seq = state_arr
     else:
+        if force_replay:
+            raise ValueError(
+                "Forced GT action replay requested but no replay actions/trajectory found in sample metadata."
+            )
         state_seq = state_arr
 
     for s in state_seq:
-        s = np.asarray(s, dtype=np.float32)
-        if s.shape[0] < int(getattr(env, "state_dim", s.shape[0])):
-            pad = int(getattr(env, "state_dim", s.shape[0])) - s.shape[0]
-            s = np.concatenate([s, np.zeros((pad,), dtype=np.float32)], axis=0)
-        env.prepare(seed=0, init_state=s[: int(getattr(env, "state_dim", s.shape[0]))])
+        s = _state_to_env_dim(np.asarray(s, dtype=np.float32))
+        env.prepare(seed=0, init_state=s)
         _set_goal_pose(env, goal_state)
         frames.append(env.render("rgb_array", include_start_pose=True))
     return frames
@@ -926,6 +951,7 @@ def main(cfg_path: str) -> None:
                 "split_ratio": None,    # if None, falls back to world config split_ratio (or 0.8)
                 "trajectory_len": 20,
                 "seed": 0,
+                "reconstruct_goal_state": 0,  # 0: off, 1: assert reconstructed==stored, 2: use reconstructed, 3: force replay trajectory as GT
             },
         },
         "render": False,

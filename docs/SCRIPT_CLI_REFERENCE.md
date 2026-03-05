@@ -35,9 +35,11 @@ Options:
 Output schema:
 
 - `data/img`
-- `data/action`
+- `data/action` (replay-safe env input actions)
+- `data/action_abs` (absolute targets for debugging/reference)
 - `data/state`
 - `meta/episode_ends`
+- zarr attrs: `action_format="env_input"`, `action_abs_format="absolute_target"`, `env_action_scale`, `env_relative`
 
 ## `scripts/visualize_rollouts.py`
 
