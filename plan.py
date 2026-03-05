@@ -622,17 +622,34 @@ def _run_closed_loop(
     trajectory = [cur_state.copy()]
     frames: list[np.ndarray] = []
     planner_frames: list[np.ndarray] = []
+    last_term: dict | None = None
     if bool(cfg.save):
         frames.append(env.render("rgb_array", include_start_pose=True))
 
-    # Early exit if the reset state already satisfies the goal condition.
-    initial_metrics = env.eval_state(goal_state, cur_state)
-    if bool(initial_metrics["success"]):
+    # Early exit only if reset state satisfies BOTH metric success and env-done coverage.
+    initial_term = env.eval_termination(goal_state, cur_state, done=None, info=None)
+    if bool(initial_term["success_and_done"]):
+        cov_s = "n/a" if initial_term["coverage"] is None else f"{float(initial_term['coverage']):.4f}"
+        print(
+            "[terminate] reason=initial_metric_and_env_done "
+            f"step=0 pos_diff={float(initial_term['pos_diff']):.3f} "
+            f"angle_diff={float(initial_term['angle_diff']):.3f} "
+            f"eef_diff={float(initial_term['eef_diff']):.3f} "
+            f"coverage={cov_s}"
+        )
         stats = {
             "plans": 0,
             "bits_used_total": 0,
             "flops_used_total": 0,
             "plan_time_total_sec": 0.0,
+            "termination_reason": "initial_metric_and_env_done",
+            "termination_step": 0,
+            "termination_metric_success": bool(initial_term["success"]),
+            "termination_done": bool(initial_term["done"]),
+            "termination_pos_diff": float(initial_term["pos_diff"]),
+            "termination_angle_diff": float(initial_term["angle_diff"]),
+            "termination_eef_diff": float(initial_term["eef_diff"]),
+            "termination_coverage": initial_term["coverage"],
         }
         return True, trajectory, frames, planner_frames, stats,[],[],[]
 
@@ -755,14 +772,15 @@ def _run_closed_loop(
             cur_state = step_info["state"]
             trajectory.append(cur_state.copy())
 
-            metrics = env.eval_state(goal_state, cur_state)
-            pd = metrics["pos_diff"]
-            ad = metrics["angle_diff"] 
-            ed = metrics["eef_diff"]
+            term = env.eval_termination(goal_state, cur_state, done=done, info=step_info)
+            last_term = term
+            pd = term["pos_diff"]
+            ad = term["angle_diff"] 
+            ed = term["eef_diff"]
             pos_diffs.append(pd)
             angle_diffs.append(ad)
             eef_diffs.append(ed)
-            dist = metrics["state_dist"]
+            dist = term["state_dist"]
             base_k = getattr(info, "base_k", None)
             base_spacing = getattr(info, "base_spacing", None)
             base_np = getattr(info, "base_num_particles", None)
@@ -829,13 +847,29 @@ def _run_closed_loop(
                         )
                     )
 
-            # Use either geometric success check or environment terminal signal.
-            if bool(metrics["success"]) or bool(done):
+            # Require both geometric success and env terminal signal.
+            if bool(term["success_and_done"]):
+                term_reason = "metric_success_and_env_done"
+                cov_s = "n/a" if term["coverage"] is None else f"{float(term['coverage']):.4f}"
+                print(
+                    f"[terminate] reason={term_reason} step={t + 1} "
+                    f"metric_success={bool(term['success'])} done={bool(term['done'])} "
+                    f"pos_diff={float(pd):.3f} angle_diff={float(ad):.3f} "
+                    f"eef_diff={float(ed):.3f} coverage={cov_s}"
+                )
                 stats = {
                     "plans": n_plans,
                     "bits_used_total": total_plan_bits,
                     "flops_used_total": total_plan_flops,
                     "plan_time_total_sec": total_plan_time,
+                    "termination_reason": str(term_reason),
+                    "termination_step": int(t + 1),
+                    "termination_metric_success": bool(term["success"]),
+                    "termination_done": bool(term["done"]),
+                    "termination_pos_diff": float(term["pos_diff"]),
+                    "termination_angle_diff": float(term["angle_diff"]),
+                    "termination_eef_diff": float(term["eef_diff"]),
+                    "termination_coverage": term["coverage"],
                 }
                 return True, trajectory, frames, planner_frames, stats, pos_diffs, angle_diffs, eef_diffs
 
@@ -844,11 +878,30 @@ def _run_closed_loop(
         prev_exec_steps = int(n_exec)
         replan_idx += 1
 
+    cov_s = "n/a" if (last_term is None or last_term["coverage"] is None) else f"{float(last_term['coverage']):.4f}"
+    if last_term is not None:
+        print(
+            "[terminate] reason=max_steps "
+            f"step={int(steps)} metric_success={bool(last_term['success'])} "
+            f"done={bool(last_term['done'])} pos_diff={float(last_term['pos_diff']):.3f} "
+            f"angle_diff={float(last_term['angle_diff']):.3f} "
+            f"eef_diff={float(last_term['eef_diff']):.3f} coverage={cov_s}"
+        )
+    else:
+        print("[terminate] reason=max_steps step=0 metric_success=False done=False coverage=n/a")
     stats = {
         "plans": n_plans,
         "bits_used_total": total_plan_bits,
         "flops_used_total": total_plan_flops,
         "plan_time_total_sec": total_plan_time,
+        "termination_reason": "max_steps",
+        "termination_step": int(steps),
+        "termination_metric_success": False if last_term is None else bool(last_term["success"]),
+        "termination_done": False if last_term is None else bool(last_term["done"]),
+        "termination_pos_diff": None if last_term is None else float(last_term["pos_diff"]),
+        "termination_angle_diff": None if last_term is None else float(last_term["angle_diff"]),
+        "termination_eef_diff": None if last_term is None else float(last_term["eef_diff"]),
+        "termination_coverage": None if last_term is None else last_term["coverage"],
     }
     return False, trajectory, frames, planner_frames, stats, pos_diffs, angle_diffs, eef_diffs
 
@@ -1175,6 +1228,14 @@ def main(cfg_path: str) -> None:
             "flops_used_total": int(run_stats["flops_used_total"]),
             "flops_used_total_human": _format_flops_human(int(run_stats["flops_used_total"])),
             "plan_time_total_sec": float(run_stats["plan_time_total_sec"]),
+            "termination_reason": str(run_stats.get("termination_reason", "unknown")),
+            "termination_step": int(run_stats.get("termination_step", -1)),
+            "termination_metric_success": bool(run_stats.get("termination_metric_success", False)),
+            "termination_done": bool(run_stats.get("termination_done", False)),
+            "termination_pos_diff": run_stats.get("termination_pos_diff", None),
+            "termination_angle_diff": run_stats.get("termination_angle_diff", None),
+            "termination_eef_diff": run_stats.get("termination_eef_diff", None),
+            "termination_coverage": run_stats.get("termination_coverage", None),
             "init_state": np.asarray(init_state, dtype=np.float32).tolist(),
             "goal_state": np.asarray(goal_state, dtype=np.float32).tolist(),
             "sample": sample_meta,

@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import torch
-from pusht.pusht_env import PushTEnv
+from pusht.pusht_env import PushTEnv, pymunk_to_shapely
 from pusht.utils import aggregate_dct
 from planning.fidelity import apply_fidelity
 
@@ -678,6 +678,45 @@ class PushTWrapper(PushTEnv):
             'eef_diff': eef_diff,
             'state_dist': state_dist,
         }
+
+    def eval_termination(self, goal_state, cur_state, done=None, info=None):
+        """
+        Unified termination eval used by planners and debug logging.
+
+        Returns metric success (wrapper thresholds), env-done status, coverage,
+        and the strict success gate requiring both metric success and done.
+        """
+        metrics = self.eval_state(goal_state, cur_state)
+
+        coverage = None
+        if isinstance(info, dict) and ("final_coverage" in info):
+            cov_raw = info.get("final_coverage", None)
+            if cov_raw is not None:
+                coverage = float(cov_raw)
+        if coverage is None:
+            try:
+                goal_body = self._get_goal_pose_body(self.goal_pose)
+                goal_geom = pymunk_to_shapely(goal_body, self.block.shapes)
+                block_geom = pymunk_to_shapely(self.block, self.block.shapes)
+                goal_area = float(goal_geom.area)
+                if goal_area > 0.0:
+                    coverage = float(goal_geom.intersection(block_geom).area / goal_area)
+            except Exception:
+                coverage = None
+
+        if done is None:
+            done_flag = (
+                coverage is not None
+                and coverage > float(getattr(self, "success_threshold", np.inf))
+            )
+        else:
+            done_flag = bool(done)
+
+        out = dict(metrics)
+        out["done"] = bool(done_flag)
+        out["coverage"] = coverage
+        out["success_and_done"] = bool(metrics["success"]) and bool(done_flag)
+        return out
 
     def prepare(self, seed, init_state, goal_state=None):
         """
