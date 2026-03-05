@@ -92,7 +92,7 @@ The fields below are the source of truth for the current implementation.
 | `particle_env` | mapping | Warp particle backend rollout/fidelity settings. |
 | `init_goal` | mapping | Initial/goal state sampling configuration. |
 | `render` | bool | Enable interactive render. |
-| `save` | bool | Save rollout GIF under `rollouts/`. |
+| `save` | bool | Save rollout MP4 files under `rollouts/`. |
 
 ### `env`
 

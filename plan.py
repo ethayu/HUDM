@@ -355,6 +355,45 @@ def _resize_image_hw(img: np.ndarray, target_hw: tuple[int, int]) -> np.ndarray:
     return out
 
 
+def _write_video_mp4(path: str, frames: list[np.ndarray], fps: int = 15) -> None:
+    if len(frames) == 0:
+        raise ValueError(f"No frames to write for {path}")
+
+    first = np.asarray(frames[0])
+    if first.ndim == 2:
+        first = np.repeat(first[:, :, None], 3, axis=2)
+    if first.ndim != 3:
+        raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {first.shape}")
+    if first.shape[2] == 1:
+        first = np.repeat(first, 3, axis=2)
+    h, w = int(first.shape[0]), int(first.shape[1])
+    writer = cv2.VideoWriter(
+        str(path),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        float(max(1, int(fps))),
+        (w, h),
+    )
+    if not writer.isOpened():
+        raise RuntimeError(f"Failed to open MP4 writer for {path}")
+
+    try:
+        for fr in frames:
+            x = np.asarray(fr)
+            if x.ndim == 2:
+                x = np.repeat(x[:, :, None], 3, axis=2)
+            if x.ndim != 3:
+                raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
+            if x.shape[2] == 1:
+                x = np.repeat(x, 3, axis=2)
+            if x.shape[0] != h or x.shape[1] != w:
+                x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
+            if x.dtype != np.uint8:
+                x = np.clip(x, 0.0, 255.0).astype(np.uint8)
+            writer.write(cv2.cvtColor(x, cv2.COLOR_RGB2BGR))
+    finally:
+        writer.release()
+
+
 def _overlay_start_pose(
     planner_img: np.ndarray,
     exec_with_start: np.ndarray,
@@ -388,7 +427,7 @@ def _planner_view_frame(
 ) -> np.ndarray:
     """
     Approximate "what planner saw" at a chosen fidelity level, while keeping
-    saved GIF frame size fixed for readability.
+    saved video frame size fixed for readability.
     """
     img = np.asarray(base_visual)
     out = img
@@ -530,7 +569,7 @@ def _render_dataset_gt_frames(
         except Exception as exc:
             if force_replay:
                 raise RuntimeError(
-                    f"Forced GT action replay failed while rendering gt.gif: {exc}"
+                    f"Forced GT action replay failed while rendering gt.mp4: {exc}"
                 ) from exc
             print(f"[save][gt] action-rollout fallback to dataset states ({exc}).")
             state_seq = state_arr
@@ -1101,20 +1140,15 @@ def main(cfg_path: str) -> None:
     )
 
     if bool(cfg.save):
-        try:
-            import imageio.v2 as imageio
-        except ModuleNotFoundError:
-            import imageio
-
         rollout_root = "rollouts"
         os.makedirs(rollout_root, exist_ok=True)
         run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_dir = os.path.join(rollout_root, f"plan_{backend}_{run_ts}")
         os.makedirs(run_dir, exist_ok=True)
         source = str(sample_meta.get("source", "unknown"))
-        out_path = os.path.join(run_dir, "planned.gif")
-        print(f"[save] Writing rollout GIF to {out_path}")
-        imageio.mimwrite(out_path, frames, fps=15)
+        out_path = os.path.join(run_dir, "planned.mp4")
+        print(f"[save] Writing rollout MP4 to {out_path}")
+        _write_video_mp4(out_path, frames, fps=15)
         print(f"[save] Video saved ({len(frames)} frames)")
 
         import matplotlib.pyplot as plt
@@ -1159,15 +1193,15 @@ def main(cfg_path: str) -> None:
                 goal_state=goal_state,
             )
             if len(gt_frames) > 0:
-                gt_path = os.path.join(run_dir, "gt.gif")
-                print(f"[save] Writing dataset GT GIF to {gt_path}")
-                imageio.mimwrite(gt_path, gt_frames, fps=15)
+                gt_path = os.path.join(run_dir, "gt.mp4")
+                print(f"[save] Writing dataset GT MP4 to {gt_path}")
+                _write_video_mp4(gt_path, gt_frames, fps=15)
                 print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
 
         if len(planner_frames) > 0:
-            planner_path = os.path.join(run_dir, "planner_view.gif")
-            print(f"[save] Writing planner-view GIF to {planner_path}")
-            imageio.mimwrite(planner_path, planner_frames, fps=15)
+            planner_path = os.path.join(run_dir, "planner_view.mp4")
+            print(f"[save] Writing planner-view MP4 to {planner_path}")
+            _write_video_mp4(planner_path, planner_frames, fps=15)
             print(f"[save] Planner-view video saved ({len(planner_frames)} frames)")
 
     print(
