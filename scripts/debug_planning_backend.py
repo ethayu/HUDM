@@ -24,6 +24,11 @@ from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_wrapper import PushTWrapper
 
 
+def _max_steps_reached(step_idx: int, max_steps: int) -> bool:
+    ms = int(max_steps)
+    return ms > 0 and step_idx >= ms
+
+
 def _parse_actions(text: Optional[str]) -> List[np.ndarray]:
     if text is None or str(text).strip() == "":
         return []
@@ -178,54 +183,51 @@ class ParticleDebugAdapter:
     def fidelity_label(self) -> str:
         sp = float(self.backend.spacing(self.level_idx))
         nparts = int(self.backend.num_particles(self.level_idx))
-        return f"L{self.level_idx}/{self.num_levels - 1} -> spacing={sp:.4f}, N={nparts}"
+        pr = float(self.backend.particle_radius(self.level_idx))
+        return f"L{self.level_idx}/{self.num_levels - 1} -> spacing={sp:.4f}, N={nparts}, r={pr:.4f}"
 
 
-def _handle_key(
+def _handle_control_key(
     key: int,
     adapter,
     init_state: np.ndarray,
     goal_state: np.ndarray,
     seed: int,
-    key_action_mag: float,
 ):
     if key in (27, ord("q"), ord("Q")):
-        return "quit", None
+        return "quit"
 
     if key in (ord("r"), ord("R")):
         adapter.reset(init_state=init_state, goal_state=goal_state, seed=seed)
-        return "redraw", None
+        return "redraw"
 
     if key in (ord("["), ord("-")):
         adapter.set_level(adapter.level_idx - 1)
-        return "redraw", None
+        return "redraw"
 
     if key in (ord("]"), ord("=")):
         adapter.set_level(adapter.level_idx + 1)
-        return "redraw", None
+        return "redraw"
 
     if ord("0") <= key <= ord("9"):
         level = int(key - ord("0"))
         adapter.set_level(level)
-        return "redraw", None
+        return "redraw"
 
+    return "none"
+
+
+def _key_to_action(key: int, key_action_mag: float) -> np.ndarray:
     a = np.zeros((2,), dtype=np.float32)
     if key in (ord("w"), ord("W")):
         a[1] = key_action_mag
-        return "step", a
-    if key in (ord("s"), ord("S")):
+    elif key in (ord("s"), ord("S")):
         a[1] = -key_action_mag
-        return "step", a
-    if key in (ord("a"), ord("A")):
+    elif key in (ord("a"), ord("A")):
         a[0] = -key_action_mag
-        return "step", a
-    if key in (ord("d"), ord("D")):
+    elif key in (ord("d"), ord("D")):
         a[0] = key_action_mag
-        return "step", a
-    if key == ord(" "):
-        return "step", a
-
-    return "none", None
+    return a
 
 
 def main() -> None:
@@ -235,8 +237,8 @@ def main() -> None:
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--fidelity-level", type=int, default=-1, help="Initial level index; -1 means finest")
     ap.add_argument("--actions", type=str, default="", help="Semicolon list of actions: 'ax,ay;ax,ay;...'")
-    ap.add_argument("--keyboard", action="store_true", help="Enable live key control")
-    ap.add_argument("--max-steps", type=int, default=200)
+    ap.add_argument("--keyboard", action="store_true", help="Enable realtime key control")
+    ap.add_argument("--max-steps", type=int, default=0, help="Max env steps; <=0 means no limit")
     ap.add_argument("--key-action-mag", type=float, default=0.25, help="Action magnitude for WASD keys")
     ap.add_argument("--fps", type=float, default=12.0)
     ap.add_argument("--render-size", type=int, default=224, help="Backend render resolution before display upsampling")
@@ -245,6 +247,7 @@ def main() -> None:
     ap.add_argument("--font-scale", type=float, default=0.58, help="HUD font scale")
     ap.add_argument("--save", type=str, default="", help="Optional GIF path")
     ap.add_argument("--no-window", action="store_true", help="Disable cv2 window display")
+    ap.add_argument("--stop-on-done", action="store_true", help="Stop automatically when env returns done=true")
     args = ap.parse_args()
 
     cfg_root = OmegaConf.load(args.config)
@@ -269,21 +272,24 @@ def main() -> None:
     adapter.set_level(init_level)
 
     scripted_actions = _parse_actions(args.actions)
+    save_frames = bool(str(args.save).strip())
     frames: List[np.ndarray] = []
     delay_ms = max(1, int(round(1000.0 / max(1e-6, args.fps))))
 
     def _emit_frame(step_idx: int) -> None:
         frame = adapter.render()
         metrics = adapter.eval_state()
+        success = bool(metrics.get("success", False))
         lines = [
             f"backend: {backend}",
             f"step: {step_idx}",
             f"fidelity: {adapter.fidelity_label()}",
+            f"success: {success}",
             f"dist: {metrics['state_dist']:.2f}  pos: {metrics['pos_diff']:.2f}  ang: {metrics['angle_diff']:.3f}",
             "",
             "Controls",
-            "W/A/S/D: move",
-            "space: no-op step",
+            "W/A/S/D: move (realtime)",
+            "no key: no-op",
             "[ ] or -/=: fidelity down/up",
             "0-9: set fidelity level",
             "R: reset",
@@ -296,12 +302,15 @@ def main() -> None:
             panel_width=int(args.panel_width),
             font_scale=float(args.font_scale),
         )
-        frames.append(composed)
+        if save_frames:
+            frames.append(composed)
         if not args.no_window:
             cv2.imshow("backend_debug", cv2.cvtColor(composed, cv2.COLOR_RGB2BGR))
 
     step_idx = 0
     _emit_frame(step_idx)
+
+    exit_reason = "completed"
 
     # Scripted phase.
     for a in scripted_actions:
@@ -310,54 +319,56 @@ def main() -> None:
         _emit_frame(step_idx)
         if not args.no_window:
             key = cv2.waitKey(max(1, delay_ms // 3)) & 0xFF
-            mode, _ = _handle_key(
+            mode = _handle_control_key(
                 key,
                 adapter,
                 init_state=init_state,
                 goal_state=goal_state,
                 seed=args.seed,
-                key_action_mag=float(args.key_action_mag),
             )
             if mode == "quit":
+                exit_reason = "quit"
                 break
             if mode == "redraw":
                 _emit_frame(step_idx)
-        if done or step_idx >= args.max_steps:
+        if bool(args.stop_on_done) and done:
+            exit_reason = "done"
+            break
+        if _max_steps_reached(step_idx, int(args.max_steps)):
+            exit_reason = "max_steps"
             break
 
-    # Keyboard/manual phase (event-driven stepping, live fidelity changes without forced step).
-    if args.keyboard and step_idx < args.max_steps:
+    # Keyboard/manual phase (continuous realtime stepping; no key => no-op action).
+    if args.keyboard and not _max_steps_reached(step_idx, int(args.max_steps)):
         if args.no_window:
             print("[warn] --keyboard requested with --no-window; skipping keyboard loop.")
         else:
-            while step_idx < args.max_steps:
+            while not _max_steps_reached(step_idx, int(args.max_steps)):
                 key = cv2.waitKey(delay_ms) & 0xFF
-                mode, action = _handle_key(
+                mode = _handle_control_key(
                     key,
                     adapter,
                     init_state=init_state,
                     goal_state=goal_state,
                     seed=args.seed,
-                    key_action_mag=float(args.key_action_mag),
                 )
                 if mode == "quit":
+                    exit_reason = "quit"
                     break
-                if mode == "redraw":
-                    _emit_frame(step_idx)
-                    continue
-                if mode != "step":
-                    continue
-
+                action = _key_to_action(key, float(args.key_action_mag))
                 _, _, done, _ = adapter.step(action)
                 step_idx += 1
                 _emit_frame(step_idx)
-                if done:
+                if bool(args.stop_on_done) and done:
+                    exit_reason = "done"
                     break
+            if _max_steps_reached(step_idx, int(args.max_steps)) and exit_reason == "completed":
+                exit_reason = "max_steps"
 
     if not args.no_window:
         cv2.destroyAllWindows()
 
-    if args.save:
+    if save_frames:
         try:
             import imageio.v2 as imageio
         except Exception:
@@ -366,6 +377,8 @@ def main() -> None:
         if len(frames) > 0:
             imageio.mimwrite(args.save, frames, fps=max(1, int(round(args.fps))))
             print(f"[save] wrote {len(frames)} frames -> {args.save}")
+
+    print(f"[exit] reason={exit_reason} steps={step_idx}")
 
 
 if __name__ == "__main__":
