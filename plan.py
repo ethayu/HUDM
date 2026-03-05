@@ -7,6 +7,7 @@ python plan.py configs/plan.yaml
 
 from __future__ import annotations
 
+import inspect
 import os
 import random
 import sys
@@ -40,6 +41,37 @@ def _unwrap_env(env):
     return env
 
 
+def _resolve_dataset_seed(seed_cfg: Any) -> int:
+    if isinstance(seed_cfg, str):
+        seed_s = seed_cfg.strip().lower()
+        if seed_s == "random":
+            return int(random.randrange(1_000_000))
+        raise ValueError(
+            f"plan.init_goal.dataset.seed must be an int or 'random', got {seed_cfg!r}."
+        )
+    try:
+        return int(seed_cfg)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            f"plan.init_goal.dataset.seed must be an int or 'random', got {seed_cfg!r}."
+        ) from exc
+
+
+def _gym_make_versioned(env_id: str, env_cfg: DictConfig):
+    make_kwargs = dict(OmegaConf.to_container(env_cfg, resolve=True))
+    make_kwargs["render_action"] = True
+
+    try:
+        make_params = inspect.signature(gym.make).parameters
+    except (TypeError, ValueError):
+        make_params = {}
+    if "disable_env_checker" in make_params:
+        make_kwargs["disable_env_checker"] = True
+    if "apply_api_compatibility" in make_params:
+        make_kwargs["apply_api_compatibility"] = False
+    return gym.make(str(env_id), **make_kwargs)
+
+
 def _image_to_model_tensor(img: np.ndarray, device: torch.device) -> torch.Tensor:
     x = torch.as_tensor(img, dtype=torch.float32, device=device)
     if x.ndim == 3:
@@ -70,6 +102,23 @@ def _resolve_device(device_cfg: str) -> torch.device:
 def _format_bits_human(bits: int) -> str:
     value = float(max(0, int(bits)))
     units = ["b", "Kb", "Mb", "Gb", "Tb"]
+    unit_idx = 0
+    while value >= 1000.0 and unit_idx < len(units) - 1:
+        value /= 1000.0
+        unit_idx += 1
+    return f"{value:.2f} {units[unit_idx]}"
+
+
+def _bits_to_flops_estimate(bits: int) -> int:
+    # Current planners track compute volume in transferred/processed bit-counts.
+    # Convert to an operation-count proxy via 32-bit scalar granularity.
+    b = max(0, int(bits))
+    return (b + 31) // 32
+
+
+def _format_flops_human(flops: int) -> str:
+    value = float(max(0, int(flops)))
+    units = ["FLOPs", "KFLOPs", "MFLOPs", "GFLOPs", "TFLOPs", "PFLOPs"]
     unit_idx = 0
     while value >= 1000.0 and unit_idx < len(units) - 1:
         value /= 1000.0
@@ -119,6 +168,19 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
         if not os.path.isfile(dyn_path):
             raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
         wm.dynamics.load_state_dict(torch.load(dyn_path, map_location=device))
+
+    decoder_mode = str(getattr(wm_cfg.model, "decoder_mode", "per_level"))
+    if decoder_mode == "per_level":
+        for li in range(len(wm.K)):
+            dec_path = os.path.join(run_dir, f"decoder_l{li}.pt")
+            if not os.path.isfile(dec_path):
+                raise FileNotFoundError(f"Missing decoder checkpoint: {dec_path}")
+            wm.decoders[li].load_state_dict(torch.load(dec_path, map_location=device))
+    else:
+        dec_path = os.path.join(run_dir, "decoder.pt")
+        if not os.path.isfile(dec_path):
+            raise FileNotFoundError(f"Missing decoder checkpoint: {dec_path}")
+        wm.decoder.load_state_dict(torch.load(dec_path, map_location=device))
 
     wm.eval()
     return wm
@@ -235,23 +297,26 @@ def _sample_init_goal_states(
     split_ratio = ds_cfg.split_ratio
     if split_ratio is None:
         split_ratio = 0.8 if wm_cfg is None else float(getattr(wm_cfg.data, "split_ratio", 0.8))
+    sample_seed = _resolve_dataset_seed(getattr(ds_cfg, "seed", 0))
 
     init_state, goal_state, meta = env.sample_dataset_init_goal_states(
         dataset=str(zarr_path),
         trajectory_len=int(ds_cfg.trajectory_len),
         split=str(ds_cfg.split),
         split_ratio=float(split_ratio),
-        seed=random.randrange(1_000_000),#int(ds_cfg.seed),
+        seed=sample_seed,
     )
     print(
         "[init_goal] source=dataset "
         f"episode={meta['episode_index']} start={meta['start_index']} "
-        f"goal={meta['goal_index']} len={meta['trajectory_len']} split={meta['split']}"
+        f"goal={meta['goal_index']} len={meta['trajectory_len']} split={meta['split']} "
+        f"seed={sample_seed}"
     )
     meta = dict(meta)
     meta["source"] = "dataset"
     meta["zarr_path"] = str(zarr_path)
     meta["split_ratio"] = float(split_ratio)
+    meta["seed"] = int(sample_seed)
     return init_state, goal_state, meta
 
 
@@ -279,6 +344,28 @@ def _set_execution_fidelity_finest(env: PushTWrapper) -> None:
     if hasattr(env, "_planning_fidelity_num_levels") and hasattr(env, "set_planning_fidelity_level"):
         n_levels = int(getattr(env, "_planning_fidelity_num_levels", 1))
         env.set_planning_fidelity_level(max(0, n_levels - 1))
+
+
+def _resize_image_hw(img: np.ndarray, target_hw: tuple[int, int]) -> np.ndarray:
+    out = np.asarray(img)
+    h_t, w_t = int(target_hw[0]), int(target_hw[1])
+    if out.shape[0] != h_t or out.shape[1] != w_t:
+        out = cv2.resize(out, (w_t, h_t), interpolation=cv2.INTER_NEAREST)
+    return out
+
+
+def _overlay_start_pose(
+    planner_img: np.ndarray,
+    exec_with_start: np.ndarray,
+    exec_without_start: np.ndarray,
+    target_hw: tuple[int, int],
+) -> np.ndarray:
+    out = _resize_image_hw(np.asarray(planner_img), target_hw).copy()
+    with_start = _resize_image_hw(np.asarray(exec_with_start), target_hw)
+    without_start = _resize_image_hw(np.asarray(exec_without_start), target_hw)
+    mask = np.any(with_start != without_start, axis=-1)
+    out[mask] = with_start[mask]
+    return out
 
 
 def _rollout_level_for_exec_step(info: object, exec_step_in_replan: int) -> int:
@@ -317,11 +404,64 @@ def _planner_view_frame(
             out = env._apply_planning_fidelity_visual(img)
         finally:
             env.set_planning_fidelity_level(prev_idx)
+    return _resize_image_hw(out, target_hw)
 
-    h_t, w_t = int(target_hw[0]), int(target_hw[1])
-    if out.shape[0] != h_t or out.shape[1] != w_t:
-        out = cv2.resize(out, (w_t, h_t), interpolation=cv2.INTER_NEAREST)
-    return out
+
+def _wm_decode_frame(
+    wm: object,
+    z: torch.Tensor,
+    level_idx: int,
+    target_hw: tuple[int, int],
+) -> np.ndarray:
+    decoder = wm if hasattr(wm, "decode") else getattr(wm, "primary", None)
+    if decoder is None or (not hasattr(decoder, "decode")):
+        raise ValueError("World-model backend does not expose a decode(level, z) API.")
+
+    n_levels = len(getattr(decoder, "K", []))
+    li = int(level_idx)
+    if n_levels > 0:
+        li = max(0, min(li, n_levels - 1))
+
+    z_in = z
+    if z_in.ndim == 1:
+        z_in = z_in.unsqueeze(0)
+    x = decoder.decode(li, z_in)
+    if x.ndim == 4:
+        x = x[0]
+    if x.ndim != 3:
+        raise ValueError(f"Decoded frame must be rank-3, got shape {tuple(x.shape)}")
+
+    # Decoder outputs are in [-1, 1].
+    x = (x * 0.5 + 0.5).clamp(0.0, 1.0).detach().cpu()
+    if int(x.shape[0]) in {1, 3} and int(x.shape[-1]) not in {1, 3}:
+        x = x.permute(1, 2, 0)
+    img = (x.numpy() * 255.0).astype(np.uint8)
+    if img.ndim == 2:
+        img = np.repeat(img[:, :, None], 3, axis=2)
+    if img.shape[2] == 1:
+        img = np.repeat(img, 3, axis=2)
+    return _resize_image_hw(img, target_hw)
+
+
+def _particle_planner_view_frame(
+    particle_backend: object,
+    start_state: np.ndarray,
+    cur_state: np.ndarray,
+    goal_state: np.ndarray,
+    level_idx: int,
+    target_hw: tuple[int, int],
+) -> np.ndarray:
+    prev_idx = int(getattr(particle_backend, "_planning_fidelity_level_idx", 0))
+    try:
+        particle_backend.set_planning_fidelity_level(int(level_idx))
+        particle_backend.prepare(seed=0, init_state=cur_state, goal_state=goal_state, with_visual=False)
+        # Keep planner-view start overlay anchored to the true episode start.
+        if hasattr(particle_backend, "_start_state"):
+            particle_backend._start_state = np.asarray(start_state, dtype=np.float32).copy()
+        img = particle_backend.render("rgb_array", include_start_pose=True)
+    finally:
+        particle_backend.set_planning_fidelity_level(prev_idx)
+    return _resize_image_hw(np.asarray(img), target_hw)
 
 
 def _render_dataset_gt_frames(
@@ -382,6 +522,11 @@ def _run_closed_loop(
     device: torch.device,
 ) -> Tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray], dict]:
     _set_start_pose(env, init_state)
+    particle_backend = None
+    if backend == "particle_sim":
+        particle_backend = getattr(planner, "backend", None)
+        if particle_backend is None:
+            raise ValueError("backend='particle_sim' requires planner.backend for planner-view rendering.")
     z_goal = None
     if backend == "wm":
         if wm is None:
@@ -409,6 +554,7 @@ def _run_closed_loop(
         stats = {
             "plans": 0,
             "bits_used_total": 0,
+            "flops_used_total": 0,
             "plan_time_total_sec": 0.0,
         }
         return True, trajectory, frames, planner_frames, stats
@@ -422,15 +568,17 @@ def _run_closed_loop(
     t = 0
     replan_idx = 0
     total_plan_bits = 0
+    total_plan_flops = 0
     total_plan_time = 0.0
     n_plans = 0
     prev_exec_steps = 0
     while t < steps:
         mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
+        z_cur_for_plan = None
         if backend == "wm":
-            z_cur = _encode_visual(wm, obs["visual"], device)
+            z_cur_for_plan = _encode_visual(wm, obs["visual"], device)
             action_seq, info = planner.plan(
-                z_cur,
+                z_cur_for_plan,
                 z_goal,
                 mpc_progress=mpc_progress,
                 warm_start_steps=int(prev_exec_steps),
@@ -458,28 +606,67 @@ def _run_closed_loop(
             )
 
         bits_used = int(getattr(info, "bits_used_estimate", 0))
+        flops_used = _bits_to_flops_estimate(bits_used)
         plan_time = float(getattr(info, "plan_time_sec", 0.0))
         total_plan_bits += bits_used
+        total_plan_flops += flops_used
         total_plan_time += plan_time
         n_plans += 1
         if bits_used > 0 or plan_time > 0:
             print(
                 f"[plan] replan {replan_idx:03d}  backend {backend}  "
                 f"bits {bits_used} ({_format_bits_human(bits_used)})  "
+                f"flops {flops_used} ({_format_flops_human(flops_used)})  "
                 f"time {plan_time:.3f}s"
             )
 
         # Add first planner-view frame (t=0) after the first plan is available.
-        if bool(cfg.save) and backend == "gt_env" and len(planner_frames) == 0:
+        if bool(cfg.save) and len(planner_frames) == 0:
             init_level = _rollout_level_for_exec_step(info, exec_step_in_replan=0)
-            planner_frames.append(
-                _planner_view_frame(
+            target_hw = frames[0].shape[:2] if len(frames) > 0 else np.asarray(obs["visual"]).shape[:2]
+            if backend == "gt_env":
+                frame = _planner_view_frame(
                     env=env,
                     base_visual=np.asarray(obs["visual"]),
                     level_idx=init_level,
-                    target_hw=frames[0].shape[:2] if len(frames) > 0 else np.asarray(obs["visual"]).shape[:2],
+                    target_hw=target_hw,
                 )
-            )
+                if len(frames) > 0:
+                    frame = _overlay_start_pose(
+                        planner_img=frame,
+                        exec_with_start=np.asarray(frames[0]),
+                        exec_without_start=np.asarray(obs["visual"]),
+                        target_hw=target_hw,
+                    )
+                planner_frames.append(frame)
+            elif backend == "wm":
+                if z_cur_for_plan is None:
+                    z_cur_for_plan = _encode_visual(wm, obs["visual"], device)
+                frame = _wm_decode_frame(
+                    wm=wm,
+                    z=z_cur_for_plan,
+                    level_idx=init_level,
+                    target_hw=target_hw,
+                )
+                if len(frames) > 0:
+                    frame = _overlay_start_pose(
+                        planner_img=frame,
+                        exec_with_start=np.asarray(frames[0]),
+                        exec_without_start=np.asarray(obs["visual"]),
+                        target_hw=target_hw,
+                    )
+                planner_frames.append(frame)
+            else:
+                planner_frames.append(
+                    _particle_planner_view_frame(
+                        particle_backend=particle_backend,
+                        start_state=init_state,
+                        cur_state=cur_state,
+                        goal_state=goal_state,
+                        level_idx=init_level,
+                        target_hw=target_hw,
+                    )
+                )
 
         n_exec = min(replan_every, horizon, steps - t)
         for i in range(n_exec):
@@ -510,13 +697,47 @@ def _run_closed_loop(
                     render_enabled = False
 
             if bool(cfg.save):
-                frames.append(env.render("rgb_array", include_start_pose=True))
+                frame_with_start = env.render("rgb_array", include_start_pose=True)
+                frames.append(frame_with_start)
+                li_exec = _rollout_level_for_exec_step(info, exec_step_in_replan=i)
                 if backend == "gt_env":
-                    li_exec = _rollout_level_for_exec_step(info, exec_step_in_replan=i)
+                    frame = _planner_view_frame(
+                        env=env,
+                        base_visual=np.asarray(obs["visual"]),
+                        level_idx=li_exec,
+                        target_hw=frames[-1].shape[:2],
+                    )
                     planner_frames.append(
-                        _planner_view_frame(
-                            env=env,
-                            base_visual=np.asarray(obs["visual"]),
+                        _overlay_start_pose(
+                            planner_img=frame,
+                            exec_with_start=np.asarray(frame_with_start),
+                            exec_without_start=np.asarray(obs["visual"]),
+                            target_hw=frames[-1].shape[:2],
+                        )
+                    )
+                elif backend == "wm":
+                    z_exec = _encode_visual(wm, obs["visual"], device)
+                    frame = _wm_decode_frame(
+                        wm=wm,
+                        z=z_exec,
+                        level_idx=li_exec,
+                        target_hw=frames[-1].shape[:2],
+                    )
+                    planner_frames.append(
+                        _overlay_start_pose(
+                            planner_img=frame,
+                            exec_with_start=np.asarray(frame_with_start),
+                            exec_without_start=np.asarray(obs["visual"]),
+                            target_hw=frames[-1].shape[:2],
+                        )
+                    )
+                else:
+                    planner_frames.append(
+                        _particle_planner_view_frame(
+                            particle_backend=particle_backend,
+                            start_state=init_state,
+                            cur_state=cur_state,
+                            goal_state=goal_state,
                             level_idx=li_exec,
                             target_hw=frames[-1].shape[:2],
                         )
@@ -527,6 +748,7 @@ def _run_closed_loop(
                 stats = {
                     "plans": n_plans,
                     "bits_used_total": total_plan_bits,
+                    "flops_used_total": total_plan_flops,
                     "plan_time_total_sec": total_plan_time,
                 }
                 return True, trajectory, frames, planner_frames, stats
@@ -539,6 +761,7 @@ def _run_closed_loop(
     stats = {
         "plans": n_plans,
         "bits_used_total": total_plan_bits,
+        "flops_used_total": total_plan_flops,
         "plan_time_total_sec": total_plan_time,
     }
     return False, trajectory, frames, planner_frames, stats
@@ -649,17 +872,25 @@ def main(cfg_path: str) -> None:
                 "xmax": 0.25,
                 "ymin": -0.25,
                 "ymax": 0.25,
-                "particle_radius": 0.006,
+                "min_particles": 1,
+                "coarsest_single_particle": True,
+                "particle_radius": None,
+                "radius_scale": 1.0,
+                "radius_clip_spacing": False,
                 "stem_w": 0.05,
                 "stem_h": 0.10,
                 "bar_w": 0.12,
                 "bar_h": 0.04,
                 "pusher_radius": 0.015,
                 "pusher_speed": 0.6,
-                "frame_dt": 0.1,
+                "pusher_interp_substeps": True,
+                "frame_dt": 1.0 / 60.0,
                 "substeps": 16,
                 "iters": 8,
                 "mu": 0.6,
+                "contact_alpha": 0.35,
+                "ground_friction_accel": 2.0,
+                "rest_speed_eps": 0.01,
                 "lin_damp": 0.995,
                 "vel_damp": 0.999,
                 "alpha_rigid": 1.0,
@@ -680,6 +911,7 @@ def main(cfg_path: str) -> None:
     }
     cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))
     validate_plan_cfg(cfg)
+    cfg.init_goal.dataset.seed = _resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
 
     # Register env id.
     try:
@@ -692,13 +924,7 @@ def main(cfg_path: str) -> None:
     except gym.error.Error:
         pass
 
-    env_wrapped = gym.make(
-        str(cfg.env_id),
-        #disable_env_checker=True,
-        #apply_api_compatibility=False,
-        render_action=True,
-        **cfg.env,
-    )
+    env_wrapped = _gym_make_versioned(str(cfg.env_id), cfg.env)
     env: PushTWrapper = _unwrap_env(env_wrapped)
     backend = str(cfg.backend).lower()
     device = _resolve_device(str(cfg.world_model.device))
@@ -852,6 +1078,8 @@ def main(cfg_path: str) -> None:
             "plans": int(run_stats["plans"]),
             "bits_used_total": int(run_stats["bits_used_total"]),
             "bits_used_total_human": _format_bits_human(int(run_stats["bits_used_total"])),
+            "flops_used_total": int(run_stats["flops_used_total"]),
+            "flops_used_total_human": _format_flops_human(int(run_stats["flops_used_total"])),
             "plan_time_total_sec": float(run_stats["plan_time_total_sec"]),
             "init_state": np.asarray(init_state, dtype=np.float32).tolist(),
             "goal_state": np.asarray(goal_state, dtype=np.float32).tolist(),
@@ -876,7 +1104,7 @@ def main(cfg_path: str) -> None:
                 imageio.mimwrite(gt_path, gt_frames, fps=15)
                 print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
 
-        if backend == "gt_env" and len(planner_frames) > 0:
+        if len(planner_frames) > 0:
             planner_path = os.path.join(run_dir, "planner_view.gif")
             print(f"[save] Writing planner-view GIF to {planner_path}")
             imageio.mimwrite(planner_path, planner_frames, fps=15)
@@ -886,6 +1114,8 @@ def main(cfg_path: str) -> None:
         f"[planning_stats] plans={run_stats['plans']}  "
         f"bits_used_total={run_stats['bits_used_total']} "
         f"({ _format_bits_human(int(run_stats['bits_used_total'])) })  "
+        f"flops_used_total={run_stats['flops_used_total']} "
+        f"({ _format_flops_human(int(run_stats['flops_used_total'])) })  "
         f"plan_time_total_sec={run_stats['plan_time_total_sec']:.3f}"
     )
     print("Reached goal:", success)

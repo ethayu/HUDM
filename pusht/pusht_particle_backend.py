@@ -13,6 +13,14 @@ def _wrap_pi(a: float) -> float:
     return (a + math.pi) % (2.0 * math.pi) - math.pi
 
 
+def _optional_float(value):
+    if value is None:
+        return None
+    if isinstance(value, str) and value.strip().lower() in {"none", "null", ""}:
+        return None
+    return float(value)
+
+
 class PushTParticleBackend:
     """
     Adapter that exposes PushT-like state/observation semantics on top of Warp particle sims.
@@ -64,6 +72,8 @@ class PushTParticleBackend:
         self._seed = int(seed)
 
         self._device = self._resolve_device(str(device))
+        particle_radius = _optional_float(warp_cfg.get("particle_radius", None))
+        coarsest_single_particle = bool(warp_cfg.get("coarsest_single_particle", True))
 
         self._sims: List[PushTWarpEnv] = []
         for li, spacing in enumerate(self.spacings):
@@ -72,18 +82,26 @@ class PushTParticleBackend:
                 xmax=float(warp_cfg.get("xmax", 0.25)),
                 ymin=float(warp_cfg.get("ymin", -0.25)),
                 ymax=float(warp_cfg.get("ymax", 0.25)),
-                particle_radius=float(warp_cfg.get("particle_radius", 0.006)),
                 spacing=float(spacing),
+                min_particles=int(warp_cfg.get("min_particles", 1)),
+                force_single_particle=bool(coarsest_single_particle and li == 0),
+                particle_radius=particle_radius,
+                radius_scale=float(warp_cfg.get("radius_scale", 1.0)),
+                radius_clip_spacing=bool(warp_cfg.get("radius_clip_spacing", False)),
                 stem_w=float(warp_cfg.get("stem_w", 0.05)),
                 stem_h=float(warp_cfg.get("stem_h", 0.10)),
                 bar_w=float(warp_cfg.get("bar_w", 0.12)),
                 bar_h=float(warp_cfg.get("bar_h", 0.04)),
                 pusher_radius=float(warp_cfg.get("pusher_radius", 0.015)),
                 pusher_speed=float(warp_cfg.get("pusher_speed", 0.6)),
-                frame_dt=float(warp_cfg.get("frame_dt", 1.0 / 10.0)),
+                pusher_interp_substeps=bool(warp_cfg.get("pusher_interp_substeps", True)),
+                frame_dt=float(warp_cfg.get("frame_dt", 1.0 / 60.0)),
                 substeps=int(warp_cfg.get("substeps", 16)),
                 iters=int(warp_cfg.get("iters", 8)),
                 mu=float(warp_cfg.get("mu", 0.6)),
+                contact_alpha=float(warp_cfg.get("contact_alpha", 0.35)),
+                ground_friction_accel=float(warp_cfg.get("ground_friction_accel", 2.0)),
+                rest_speed_eps=float(warp_cfg.get("rest_speed_eps", 0.01)),
                 lin_damp=float(warp_cfg.get("lin_damp", 0.995)),
                 vel_damp=float(warp_cfg.get("vel_damp", 0.999)),
                 alpha_rigid=float(warp_cfg.get("alpha_rigid", 1.0)),
@@ -151,6 +169,11 @@ class PushTParticleBackend:
         li = self._planning_fidelity_level_idx if level_idx is None else int(level_idx)
         li = max(0, min(li, len(self._sims) - 1))
         return float(self.spacings[li])
+
+    def particle_radius(self, level_idx: Optional[int] = None) -> float:
+        li = self._planning_fidelity_level_idx if level_idx is None else int(level_idx)
+        li = max(0, min(li, len(self._sims) - 1))
+        return float(self._sims[li].pr)
 
     def _ensure_state_dim(self, state: np.ndarray) -> np.ndarray:
         s = np.asarray(state, dtype=np.float32).reshape(-1)
@@ -234,10 +257,17 @@ class PushTParticleBackend:
     def _world_to_img_xy(self, xy_world: np.ndarray) -> tuple[int, int]:
         pxy = self._world_to_pix_xy(xy_world)
         u = int(round((pxy[0] / 512.0) * (self.render_size - 1)))
-        v = int(round((1.0 - (pxy[1] / 512.0)) * (self.render_size - 1)))
+        # Match PushT/Pygame image convention: origin at top-left, +y downward.
+        v = int(round((pxy[1] / 512.0) * (self.render_size - 1)))
         u = max(0, min(self.render_size - 1, u))
         v = max(0, min(self.render_size - 1, v))
         return u, v
+
+    def _world_len_to_img_px(self, l_world: float) -> int:
+        sx = (self.render_size - 1) / max(1e-8, self._xrange)
+        sy = (self.render_size - 1) / max(1e-8, self._yrange)
+        s = 0.5 * (sx + sy)
+        return max(1, int(round(float(l_world) * s)))
 
     def _transform_points(self, r0: np.ndarray, pose_world: np.ndarray) -> np.ndarray:
         theta = float(pose_world[2])
@@ -265,25 +295,27 @@ class PushTParticleBackend:
 
         sim = self._active_sim()
         img = np.full((self.render_size, self.render_size, 3), 255, dtype=np.uint8)
+        pr_px = self._world_len_to_img_px(float(sim.pr))
+        pusher_r_px = self._world_len_to_img_px(float(sim.pusher_r))
 
         # Goal overlay (light green) uses current fidelity particle layout.
         r0 = sim.rest_offsets()
         goal_w = np.array([*self._pix_to_world_xy(self._goal_state[2:4]), float(self._goal_state[4])], dtype=np.float32)
         goal_pts = self._transform_points(r0, goal_w)
-        self._draw_particles(img, goal_pts, color=(180, 235, 180), radius_px=2, thickness=-1)
+        self._draw_particles(img, goal_pts, color=(180, 235, 180), radius_px=pr_px, thickness=-1)
 
         # Optional start overlay (outlined blue-ish markers).
         if include_start_pose:
             start_w = np.array([*self._pix_to_world_xy(self._start_state[2:4]), float(self._start_state[4])], dtype=np.float32)
             start_pts = self._transform_points(r0, start_w)
-            self._draw_particles(img, start_pts, color=(220, 90, 40), radius_px=2, thickness=1)
+            self._draw_particles(img, start_pts, color=(220, 90, 40), radius_px=pr_px, thickness=1)
 
         obj_pts = sim.get_particle_positions().astype(np.float32)
-        self._draw_particles(img, obj_pts, color=(112, 128, 144), radius_px=2, thickness=-1)
+        self._draw_particles(img, obj_pts, color=(112, 128, 144), radius_px=pr_px, thickness=-1)
 
         pusher_xy_w = np.asarray(sim.pusher_pos[:2], dtype=np.float32)
         p_u, p_v = self._world_to_img_xy(pusher_xy_w)
-        cv2.circle(img, (p_u, p_v), 3, (65, 105, 225), thickness=-1, lineType=cv2.LINE_AA)
+        cv2.circle(img, (p_u, p_v), pusher_r_px, (65, 105, 225), thickness=-1, lineType=cv2.LINE_AA)
 
         return img
 
@@ -292,6 +324,7 @@ class PushTParticleBackend:
         seed: int,
         init_state: np.ndarray,
         goal_state: Optional[np.ndarray] = None,
+        with_visual: bool = True,
     ) -> tuple[dict, np.ndarray]:
         del seed
         init_state = self._ensure_state_dim(init_state)
@@ -308,13 +341,13 @@ class PushTParticleBackend:
         cur_state = self._sim_state(self._active_sim())
         self._current_state = cur_state.copy()
         obs = {
-            "visual": self.render("rgb_array", include_start_pose=False),
+            "visual": self.render("rgb_array", include_start_pose=False) if bool(with_visual) else None,
             "proprio": self._proprio_from_state(cur_state),
             "state": cur_state.copy(),
         }
         return obs, cur_state.copy()
 
-    def step(self, action: np.ndarray):
+    def step(self, action: np.ndarray, with_visual: bool = True):
         a = np.asarray(action, dtype=np.float32).reshape(2)
         sim = self._active_sim()
 
@@ -332,7 +365,7 @@ class PushTParticleBackend:
         cur_state = self._sim_state(sim)
         self._current_state = cur_state.copy()
         obs = {
-            "visual": self.render("rgb_array", include_start_pose=False),
+            "visual": self.render("rgb_array", include_start_pose=False) if bool(with_visual) else None,
             "proprio": self._proprio_from_state(cur_state),
             "state": cur_state.copy(),
         }

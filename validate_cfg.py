@@ -111,17 +111,25 @@ def validate_plan_cfg(cfg) -> None:
             "xmax",
             "ymin",
             "ymax",
+            "min_particles",
+            "coarsest_single_particle",
             "particle_radius",
+            "radius_scale",
+            "radius_clip_spacing",
             "stem_w",
             "stem_h",
             "bar_w",
             "bar_h",
             "pusher_radius",
             "pusher_speed",
+            "pusher_interp_substeps",
             "frame_dt",
             "substeps",
             "iters",
             "mu",
+            "contact_alpha",
+            "ground_friction_accel",
+            "rest_speed_eps",
             "lin_damp",
             "vel_damp",
             "alpha_rigid",
@@ -184,6 +192,54 @@ def validate_plan_cfg(cfg) -> None:
             raise ValueError(
                 f"plan.particle_env.fidelity_env.spacings[{i}] must be > 0, got {s}"
             )
+    min_particles = int(getattr(cfg.particle_env.fidelity_env, "min_particles", 1))
+    if min_particles <= 0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.min_particles must be >= 1, "
+            f"got {min_particles}"
+        )
+    radius_scale = float(getattr(cfg.particle_env.fidelity_env, "radius_scale", 1.0))
+    if radius_scale <= 0.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.radius_scale must be > 0, "
+            f"got {radius_scale}"
+        )
+    particle_radius = getattr(cfg.particle_env.fidelity_env, "particle_radius", None)
+    if particle_radius is not None and float(particle_radius) <= 0.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.particle_radius must be > 0 or null, "
+            f"got {particle_radius}"
+        )
+    pusher_interp_substeps = getattr(cfg.particle_env.fidelity_env, "pusher_interp_substeps", True)
+    if not isinstance(pusher_interp_substeps, bool):
+        raise ValueError(
+            "plan.particle_env.fidelity_env.pusher_interp_substeps must be a bool, "
+            f"got {type(pusher_interp_substeps).__name__}"
+        )
+    coarsest_single_particle = getattr(cfg.particle_env.fidelity_env, "coarsest_single_particle", True)
+    if not isinstance(coarsest_single_particle, bool):
+        raise ValueError(
+            "plan.particle_env.fidelity_env.coarsest_single_particle must be a bool, "
+            f"got {type(coarsest_single_particle).__name__}"
+        )
+    contact_alpha = float(getattr(cfg.particle_env.fidelity_env, "contact_alpha", 0.35))
+    if contact_alpha <= 0.0 or contact_alpha > 1.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.contact_alpha must be in (0, 1], "
+            f"got {contact_alpha}"
+        )
+    ground_friction_accel = float(getattr(cfg.particle_env.fidelity_env, "ground_friction_accel", 2.0))
+    if ground_friction_accel < 0.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.ground_friction_accel must be >= 0, "
+            f"got {ground_friction_accel}"
+        )
+    rest_speed_eps = float(getattr(cfg.particle_env.fidelity_env, "rest_speed_eps", 0.01))
+    if rest_speed_eps < 0.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.rest_speed_eps must be >= 0, "
+            f"got {rest_speed_eps}"
+        )
     if int(cfg.fidelity.num_levels) <= 0:
         raise ValueError(f"plan.fidelity.num_levels must be > 0, got {cfg.fidelity.num_levels}")
     if backend == "gt_env" and str(cfg.fidelity.rollout.mode).lower() == "uncertainty_downshift":
@@ -206,6 +262,21 @@ def validate_plan_cfg(cfg) -> None:
         raise ValueError(
             "plan.init_goal.dataset.trajectory_len must be > 0 when source='dataset'."
         )
+    seed_cfg = getattr(cfg.init_goal.dataset, "seed", 0)
+    if isinstance(seed_cfg, str):
+        if seed_cfg.strip().lower() != "random":
+            raise ValueError(
+                "plan.init_goal.dataset.seed must be an int or the string 'random', "
+                f"got {cfg.init_goal.dataset.seed!r}"
+            )
+    else:
+        try:
+            int(seed_cfg)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                "plan.init_goal.dataset.seed must be an int or the string 'random', "
+                f"got {cfg.init_goal.dataset.seed!r}"
+            ) from exc
 
     ens_enabled = bool(getattr(cfg.world_model.ensemble, "enabled", False))
     run_dir = cfg.world_model.run_dir

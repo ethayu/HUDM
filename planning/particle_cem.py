@@ -159,7 +159,12 @@ class ParticleCEMPlanner:
         unique_levels = sorted({int(li) for li in rollout_levels})
         for li in unique_levels:
             self.backend.set_planning_fidelity_level(li)
-            obs, _ = self.backend.prepare(seed=seed + 17 * li, init_state=goal_state, goal_state=goal_state)
+            obs, _ = self.backend.prepare(
+                seed=seed + 17 * li,
+                init_state=goal_state,
+                goal_state=goal_state,
+                with_visual=True,
+            )
             visual = obs.get("visual", None)
             if visual is None:
                 raise ValueError("particle_sim backend requires observations to include 'visual'.")
@@ -209,7 +214,13 @@ class ParticleCEMPlanner:
         # Fixed rollout mode: all entries are the same level.
         level_idx = int(rollout_levels[0])
         self.backend.set_planning_fidelity_level(level_idx)
-        obs, state = self.backend.prepare(seed=seed, init_state=init_state, goal_state=goal_state)
+        need_visual = self.objective_space == "image"
+        obs, state = self.backend.prepare(
+            seed=seed,
+            init_state=init_state,
+            goal_state=goal_state,
+            with_visual=need_visual,
+        )
         del obs
 
         bits_used = 0
@@ -217,7 +228,7 @@ class ParticleCEMPlanner:
         final_dist = 0.0
 
         for t in range(self.horizon):
-            obs_t, _, done, info = self.backend.step(actions[t])
+            obs_t, _, done, info = self.backend.step(actions[t], with_visual=need_visual)
             state = np.asarray(info["state"], dtype=np.float32)
             bits_used += int(self.backend.num_particles(level_idx=level_idx) * 2 * 32)
 
@@ -227,7 +238,7 @@ class ParticleCEMPlanner:
                     raise ValueError("particle_sim image objective requires visual observations.")
                 
                 img_t = self._to_float_image(visual)
-                d = self._image_distance(img_t, goal_visual_by_level[int(level_idx)]/255.)
+                d = self._image_distance(img_t, goal_visual_by_level[int(level_idx)])
                 final_dist = float(d)
                 if self.running_weight > 0.0:
                     running_dists.append(float(d))

@@ -155,6 +155,9 @@ class PushTWrapper(PushTEnv):
         split: str = "valid",
         split_ratio: float = 0.8,
         seed: int = 0,
+        min_block_pos_delta: float = 10.0,
+        min_block_angle_delta: float = np.pi / 9.0,
+        max_resample_tries: int = 512,
     ):
         if trajectory_len <= 0:
             raise ValueError(f"trajectory_len must be > 0, got {trajectory_len}")
@@ -202,30 +205,87 @@ class PushTWrapper(PushTEnv):
             )
 
         rng = np.random.default_rng(seed=seed)
-        ei, s, e = candidates[int(rng.integers(0, len(candidates)))]
-        start_idx = int(rng.integers(s, e - trajectory_len + 1))
-        goal_idx = start_idx + trajectory_len
+        pos_thresh = float(min_block_pos_delta)
+        ang_thresh = float(min_block_angle_delta)
+        if pos_thresh < 0.0:
+            raise ValueError(f"min_block_pos_delta must be >= 0, got {min_block_pos_delta}")
+        if ang_thresh < 0.0:
+            raise ValueError(f"min_block_angle_delta must be >= 0, got {min_block_angle_delta}")
+        n_tries = max(1, int(max_resample_tries))
 
-        init_state = np.asarray(state_arr[start_idx], dtype=np.float32)
-        goal_state = np.asarray(state_arr[goal_idx], dtype=np.float32)
-        if init_state.shape[0] == 5:
-            init_state = np.concatenate([init_state, np.zeros(2, dtype=init_state.dtype)], axis=0)
-        if goal_state.shape[0] == 5:
-            goal_state = np.concatenate([goal_state, np.zeros(2, dtype=goal_state.dtype)], axis=0)
-        if init_state.shape[0] < self.state_dim or goal_state.shape[0] < self.state_dim:
-            raise ValueError(
-                f"Dataset state dim ({init_state.shape[0]}) is smaller than env.state_dim ({self.state_dim})."
+        def _pad_and_trim_state(x: np.ndarray) -> np.ndarray:
+            s = np.asarray(x, dtype=np.float32)
+            if s.shape[0] == 5:
+                s = np.concatenate([s, np.zeros(2, dtype=s.dtype)], axis=0)
+            if s.shape[0] < self.state_dim:
+                raise ValueError(
+                    f"Dataset state dim ({s.shape[0]}) is smaller than env.state_dim ({self.state_dim})."
+                )
+            return s[: self.state_dim]
+
+        fallback = None
+        fallback_score = -np.inf
+        for attempt_idx in range(n_tries):
+            ei, s, e = candidates[int(rng.integers(0, len(candidates)))]
+            start_idx = int(rng.integers(s, e - trajectory_len + 1))
+            goal_idx = start_idx + trajectory_len
+
+            init_state = _pad_and_trim_state(state_arr[start_idx])
+            goal_state = _pad_and_trim_state(state_arr[goal_idx])
+
+            pos_diff = float(np.linalg.norm(goal_state[2:4] - init_state[2:4]))
+            ang_diff = float(np.abs(goal_state[4] - init_state[4]))
+            ang_diff = float(np.minimum(ang_diff, 2.0 * np.pi - ang_diff))
+
+            # Avoid trivially solved tasks at reset: require meaningful block-pose change.
+            if (pos_diff >= pos_thresh) or (ang_diff >= ang_thresh):
+                meta = {
+                    "episode_index": int(ei),
+                    "start_index": int(start_idx),
+                    "goal_index": int(goal_idx),
+                    "trajectory_len": int(trajectory_len),
+                    "split": split_l,
+                    "pos_diff": pos_diff,
+                    "angle_diff": ang_diff,
+                    "resample_tries": int(attempt_idx + 1),
+                }
+                return init_state, goal_state, meta
+
+            score = max(
+                pos_diff / (pos_thresh + 1e-8),
+                ang_diff / (ang_thresh + 1e-8),
             )
-        init_state = init_state[: self.state_dim]
-        goal_state = goal_state[: self.state_dim]
-        meta = {
-            "episode_index": int(ei),
-            "start_index": int(start_idx),
-            "goal_index": int(goal_idx),
-            "trajectory_len": int(trajectory_len),
-            "split": split_l,
-        }
-        return init_state, goal_state, meta
+            if score > fallback_score:
+                fallback_score = score
+                fallback = (
+                    init_state,
+                    goal_state,
+                    ei,
+                    start_idx,
+                    goal_idx,
+                    pos_diff,
+                    ang_diff,
+                    attempt_idx + 1,
+                )
+
+        if fallback is not None:
+            init_state, goal_state, ei, start_idx, goal_idx, pos_diff, ang_diff, n_used = fallback
+            meta = {
+                "episode_index": int(ei),
+                "start_index": int(start_idx),
+                "goal_index": int(goal_idx),
+                "trajectory_len": int(trajectory_len),
+                "split": split_l,
+                "pos_diff": float(pos_diff),
+                "angle_diff": float(ang_diff),
+                "resample_tries": int(n_used),
+                "fallback": True,
+            }
+            return init_state, goal_state, meta
+
+        raise RuntimeError(
+            "Unable to sample init/goal states from dataset; no candidate states were available."
+        )
     
     def step(self, action):
         """
