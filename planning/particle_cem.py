@@ -107,6 +107,9 @@ class ParticleCEMPlanner:
         if self.metric not in {"l1", "l2"}:
             raise ValueError(f"Unsupported objective latent_metric '{self.metric}'. Use 'l1' or 'l2'.")
 
+    def reset(self) -> None:
+        self.core.reset_distribution()
+
     @staticmethod
     def _angle_delta(a: float, b: float) -> float:
         d = a - b
@@ -260,6 +263,7 @@ class ParticleCEMPlanner:
         mpc_progress: float = 0.0,
         seed: int = 0,
         warm_start_steps: int = 0,
+        rng_seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, ParticleCEMInfo]:
         t0 = time.perf_counter()
 
@@ -317,6 +321,7 @@ class ParticleCEMPlanner:
             evaluate_population=_evaluate,
             warm_start=self.warm_start,
             shift_steps=int(warm_start_steps),
+            rng_seed=rng_seed,
         )
 
         base_spacing = float(self.backend.spacing(final_level_idx))

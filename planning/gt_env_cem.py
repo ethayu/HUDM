@@ -115,6 +115,9 @@ class GTEnvCEMPlanner:
                 cfg=self.env_fidelity_cfg,
             )
 
+    def reset(self) -> None:
+        self.core.reset_distribution()
+
     @staticmethod
     def _angle_delta(a: float, b: float) -> float:
         d = a - b
@@ -257,6 +260,7 @@ class GTEnvCEMPlanner:
         mpc_progress: float = 0.0,
         seed: int = 0,
         warm_start_steps: int = 0,
+        rng_seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, GTEnvCEMInfo]:
         t0 = time.perf_counter()
 
@@ -314,6 +318,7 @@ class GTEnvCEMPlanner:
             evaluate_population=_evaluate,
             warm_start=self.warm_start,
             shift_steps=int(warm_start_steps),
+            rng_seed=rng_seed,
         )
 
         info = GTEnvCEMInfo(

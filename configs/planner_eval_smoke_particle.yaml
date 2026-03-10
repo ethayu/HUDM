@@ -1,0 +1,33 @@
+planner_eval:
+  plan_config: "configs/plan_smoke_particle.yaml"
+  seed: 5
+  num_rollouts: 2
+  sample_without_replacement: true
+  output_root: "rollouts"
+  parallel:
+    mode: "process"
+    max_workers: 2
+    wm_schedule_batch_size: 0
+  schedules:
+    - name: "finest_fixed"
+      fidelity:
+        mpc:
+          mode: "fixed"
+          level: "finest"
+        cem:
+          mode: "fixed"
+          level: "base"
+        rollout:
+          mode: "fixed"
+          level: "base"
+    - name: "coarsest_fixed"
+      fidelity:
+        mpc:
+          mode: "fixed"
+          level: "coarsest"
+        cem:
+          mode: "fixed"
+          level: "base"
+        rollout:
+          mode: "fixed"
+          level: "base"
