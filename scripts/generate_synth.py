@@ -529,6 +529,23 @@ def _mp_context() -> mp.context.BaseContext:
     return mp.get_context()
 
 
+def _resolve_max_failed_episode_batches(n_eps: int, max_failed_episode_batches: int) -> int:
+    if int(max_failed_episode_batches) < 0:
+        return -1
+    if int(max_failed_episode_batches) > 0:
+        return int(max_failed_episode_batches)
+    return max(32, 8 * int(n_eps))
+
+
+def _generator_runtime_reasons(exc: RuntimeError) -> tuple[str, ...] | None:
+    msg = str(exc)
+    if msg.startswith("Unable to sample a valid synthetic init state"):
+        return ("spawn_sampling_failed",)
+    if msg.startswith("No candidates available for family="):
+        return ("no_contact_candidates",)
+    return None
+
+
 def _generate_single_episode_task(task: Mapping[str, Any]) -> dict[str, Any]:
     rng = np.random.default_rng(int(task["seed"]))
     with_velocity = bool(task["with_velocity"])
@@ -543,38 +560,46 @@ def _generate_single_episode_task(task: Mapping[str, Any]) -> dict[str, Any]:
 
     for _ in range(int(task["max_attempts_per_episode"])):
         horizon = int(rng.integers(int(task["len_min"]), int(task["len_max"]) + 1))
-        if policy in {"contact_aware", "advanced"}:
-            attempt = rollout_contact_aware_episode(
-                decision_env,
-                shadow_env,
-                T=horizon,
-                rng=rng,
-                with_velocity=with_velocity,
-                mode_profile=mode_profile,
-                quality_profile=quality_profile,
-                weights=dict(task["weights"]),
-                spawn_attempts=int(task["max_attempts_per_episode"]),
-                contact_aware_ou_theta=float(task["contact_aware_ou_theta"]),
-                contact_aware_ou_sigma=float(task["contact_aware_ou_sigma"]),
-                contact_aware_ou_dt=float(task["contact_aware_ou_dt"]),
-            )
-        else:
-            attempt = rollout_baseline_episode(
-                decision_env,
-                T=horizon,
-                policy=policy,
-                action_scale=float(task["action_scale"]),
-                rng=rng,
-                with_velocity=with_velocity,
-                quality_profile=quality_profile,
-                spawn_attempts=int(task["max_attempts_per_episode"]),
-                ou_theta=float(task["ou_theta"]),
-                ou_sigma=float(task["ou_sigma"]),
-                ou_dt=float(task["ou_dt"]),
-                ou_mu=ou_mu,
-            )
+        try:
+            if policy in {"contact_aware", "advanced"}:
+                attempt = rollout_contact_aware_episode(
+                    decision_env,
+                    shadow_env,
+                    T=horizon,
+                    rng=rng,
+                    with_velocity=with_velocity,
+                    mode_profile=mode_profile,
+                    quality_profile=quality_profile,
+                    weights=dict(task["weights"]),
+                    spawn_attempts=int(task["max_attempts_per_episode"]),
+                    contact_aware_ou_theta=float(task["contact_aware_ou_theta"]),
+                    contact_aware_ou_sigma=float(task["contact_aware_ou_sigma"]),
+                    contact_aware_ou_dt=float(task["contact_aware_ou_dt"]),
+                )
+            else:
+                attempt = rollout_baseline_episode(
+                    decision_env,
+                    T=horizon,
+                    policy=policy,
+                    action_scale=float(task["action_scale"]),
+                    rng=rng,
+                    with_velocity=with_velocity,
+                    quality_profile=quality_profile,
+                    spawn_attempts=int(task["max_attempts_per_episode"]),
+                    ou_theta=float(task["ou_theta"]),
+                    ou_sigma=float(task["ou_sigma"]),
+                    ou_dt=float(task["ou_dt"]),
+                    ou_mu=ou_mu,
+                )
+        except RuntimeError as exc:
+            reasons = _generator_runtime_reasons(exc)
+            if reasons is None:
+                raise
+            rejection_reasons.append(reasons)
+            continue
         if attempt.accepted:
             return {
+                "accepted": True,
                 "task_idx": int(task["task_idx"]),
                 "render_seed": int(task["render_seed"]),
                 "init_state": np.asarray(attempt.init_state, dtype=np.float32),
@@ -585,12 +610,11 @@ def _generate_single_episode_task(task: Mapping[str, Any]) -> dict[str, Any]:
             }
         rejection_reasons.append(attempt.rejection_reasons)
 
-    summary = summarize_rejections(rejection_reasons)
-    raise RuntimeError(
-        f"Unable to produce accepted episode task_idx={int(task['task_idx'])} "
-        f"for split={task['split_name']!r} after {task['max_attempts_per_episode']} attempts. "
-        f"Rejections: {summary}"
-    )
+    return {
+        "accepted": False,
+        "task_idx": int(task["task_idx"]),
+        "rejection_reasons": list(rejection_reasons),
+    }
 
 
 def _episode_worker(task: Mapping[str, Any], send_conn) -> None:
@@ -609,40 +633,41 @@ def _episode_worker(task: Mapping[str, Any], send_conn) -> None:
 
 
 def _run_parallel_episode_tasks(
-    tasks: Sequence[Mapping[str, Any]],
     *,
     split_name: str,
+    target_accepted: int,
     workers: int,
+    task_factory,
     rejection_reasons: list[Sequence[str]],
-) -> dict[int, dict[str, Any]]:
+    max_failed_episode_batches: int,
+) -> tuple[list[dict[str, Any]], int]:
     ctx = _mp_context()
-    task_iter = iter(tasks)
     active: dict[Any, tuple[mp.Process, Mapping[str, Any]]] = {}
-    accepted: dict[int, dict[str, Any]] = {}
+    accepted: list[dict[str, Any]] = []
+    next_task_idx = 0
+    failed_episode_batches = 0
+    displayed_accepted = 0
     progress = tqdm(
-        total=len(tasks),
+        total=int(target_accepted),
         desc=f"generate:{split_name}",
         unit="ep",
         dynamic_ncols=True,
         disable=not sys.stderr.isatty(),
     )
 
-    def launch_next() -> bool:
-        try:
-            task = next(task_iter)
-        except StopIteration:
-            return False
+    def launch_next() -> None:
+        nonlocal next_task_idx
+        task = task_factory(int(next_task_idx))
+        next_task_idx += 1
         recv_conn, send_conn = ctx.Pipe(duplex=False)
         proc = ctx.Process(target=_episode_worker, args=(task, send_conn))
         proc.start()
         send_conn.close()
         active[recv_conn] = (proc, task)
-        return True
 
     try:
-        for _ in range(min(int(workers), len(tasks))):
-            if not launch_next():
-                break
+        for _ in range(max(1, int(workers))):
+            launch_next()
 
         while active:
             ready = wait(list(active.keys()))
@@ -662,11 +687,31 @@ def _run_parallel_episode_tasks(
                         f"task_idx={int(payload.get('task_idx', task['task_idx']))}: {payload['error']}"
                     )
                 result = payload["result"]
-                accepted[int(result["task_idx"])] = result
                 rejection_reasons.extend(result["rejection_reasons"])
-                progress.update(1)
-                progress.set_postfix(rejected=len(rejection_reasons), refresh=False)
-                launch_next()
+                if bool(result.get("accepted", False)):
+                    accepted.append(result)
+                else:
+                    failed_episode_batches += 1
+                    if int(max_failed_episode_batches) >= 0 and failed_episode_batches > int(max_failed_episode_batches):
+                        summary = summarize_rejections(rejection_reasons)
+                        raise RuntimeError(
+                            f"Unable to produce enough accepted episodes for split={split_name!r}. "
+                            f"accepted={min(len(accepted), int(target_accepted))}/{int(target_accepted)} "
+                            f"failed_episode_batches={failed_episode_batches} "
+                            f"max_failed_episode_batches={max_failed_episode_batches}. "
+                            f"Rejections: {summary}"
+                        )
+                new_displayed_accepted = min(len(accepted), int(target_accepted))
+                if new_displayed_accepted > displayed_accepted:
+                    progress.update(new_displayed_accepted - displayed_accepted)
+                    displayed_accepted = new_displayed_accepted
+                progress.set_postfix(
+                    rejected=len(rejection_reasons),
+                    failed_batches=failed_episode_batches,
+                    refresh=False,
+                )
+                if len(accepted) < int(target_accepted):
+                    launch_next()
     finally:
         progress.close()
         for recv_conn, (proc, _) in list(active.items()):
@@ -674,7 +719,8 @@ def _run_parallel_episode_tasks(
             if proc.is_alive():
                 proc.terminate()
             proc.join()
-    return accepted
+    accepted.sort(key=lambda item: int(item["task_idx"]))
+    return accepted[: int(target_accepted)], int(failed_episode_batches)
 
 
 def generate_split(
@@ -695,6 +741,7 @@ def generate_split(
     quality_profile: str,
     weights: Mapping[str, float],
     max_attempts_per_episode: int,
+    max_failed_episode_batches: int,
     workers: int,
     contact_aware_ou_theta: float,
     contact_aware_ou_sigma: float,
@@ -709,11 +756,15 @@ def generate_split(
     frames_list: list[np.ndarray] = []
     states_list: list[np.ndarray] = []
     rejection_reasons: list[Sequence[str]] = []
+    failed_episode_batches = 0
+    resolved_max_failed_episode_batches = _resolve_max_failed_episode_batches(
+        int(n_eps), int(max_failed_episode_batches)
+    )
     if int(workers) > 1:
         worker_count = min(int(workers), int(n_eps))
-        tasks = [
-            {
-                "task_idx": int(ep_idx),
+        def make_task(task_idx: int) -> dict[str, Any]:
+            return {
+                "task_idx": int(task_idx),
                 "split_name": str(split_name),
                 "seed": int(rng.integers(0, 2**31 - 1)),
                 "render_seed": int(rng.integers(0, 2**31 - 1)),
@@ -734,13 +785,13 @@ def generate_split(
                 "ou_dt": float(ou_dt),
                 "ou_mu": None if ou_mu is None else np.asarray(ou_mu, dtype=np.float32).tolist(),
             }
-            for ep_idx in range(int(n_eps))
-        ]
-        accepted = _run_parallel_episode_tasks(
-            tasks,
+        accepted, failed_episode_batches = _run_parallel_episode_tasks(
             split_name=split_name,
+            target_accepted=int(n_eps),
             workers=worker_count,
+            task_factory=make_task,
             rejection_reasons=rejection_reasons,
+            max_failed_episode_batches=resolved_max_failed_episode_batches,
         )
 
         render_progress = tqdm(
@@ -751,8 +802,7 @@ def generate_split(
             disable=not sys.stderr.isatty(),
         )
         try:
-            for task_idx in range(int(n_eps)):
-                result = accepted[task_idx]
+            for result in accepted:
                 frames = render_episode_frames(
                     render_env,
                     init_state=np.asarray(result["init_state"], dtype=np.float32),
@@ -765,18 +815,24 @@ def generate_split(
                 frames_list.append(frames)
                 states_list.append(np.asarray(result["states"], dtype=np.float32))
                 render_progress.update(1)
-                render_progress.set_postfix(rejected=len(rejection_reasons), refresh=False)
+                render_progress.set_postfix(
+                    rejected=len(rejection_reasons),
+                    failed_batches=failed_episode_batches,
+                    refresh=False,
+                )
         finally:
             render_progress.close()
 
         stats = {
             "accepted_episodes": int(n_eps),
             "rejected_attempts": int(len(rejection_reasons)),
+            "failed_episode_batches": int(failed_episode_batches),
             "rejection_counts": summarize_rejections(rejection_reasons),
         }
         print(
             f"[generate_synth] split={split_name} accepted={stats['accepted_episodes']} "
-            f"rejected={stats['rejected_attempts']} reasons={stats['rejection_counts']}"
+            f"rejected={stats['rejected_attempts']} failed_batches={stats['failed_episode_batches']} "
+            f"reasons={stats['rejection_counts']}"
         )
         return actions_list, actions_abs_list, frames_list, states_list, stats
 
@@ -788,51 +844,79 @@ def generate_split(
         disable=not sys.stderr.isatty(),
     )
     try:
-        for ep_idx in range(int(n_eps)):
+        accepted_episodes = 0
+        while accepted_episodes < int(n_eps):
             accepted_attempt = None
-            for attempt_idx in range(int(max_attempts_per_episode)):
+            for _ in range(int(max_attempts_per_episode)):
                 horizon = int(rng.integers(int(len_min), int(len_max) + 1))
-                if policy in {"contact_aware", "advanced"}:
-                    attempt = rollout_contact_aware_episode(
-                        decision_env,
-                        shadow_env,
-                        T=horizon,
-                        rng=rng,
-                        with_velocity=with_velocity,
-                        mode_profile=mode_profile,
-                        quality_profile=quality_profile,
-                        weights=weights,
-                        spawn_attempts=max_attempts_per_episode,
-                        contact_aware_ou_theta=contact_aware_ou_theta,
-                        contact_aware_ou_sigma=contact_aware_ou_sigma,
-                        contact_aware_ou_dt=contact_aware_ou_dt,
+                try:
+                    if policy in {"contact_aware", "advanced"}:
+                        attempt = rollout_contact_aware_episode(
+                            decision_env,
+                            shadow_env,
+                            T=horizon,
+                            rng=rng,
+                            with_velocity=with_velocity,
+                            mode_profile=mode_profile,
+                            quality_profile=quality_profile,
+                            weights=weights,
+                            spawn_attempts=max_attempts_per_episode,
+                            contact_aware_ou_theta=contact_aware_ou_theta,
+                            contact_aware_ou_sigma=contact_aware_ou_sigma,
+                            contact_aware_ou_dt=contact_aware_ou_dt,
+                        )
+                    else:
+                        attempt = rollout_baseline_episode(
+                            decision_env,
+                            T=horizon,
+                            policy=policy,
+                            action_scale=action_scale,
+                            rng=rng,
+                            with_velocity=with_velocity,
+                            quality_profile=quality_profile,
+                            spawn_attempts=max_attempts_per_episode,
+                            ou_theta=ou_theta,
+                            ou_sigma=ou_sigma,
+                            ou_dt=ou_dt,
+                            ou_mu=ou_mu,
+                        )
+                except RuntimeError as exc:
+                    reasons = _generator_runtime_reasons(exc)
+                    if reasons is None:
+                        raise
+                    rejection_reasons.append(reasons)
+                    progress.set_postfix(
+                        rejected=len(rejection_reasons),
+                        failed_batches=failed_episode_batches,
+                        refresh=False,
                     )
-                else:
-                    attempt = rollout_baseline_episode(
-                        decision_env,
-                        T=horizon,
-                        policy=policy,
-                        action_scale=action_scale,
-                        rng=rng,
-                        with_velocity=with_velocity,
-                        quality_profile=quality_profile,
-                        spawn_attempts=max_attempts_per_episode,
-                        ou_theta=ou_theta,
-                        ou_sigma=ou_sigma,
-                        ou_dt=ou_dt,
-                        ou_mu=ou_mu,
-                    )
+                    continue
                 if attempt.accepted:
                     accepted_attempt = attempt
                     break
                 rejection_reasons.append(attempt.rejection_reasons)
-                progress.set_postfix(rejected=len(rejection_reasons), refresh=False)
-            if accepted_attempt is None:
-                summary = summarize_rejections(rejection_reasons)
-                raise RuntimeError(
-                    f"Unable to produce accepted episode {ep_idx + 1}/{n_eps} for split={split_name!r} "
-                    f"after {max_attempts_per_episode} attempts. Rejections: {summary}"
+                progress.set_postfix(
+                    rejected=len(rejection_reasons),
+                    failed_batches=failed_episode_batches,
+                    refresh=False,
                 )
+            if accepted_attempt is None:
+                failed_episode_batches += 1
+                if int(resolved_max_failed_episode_batches) >= 0 and failed_episode_batches > int(resolved_max_failed_episode_batches):
+                    summary = summarize_rejections(rejection_reasons)
+                    raise RuntimeError(
+                        f"Unable to produce enough accepted episodes for split={split_name!r}. "
+                        f"accepted={accepted_episodes}/{int(n_eps)} "
+                        f"failed_episode_batches={failed_episode_batches} "
+                        f"max_failed_episode_batches={resolved_max_failed_episode_batches}. "
+                        f"Rejections: {summary}"
+                    )
+                progress.set_postfix(
+                    rejected=len(rejection_reasons),
+                    failed_batches=failed_episode_batches,
+                    refresh=False,
+                )
+                continue
 
             frames = render_episode_frames(
                 render_env,
@@ -845,19 +929,26 @@ def generate_split(
             actions_abs_list.append(accepted_attempt.actions_abs)
             frames_list.append(frames)
             states_list.append(accepted_attempt.states)
+            accepted_episodes += 1
             progress.update(1)
-            progress.set_postfix(rejected=len(rejection_reasons), refresh=False)
+            progress.set_postfix(
+                rejected=len(rejection_reasons),
+                failed_batches=failed_episode_batches,
+                refresh=False,
+            )
     finally:
         progress.close()
 
     stats = {
         "accepted_episodes": int(n_eps),
         "rejected_attempts": int(len(rejection_reasons)),
+        "failed_episode_batches": int(failed_episode_batches),
         "rejection_counts": summarize_rejections(rejection_reasons),
     }
     print(
         f"[generate_synth] split={split_name} accepted={stats['accepted_episodes']} "
-        f"rejected={stats['rejected_attempts']} reasons={stats['rejection_counts']}"
+        f"rejected={stats['rejected_attempts']} failed_batches={stats['failed_episode_batches']} "
+        f"reasons={stats['rejection_counts']}"
     )
     return actions_list, actions_abs_list, frames_list, states_list, stats
 
@@ -882,6 +973,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--mode-profile", choices=["train", "planning", "balanced"], default="train")
     p.add_argument("--quality-profile", choices=["strict", "balanced", "loose"], default="strict")
     p.add_argument("--max-attempts-per-episode", type=int, default=64)
+    p.add_argument(
+        "--max-failed-episode-batches",
+        type=int,
+        default=-1,
+        help="Global cap on exhausted episode batches before the split aborts. -1 disables the cap; 0 uses an automatic limit.",
+    )
     p.add_argument("--workers", type=int, default=1, help="Number of worker processes for episode generation.")
     p.add_argument("--weight-translate", type=float, default=None)
     p.add_argument("--weight-rotate", type=float, default=None)
@@ -905,6 +1002,8 @@ def main() -> None:
         raise ValueError("len_min must be > 0 and len_max must be >= len_min")
     if int(args.max_attempts_per_episode) <= 0:
         raise ValueError("max_attempts_per_episode must be > 0")
+    if int(args.max_failed_episode_batches) < -1:
+        raise ValueError("max_failed_episode_batches must be >= -1")
     if int(args.workers) <= 0:
         raise ValueError("workers must be > 0")
     if str(args.quality_profile) not in QUALITY_PROFILES:
@@ -943,6 +1042,7 @@ def main() -> None:
         quality_profile=str(args.quality_profile),
         weights=mode_weights,
         max_attempts_per_episode=int(args.max_attempts_per_episode),
+        max_failed_episode_batches=int(args.max_failed_episode_batches),
         workers=int(args.workers),
         contact_aware_ou_theta=float(args.contact_aware_ou_theta),
         contact_aware_ou_sigma=float(args.contact_aware_ou_sigma),
@@ -969,6 +1069,7 @@ def main() -> None:
         quality_profile=str(args.quality_profile),
         weights=mode_weights,
         max_attempts_per_episode=int(args.max_attempts_per_episode),
+        max_failed_episode_batches=int(args.max_failed_episode_batches),
         workers=int(args.workers),
         contact_aware_ou_theta=float(args.contact_aware_ou_theta),
         contact_aware_ou_sigma=float(args.contact_aware_ou_sigma),
@@ -984,6 +1085,7 @@ def main() -> None:
     actions_abs_all = train_actions_abs + val_actions_abs
     states_all = train_states + val_states
     rejected_attempts = int(train_stats["rejected_attempts"]) + int(val_stats["rejected_attempts"])
+    failed_episode_batches = int(train_stats["failed_episode_batches"]) + int(val_stats["failed_episode_batches"])
     save_zarr(
         args.zarr_out,
         frames_all,
@@ -1005,6 +1107,7 @@ def main() -> None:
             "contact_aware_ou_dt": float(args.contact_aware_ou_dt),
             "accepted_episodes": int(args.train_eps) + int(args.val_eps),
             "rejected_attempts": rejected_attempts,
+            "failed_episode_batches": failed_episode_batches,
         },
     )
     print(f"Saved synthetic Zarr store to {args.zarr_out}")
@@ -1013,6 +1116,7 @@ def main() -> None:
     print(f"  Total frames: {sum(len(f) for f in frames_all)}")
     print(f"  Total actions: {sum(len(a) for a in actions_all)}")
     print(f"  Rejected attempts: {rejected_attempts}")
+    print(f"  Failed episode batches: {failed_episode_batches}")
 
 
 if __name__ == "__main__":

@@ -28,7 +28,8 @@ Options:
 | `--action_scale` | float | `1.0` | Relative action scale before wrapper action scaling. |
 | `--mode-profile` | `train|planning|balanced` | `train` | Motion mix profile for contact-aware generation. |
 | `--quality-profile` | `strict|balanced|loose` | `strict` | Rollout acceptance strictness. |
-| `--max-attempts-per-episode` | int | `64` | Maximum rejected attempts allowed before generation fails for one accepted episode. |
+| `--max-attempts-per-episode` | int | `64` | Maximum rollout attempts per episode batch before that batch is discarded and resampled. |
+| `--max-failed-episode-batches` | int | `-1` | Global cap on exhausted episode batches before the split aborts. `-1` disables the cap; `0` uses an automatic limit. |
 | `--workers` | int | `1` | Number of worker processes used for accepted-episode generation. Rendering and final Zarr writing remain parent-side. |
 | `--weight-translate` | float | `None` | Optional override for translation maneuver weight. |
 | `--weight-rotate` | float | `None` | Optional override for rotation maneuver weight. |
@@ -50,7 +51,7 @@ Output schema:
 - `data/action_abs` (absolute targets for debugging/reference)
 - `data/state`
 - `meta/episode_ends`
-- zarr attrs: `action_format="env_input"`, `action_abs_format="absolute_target"`, `env_action_scale`, `env_relative`, `generator_policy`, `mode_profile`, `quality_profile`, per-mode weights, contact-aware OU settings, accepted/rejected counts
+- zarr attrs: `action_format="env_input"`, `action_abs_format="absolute_target"`, `env_action_scale`, `env_relative`, `generator_policy`, `mode_profile`, `quality_profile`, per-mode weights, contact-aware OU settings, accepted/rejected counts, failed episode batch counts
 - Terminal runs show `tqdm` progress bars for generation and, when `--workers > 1`, a second render pass.
 
 ## `scripts/visualize_rollouts.py`

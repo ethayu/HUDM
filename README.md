@@ -66,6 +66,7 @@ python scripts/generate_synth.py synthetic/pusht_synth.zarr \
 
 `--workers` parallelizes accepted-episode generation across processes while keeping final frame rendering and Zarr writing in the parent process.
 `--contact-aware-ou-sigma` adds a small OU perturbation around contact-aware absolute targets without changing the dataset schema.
+`--max-attempts-per-episode` is now a per-batch retry limit; exhausted batches are skipped and generation continues until enough accepted episodes are collected or the global failed-batch cap is hit. By default `--max-failed-episode-batches=-1`, so there is no global cap.
 
 ---
 

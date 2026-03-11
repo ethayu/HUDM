@@ -29,6 +29,11 @@ SPEC.loader.exec_module(GENERATE_SYNTH)
 
 
 class SyntheticGenerationTests(unittest.TestCase):
+    def test_failed_episode_batch_limit_resolver_supports_unlimited(self):
+        self.assertEqual(GENERATE_SYNTH._resolve_max_failed_episode_batches(10, -1), -1)
+        self.assertEqual(GENERATE_SYNTH._resolve_max_failed_episode_batches(10, 0), 80)
+        self.assertEqual(GENERATE_SYNTH._resolve_max_failed_episode_batches(10, 7), 7)
+
     def test_contact_aware_ou_offset_is_deterministic(self):
         target = np.asarray([256.0, 256.0], dtype=np.float32)
         ou_state = np.zeros(2, dtype=np.float32)
@@ -169,6 +174,109 @@ class SyntheticGenerationTests(unittest.TestCase):
         self.assertTrue(planning_rejected)
         self.assertIn("episode_low_translation", planning_reasons)
 
+    def test_generate_split_retries_after_failed_episode_batch(self):
+        original_rollout = GENERATE_SYNTH.rollout_contact_aware_episode
+        original_render = GENERATE_SYNTH.render_episode_frames
+        calls = {"count": 0}
+
+        def fake_rollout(*args, **kwargs):
+            calls["count"] += 1
+            if calls["count"] <= 2:
+                return GENERATE_SYNTH.EpisodeAttempt(
+                    init_state=np.zeros(7, dtype=np.float32),
+                    states=np.zeros((1, 7), dtype=np.float32),
+                    actions=np.zeros((1, 2), dtype=np.float32),
+                    actions_abs=np.zeros((1, 2), dtype=np.float32),
+                    diagnostics=RolloutDiagnostics(
+                        total_block_translation_path=0.0,
+                        net_block_translation=0.0,
+                        total_absolute_angle_change=0.0,
+                        motion_fraction=0.0,
+                        contact_fraction=0.0,
+                        first_contact_step=-1,
+                        first_meaningful_motion_step=-1,
+                        wall_adjacent_fraction=0.0,
+                        suspicious_no_contact_motion_count=0,
+                        out_of_bounds_steps=0,
+                        min_wall_clearance=20.0,
+                        start_wall_clearance=20.0,
+                        end_wall_clearance=20.0,
+                        max_block_step_displacement=0.0,
+                        num_steps=1,
+                    ),
+                    rejection_reasons=("episode_low_translation",),
+                    selected_families=("translate",),
+                    selected_candidates=("translate_0",),
+                )
+            return GENERATE_SYNTH.EpisodeAttempt(
+                init_state=np.zeros(7, dtype=np.float32),
+                states=np.zeros((1, 7), dtype=np.float32),
+                actions=np.zeros((1, 2), dtype=np.float32),
+                actions_abs=np.zeros((1, 2), dtype=np.float32),
+                diagnostics=RolloutDiagnostics(
+                    total_block_translation_path=40.0,
+                    net_block_translation=40.0,
+                    total_absolute_angle_change=0.1,
+                    motion_fraction=0.5,
+                    contact_fraction=0.5,
+                    first_contact_step=0,
+                    first_meaningful_motion_step=0,
+                    wall_adjacent_fraction=0.0,
+                    suspicious_no_contact_motion_count=0,
+                    out_of_bounds_steps=0,
+                    min_wall_clearance=20.0,
+                    start_wall_clearance=20.0,
+                    end_wall_clearance=20.0,
+                    max_block_step_displacement=2.0,
+                    num_steps=1,
+                ),
+                rejection_reasons=(),
+                selected_families=("translate",),
+                selected_candidates=("translate_0",),
+            )
+
+        def fake_render(*args, **kwargs):
+            return np.zeros((1, 8, 8, 3), dtype=np.float32)
+
+        try:
+            GENERATE_SYNTH.rollout_contact_aware_episode = fake_rollout
+            GENERATE_SYNTH.render_episode_frames = fake_render
+            _, _, frames, _, stats = GENERATE_SYNTH.generate_split(
+                n_eps=1,
+                split_name="train",
+                len_min=8,
+                len_max=8,
+                policy="contact_aware",
+                action_scale=1.0,
+                rng=np.random.default_rng(0),
+                decision_env=None,
+                shadow_env=None,
+                render_env=None,
+                with_velocity=True,
+                img_size=8,
+                mode_profile="planning",
+                quality_profile="strict",
+                weights=resolve_mode_weights("planning"),
+                max_attempts_per_episode=2,
+                max_failed_episode_batches=4,
+                workers=1,
+                contact_aware_ou_theta=0.35,
+                contact_aware_ou_sigma=0.0,
+                contact_aware_ou_dt=1.0,
+                ou_theta=0.15,
+                ou_sigma=0.2,
+                ou_dt=1.0,
+                ou_mu=None,
+            )
+        finally:
+            GENERATE_SYNTH.rollout_contact_aware_episode = original_rollout
+            GENERATE_SYNTH.render_episode_frames = original_render
+
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(int(stats["accepted_episodes"]), 1)
+        self.assertEqual(int(stats["failed_episode_batches"]), 1)
+        self.assertEqual(int(stats["rejected_attempts"]), 2)
+
     def test_generate_tiny_dataset_keeps_schema_and_counts(self):
         rng = np.random.default_rng(5)
         decision_env = GENERATE_SYNTH.build_generator_env(with_velocity=True, headless=True)
@@ -193,6 +301,7 @@ class SyntheticGenerationTests(unittest.TestCase):
             quality_profile="strict",
             weights=weights,
             max_attempts_per_episode=32,
+            max_failed_episode_batches=0,
             workers=2,
             contact_aware_ou_theta=0.35,
             contact_aware_ou_sigma=0.0,
@@ -219,6 +328,7 @@ class SyntheticGenerationTests(unittest.TestCase):
             quality_profile="strict",
             weights=weights,
             max_attempts_per_episode=32,
+            max_failed_episode_batches=0,
             workers=2,
             contact_aware_ou_theta=0.35,
             contact_aware_ou_sigma=0.0,
@@ -286,13 +396,13 @@ class SyntheticGenerationTests(unittest.TestCase):
                     rng=rng,
                     with_velocity=True,
                     mode_profile=mode_profile,
-                        quality_profile="strict",
-                        weights=weights,
-                        spawn_attempts=32,
-                        contact_aware_ou_theta=0.35,
-                        contact_aware_ou_sigma=0.0,
-                        contact_aware_ou_dt=1.0,
-                    )
+                    quality_profile="strict",
+                    weights=weights,
+                    spawn_attempts=32,
+                    contact_aware_ou_theta=0.35,
+                    contact_aware_ou_sigma=0.0,
+                    contact_aware_ou_dt=1.0,
+                )
                 if attempt.accepted:
                     diags.append(attempt.diagnostics)
             return diags
