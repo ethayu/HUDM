@@ -1,0 +1,6 @@
+{
+    "action_abs_format": "absolute_target",
+    "action_format": "env_input",
+    "env_action_scale": 100.0,
+    "env_relative": true
+}
