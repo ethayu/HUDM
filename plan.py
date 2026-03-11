@@ -26,6 +26,7 @@ from omegaconf import DictConfig, OmegaConf
 # Ensure local imports work even when launched via an absolute path.
 sys.path.append(os.path.dirname(__file__))
 
+from hudm.world_io import latest_checkpoint_epoch, load_world_checkpoint
 from models.world.ensemble import WorldModelEnsemble
 from models.world.model import HierWorldModel
 from planning.gt_env_cem import GTEnvCEMPlanner
@@ -33,7 +34,6 @@ from planning.latent_cem import LatentCEMPlanner
 from planning.particle_cem import ParticleCEMPlanner
 from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_wrapper import PushTWrapper
-from validate_cfg import validate_plan_cfg
 
 
 def _unwrap_env(env):
@@ -148,41 +148,11 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
         K=list[int](wm_cfg.model.K),
         D=int(wm_cfg.model.D),
         action_dim=int(wm_cfg.data.action_dim),
+        input=str(getattr(wm_cfg.model, "input", "images")),
         decoder_mode=str(getattr(wm_cfg.model, "decoder_mode", "per_level")),
         dynamics_mode=str(getattr(wm_cfg.model, "dynamics_mode", "per_level")),
     ).to(device)
-
-    enc_path = os.path.join(run_dir, f"encoder_epoch{epoch}.pt")
-    if not os.path.isfile(enc_path):
-        raise FileNotFoundError(f"Missing encoder checkpoint: {enc_path}")
-    wm.encoder.load_state_dict(torch.load(enc_path, map_location=device))
-
-    dynamics_mode = str(getattr(wm_cfg.model, "dynamics_mode", "per_level"))
-
-    if dynamics_mode == "per_level":
-        for li in range(len(wm.K)):
-            dyn_path = os.path.join(run_dir, f"dyn_l{li}_epoch{epoch}.pt")
-            if not os.path.isfile(dyn_path):
-                raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
-            wm.dynamics[li].load_state_dict(torch.load(dyn_path, map_location=device))
-    else:
-        dyn_path = os.path.join(run_dir, f"dyn_epoch{epoch}.pt")
-        if not os.path.isfile(dyn_path):
-            raise FileNotFoundError(f"Missing dynamics checkpoint: {dyn_path}")
-        wm.dynamics.load_state_dict(torch.load(dyn_path, map_location=device))
-
-    decoder_mode = str(getattr(wm_cfg.model, "decoder_mode", "per_level"))
-    if decoder_mode == "per_level":
-        for li in range(len(wm.K)):
-            dec_path = os.path.join(run_dir, f"decoder_l{li}_epoch{epoch}.pt")
-            if not os.path.isfile(dec_path):
-                raise FileNotFoundError(f"Missing decoder checkpoint: {dec_path}")
-            wm.decoders[li].load_state_dict(torch.load(dec_path, map_location=device))
-    else:
-        dec_path = os.path.join(run_dir, "decoder.pt")
-        if not os.path.isfile(dec_path):
-            raise FileNotFoundError(f"Missing decoder checkpoint: {dec_path}")
-        wm.decoder.load_state_dict(torch.load(dec_path, map_location=device))
+    load_world_checkpoint(wm, run_dir, epoch=epoch, device=device)
 
     wm.eval()
     return wm
@@ -193,6 +163,7 @@ def _wm_signature(wm_cfg: DictConfig) -> dict:
         "K": list(wm_cfg.model.K),
         "D": int(wm_cfg.model.D),
         "action_dim": int(wm_cfg.data.action_dim),
+        "input": str(getattr(wm_cfg.model, "input", "images")),
         "decoder_mode": str(getattr(wm_cfg.model, "decoder_mode", "per_level")),
         "dynamics_mode": str(getattr(wm_cfg.model, "dynamics_mode", "per_level")),
     }
@@ -216,6 +187,12 @@ def _assert_world_cfg_compatible(base_sig: dict, other_cfg: DictConfig, label: s
             f"Expected: {base_sig}\n"
             f"Found:    {other_sig}"
         )
+
+
+def _resolve_world_epoch(run_dir: str, epoch_cfg: Any) -> int:
+    if epoch_cfg is None:
+        return latest_checkpoint_epoch(run_dir)
+    return int(epoch_cfg)
 
 
 def _load_world_model(plan_cfg: DictConfig) -> tuple[object, DictConfig, str, torch.device]:
@@ -247,7 +224,14 @@ def _load_world_model(plan_cfg: DictConfig) -> tuple[object, DictConfig, str, to
             if os.path.isfile(run_cfg_path):
                 run_cfg = OmegaConf.load(run_cfg_path)
                 _assert_world_cfg_compatible(base_sig, run_cfg, label=rd)
-            members.append(_load_world_model_member(wm_cfg, rd, device))
+            members.append(
+                _load_world_model_member(
+                    wm_cfg,
+                    rd,
+                    device,
+                    epoch=_resolve_world_epoch(rd, getattr(plan_cfg.world_model, "epoch", None)),
+                )
+            )
         wm_backend = WorldModelEnsemble(members).to(device)
         run_desc = ", ".join(run_dirs)
         return wm_backend, wm_cfg, run_desc, device
@@ -265,7 +249,12 @@ def _load_world_model(plan_cfg: DictConfig) -> tuple[object, DictConfig, str, to
         if os.path.isfile(run_cfg_path):
             run_cfg = OmegaConf.load(run_cfg_path)
             _assert_world_cfg_compatible(_wm_signature(wm_cfg), run_cfg, label=run_dir)
-    wm = _load_world_model_member(wm_cfg, run_dir, device, epoch=plan_cfg.world_model.epoch)
+    wm = _load_world_model_member(
+        wm_cfg,
+        run_dir,
+        device,
+        epoch=_resolve_world_epoch(run_dir, getattr(plan_cfg.world_model, "epoch", None)),
+    )
     return wm, wm_cfg, run_dir, device
 
 
@@ -424,7 +413,6 @@ def _overlay_start_pose(
 
 def _rollout_level_for_exec_step(info: object, exec_step_in_replan: int) -> int:
     levels = list(getattr(info, "rollout_level_indices", []))
-    #import pdb; pdb.set_trace()
     if exec_step_in_replan < len(levels):
         return int(levels[exec_step_in_replan])
     base = getattr(info, "base_level_idx", None)
@@ -793,7 +781,6 @@ def _run_closed_loop(
                     )
                 planner_frames.append(frame)
             elif backend == "wm":
-                import pdb; pdb.set_trace()
                 if z_cur_for_plan is None:
                     z_cur_for_plan = _encode_visual(wm, obs["visual"], device)
                 frame = _wm_decode_frame(
@@ -1006,6 +993,7 @@ def _plan_defaults() -> dict:
         "world_model": {
             "config_path": None,
             "run_dir": None,
+            "epoch": None,
             "checkpoint_root": "checkpoints_world",
             "device": "auto",
             "ensemble": {
@@ -1131,9 +1119,9 @@ def _plan_defaults() -> dict:
 
 
 def load_plan_cfg(cfg_path: str) -> DictConfig:
-    cfg_root = OmegaConf.load(cfg_path)
-    cfg = OmegaConf.merge(_plan_defaults(), cfg_root.get("plan", cfg_root))
-    validate_plan_cfg(cfg)
+    from hudm.config import resolve_plan_spec
+
+    cfg = resolve_plan_spec(cfg_path).runtime_cfg
     cfg.init_goal.dataset.seed = _resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
     return cfg
 

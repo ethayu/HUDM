@@ -29,6 +29,7 @@ class ZarrPushTEpisodes(Dataset):
         zarr_root: str,
         split: str = "train",
         split_ratio: float = 0.8,
+        action_mode: str = "relative",
         image_key: str = "img",
         action_key: str = "action",
         state_key: str = "state",
@@ -41,6 +42,12 @@ class ZarrPushTEpisodes(Dataset):
         self.action_key = action_key
         self.state_key = state_key
         self.meta_episode_key = meta_episode_key
+        if str(action_mode).lower() != "relative":
+            raise ValueError(
+                "ZarrPushTEpisodes currently supports only action_mode='relative'. "
+                f"Got {action_mode!r}."
+            )
+        self.action_mode = "relative"
 
         # Open Zarr arrays
         root = zarr.open_group(zarr_root, mode="r")
@@ -94,8 +101,6 @@ class ZarrPushTEpisodes(Dataset):
         a_abs = self.act[s:e]
         agent_pos = state[:-1, :2]
         #print(agent_pos.shape, a_abs.shape,s,e,self.act.shape,state.shape)
-        #if agent_pos.shape != a_abs.shape:
-        #    import pdb; pdb.set_trace()
         a = a_abs# (a_abs - agent_pos) / self._ACTION_SCALE #
 
         x_t = torch.stack([self._img_to_tensor(frame) for frame in x], dim=0)
@@ -131,9 +136,12 @@ class ZarrPushTEpisodes(Dataset):
         return observations, states, actions
 
 
-def collate_episodes(batch: List[dict], length) -> dict:
+def collate_episodes(batch: List[dict], length: int | None = None) -> dict:
     lengths = [item["length"] for item in batch]
-    max_len = max(lengths)
+    if length is None or int(length) <= 0:
+        max_len = max(lengths)
+    else:
+        max_len = min(int(length), max(lengths))
 
     bsz = len(batch)
     c, h, w = batch[0]["x"].shape[1:]
@@ -146,8 +154,9 @@ def collate_episodes(batch: List[dict], length) -> dict:
     mask = torch.zeros((bsz, max_len), dtype=torch.bool)
 
     for i, item in enumerate(batch):
-        L = length#item["length"]
-        start = random.randint(0, item["x"].shape[0] - L)
+        item_len = int(item["x"].shape[0])
+        L = min(item_len, max_len)
+        start = 0 if item_len == L else random.randint(0, item_len - L)
         x[i, :L] = item["x"][start:start+L]
         state[i, :L] = item["state"][start:start+L]
         mask[i, :L] = True

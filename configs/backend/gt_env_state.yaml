@@ -1,0 +1,23 @@
+plan:
+  backend:
+    kind: "gt_env"
+    gt_env:
+      rollout_samples: 1
+      objective_space: "state"
+      progress: false
+      progress_leave: false
+      objective:
+        action_l2_weight: 0.05
+        eef_weight: 1.0
+        block_pos_weight: 1.0
+        block_angle_weight: 0.1
+        state_l2_weight: 0.0
+      fidelity_env:
+        mode: "blur_avgpool"
+        blur_sigma_max: 1.0
+        pool_scale_max: 2
+        quantize_levels_min: 8
+        quantize_levels_max: 256
+        action_noise_std_max: 0.0
+        downsample_output: false
+        min_downsample_size: 12

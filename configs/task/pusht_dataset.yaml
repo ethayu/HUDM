@@ -1,0 +1,18 @@
+plan:
+  task:
+    env_id: "pusht"
+    env:
+      with_velocity: true
+      with_target: true
+      add_noise: 0
+      noise_std: [0.5, 0.5]
+      render_size: 512
+    init_goal:
+      source: "dataset"
+      dataset:
+        zarr_path: "synthetic/pusht_synth.zarr"
+        split: "valid"
+        split_ratio: null
+        trajectory_len: 5
+        seed: 675189
+        reconstruct_goal_state: 3

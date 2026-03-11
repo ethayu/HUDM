@@ -1,0 +1,18 @@
+plan:
+  backend:
+    kind: "wm"
+    wm:
+      world_model:
+        config_path: null
+        run_dir: null
+        epoch: null
+        checkpoint_root: "checkpoints_world"
+        device: "auto"
+        ensemble:
+          enabled: false
+          run_dirs: []
+      objective:
+        latent_metric: "l2"
+        terminal_weight: 1.0
+        running_weight: 0.0
+        action_l2_weight: 0.1

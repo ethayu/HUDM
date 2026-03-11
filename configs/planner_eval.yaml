@@ -1,35 +1,33 @@
-planner_eval:
-  plan_config: "configs/plan.yaml"
-  seed: 0
-  num_rollouts: 4
-  sample_without_replacement: true
-  output_root: "rollouts"
-  parallel:
-    mode: "auto"  # auto -> wm_batch for wm, process otherwise
+experiment:
+  name: "multi_backend_compare"
+  shared_plan:
+    imports:
+      - task/pusht_dataset.yaml
+      - planner/default.yaml
+    plan:
+      artifacts:
+        render: false
+        save: false
+  rollouts:
+    seed: 0
+    num_rollouts: 4
+    sample_without_replacement: true
+  execution:
+    mode: "auto"
     max_workers: 2
-    wm_schedule_batch_size: 0  # 0 => use all schedules
-  schedules:
-    - name: "finest_fixed"
-      fidelity:
-        mpc:
-          mode: "fixed"
-          level: "finest"
-        cem:
-          mode: "fixed"
-          level: "base"
-        rollout:
-          mode: "fixed"
-          level: "base"
-    - name: "coarse_to_fine"
-      fidelity:
-        mpc:
-          mode: "linear"
-          start_level: "coarsest"
-          end_level: "finest"
-        cem:
-          mode: "linear"
-          start_level: "base"
-          end_level: "finest"
-        rollout:
-          mode: "fixed"
-          level: "base"
+  reporting:
+    output_root: "rollouts"
+  baseline: "gt_env_finest"
+  variants:
+    - name: "gt_env_finest"
+      imports:
+        - backend/gt_env_image.yaml
+        - fidelity/finest.yaml
+    - name: "gt_env_coarse_to_fine"
+      imports:
+        - backend/gt_env_image.yaml
+        - fidelity/coarse_to_fine.yaml
+    - name: "particle_finest"
+      imports:
+        - backend/particle_state.yaml
+        - fidelity/finest.yaml
