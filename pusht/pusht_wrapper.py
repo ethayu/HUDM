@@ -736,8 +736,9 @@ class PushTWrapper(PushTEnv):
         """
         Unified termination eval used by planners and debug logging.
 
-        Returns metric success (wrapper thresholds), env-done status, coverage,
-        and the strict success gate requiring both metric success and done.
+        Returns pose-metric success (for planner analysis/objectives), the
+        coverage-based env done flag, coverage, and a compatibility field
+        combining both.
         """
         metrics = self.eval_state(goal_state, cur_state)
 

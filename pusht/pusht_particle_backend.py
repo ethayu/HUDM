@@ -371,7 +371,10 @@ class PushTParticleBackend:
             "state": cur_state.copy(),
         }
         metrics = self.eval_state(self._goal_state, cur_state)
-        done = bool(done_sim) or bool(metrics["success"])
+        # Keep planner metrics separate from env termination. The particle
+        # backend should terminate only when the simulated env reports success,
+        # which is coverage-based like the real PushT env.
+        done = bool(done_sim)
 
         info = {
             "state": cur_state.copy(),

@@ -12,8 +12,23 @@ import numpy as np
 import torch
 from omegaconf import DictConfig, OmegaConf
 
-import plan as single_plan
+from hudm.artifacts import save_plan_result
 from hudm.config import resolve_experiment_spec
+from hudm.runtime import (
+    bits_to_flops_estimate,
+    build_plan_runtime,
+    encode_visual,
+    gym_make_versioned,
+    register_plan_env,
+    unwrap_env,
+)
+from hudm.session import run_plan_session
+from hudm.session_helpers import (
+    load_selected_rollout,
+    set_execution_fidelity_finest,
+    set_goal_pose,
+    set_start_pose,
+)
 from hudm.specs import ExperimentSpec, ExperimentVariant
 from hudm.task_sampling import enumerate_rollout_candidates, rollout_id, select_rollouts
 from planning.latent_cem_batch import BatchedLatentCEMPlanner
@@ -332,21 +347,21 @@ def save_summary_plots(rows: Sequence[dict], summary_rows: Sequence[dict], out_d
 
 def _run_variant_task(task: dict) -> dict:
     cfg = OmegaConf.create(task["cfg"])
-    result = single_plan.run_plan_session(
+    result = run_plan_session(
         cfg,
         rollout_selection=task["selection"],
         schedule_name=task["variant_name"],
         print_summary=False,
     )
     result["variant_name"] = task["variant_name"]
-    single_plan.save_plan_result(result, task["run_dir"], save_media=False)
+    save_plan_result(result, task["run_dir"], save_media=False)
     return result_row(result, task["run_dir"])
 
 
 def _make_exec_env(cfg: DictConfig):
-    single_plan._register_plan_env(cfg)
-    env_wrapped = single_plan._gym_make_versioned(str(cfg.env_id), cfg.env)
-    return single_plan._unwrap_env(env_wrapped)
+    register_plan_env(cfg)
+    env_wrapped = gym_make_versioned(str(cfg.env_id), cfg.env)
+    return unwrap_env(env_wrapped)
 
 
 def _finalize_wm_state(state: dict, term_reason: str, term_step: int) -> tuple[dict, dict]:
@@ -387,7 +402,7 @@ def _run_wm_batched_variants(
     seed_base: int,
 ) -> list[dict]:
     runtime_cfgs = [variant.plan.runtime_cfg for variant in variants]
-    runtime = single_plan.build_plan_runtime(runtime_cfgs[0])
+    runtime = build_plan_runtime(runtime_cfgs[0])
     wm = runtime["wm"]
     device = runtime["device"]
     envs = [runtime["env"]]
@@ -411,22 +426,22 @@ def _run_wm_batched_variants(
         warm_start=bool(runtime_cfgs[0].cem.warm_start),
         device=device,
     )
-    init_state, goal_state, sample_meta = single_plan.load_selected_rollout(
+    init_state, goal_state, sample_meta = load_selected_rollout(
         envs[0],
         runtime_cfgs[0],
         runtime["wm_cfg"],
         selection,
     )
     goal_obs, _ = envs[0].prepare(seed=0, init_state=goal_state)
-    single_plan._set_goal_pose(envs[0], goal_state)
+    set_goal_pose(envs[0], goal_state)
     goal_obs["visual"] = envs[0].render("rgb_array", include_start_pose=False)
-    z_goal = single_plan._encode_visual(wm, goal_obs["visual"], device)
+    z_goal = encode_visual(wm, goal_obs["visual"], device)
 
     variant_states: list[dict] = []
     for env, cfg, variant in zip(envs, runtime_cfgs, variants):
-        single_plan._set_start_pose(env, init_state)
+        set_start_pose(env, init_state)
         obs, cur_state = env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
-        single_plan._set_execution_fidelity_finest(env)
+        set_execution_fidelity_finest(env)
         obs["visual"] = env.render("rgb_array", include_start_pose=False)
         variant_states.append(
             {
@@ -455,11 +470,11 @@ def _run_wm_batched_variants(
         )
 
     initial_term = envs[0].eval_termination(goal_state, variant_states[0]["cur_state"], done=None, info=None)
-    if bool(initial_term["success_and_done"]):
+    if bool(initial_term["done"]):
         rows = []
         for state in variant_states:
             state["last_term"] = initial_term
-            trace, run_stats = _finalize_wm_state(state, "initial_metric_and_env_done", 0)
+            trace, run_stats = _finalize_wm_state(state, "initial_env_done", 0)
             result = {
                 "cfg": state["cfg"],
                 "runtime": {"backend": "wm"},
@@ -475,7 +490,7 @@ def _run_wm_batched_variants(
                 "variant_name": state["variant_name"],
             }
             run_dir = os.path.join(run_root, "traces", state["variant_name"], selection["rollout_id"])
-            single_plan.save_plan_result(result, run_dir, save_media=False)
+            save_plan_result(result, run_dir, save_media=False)
             rows.append(result_row(result, run_dir))
         return rows
 
@@ -490,7 +505,7 @@ def _run_wm_batched_variants(
     while t < steps and any(not state["done"] for state in variant_states):
         mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
         z_batch = torch.cat(
-            [single_plan._encode_visual(wm, state["obs"]["visual"], device) for state in variant_states],
+            [encode_visual(wm, state["obs"]["visual"], device) for state in variant_states],
             dim=0,
         )
         plan_seeds = [
@@ -509,7 +524,7 @@ def _run_wm_batched_variants(
             info = batch_result.info
             action_seq = np.asarray(batch_result.action_seq.detach().cpu().numpy(), dtype=np.float32)
             bits_used = int(getattr(info, "bits_used_estimate", 0))
-            flops_used = int(single_plan._bits_to_flops_estimate(bits_used))
+            flops_used = int(bits_to_flops_estimate(bits_used))
             plan_time = float(getattr(info, "plan_time_sec", 0.0))
             state["bits_total"] += bits_used
             state["flops_total"] += flops_used
@@ -556,7 +571,7 @@ def _run_wm_batched_variants(
                 state["metric_success_flags"].append(bool(term["success"]))
                 state["done_flags"].append(bool(term["done"]))
                 state["state_dists"].append(float(term["state_dist"]))
-                if bool(term["success_and_done"]):
+                if bool(term["done"]):
                     state["done"] = True
             t += 1
             if t >= steps or all(state["done"] for state in variant_states):
@@ -569,7 +584,7 @@ def _run_wm_batched_variants(
     for state in variant_states:
         trace, run_stats = _finalize_wm_state(
             state,
-            "metric_success_and_env_done" if state["done"] else "max_steps",
+            "env_done" if state["done"] else "max_steps",
             max(0, len(state["trajectory"]) - 1),
         )
         result = {
@@ -587,7 +602,7 @@ def _run_wm_batched_variants(
             "variant_name": state["variant_name"],
         }
         run_dir = os.path.join(run_root, "traces", state["variant_name"], selection["rollout_id"])
-        single_plan.save_plan_result(result, run_dir, save_media=False)
+        save_plan_result(result, run_dir, save_media=False)
         rows.append(result_row(result, run_dir))
     return rows
 
