@@ -314,17 +314,17 @@ def validate_world_cfg(cfg, wandb_available: bool = True) -> None:
     )
     _reject_unknown_keys(
         cfg.data,
-        {"zarr_path", "split_ratio", "action_dim", "action_mode", "synthetic"},
+        {"zarr_path", "split_ratio", "action_dim", "action_mode", "synthetic", "horizon_T"},
         "world.data",
     )
     _reject_unknown_keys(
         cfg.model,
-        {"D", "K", "decoder_mode", "dynamics_mode"},
+        {"D", "K", "decoder_mode", "dynamics_mode","input"},
         "world.model",
     )
     _reject_unknown_keys(
         cfg.train,
-        {"batch_size", "num_workers", "no_cuda", "checkpoint_dir", "run_name"},
+        {"batch_size", "num_workers", "no_cuda", "checkpoint_dir", "run_name","horizon"},
         "world.train",
     )
     _reject_unknown_keys(cfg.optim, {"lr"}, "world.optim")
