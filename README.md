@@ -59,8 +59,13 @@ data:
 ```bash
 python scripts/generate_synth.py synthetic/pusht_synth.zarr \
   --train_eps 200 --val_eps 50 --len_min 50 --len_max 160 --with_velocity \
-  --policy ou --ou-theta 0.15 --ou-sigma 0.2 --img-size 96
+  --policy contact_aware --mode-profile train --quality-profile strict --img-size 96 \
+  --contact-aware-ou-sigma 3.0 \
+  --workers 4
 ```
+
+`--workers` parallelizes accepted-episode generation across processes while keeping final frame rendering and Zarr writing in the parent process.
+`--contact-aware-ou-sigma` adds a small OU perturbation around contact-aware absolute targets without changing the dataset schema.
 
 ---
 

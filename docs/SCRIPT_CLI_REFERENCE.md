@@ -22,10 +22,21 @@ Options:
 | `--val_eps` | int | `50` | Number of validation episodes to generate. |
 | `--len_min` | int | `50` | Minimum episode length. |
 | `--len_max` | int | `160` | Maximum episode length. |
-| `--policy` | `ou|random|advanced` | `ou` | Action policy used for rollout generation. |
+| `--policy` | `ou|random|contact_aware|advanced` | `contact_aware` | Action policy used for rollout generation (`advanced` is an alias for `contact_aware`). |
 | `--seed` | int | `0` | RNG seed. |
 | `--with_velocity` | flag | off | Use velocity-augmented state in environment wrapper. |
 | `--action_scale` | float | `1.0` | Relative action scale before wrapper action scaling. |
+| `--mode-profile` | `train|planning|balanced` | `train` | Motion mix profile for contact-aware generation. |
+| `--quality-profile` | `strict|balanced|loose` | `strict` | Rollout acceptance strictness. |
+| `--max-attempts-per-episode` | int | `64` | Maximum rejected attempts allowed before generation fails for one accepted episode. |
+| `--workers` | int | `1` | Number of worker processes used for accepted-episode generation. Rendering and final Zarr writing remain parent-side. |
+| `--weight-translate` | float | `None` | Optional override for translation maneuver weight. |
+| `--weight-rotate` | float | `None` | Optional override for rotation maneuver weight. |
+| `--weight-sweep` | float | `None` | Optional override for sweep/orbit maneuver weight. |
+| `--weight-recover` | float | `None` | Optional override for recovery maneuver weight. |
+| `--contact-aware-ou-theta` | float | `0.35` | OU mean reversion rate for contact-aware absolute-target offsets. |
+| `--contact-aware-ou-sigma` | float | `0.0` | OU sigma in pixels for contact-aware absolute-target offsets. `0.0` disables the perturbation. |
+| `--contact-aware-ou-dt` | float | `1.0` | OU timestep for contact-aware absolute-target offsets. |
 | `--ou-theta` | float | `0.15` | OU process mean reversion rate. |
 | `--ou-sigma` | float | `0.2` | OU process volatility. |
 | `--ou-dt` | float | `1.0` | OU process timestep. |
@@ -39,7 +50,8 @@ Output schema:
 - `data/action_abs` (absolute targets for debugging/reference)
 - `data/state`
 - `meta/episode_ends`
-- zarr attrs: `action_format="env_input"`, `action_abs_format="absolute_target"`, `env_action_scale`, `env_relative`
+- zarr attrs: `action_format="env_input"`, `action_abs_format="absolute_target"`, `env_action_scale`, `env_relative`, `generator_policy`, `mode_profile`, `quality_profile`, per-mode weights, contact-aware OU settings, accepted/rejected counts
+- Terminal runs show `tqdm` progress bars for generation and, when `--workers > 1`, a second render pass.
 
 ## `scripts/visualize_rollouts.py`
 
