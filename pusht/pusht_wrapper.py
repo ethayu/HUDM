@@ -697,7 +697,7 @@ class PushTWrapper(PushTEnv):
         pos_diff = np.linalg.norm(goal_state[2:4] - cur_state[2:4])
         angle_diff = np.abs(goal_state[4] - cur_state[4])
         angle_diff = np.minimum(angle_diff, 2 * np.pi - angle_diff)
-        success = pos_diff < 20 and angle_diff < np.pi / 9 #and eef_diff < 20
+        success = pos_diff < 1 and angle_diff < np.pi / 9 #and eef_diff < 20
         state_dist = np.linalg.norm(goal_state - cur_state)
         return {
             'success': success,

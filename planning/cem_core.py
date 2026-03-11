@@ -179,11 +179,13 @@ class SharedCEMCore:
         )
 
     def rollout_level_indices(self, base_level_idx: int) -> List[int]:
+        
         if self.rollout_mode == "fixed":
+            #import pdb; pdb.set_trace() 
             level = self.rollout_cfg.get("level", "base")
             idx = self.resolve_level_spec(level, base_level_idx, "fidelity.rollout.level")
             return [idx] * self.horizon
-
+        
         if self.rollout_mode == "linear":
             start = self.rollout_cfg.get("start_level", "base")
             end = self.rollout_cfg.get("end_level", "coarsest")
@@ -200,6 +202,7 @@ class SharedCEMCore:
                 p = t / (self.horizon - 1)
                 idx = _interp_level(start_idx, end_idx, p)
                 levels.append(self._validated_level_index(idx))
+            import pdb; pdb.set_trace() 
             return levels
 
         if self.rollout_mode == "uncertainty_downshift":
@@ -240,6 +243,7 @@ class SharedCEMCore:
             cem_progress = 1.0 if self.n_iter == 1 else it / (self.n_iter - 1)
             base_level_idx = self.base_level_index(mpc_progress, cem_progress)
             rollout_levels = self.rollout_level_indices(base_level_idx)
+            #import pdb; pdb.set_trace() 
 
             actions = torch.normal(
                 mean=self.mu.unsqueeze(0).expand(self.pop_size, -1, -1),

@@ -130,7 +130,7 @@ class LatentCEMPlanner:
         if hasattr(self.world_model, "predict_next_stats"):
             mu, var = self.world_model.predict_next_stats(level, z, a_t)
             return mu, torch.clamp_min(var, 0.0)
-        a_t = (a_t - self.ACTION_MEAN) / self.ACTION_STD
+        #a_t = (a_t - self.ACTION_MEAN) / self.ACTION_STD
         mu = self.world_model.predict_next(level, z, a_t)
         var = torch.zeros_like(mu)
         return mu, var

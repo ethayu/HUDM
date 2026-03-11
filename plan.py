@@ -17,6 +17,7 @@ from typing import Any, Dict, Tuple
 
 import cv2
 import gym
+import imageio
 import numpy as np
 import torch
 from gym.envs.registration import register
@@ -144,7 +145,7 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
         raise FileNotFoundError(f"World-model run directory not found: {run_dir}")
 
     wm = HierWorldModel(
-        K=list(wm_cfg.model.K),
+        K=list[int](wm_cfg.model.K),
         D=int(wm_cfg.model.D),
         action_dim=int(wm_cfg.data.action_dim),
         decoder_mode=str(getattr(wm_cfg.model, "decoder_mode", "per_level")),
@@ -157,6 +158,7 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
     wm.encoder.load_state_dict(torch.load(enc_path, map_location=device))
 
     dynamics_mode = str(getattr(wm_cfg.model, "dynamics_mode", "per_level"))
+
     if dynamics_mode == "per_level":
         for li in range(len(wm.K)):
             dyn_path = os.path.join(run_dir, f"dyn_l{li}_epoch{epoch}.pt")
@@ -172,7 +174,7 @@ def _load_world_model_member(wm_cfg: DictConfig, run_dir: str, device: torch.dev
     decoder_mode = str(getattr(wm_cfg.model, "decoder_mode", "per_level"))
     if decoder_mode == "per_level":
         for li in range(len(wm.K)):
-            dec_path = os.path.join(run_dir, f"decoder_l{li}.pt")
+            dec_path = os.path.join(run_dir, f"decoder_l{li}_epoch{epoch}.pt")
             if not os.path.isfile(dec_path):
                 raise FileNotFoundError(f"Missing decoder checkpoint: {dec_path}")
             wm.decoders[li].load_state_dict(torch.load(dec_path, map_location=device))
@@ -359,50 +361,52 @@ def _write_video_mp4(
     path: str,
     frames: list[np.ndarray],
     fps: int = 15,
-    output_size: int = 512,
+    output_size: int = 256,
 ) -> None:
     if len(frames) == 0:
         raise ValueError(f"No frames to write for {path}")
 
-    first = np.asarray(frames[0])
-    if first.ndim == 2:
-        first = np.repeat(first[:, :, None], 3, axis=2)
-    if first.ndim != 3:
-        raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {first.shape}")
-    if first.shape[2] == 1:
-        first = np.repeat(first, 3, axis=2)
-    out_hw = int(output_size)
-    if out_hw <= 0:
-        raise ValueError(f"output_size must be > 0, got {output_size}")
-    h, w = out_hw, out_hw
-    writer = cv2.VideoWriter(
-        str(path),
-        cv2.VideoWriter_fourcc(*"avc1"),  # H.264/AVC
-        float(max(1, int(fps))),
-        (w, h),
-    )
-    if not writer.isOpened():
-        raise RuntimeError(
-            f"Failed to open H.264/AVC MP4 writer for {path}. "
-            "Ensure your OpenCV build has FFmpeg/x264 encoding support."
-        )
+    h = w = int(output_size)
+    processed_frames = []
 
-    try:
-        for fr in frames:
-            x = np.asarray(fr)
-            if x.ndim == 2:
-                x = np.repeat(x[:, :, None], 3, axis=2)
-            if x.ndim != 3:
-                raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
-            if x.shape[2] == 1:
-                x = np.repeat(x, 3, axis=2)
-            if x.shape[0] != h or x.shape[1] != w:
-                x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
+    for fr in frames:
+        # 1. Convert to numpy and handle the 'object' dtype issue
+        x = np.asarray(fr)
+        if x.dtype == object:
+            x = x.astype(np.float32)
+        
+        # 2. Handle grayscale/rank 2
+        if x.ndim == 2:
+            x = x[:, :, None]
+        
+        # 3. Ensure 3 channels (RGB)
+        if x.shape[2] == 1:
+            x = np.repeat(x, 3, axis=2)
+        elif x.shape[2] != 3:
+            raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
+
+        # 4. Resize if necessary (OpenCV is still fine for this part)
+        if x.shape[0] != h or x.shape[1] != w:
+            # Ensure uint8 before resize to avoid OpenCV errors
             if x.dtype != np.uint8:
-                x = np.clip(x, 0.0, 255.0).astype(np.uint8)
-            writer.write(cv2.cvtColor(x, cv2.COLOR_RGB2BGR))
-    finally:
-        writer.release()
+                x = np.clip(x, 0, 255).astype(np.uint8)
+            x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
+
+        # 5. Final check for uint8
+        if x.dtype != np.uint8:
+            x = np.clip(x, 0, 255).astype(np.uint8)
+            
+        processed_frames.append(x)
+
+    # Save using imageio (uses FFmpeg libx264 by default)
+    # This produces web-standard MP4s that VS Code can preview
+    imageio.mimwrite(
+        str(path), 
+        processed_frames, 
+        fps=fps, 
+        codec='libx264', 
+        pixelformat='yuv420p' # Ensures compatibility with most players
+    )
 
 
 def _overlay_start_pose(
@@ -745,6 +749,7 @@ def _run_closed_loop(
                     )
                 planner_frames.append(frame)
             elif backend == "wm":
+                import pdb; pdb.set_trace()
                 if z_cur_for_plan is None:
                     z_cur_for_plan = _encode_visual(wm, obs["visual"], device)
                 frame = _wm_decode_frame(
