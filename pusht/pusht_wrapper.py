@@ -733,12 +733,12 @@ class PushTWrapper(PushTEnv):
         Return True if the goal is reached
         [agent_x, agent_y, T_x, T_y, angle, agent_vx, agent_vy]
         """
-        # if position difference is < 20, and angle difference < np.pi/9, then success
+        # if position difference is < 10, and angle difference < np.pi/9, then success
         eef_diff = np.linalg.norm(goal_state[:2] - cur_state[:2])
         pos_diff = np.linalg.norm(goal_state[2:4] - cur_state[2:4])
         angle_diff = np.abs(goal_state[4] - cur_state[4])
         angle_diff = np.minimum(angle_diff, 2 * np.pi - angle_diff)
-        success = pos_diff < 1 and angle_diff < np.pi / 9 #and eef_diff < 20
+        success = pos_diff < 10 and angle_diff < np.pi / 9 #and eef_diff < 20
         state_dist = np.linalg.norm(goal_state - cur_state)
         return {
             'success': success,

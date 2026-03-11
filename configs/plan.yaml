@@ -22,9 +22,9 @@ plan:
       run_dirs: []    # when enabled, provide >=2 run directories
 
   mpc:
-    steps: 15
-    horizon: 15
-    replan_every: 15
+    steps: 10
+    horizon: 10
+    replan_every: 10
 
   cem:
     pop_size: 100
@@ -55,14 +55,14 @@ plan:
   #   * in rollout fields: resolves to the current CEM-iteration level
   fidelity:
     enabled: true
-    num_levels: 12   # used by gt_env / particle_sim backends; wm backend uses len(model.K)
+    num_levels: 4   # used by gt_env / particle_sim backends; wm backend uses len(model.K)
     mpc:
-      mode: "linear"            # fixed | linear
-      level: "finest" #"finest"          # used when mode=fixed
+      mode: "fixed"            # fixed | linear
+      level:  "finest"          # used when mode=fixed
       start_level: 0   # used when mode=linear
       end_level: 3       # used when mode=linear
     cem:
-      mode: "linear"            # fixed | linear
+      mode: "fixed"            # fixed | linear
       level: "base"             # used when mode=fixed
       start_level: "base"       # used when mode=linear
       end_level: "finest"       # used when mode=linear
@@ -80,7 +80,7 @@ plan:
 
   gt_env:
     rollout_samples: 1
-    objective_space: "state"  # image | state
+    objective_space: "image"  # image | state
     progress: true            # per-CEM-iteration rollout progress bar
     progress_leave: false     # keep bars after completion
     fidelity_env:
@@ -135,8 +135,8 @@ plan:
       zarr_path:  "/Users/ethanyu/VSCodeProjects/HUDM/synthetic/pusht_synth.zarr"     # if null, falls back to world_model config data.zarr_path
       split: "valid"
       split_ratio: null   # if null, uses world split ratio (or 0.8 without world config)
-      trajectory_len: 15
-      seed: 50
+      trajectory_len: 5
+      seed: 675189 # number or "random"
       reconstruct_goal_state: 3   # 0: use stored goal state, 1: assert reconstructed==stored, 2: use reconstructed, 3: force replay trajectory as GT
 
   render: true

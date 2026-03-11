@@ -18,7 +18,6 @@ from typing import Any, Dict, Optional, Sequence, Tuple
 
 import cv2
 import gym
-import imageio
 import numpy as np
 import torch
 from gym.envs.registration import register
@@ -369,47 +368,44 @@ def _write_video_mp4(
     if len(frames) == 0:
         raise ValueError(f"No frames to write for {path}")
 
-    h = w = int(output_size)
-    processed_frames = []
+    out_hw = int(output_size)
+    if out_hw <= 0:
+        raise ValueError(f"output_size must be > 0, got {output_size}")
+    h = w = out_hw
+    writer = cv2.VideoWriter(
+        str(path),
+        cv2.VideoWriter_fourcc(*"avc1"),
+        float(max(1, int(fps))),
+        (w, h),
+    )
+    if not writer.isOpened():
+        raise RuntimeError(
+            f"Failed to open H.264/AVC MP4 writer for {path}. "
+            "Ensure your OpenCV build has FFmpeg/x264 encoding support."
+        )
 
-    for fr in frames:
-        # 1. Convert to numpy and handle the 'object' dtype issue
-        x = np.asarray(fr)
-        if x.dtype == object:
-            x = x.astype(np.float32)
-        
-        # 2. Handle grayscale/rank 2
-        if x.ndim == 2:
-            x = x[:, :, None]
-        
-        # 3. Ensure 3 channels (RGB)
-        if x.shape[2] == 1:
-            x = np.repeat(x, 3, axis=2)
-        elif x.shape[2] != 3:
-            raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
-
-        # 4. Resize if necessary (OpenCV is still fine for this part)
-        if x.shape[0] != h or x.shape[1] != w:
-            # Ensure uint8 before resize to avoid OpenCV errors
+    try:
+        for fr in frames:
+            x = np.asarray(fr)
+            if x.dtype == object:
+                x = x.astype(np.float32)
+            if x.ndim == 2:
+                x = x[:, :, None]
+            if x.ndim != 3:
+                raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
+            if x.shape[2] == 1:
+                x = np.repeat(x, 3, axis=2)
+            elif x.shape[2] != 3:
+                raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
+            if x.shape[0] != h or x.shape[1] != w:
+                if x.dtype != np.uint8:
+                    x = np.clip(x, 0, 255).astype(np.uint8)
+                x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
             if x.dtype != np.uint8:
                 x = np.clip(x, 0, 255).astype(np.uint8)
-            x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
-
-        # 5. Final check for uint8
-        if x.dtype != np.uint8:
-            x = np.clip(x, 0, 255).astype(np.uint8)
-            
-        processed_frames.append(x)
-
-    # Save using imageio (uses FFmpeg libx264 by default)
-    # This produces web-standard MP4s that VS Code can preview
-    imageio.mimwrite(
-        str(path), 
-        processed_frames, 
-        fps=fps, 
-        codec='libx264', 
-        pixelformat='yuv420p' # Ensures compatibility with most players
-    )
+            writer.write(cv2.cvtColor(x, cv2.COLOR_RGB2BGR))
+    finally:
+        writer.release()
 
 
 def _overlay_start_pose(
