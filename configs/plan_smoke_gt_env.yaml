@@ -1,0 +1,107 @@
+plan:
+  backend: "gt_env"
+  env_id: "pusht"
+  env:
+    with_velocity: true
+    with_target: true
+    add_noise: 0
+    noise_std: [0.5, 0.5]
+    render_size: 128
+  mpc:
+    steps: 4
+    horizon: 4
+    replan_every: 2
+  cem:
+    pop_size: 8
+    elite_frac: 0.25
+    n_iter: 2
+    init_std: 0.5
+    warm_start: true
+    action_low: null
+    action_high: null
+  objective:
+    latent_metric: "l2"
+    terminal_weight: 1.0
+    running_weight: 0.0
+    action_l2_weight: 0.05
+    eef_weight: 1.0
+    block_pos_weight: 1.0
+    block_angle_weight: 0.1
+    state_l2_weight: 0.0
+  fidelity:
+    enabled: true
+    num_levels: 4
+    mpc:
+      mode: "fixed"
+      level: "finest"
+    cem:
+      mode: "fixed"
+      level: "base"
+    rollout:
+      mode: "fixed"
+      level: "base"
+      uncertainty:
+        criterion: "mean"
+        threshold: 0.05
+        percentile: 0.8
+        min_level: "coarsest"
+        max_downshifts_per_step: 1
+  gt_env:
+    rollout_samples: 1
+    objective_space: "state"
+    progress: false
+    progress_leave: false
+    fidelity_env:
+      mode: "blur_avgpool"
+      blur_sigma_max: 1.0
+      pool_scale_max: 2
+      quantize_levels_min: 8
+      quantize_levels_max: 256
+      action_noise_std_max: 0.0
+      downsample_output: false
+      min_downsample_size: 12
+  particle_env:
+    rollout_samples: 1
+    objective_space: "state"
+    progress: false
+    progress_leave: false
+    fidelity_env:
+      spacings: [0.1, 0.08, 0.06, 0.04]
+      device: "auto"
+      xmin: -0.25
+      xmax: 0.25
+      ymin: -0.25
+      ymax: 0.25
+      min_particles: 1
+      coarsest_single_particle: true
+      particle_radius: null
+      radius_scale: 1.0
+      radius_clip_spacing: false
+      stem_w: 0.05
+      stem_h: 0.10
+      bar_w: 0.12
+      bar_h: 0.04
+      pusher_radius: 0.015
+      pusher_speed: 0.6
+      pusher_interp_substeps: true
+      frame_dt: 0.0166666667
+      substeps: 8
+      iters: 4
+      mu: 0.6
+      contact_alpha: 0.35
+      ground_friction_accel: 1000000.0
+      rest_speed_eps: 0.5
+      lin_damp: 0.995
+      vel_damp: 0.999
+      alpha_rigid: 1.0
+  init_goal:
+    source: "dataset"
+    dataset:
+      zarr_path: "/Users/ethanyu/VSCodeProjects/HUDM/synthetic/pusht_synth.zarr"
+      split: "valid"
+      split_ratio: null
+      trajectory_len: 4
+      seed: 0
+      reconstruct_goal_state: 3
+  render: false
+  save: false

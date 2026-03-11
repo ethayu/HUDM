@@ -12,8 +12,9 @@ import os
 import random
 import sys
 import json
+import copy
 from datetime import datetime
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Sequence, Tuple
 
 import cv2
 import gym
@@ -279,6 +280,7 @@ def _sample_init_goal_states(
     env: PushTWrapper,
     cfg: DictConfig,
     wm_cfg: DictConfig | None,
+    selection: Optional[dict] = None,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     src = str(cfg.init_goal.source).lower()
     if src == "random":
@@ -308,6 +310,7 @@ def _sample_init_goal_states(
         split_ratio=float(split_ratio),
         seed=sample_seed,
         reconstruct_goal_state=int(getattr(ds_cfg, "reconstruct_goal_state", 0)),
+        selection=selection,
     )
     print(
         "[init_goal] source=dataset "
@@ -612,7 +615,7 @@ def _run_closed_loop(
     init_state: np.ndarray,
     goal_state: np.ndarray,
     device: torch.device,
-) -> Tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray], dict]:
+) -> tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray], dict, dict]:
     _set_start_pose(env, init_state)
     particle_backend = None
     if backend == "particle_sim":
@@ -637,6 +640,15 @@ def _run_closed_loop(
     trajectory = [cur_state.copy()]
     frames: list[np.ndarray] = []
     planner_frames: list[np.ndarray] = []
+    executed_actions: list[np.ndarray] = []
+    pos_diffs: list[float] = []
+    angle_diffs: list[float] = []
+    eef_diffs: list[float] = []
+    coverages: list[float] = []
+    metric_success_flags: list[bool] = []
+    done_flags: list[bool] = []
+    state_dists: list[float] = []
+    replan_traces: list[dict[str, Any]] = []
     last_term: dict | None = None
     if bool(cfg.save):
         frames.append(env.render("rgb_array", include_start_pose=True))
@@ -666,7 +678,19 @@ def _run_closed_loop(
             "termination_eef_diff": float(initial_term["eef_diff"]),
             "termination_coverage": initial_term["coverage"],
         }
-        return True, trajectory, frames, planner_frames, stats,[],[],[]
+        trace = {
+            "executed_actions": [],
+            "trajectory": np.asarray(trajectory, dtype=np.float32).tolist(),
+            "pos_diffs": [],
+            "angle_diffs": [],
+            "eef_diffs": [],
+            "coverages": [],
+            "metric_success_flags": [],
+            "done_flags": [],
+            "state_dists": [],
+            "replans": [],
+        }
+        return True, trajectory, frames, planner_frames, stats, trace
 
     steps = int(cfg.mpc.steps)
     horizon = int(cfg.mpc.horizon)
@@ -684,6 +708,7 @@ def _run_closed_loop(
     while t < steps:
         mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
         z_cur_for_plan = None
+        plan_seed = int(1009 * replan_idx + 7919 * t)
         if backend == "wm":
             z_cur_for_plan = _encode_visual(wm, obs["visual"], device)
             action_seq, info = planner.plan(
@@ -691,14 +716,16 @@ def _run_closed_loop(
                 z_goal,
                 mpc_progress=mpc_progress,
                 warm_start_steps=int(prev_exec_steps),
+                seed=plan_seed,
             )
         elif backend == "gt_env":
             action_seq, info = planner.plan(
                 init_state=cur_state,
                 goal_state=goal_state,
                 mpc_progress=mpc_progress,
-                seed=int(1009 * replan_idx + 7919 * t),
+                seed=plan_seed,
                 warm_start_steps=int(prev_exec_steps),
+                rng_seed=plan_seed,
             )
             # GT-env planner rollouts reuse env and mutate/reset it internally.
             # Restore the true execution state/goal before applying planned actions.
@@ -710,10 +737,12 @@ def _run_closed_loop(
                 init_state=cur_state,
                 goal_state=goal_state,
                 mpc_progress=mpc_progress,
-                seed=int(1009 * replan_idx + 7919 * t),
+                seed=plan_seed,
                 warm_start_steps=int(prev_exec_steps),
+                rng_seed=plan_seed,
             )
 
+        planned_actions_np = np.asarray(action_seq.detach().cpu().numpy(), dtype=np.float32)
         bits_used = int(getattr(info, "bits_used_estimate", 0))
         flops_used = _bits_to_flops_estimate(bits_used)
         plan_time = float(getattr(info, "plan_time_sec", 0.0))
@@ -728,6 +757,25 @@ def _run_closed_loop(
                 f"flops {flops_used} ({_format_flops_human(flops_used)})  "
                 f"time {plan_time:.3f}s"
             )
+
+        replan_traces.append(
+            {
+                "replan_idx": int(replan_idx),
+                "step_start": int(t),
+                "mpc_progress": float(mpc_progress),
+                "seed": int(plan_seed),
+                "action_seq": planned_actions_np.tolist(),
+                "base_level_idx": int(getattr(info, "base_level_idx", -1)),
+                "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
+                "bits_used_estimate": bits_used,
+                "flops_used_estimate": flops_used,
+                "plan_time_sec": plan_time,
+                "base_k": None if getattr(info, "base_k", None) is None else int(getattr(info, "base_k")),
+                "base_spacing": None if getattr(info, "base_spacing", None) is None else float(getattr(info, "base_spacing")),
+                "base_num_particles": None if getattr(info, "base_num_particles", None) is None else int(getattr(info, "base_num_particles")),
+                "start_state": np.asarray(cur_state, dtype=np.float32).tolist(),
+            }
+        )
 
         # Add first planner-view frame (t=0) after the first plan is available.
         if bool(cfg.save) and len(planner_frames) == 0:
@@ -779,11 +827,9 @@ def _run_closed_loop(
                 )
 
         n_exec = min(replan_every, horizon, steps - t)
-        pos_diffs = []
-        angle_diffs = []
-        eef_diffs = []
         for i in range(n_exec):
-            action = np.asarray(action_seq[i].numpy(), dtype=np.float32)
+            action = np.asarray(planned_actions_np[i], dtype=np.float32)
+            executed_actions.append(action.copy())
             obs, _, done, step_info = env.step(action)
             cur_state = step_info["state"]
             trajectory.append(cur_state.copy())
@@ -796,7 +842,11 @@ def _run_closed_loop(
             pos_diffs.append(pd)
             angle_diffs.append(ad)
             eef_diffs.append(ed)
+            coverages.append(float(term["coverage"]) if term["coverage"] is not None else float("nan"))
+            metric_success_flags.append(bool(term["success"]))
+            done_flags.append(bool(term["done"]))
             dist = term["state_dist"]
+            state_dists.append(float(dist))
             base_k = getattr(info, "base_k", None)
             base_spacing = getattr(info, "base_spacing", None)
             base_np = getattr(info, "base_num_particles", None)
@@ -887,7 +937,19 @@ def _run_closed_loop(
                     "termination_eef_diff": float(term["eef_diff"]),
                     "termination_coverage": term["coverage"],
                 }
-                return True, trajectory, frames, planner_frames, stats, pos_diffs, angle_diffs, eef_diffs
+                trace = {
+                    "executed_actions": np.asarray(executed_actions, dtype=np.float32).tolist(),
+                    "trajectory": np.asarray(trajectory, dtype=np.float32).tolist(),
+                    "pos_diffs": [float(x) for x in pos_diffs],
+                    "angle_diffs": [float(x) for x in angle_diffs],
+                    "eef_diffs": [float(x) for x in eef_diffs],
+                    "coverages": [float(x) for x in coverages],
+                    "metric_success_flags": [bool(x) for x in metric_success_flags],
+                    "done_flags": [bool(x) for x in done_flags],
+                    "state_dists": [float(x) for x in state_dists],
+                    "replans": replan_traces,
+                }
+                return True, trajectory, frames, planner_frames, stats, trace
 
             t += 1
 
@@ -919,12 +981,23 @@ def _run_closed_loop(
         "termination_eef_diff": None if last_term is None else float(last_term["eef_diff"]),
         "termination_coverage": None if last_term is None else last_term["coverage"],
     }
-    return False, trajectory, frames, planner_frames, stats, pos_diffs, angle_diffs, eef_diffs
+    trace = {
+        "executed_actions": np.asarray(executed_actions, dtype=np.float32).tolist(),
+        "trajectory": np.asarray(trajectory, dtype=np.float32).tolist(),
+        "pos_diffs": [float(x) for x in pos_diffs],
+        "angle_diffs": [float(x) for x in angle_diffs],
+        "eef_diffs": [float(x) for x in eef_diffs],
+        "coverages": [float(x) for x in coverages],
+        "metric_success_flags": [bool(x) for x in metric_success_flags],
+        "done_flags": [bool(x) for x in done_flags],
+        "state_dists": [float(x) for x in state_dists],
+        "replans": replan_traces,
+    }
+    return False, trajectory, frames, planner_frames, stats, trace
 
 
-def main(cfg_path: str) -> None:
-    cfg_root = OmegaConf.load(cfg_path)
-    defaults = {
+def _plan_defaults() -> dict:
+    return {
         "backend": "wm",  # wm | gt_env | particle_sim
         "env_id": "pusht",
         "env": {
@@ -935,12 +1008,10 @@ def main(cfg_path: str) -> None:
             "render_size": 512,
         },
         "world_model": {
-            # If config_path is null, world config is loaded from run_dir/world.yaml
-            # (or first ensemble member's world.yaml).
             "config_path": None,
-            "run_dir": None,   # used in single-model mode
-            "checkpoint_root": "checkpoints_world",  # used if run_dir is null
-            "device": "auto",  # auto | cpu | cuda
+            "run_dir": None,
+            "checkpoint_root": "checkpoints_world",
+            "device": "auto",
             "ensemble": {
                 "enabled": False,
                 "run_dirs": [],
@@ -961,37 +1032,33 @@ def main(cfg_path: str) -> None:
             "action_high": None,
         },
         "objective": {
-            "latent_metric": "l2",  # l1 | l2
+            "latent_metric": "l2",
             "terminal_weight": 1.0,
             "running_weight": 0.0,
             "action_l2_weight": 0.0,
         },
         "fidelity": {
             "enabled": True,
-            "num_levels": 4,  # used by gt_env / particle_sim; wm backend derives count from model.K
-            # Level indices are over model.K (0=coarsest, len(K)-1=finest).
-            # Use integer indices or tokens: "coarsest", "finest", "base".
-            # "base" is valid for CEM and rollout fields; it refers to the
-            # current MPC-stage level in CEM fields and current CEM level in rollout fields.
+            "num_levels": 4,
             "mpc": {
-                "mode": "linear",      # fixed | linear
-                "level": "finest",     # used when mode=fixed
+                "mode": "linear",
+                "level": "finest",
                 "start_level": "coarsest",
                 "end_level": "finest",
             },
             "cem": {
-                "mode": "linear",      # fixed | linear
-                "level": "base",       # used when mode=fixed
+                "mode": "linear",
+                "level": "base",
                 "start_level": "base",
                 "end_level": "finest",
             },
             "rollout": {
-                "mode": "fixed",     # fixed | linear | uncertainty_downshift
-                "level": "base",     # used when mode=fixed
+                "mode": "fixed",
+                "level": "base",
                 "start_level": "base",
                 "end_level": "coarsest",
                 "uncertainty": {
-                    "criterion": "mean",   # mean | percentile
+                    "criterion": "mean",
                     "threshold": 0.05,
                     "percentile": 0.8,
                     "min_level": "coarsest",
@@ -1001,11 +1068,11 @@ def main(cfg_path: str) -> None:
         },
         "gt_env": {
             "rollout_samples": 1,
-            "objective_space": "image",  # image | state
+            "objective_space": "image",
             "progress": True,
             "progress_leave": False,
             "fidelity_env": {
-                "mode": "blur_avgpool",      # blur_avgpool | blur_quantize
+                "mode": "blur_avgpool",
                 "blur_sigma_max": 2.0,
                 "pool_scale_max": 4,
                 "quantize_levels_min": 8,
@@ -1017,13 +1084,12 @@ def main(cfg_path: str) -> None:
         },
         "particle_env": {
             "rollout_samples": 1,
-            "objective_space": "state",  # image | state
+            "objective_space": "state",
             "progress": True,
             "progress_leave": False,
             "fidelity_env": {
-                # Coarsest -> finest. Larger spacing => fewer particles.
                 "spacings": [0.020, 0.016, 0.013, 0.010],
-                "device": "auto",  # auto | cpu | cuda | cuda:0
+                "device": "auto",
                 "xmin": -0.25,
                 "xmax": 0.25,
                 "ymin": -0.25,
@@ -1053,24 +1119,30 @@ def main(cfg_path: str) -> None:
             },
         },
         "init_goal": {
-            "source": "random",  # random | dataset
+            "source": "random",
             "dataset": {
-                "zarr_path": None,      # if None, falls back to world config data.zarr_path
+                "zarr_path": None,
                 "split": "valid",
-                "split_ratio": None,    # if None, falls back to world config split_ratio (or 0.8)
+                "split_ratio": None,
                 "trajectory_len": 20,
                 "seed": 0,
-                "reconstruct_goal_state": 0,  # 0: off, 1: assert reconstructed==stored, 2: use reconstructed, 3: force replay trajectory as GT
+                "reconstruct_goal_state": 0,
             },
         },
         "render": False,
         "save": False,
     }
-    cfg = OmegaConf.merge(defaults, cfg_root.get("plan", cfg_root))
+
+
+def load_plan_cfg(cfg_path: str) -> DictConfig:
+    cfg_root = OmegaConf.load(cfg_path)
+    cfg = OmegaConf.merge(_plan_defaults(), cfg_root.get("plan", cfg_root))
     validate_plan_cfg(cfg)
     cfg.init_goal.dataset.seed = _resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
+    return cfg
 
-    # Register env id.
+
+def _register_plan_env(cfg: DictConfig) -> None:
     try:
         register(
             id=str(cfg.env_id),
@@ -1081,6 +1153,9 @@ def main(cfg_path: str) -> None:
     except gym.error.Error:
         pass
 
+
+def build_plan_runtime(cfg: DictConfig) -> dict:
+    _register_plan_env(cfg)
     env_wrapped = _gym_make_versioned(str(cfg.env_id), cfg.env)
     env: PushTWrapper = _unwrap_env(env_wrapped)
     backend = str(cfg.backend).lower()
@@ -1091,19 +1166,14 @@ def main(cfg_path: str) -> None:
 
     if backend == "wm":
         wm, wm_cfg, run_desc, device = _load_world_model(cfg)
-
-        # Validate environment/model interface.
         model_action_dim = int(wm_cfg.data.action_dim)
         if int(env.action_dim) != model_action_dim:
             raise ValueError(
                 f"Action-dim mismatch: env.action_dim={env.action_dim}, world-model action_dim={model_action_dim}"
             )
         if not bool(cfg.env.with_velocity):
-            # World config default uses velocity-aware state/image trajectories for PushT in this repo.
             print("[warn] plan.env.with_velocity=false may mismatch the world model's training distribution.")
-        # Align fidelity num_levels to the loaded model levels for consistency.
         cfg.fidelity.num_levels = len(wm.K)
-
         planner = LatentCEMPlanner(
             world_model=wm,
             horizon=int(cfg.mpc.horizon),
@@ -1167,21 +1237,23 @@ def main(cfg_path: str) -> None:
             particle_env_cfg=OmegaConf.to_container(cfg.particle_env, resolve=True),
             device=device,
         )
+    return {
+        "env": env,
+        "planner": planner,
+        "wm": wm,
+        "wm_cfg": wm_cfg,
+        "backend": backend,
+        "device": device,
+        "run_desc": run_desc,
+    }
 
-    init_state, goal_state, sample_meta = _sample_init_goal_states(env, cfg, wm_cfg=wm_cfg)
 
-    if str(sample_meta.get("source", "")).lower() == "dataset":
-        gt_len = int(sample_meta.get("trajectory_len", -1))
-        plan_steps = int(cfg.mpc.steps)
-        if gt_len > 0 and gt_len != plan_steps:
-            print(
-                "[warn] Dataset GT trajectory length differs from plan.mpc.steps: "
-                f"gt_len={gt_len}, planned_steps={plan_steps}. "
-                "Set them equal for length-matched visual comparison."
-            )
+def print_plan_runtime_summary(runtime: dict, cfg: DictConfig) -> None:
+    backend = str(runtime["backend"])
+    wm = runtime.get("wm", None)
     print(f"[backend] {backend}")
     if wm is not None:
-        print(f"[world_model] loaded from {run_desc}")
+        print(f"[world_model] loaded from {runtime['run_desc']}")
     else:
         print("[world_model] not used")
     if wm is not None and hasattr(wm, "num_members"):
@@ -1198,90 +1270,296 @@ def main(cfg_path: str) -> None:
         print(f"[particle] spacings={list(cfg.particle_env.fidelity_env.spacings)}")
         print(f"[particle] progress={bool(cfg.particle_env.progress)}")
 
-    success, traj, frames, planner_frames, run_stats, pos_diffs, angle_diffs, eef_diffs = _run_closed_loop(
-        env=env,
-        wm=wm,
-        planner=planner,
-        backend=backend,
+
+def load_selected_rollout(
+    env: PushTWrapper,
+    cfg: DictConfig,
+    wm_cfg: DictConfig | None,
+    selection: dict,
+) -> tuple[np.ndarray, np.ndarray, dict]:
+    if str(cfg.init_goal.source).lower() != "dataset":
+        raise ValueError("Explicit rollout selection requires init_goal.source=dataset.")
+    return _sample_init_goal_states(env, cfg, wm_cfg=wm_cfg, selection=selection)
+
+
+def run_plan_session(
+    cfg: DictConfig,
+    rollout_selection: Optional[dict] = None,
+    schedule_name: Optional[str] = None,
+    print_summary: bool = True,
+) -> dict:
+    runtime = build_plan_runtime(cfg)
+    env = runtime["env"]
+    wm_cfg = runtime["wm_cfg"]
+    if rollout_selection is None:
+        init_state, goal_state, sample_meta = _sample_init_goal_states(env, cfg, wm_cfg=wm_cfg)
+    else:
+        init_state, goal_state, sample_meta = load_selected_rollout(env, cfg, wm_cfg=wm_cfg, selection=rollout_selection)
+    if str(sample_meta.get("source", "")).lower() == "dataset":
+        gt_len = int(sample_meta.get("trajectory_len", -1))
+        plan_steps = int(cfg.mpc.steps)
+        if gt_len > 0 and gt_len != plan_steps:
+            print(
+                "[warn] Dataset GT trajectory length differs from plan.mpc.steps: "
+                f"gt_len={gt_len}, planned_steps={plan_steps}. "
+                "Set them equal for length-matched visual comparison."
+            )
+    if bool(print_summary):
+        print_plan_runtime_summary(runtime, cfg)
+    planner = runtime["planner"]
+    if hasattr(planner, "reset"):
+        planner.reset()
+    success, traj, frames, planner_frames, run_stats, trace = _run_closed_loop(
+        env=runtime["env"],
+        wm=runtime["wm"],
+        planner=runtime["planner"],
+        backend=runtime["backend"],
         cfg=cfg,
         init_state=init_state,
         goal_state=goal_state,
-        device=device,
+        device=runtime["device"],
     )
+    return {
+        "cfg": cfg,
+        "runtime": runtime,
+        "success": bool(success),
+        "trajectory": traj,
+        "frames": frames,
+        "planner_frames": planner_frames,
+        "run_stats": run_stats,
+        "trace": trace,
+        "init_state": np.asarray(init_state, dtype=np.float32),
+        "goal_state": np.asarray(goal_state, dtype=np.float32),
+        "sample_meta": sample_meta,
+        "schedule_name": schedule_name,
+    }
+
+
+def _trace_arrays_from_trace(trace: dict) -> dict:
+    replans = list(trace.get("replans", []))
+    n_replans = len(replans)
+    action_dim = 0
+    horizon = 0
+    state_dim = 0
+    if len(trace.get("executed_actions", [])) > 0:
+        action_dim = int(np.asarray(trace["executed_actions"], dtype=np.float32).shape[-1])
+    if len(trace.get("trajectory", [])) > 0:
+        state_dim = int(np.asarray(trace["trajectory"], dtype=np.float32).shape[-1])
+    if n_replans > 0:
+        horizon = int(np.asarray(replans[0]["action_seq"], dtype=np.float32).shape[0])
+        if action_dim == 0:
+            action_dim = int(np.asarray(replans[0]["action_seq"], dtype=np.float32).shape[-1])
+        if state_dim == 0:
+            state_dim = int(np.asarray(replans[0]["start_state"], dtype=np.float32).shape[-1])
+    rollout_len_max = max((len(r.get("rollout_level_indices", [])) for r in replans), default=0)
+    replan_action_seqs = np.zeros((n_replans, horizon, action_dim), dtype=np.float32)
+    replan_start_states = np.zeros((n_replans, state_dim), dtype=np.float32)
+    replan_rollout_levels = np.full((n_replans, rollout_len_max), -1, dtype=np.int32)
+    replan_rollout_lengths = np.zeros((n_replans,), dtype=np.int32)
+    replan_step_starts = np.zeros((n_replans,), dtype=np.int32)
+    replan_mpc_progress = np.zeros((n_replans,), dtype=np.float32)
+    replan_seeds = np.zeros((n_replans,), dtype=np.int64)
+    replan_base_levels = np.full((n_replans,), -1, dtype=np.int32)
+    replan_bits = np.zeros((n_replans,), dtype=np.int64)
+    replan_flops = np.zeros((n_replans,), dtype=np.int64)
+    replan_plan_times = np.zeros((n_replans,), dtype=np.float32)
+    replan_base_ks = np.full((n_replans,), -1, dtype=np.int32)
+    replan_base_num_particles = np.full((n_replans,), -1, dtype=np.int32)
+    replan_base_spacings = np.full((n_replans,), np.nan, dtype=np.float32)
+    for idx, replan in enumerate(replans):
+        replan_action_seqs[idx] = np.asarray(replan["action_seq"], dtype=np.float32)
+        replan_start_states[idx] = np.asarray(replan["start_state"], dtype=np.float32)
+        rl = np.asarray(replan.get("rollout_level_indices", []), dtype=np.int32)
+        replan_rollout_lengths[idx] = int(rl.shape[0])
+        if rl.shape[0] > 0:
+            replan_rollout_levels[idx, : rl.shape[0]] = rl
+        replan_step_starts[idx] = int(replan.get("step_start", 0))
+        replan_mpc_progress[idx] = float(replan.get("mpc_progress", 0.0))
+        replan_seeds[idx] = int(replan.get("seed", 0))
+        replan_base_levels[idx] = int(replan.get("base_level_idx", -1))
+        replan_bits[idx] = int(replan.get("bits_used_estimate", 0))
+        replan_flops[idx] = int(replan.get("flops_used_estimate", 0))
+        replan_plan_times[idx] = float(replan.get("plan_time_sec", 0.0))
+        if replan.get("base_k", None) is not None:
+            replan_base_ks[idx] = int(replan["base_k"])
+        if replan.get("base_num_particles", None) is not None:
+            replan_base_num_particles[idx] = int(replan["base_num_particles"])
+        if replan.get("base_spacing", None) is not None:
+            replan_base_spacings[idx] = float(replan["base_spacing"])
+    return {
+        "executed_actions": np.asarray(trace.get("executed_actions", []), dtype=np.float32),
+        "trajectory": np.asarray(trace.get("trajectory", []), dtype=np.float32),
+        "pos_diffs": np.asarray(trace.get("pos_diffs", []), dtype=np.float32),
+        "angle_diffs": np.asarray(trace.get("angle_diffs", []), dtype=np.float32),
+        "eef_diffs": np.asarray(trace.get("eef_diffs", []), dtype=np.float32),
+        "coverages": np.asarray(trace.get("coverages", []), dtype=np.float32),
+        "metric_success_flags": np.asarray(trace.get("metric_success_flags", []), dtype=np.bool_),
+        "done_flags": np.asarray(trace.get("done_flags", []), dtype=np.bool_),
+        "state_dists": np.asarray(trace.get("state_dists", []), dtype=np.float32),
+        "replan_action_seqs": replan_action_seqs,
+        "replan_start_states": replan_start_states,
+        "replan_rollout_levels": replan_rollout_levels,
+        "replan_rollout_lengths": replan_rollout_lengths,
+        "replan_step_starts": replan_step_starts,
+        "replan_mpc_progress": replan_mpc_progress,
+        "replan_seeds": replan_seeds,
+        "replan_base_levels": replan_base_levels,
+        "replan_bits": replan_bits,
+        "replan_flops": replan_flops,
+        "replan_plan_times": replan_plan_times,
+        "replan_base_ks": replan_base_ks,
+        "replan_base_num_particles": replan_base_num_particles,
+        "replan_base_spacings": replan_base_spacings,
+    }
+
+
+def _save_error_curves(path: str, trace: dict) -> None:
+    import matplotlib.pyplot as plt
+
+    pos_diffs = list(trace.get("pos_diffs", []))
+    angle_diffs = list(trace.get("angle_diffs", []))
+    eef_diffs = list(trace.get("eef_diffs", []))
+    if len(pos_diffs) == 0 and len(angle_diffs) == 0 and len(eef_diffs) == 0:
+        return
+    plt.xlabel("Step")
+    plt.ylabel("Distance")
+    plt.title("Positional, Angular and End-effector Distance vs Step")
+    if len(pos_diffs) > 0:
+        plt.plot(range(len(pos_diffs)), pos_diffs, label="pos_diffs")
+    if len(angle_diffs) > 0:
+        plt.plot(range(len(angle_diffs)), angle_diffs, label="angle_diffs")
+    if len(eef_diffs) > 0:
+        plt.plot(range(len(eef_diffs)), eef_diffs, label="eef_diffs")
+    plt.legend()
+    plt.savefig(path)
+    plt.close()
+
+
+def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
+    arrays = _trace_arrays_from_trace(result["trace"])
+    arrays_path = os.path.join(run_dir, "trace.npz")
+    np.savez_compressed(arrays_path, **arrays)
+    meta = {
+        "trace_version": 1,
+        "backend": result["runtime"]["backend"],
+        "success": bool(result["success"]),
+        "schedule_name": result.get("schedule_name", None),
+        "sample": result["sample_meta"],
+        "run_stats": result["run_stats"],
+        "init_state": np.asarray(result["init_state"], dtype=np.float32).tolist(),
+        "goal_state": np.asarray(result["goal_state"], dtype=np.float32).tolist(),
+        "plan_config": OmegaConf.to_container(result["cfg"], resolve=True),
+        "arrays_file": "trace.npz",
+        "replans": [
+            {
+                "replan_idx": int(replan.get("replan_idx", idx)),
+                "step_start": int(replan.get("step_start", 0)),
+                "mpc_progress": float(replan.get("mpc_progress", 0.0)),
+                "seed": int(replan.get("seed", 0)),
+                "base_level_idx": int(replan.get("base_level_idx", -1)),
+                "rollout_level_indices": [int(x) for x in list(replan.get("rollout_level_indices", []))],
+                "bits_used_estimate": int(replan.get("bits_used_estimate", 0)),
+                "flops_used_estimate": int(replan.get("flops_used_estimate", 0)),
+                "plan_time_sec": float(replan.get("plan_time_sec", 0.0)),
+                "base_k": replan.get("base_k", None),
+                "base_spacing": replan.get("base_spacing", None),
+                "base_num_particles": replan.get("base_num_particles", None),
+            }
+            for idx, replan in enumerate(result["trace"].get("replans", []))
+        ],
+    }
+    meta_path = os.path.join(run_dir, "trace.json")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+    return meta_path, arrays_path
+
+
+def save_plan_result(
+    result: dict,
+    run_dir: str,
+    save_media: bool = True,
+) -> dict:
+    os.makedirs(run_dir, exist_ok=True)
+    cfg = result["cfg"]
+    backend = result["runtime"]["backend"]
+    source = str(result["sample_meta"].get("source", "unknown"))
+    created_at = datetime.now().strftime("%Y%m%d_%H%M%S")
+    trace_json_path, trace_npz_path = save_trace_bundle(run_dir, result)
+    _save_error_curves(os.path.join(run_dir, "pos_diffs_angle_diffs_eef_diffs.png"), result["trace"])
+    meta = {
+        "created_at": created_at,
+        "backend": backend,
+        "source": source,
+        "success": bool(result["success"]),
+        "planned_steps": int(len(result["trajectory"]) - 1),
+        "plans": int(result["run_stats"]["plans"]),
+        "bits_used_total": int(result["run_stats"]["bits_used_total"]),
+        "bits_used_total_human": _format_bits_human(int(result["run_stats"]["bits_used_total"])),
+        "flops_used_total": int(result["run_stats"]["flops_used_total"]),
+        "flops_used_total_human": _format_flops_human(int(result["run_stats"]["flops_used_total"])),
+        "plan_time_total_sec": float(result["run_stats"]["plan_time_total_sec"]),
+        "termination_reason": str(result["run_stats"].get("termination_reason", "unknown")),
+        "termination_step": int(result["run_stats"].get("termination_step", -1)),
+        "termination_metric_success": bool(result["run_stats"].get("termination_metric_success", False)),
+        "termination_done": bool(result["run_stats"].get("termination_done", False)),
+        "termination_pos_diff": result["run_stats"].get("termination_pos_diff", None),
+        "termination_angle_diff": result["run_stats"].get("termination_angle_diff", None),
+        "termination_eef_diff": result["run_stats"].get("termination_eef_diff", None),
+        "termination_coverage": result["run_stats"].get("termination_coverage", None),
+        "init_state": np.asarray(result["init_state"], dtype=np.float32).tolist(),
+        "goal_state": np.asarray(result["goal_state"], dtype=np.float32).tolist(),
+        "sample": result["sample_meta"],
+        "schedule_name": result.get("schedule_name", None),
+        "plan_config": OmegaConf.to_container(cfg, resolve=True),
+        "trace_json": os.path.basename(trace_json_path),
+        "trace_npz": os.path.basename(trace_npz_path),
+    }
+    meta_path = os.path.join(run_dir, "metadata.json")
+    with open(meta_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, indent=2)
+
+    if not save_media:
+        return meta
+
+    if len(result["frames"]) > 0:
+        out_path = os.path.join(run_dir, "planned.mp4")
+        print(f"[save] Writing rollout MP4 to {out_path}")
+        _write_video_mp4(out_path, result["frames"], fps=15)
+        print(f"[save] Video saved ({len(result['frames'])} frames)")
+
+    if source == "dataset":
+        gt_frames = _render_dataset_gt_frames(
+            env=result["runtime"]["env"],
+            sample_meta=result["sample_meta"],
+            init_state=result["init_state"],
+            goal_state=result["goal_state"],
+        )
+        if len(gt_frames) > 0:
+            gt_path = os.path.join(run_dir, "gt.mp4")
+            print(f"[save] Writing dataset GT MP4 to {gt_path}")
+            _write_video_mp4(gt_path, gt_frames, fps=15)
+            print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
+
+    if len(result["planner_frames"]) > 0:
+        planner_path = os.path.join(run_dir, "planner_view.mp4")
+        print(f"[save] Writing planner-view MP4 to {planner_path}")
+        _write_video_mp4(planner_path, result["planner_frames"], fps=15)
+        print(f"[save] Planner-view video saved ({len(result['planner_frames'])} frames)")
+    return meta
+
+
+def main(cfg_path: str) -> None:
+    cfg = load_plan_cfg(cfg_path)
+    result = run_plan_session(cfg)
 
     if bool(cfg.save):
         rollout_root = "rollouts"
         os.makedirs(rollout_root, exist_ok=True)
         run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        run_dir = os.path.join(rollout_root, f"plan_{backend}_{run_ts}")
-        os.makedirs(run_dir, exist_ok=True)
-        source = str(sample_meta.get("source", "unknown"))
-        out_path = os.path.join(run_dir, "planned.mp4")
-        print(f"[save] Writing rollout MP4 to {out_path}")
-        _write_video_mp4(out_path, frames, fps=15)
-        print(f"[save] Video saved ({len(frames)} frames)")
+        run_dir = os.path.join(rollout_root, f"plan_{result['runtime']['backend']}_{run_ts}")
+        save_plan_result(result, run_dir, save_media=True)
 
-        import matplotlib.pyplot as plt
-        #xaxis is the step number
-        plt.xlabel('Step')
-        plt.ylabel('Distance')
-        plt.title('Positional, Angular and End-effector Distance vs Step')
-        plt.plot(range(len(pos_diffs)), pos_diffs, label='pos_diffs')
-        plt.plot(range(len(angle_diffs)), angle_diffs, label='angle_diffs')
-        plt.plot(range(len(eef_diffs)), eef_diffs, label='eef_diffs')
-        plt.legend()
-        plt.savefig(os.path.join(run_dir, "pos_diffs_angle_diffs_eef_diffs.png"))
-        plt.close() 
-
-        meta = {
-            "created_at": run_ts,
-            "backend": backend,
-            "source": source,
-            "success": bool(success),
-            "planned_steps": int(len(traj) - 1),
-            "plans": int(run_stats["plans"]),
-            "bits_used_total": int(run_stats["bits_used_total"]),
-            "bits_used_total_human": _format_bits_human(int(run_stats["bits_used_total"])),
-            "flops_used_total": int(run_stats["flops_used_total"]),
-            "flops_used_total_human": _format_flops_human(int(run_stats["flops_used_total"])),
-            "plan_time_total_sec": float(run_stats["plan_time_total_sec"]),
-            "termination_reason": str(run_stats.get("termination_reason", "unknown")),
-            "termination_step": int(run_stats.get("termination_step", -1)),
-            "termination_metric_success": bool(run_stats.get("termination_metric_success", False)),
-            "termination_done": bool(run_stats.get("termination_done", False)),
-            "termination_pos_diff": run_stats.get("termination_pos_diff", None),
-            "termination_angle_diff": run_stats.get("termination_angle_diff", None),
-            "termination_eef_diff": run_stats.get("termination_eef_diff", None),
-            "termination_coverage": run_stats.get("termination_coverage", None),
-            "init_state": np.asarray(init_state, dtype=np.float32).tolist(),
-            "goal_state": np.asarray(goal_state, dtype=np.float32).tolist(),
-            "sample": sample_meta,
-            "plan_config": OmegaConf.to_container(cfg, resolve=True),
-        }
-        meta_path = os.path.join(run_dir, "metadata.json")
-        with open(meta_path, "w", encoding="utf-8") as f:
-            json.dump(meta, f, indent=2)
-        print(f"[save] Metadata written to {meta_path}")
-
-        if source == "dataset":
-            gt_frames = _render_dataset_gt_frames(
-                env=env,
-                sample_meta=sample_meta,
-                init_state=init_state,
-                goal_state=goal_state,
-            )
-            if len(gt_frames) > 0:
-                gt_path = os.path.join(run_dir, "gt.mp4")
-                print(f"[save] Writing dataset GT MP4 to {gt_path}")
-                _write_video_mp4(gt_path, gt_frames, fps=15)
-                print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
-
-        if len(planner_frames) > 0:
-            planner_path = os.path.join(run_dir, "planner_view.mp4")
-            print(f"[save] Writing planner-view MP4 to {planner_path}")
-            _write_video_mp4(planner_path, planner_frames, fps=15)
-            print(f"[save] Planner-view video saved ({len(planner_frames)} frames)")
-
+    run_stats = result["run_stats"]
     print(
         f"[planning_stats] plans={run_stats['plans']}  "
         f"bits_used_total={run_stats['bits_used_total']} "
@@ -1290,7 +1568,7 @@ def main(cfg_path: str) -> None:
         f"({ _format_flops_human(int(run_stats['flops_used_total'])) })  "
         f"plan_time_total_sec={run_stats['plan_time_total_sec']:.3f}"
     )
-    print("Reached goal:", success)
+    print("Reached goal:", result["success"])
 
 
 if __name__ == "__main__":

@@ -156,6 +156,9 @@ class LatentCEMPlanner:
         # RMS distance keeps scale more stable across changing latent prefix sizes.
         return torch.sqrt(diff.pow(2).mean(dim=1) + 1e-8)
 
+    def reset(self) -> None:
+        self.core.reset_distribution()
+
     @torch.no_grad()
     def _evaluate_population(
         self,
@@ -264,6 +267,7 @@ class LatentCEMPlanner:
         z_goal: torch.Tensor,   # (1,D)
         mpc_progress: float = 0.0,
         warm_start_steps: int = 0,
+        seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, LatentCEMInfo]:
         t0 = time.perf_counter()
         if z0.shape[-1] != self.D or z_goal.shape[-1] != self.D:
@@ -285,6 +289,7 @@ class LatentCEMPlanner:
             evaluate_population=_evaluate,
             warm_start=self.warm_start,
             shift_steps=int(warm_start_steps),
+            rng_seed=None if seed is None else int(seed),
         )
 
         info = LatentCEMInfo(

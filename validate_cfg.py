@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from typing import List
 
+from omegaconf import OmegaConf
+
 
 def _reject_unknown_keys(cfg_section, allowed: set[str], prefix: str) -> None:
     if cfg_section is None or not hasattr(cfg_section, "keys"):
@@ -304,6 +306,102 @@ def validate_plan_cfg(cfg) -> None:
             raise ValueError(
                 "plan.world_model.ensemble.run_dirs is set but ensemble is disabled."
             )
+
+
+def validate_planner_eval_cfg(cfg, base_plan_cfg=None) -> None:
+    _reject_unknown_keys(
+        cfg,
+        {
+            "plan_config",
+            "seed",
+            "num_rollouts",
+            "sample_without_replacement",
+            "output_root",
+            "parallel",
+            "schedules",
+        },
+        "planner_eval",
+    )
+    _reject_unknown_keys(cfg.parallel, {"mode", "max_workers", "wm_schedule_batch_size"}, "planner_eval.parallel")
+
+    if int(cfg.num_rollouts) <= 0:
+        raise ValueError(f"planner_eval.num_rollouts must be > 0, got {cfg.num_rollouts}")
+    if int(cfg.seed) < 0:
+        raise ValueError(f"planner_eval.seed must be >= 0, got {cfg.seed}")
+    if not isinstance(cfg.sample_without_replacement, bool):
+        raise ValueError(
+            "planner_eval.sample_without_replacement must be a bool, "
+            f"got {type(cfg.sample_without_replacement).__name__}"
+        )
+    parallel_mode = str(getattr(cfg.parallel, "mode", "auto")).lower()
+    if parallel_mode not in {"auto", "serial", "process", "wm_batch"}:
+        raise ValueError(
+            "planner_eval.parallel.mode must be one of auto|serial|process|wm_batch, "
+            f"got {cfg.parallel.mode}"
+        )
+    if int(getattr(cfg.parallel, "max_workers", 1)) <= 0:
+        raise ValueError(
+            f"planner_eval.parallel.max_workers must be > 0, got {cfg.parallel.max_workers}"
+        )
+    if int(getattr(cfg.parallel, "wm_schedule_batch_size", 1)) <= 0:
+        raise ValueError(
+            "planner_eval.parallel.wm_schedule_batch_size must be > 0, "
+            f"got {cfg.parallel.wm_schedule_batch_size}"
+        )
+    if cfg.schedules is None or len(cfg.schedules) <= 0:
+        raise ValueError("planner_eval.schedules must contain at least one schedule.")
+
+    names = []
+    for idx, schedule in enumerate(cfg.schedules):
+        _reject_unknown_keys(schedule, {"name", "fidelity"}, f"planner_eval.schedules[{idx}]")
+        if not str(schedule.name).strip():
+            raise ValueError(f"planner_eval.schedules[{idx}].name must be non-empty.")
+        names.append(str(schedule.name))
+        _reject_unknown_keys(schedule.fidelity, {"enabled", "num_levels", "mpc", "cem", "rollout"}, f"planner_eval.schedules[{idx}].fidelity")
+        if getattr(schedule.fidelity, "mpc", None) is not None:
+            _reject_unknown_keys(
+                schedule.fidelity.mpc,
+                {"mode", "level", "start_level", "end_level"},
+                f"planner_eval.schedules[{idx}].fidelity.mpc",
+            )
+        if getattr(schedule.fidelity, "cem", None) is not None:
+            _reject_unknown_keys(
+                schedule.fidelity.cem,
+                {"mode", "level", "start_level", "end_level"},
+                f"planner_eval.schedules[{idx}].fidelity.cem",
+            )
+        if getattr(schedule.fidelity, "rollout", None) is not None:
+            _reject_unknown_keys(
+                schedule.fidelity.rollout,
+                {"mode", "level", "start_level", "end_level", "uncertainty"},
+                f"planner_eval.schedules[{idx}].fidelity.rollout",
+            )
+            if getattr(schedule.fidelity.rollout, "uncertainty", None) is not None:
+                _reject_unknown_keys(
+                    schedule.fidelity.rollout.uncertainty,
+                    {"criterion", "threshold", "percentile", "min_level", "max_downshifts_per_step"},
+                    f"planner_eval.schedules[{idx}].fidelity.rollout.uncertainty",
+                )
+    if len(set(names)) != len(names):
+        raise ValueError("planner_eval.schedules contains duplicate schedule names.")
+
+    if base_plan_cfg is not None:
+        if str(base_plan_cfg.init_goal.source).lower() != "dataset":
+            raise ValueError("planner_eval requires plan.init_goal.source='dataset'.")
+        backend = str(base_plan_cfg.backend).lower()
+        if parallel_mode == "wm_batch" and backend != "wm":
+            raise ValueError("planner_eval.parallel.mode='wm_batch' requires plan.backend='wm'.")
+        for idx, schedule in enumerate(cfg.schedules):
+            merged = OmegaConf.merge(
+                OmegaConf.create(OmegaConf.to_container(base_plan_cfg, resolve=True)),
+                OmegaConf.create({"fidelity": OmegaConf.to_container(schedule.fidelity, resolve=True)}),
+            )
+            try:
+                validate_plan_cfg(merged)
+            except Exception as exc:
+                raise ValueError(
+                    f"planner_eval.schedules[{idx}] produces an invalid merged plan config: {exc}"
+                ) from exc
 
 
 def validate_world_cfg(cfg, wandb_available: bool = True) -> None:

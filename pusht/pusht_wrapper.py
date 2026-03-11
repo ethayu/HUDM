@@ -160,6 +160,7 @@ class PushTWrapper(PushTEnv):
         min_block_angle_delta: float = np.pi / 9.0,
         max_resample_tries: int = 512,
         require_agent_in_frame: bool = True,
+        selection=None,
     ):
         if trajectory_len <= 0:
             raise ValueError(f"trajectory_len must be > 0, got {trajectory_len}")
@@ -272,6 +273,36 @@ class PushTWrapper(PushTEnv):
                 "reconstruct_goal_state must be one of {0,1,2,3}, "
                 f"got {reconstruct_goal_state}"
             )
+        explicit_selection = None
+        if selection is not None:
+            if not isinstance(selection, dict):
+                raise ValueError(f"selection must be a mapping/dict, got {type(selection).__name__}")
+            explicit_episode = selection.get("episode_index", None)
+            explicit_start = selection.get("start_index", None)
+            explicit_goal = selection.get("goal_index", None)
+            if explicit_episode is None or explicit_start is None:
+                raise ValueError("selection must include episode_index and start_index.")
+            explicit_episode = int(explicit_episode)
+            explicit_start = int(explicit_start)
+            explicit_goal = explicit_start + int(trajectory_len) if explicit_goal is None else int(explicit_goal)
+            if explicit_goal - explicit_start != int(trajectory_len):
+                raise ValueError(
+                    "Explicit selection must satisfy goal_index - start_index == trajectory_len, "
+                    f"got start={explicit_start}, goal={explicit_goal}, trajectory_len={trajectory_len}."
+                )
+            allowed_episode_ids = {int(ei) for ei, _, _ in candidates}
+            if explicit_episode not in allowed_episode_ids:
+                raise ValueError(
+                    f"Explicit selection episode_index={explicit_episode} is not in split '{split_l}'."
+                )
+            s_ep = int(starts[explicit_episode])
+            e_ep = int(ends[explicit_episode])
+            if explicit_start < s_ep or explicit_goal > e_ep:
+                raise ValueError(
+                    f"Explicit selection [{explicit_start}, {explicit_goal}] is outside episode "
+                    f"{explicit_episode} bounds [{s_ep}, {e_ep}]."
+                )
+            explicit_selection = (explicit_episode, explicit_start, explicit_goal)
         frame_min = 0.0
         frame_max = float(getattr(self, "window_size", 512))
         require_agent_visible = bool(require_agent_in_frame)
@@ -400,9 +431,12 @@ class PushTWrapper(PushTEnv):
         fallback = None
         fallback_score = -np.inf
         for attempt_idx in range(n_tries):
-            ei, s, e = candidates[int(rng.integers(0, len(candidates)))]
-            start_idx = int(rng.integers(s, e - trajectory_len + 1))
-            goal_idx = start_idx + trajectory_len
+            if explicit_selection is not None:
+                ei, start_idx, goal_idx = explicit_selection
+            else:
+                ei, s, e = candidates[int(rng.integers(0, len(candidates)))]
+                start_idx = int(rng.integers(s, e - trajectory_len + 1))
+                goal_idx = start_idx + trajectory_len
 
             init_state = _pad_and_trim_state(state_arr[start_idx])
             goal_state_stored = _pad_and_trim_state(state_arr[goal_idx])
@@ -450,7 +484,9 @@ class PushTWrapper(PushTEnv):
             )
 
             # Avoid trivially solved tasks at reset: require meaningful block-pose change.
-            if agent_visible and ((pos_diff >= pos_thresh) or (ang_diff >= ang_thresh)):
+            if (explicit_selection is not None) or (
+                agent_visible and ((pos_diff >= pos_thresh) or (ang_diff >= ang_thresh))
+            ):
                 meta = {
                     "episode_index": int(ei),
                     "start_index": int(start_idx),
@@ -479,6 +515,11 @@ class PushTWrapper(PushTEnv):
                         meta["gt_state_trajectory"] = np.asarray(state_seq_rollout, dtype=np.float32).tolist()
                         meta["gt_state_trajectory_source"] = "action_rollout"
                 return init_state, goal_state, meta
+
+            if explicit_selection is not None:
+                raise RuntimeError(
+                    "Explicit selection did not satisfy dataset rollout sampling constraints."
+                )
 
             score = max(
                 pos_diff / (pos_thresh + 1e-8),
