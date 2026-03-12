@@ -38,7 +38,7 @@ def load_episodes_from_zarr(zarr_path: str, split: str = "train", split_ratio: f
     """
     if zarr is None:
         raise ImportError("zarr not installed. pip install zarr")
-    
+    print(zarr_path)
     root = zarr.open_group(zarr_path, mode="r")
     data = root["data"]
     meta = root["meta"]
@@ -130,7 +130,7 @@ def main():
     split_name = 'valid' if args.split in ('valid','val') else 'train'
 
     # Load real episodes
-    real_episodes = load_episodes_from_zarr(data.zarr_path, split=split_name, split_ratio=split_ratio)
+    #real_episodes = load_episodes_from_zarr(data.zarr_path, split=split_name, split_ratio=split_ratio)
     
     # Load synthetic episodes if available
     synth_episodes = None

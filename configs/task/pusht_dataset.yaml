@@ -14,5 +14,5 @@ plan:
         split: "valid"
         split_ratio: null
         trajectory_len: 5
-        seed: 675189
+        seed: 10
         reconstruct_goal_state: 3

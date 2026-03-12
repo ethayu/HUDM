@@ -6,6 +6,7 @@ from datetime import datetime
 from typing import Any
 
 import cv2
+import imageio.v2 as imageio
 import numpy as np
 import torch
 from omegaconf import OmegaConf
@@ -40,40 +41,38 @@ def write_video_mp4(
     if out_hw <= 0:
         raise ValueError(f"output_size must be > 0, got {output_size}")
     h = w = out_hw
-    writer = cv2.VideoWriter(
-        str(path),
-        cv2.VideoWriter_fourcc(*"avc1"),
-        float(max(1, int(fps))),
-        (w, h),
-    )
-    if not writer.isOpened():
-        raise RuntimeError(
-            f"Failed to open H.264/AVC MP4 writer for {path}. "
-            "Ensure your OpenCV build has FFmpeg/x264 encoding support."
-        )
-
-    try:
-        for fr in frames:
-            x = np.asarray(fr)
-            if x.dtype == object:
-                x = x.astype(np.float32)
-            if x.ndim == 2:
-                x = x[:, :, None]
-            if x.ndim != 3:
-                raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
-            if x.shape[2] == 1:
-                x = np.repeat(x, 3, axis=2)
-            elif x.shape[2] != 3:
-                raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
-            if x.shape[0] != h or x.shape[1] != w:
-                if x.dtype != np.uint8:
-                    x = np.clip(x, 0, 255).astype(np.uint8)
-                x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
+    processed_frames: list[np.ndarray] = []
+    for fr in frames:
+        x = np.asarray(fr)
+        if x.dtype == object:
+            x = x.astype(np.float32)
+        if x.ndim == 2:
+            x = x[:, :, None]
+        if x.ndim != 3:
+            raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
+        if x.shape[2] == 1:
+            x = np.repeat(x, 3, axis=2)
+        elif x.shape[2] != 3:
+            raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
+        if x.shape[0] != h or x.shape[1] != w:
             if x.dtype != np.uint8:
                 x = np.clip(x, 0, 255).astype(np.uint8)
-            writer.write(cv2.cvtColor(x, cv2.COLOR_RGB2BGR))
-    finally:
-        writer.release()
+            x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
+        if x.dtype != np.uint8:
+            x = np.clip(x, 0, 255).astype(np.uint8)
+        processed_frames.append(x)
+
+    try:
+        imageio.mimwrite(
+            str(path),
+            processed_frames,
+            fps=float(max(1, int(fps))),
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to write MP4 via imageio for {path}. "
+            "Ensure imageio ffmpeg support is installed (e.g. imageio-ffmpeg)."
+        ) from exc
 
 
 def overlay_start_pose(

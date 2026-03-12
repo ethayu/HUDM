@@ -174,6 +174,7 @@ def _simulate_candidate_rollout(
     contact_aware_ou_theta: float,
     contact_aware_ou_sigma: float,
     contact_aware_ou_dt: float,
+    T: int,
 ) -> RolloutDiagnostics:
     shadow_env.headless = True
     _, state = shadow_env.prepare(seed=0, init_state=current_state)
@@ -210,7 +211,7 @@ def _simulate_candidate_rollout(
         state = np.asarray(info["state"], dtype=np.float32)
         states_after.append(state.copy())
         contacts.append(int(info.get("n_contacts", 0)))
-    return analyze_rollout(states_before, states_after, contacts, quality_profile=quality_profile)
+    return analyze_rollout(states_before, states_after, contacts, T=T, quality_profile=quality_profile)
 
 
 def _select_contact_aware_candidate(
@@ -227,6 +228,7 @@ def _select_contact_aware_candidate(
     contact_aware_ou_theta: float,
     contact_aware_ou_sigma: float,
     contact_aware_ou_dt: float,
+    T: int,
 ) -> tuple[str, Any, int | None]:
     family = choose_maneuver_family(
         state,
@@ -251,6 +253,7 @@ def _select_contact_aware_candidate(
         noise_seed = None if float(contact_aware_ou_sigma) <= 0.0 else int(rng.integers(0, 2**31 - 1))
         diag = _simulate_candidate_rollout(
             shadow_env,
+            T=T,
             current_state=np.asarray(state, dtype=np.float32),
             candidate=candidate,
             quality_profile=quality_profile,
@@ -272,8 +275,8 @@ def _select_contact_aware_candidate(
 def rollout_contact_aware_episode(
     env: PushTWrapper,
     shadow_env: PushTWrapper,
-    *,
     T: int,
+    *,
     rng: np.random.Generator,
     with_velocity: bool,
     mode_profile: str,
@@ -315,6 +318,7 @@ def rollout_contact_aware_episode(
             family, current_candidate, current_candidate_ou_seed = _select_contact_aware_candidate(
                 shadow_env,
                 state=np.asarray(state, dtype=np.float32),
+                T=T,
                 mode_weights=weights,
                 rng=rng,
                 mode_profile=mode_profile,
@@ -386,7 +390,7 @@ def rollout_contact_aware_episode(
         if bool(done):
             break
 
-    diagnostics = analyze_rollout(states, states_after, contacts, quality_profile=quality_profile)
+    diagnostics = analyze_rollout(states, states_after, contacts, T=T, quality_profile=quality_profile)
     rejected, reasons = reject_rollout(diagnostics, mode_profile=mode_profile, quality_profile=quality_profile)
     return EpisodeAttempt(
         init_state=np.asarray(init_state, dtype=np.float32),
@@ -463,7 +467,7 @@ def rollout_baseline_episode(
         if bool(done):
             break
 
-    diagnostics = analyze_rollout(states, states_after, contacts, quality_profile=quality_profile)
+    diagnostics = analyze_rollout(states, states_after, contacts, T=T, quality_profile=quality_profile)
     rejected, reasons = reject_rollout(diagnostics, mode_profile="balanced", quality_profile=quality_profile)
     return EpisodeAttempt(
         init_state=np.asarray(init_state, dtype=np.float32),
@@ -501,21 +505,46 @@ def save_zarr(
     ends = np.cumsum(lengths) - 1
 
     root = zarr.group(zarr_out, overwrite=True)
-    g_data = root.create_group("data")
-    g_meta = root.create_group("meta")
-    g_data.create("img", data=frames.astype(np.float32), chunks=(min(160, frames.shape[0]),) + frames.shape[1:])
-    g_data.create("action", data=actions.astype(np.float32), chunks=(min(160, actions.shape[0]), actions.shape[1]))
-    g_data.create("action_abs", data=actions_abs.astype(np.float32), chunks=(min(160, actions_abs.shape[0]), actions_abs.shape[1]))
-    g_data.create("state", data=states.astype(np.float32), chunks=(min(160, states.shape[0]), states.shape[1]))
-    g_meta.create("episode_ends", data=ends.astype(np.int64), chunks=(max(1, len(ends)),))
-    root.attrs.update(
-        {
-            "action_format": "env_input",
-            "action_abs_format": "absolute_target",
-            "env_action_scale": float(env_action_scale),
-            "env_relative": bool(env_relative),
-        }
+    g_data = root.create_group('data')
+    g_meta = root.create_group('meta')
+    # NOTE: zarr.Group.create(...) ignores `data=` in zarr 2.x and writes zeros.
+    # Use create_dataset so arrays are materialized from provided numpy buffers.
+    g_data.create_dataset(
+        'img',
+        data=frames.astype(np.float32),
+        chunks=(min(160, frames.shape[0]),) + frames.shape[1:],
+        dtype=np.float32,
     )
+    g_data.create_dataset(
+        'action',
+        data=actions.astype(np.float32),
+        chunks=(min(160, actions.shape[0]), actions.shape[1]),
+        dtype=np.float32,
+    )
+    g_data.create_dataset(
+        'action_abs',
+        data=actions_abs.astype(np.float32),
+        chunks=(min(160, actions_abs.shape[0]), actions_abs.shape[1]),
+        dtype=np.float32,
+    )
+    g_data.create_dataset(
+        'state',
+        data=states.astype(np.float32),
+        chunks=(min(160, states.shape[0]), states.shape[1]),
+        dtype=np.float32,
+    )
+    g_meta.create_dataset(
+        'episode_ends',
+        data=ends.astype(np.int64),
+        chunks=(max(1, min(1024, len(ends))),),
+        dtype=np.int64,
+    )
+    root.attrs.update({
+        "action_format": "env_input",
+        "action_abs_format": "absolute_target",
+        "env_action_scale": float(env_action_scale),
+        "env_relative": bool(env_relative),
+    })
     if extra_attrs:
         root.attrs.update(dict(extra_attrs))
 

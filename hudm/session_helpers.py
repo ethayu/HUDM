@@ -15,12 +15,12 @@ def sample_init_goal_states(
     wm_cfg: DictConfig | None,
     selection: Optional[dict] = None,
 ) -> Tuple[np.ndarray, np.ndarray, dict[str, Any]]:
+    ds_cfg = cfg.init_goal.dataset
     src = str(cfg.init_goal.source).lower()
     if src == "random":
-        init_state, goal_state = env.sample_random_init_goal_states(seed=0)
+        init_state, goal_state = env.sample_random_init_goal_states(seed=ds_cfg.seed)
         return init_state, goal_state, {"source": "random"}
 
-    ds_cfg = cfg.init_goal.dataset
     zarr_path = ds_cfg.zarr_path
     if zarr_path is None:
         if wm_cfg is not None and getattr(wm_cfg, "data", None) is not None:
