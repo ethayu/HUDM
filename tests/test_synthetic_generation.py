@@ -11,6 +11,7 @@ import zarr
 from hudm.synthetic_generation import (
     DEFAULT_BOUNDS,
     RolloutDiagnostics,
+    analyze_rollout,
     build_contact_candidates,
     block_world_vertices,
     reject_rollout,
@@ -26,6 +27,29 @@ SPEC = importlib.util.spec_from_file_location("generate_synth", SCRIPT_PATH)
 GENERATE_SYNTH = importlib.util.module_from_spec(SPEC)
 assert SPEC is not None and SPEC.loader is not None
 SPEC.loader.exec_module(GENERATE_SYNTH)
+
+
+def make_rollout_diagnostics(**overrides) -> RolloutDiagnostics:
+    base = dict(
+        total_block_translation_path=12.0,
+        net_block_translation=12.0,
+        total_absolute_angle_change=0.1,
+        motion_fraction=0.2,
+        contact_fraction=0.2,
+        first_contact_step=0,
+        first_meaningful_motion_step=0,
+        wall_adjacent_fraction=0.0,
+        suspicious_no_contact_motion_count=0,
+        out_of_bounds_steps=0,
+        min_wall_clearance=20.0,
+        start_wall_clearance=20.0,
+        end_wall_clearance=20.0,
+        max_block_step_displacement=2.0,
+        num_steps=8,
+        steps_requirement=True,
+    )
+    base.update(overrides)
+    return RolloutDiagnostics(**base)
 
 
 class SyntheticGenerationTests(unittest.TestCase):
@@ -101,6 +125,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                     contact_aware_ou_theta=0.35,
                     contact_aware_ou_sigma=0.0,
                     contact_aware_ou_dt=1.0,
+                    T=6,
                 ),
                 mode_profile="planning",
                 quality_profile="strict",
@@ -120,6 +145,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                     contact_aware_ou_theta=0.35,
                     contact_aware_ou_sigma=0.0,
                     contact_aware_ou_dt=1.0,
+                    T=6,
                 ),
                 mode_profile="planning",
                 quality_profile="strict",
@@ -129,20 +155,11 @@ class SyntheticGenerationTests(unittest.TestCase):
         self.assertGreater(best_translate, best_rotate)
 
     def test_reject_rollout_detects_suspicious_no_contact_motion(self):
-        diagnostics = RolloutDiagnostics(
-            total_block_translation_path=12.0,
+        diagnostics = make_rollout_diagnostics(
             net_block_translation=8.0,
-            total_absolute_angle_change=0.1,
-            motion_fraction=0.2,
             contact_fraction=0.0,
             first_contact_step=-1,
-            first_meaningful_motion_step=0,
-            wall_adjacent_fraction=0.0,
             suspicious_no_contact_motion_count=1,
-            out_of_bounds_steps=0,
-            min_wall_clearance=20.0,
-            start_wall_clearance=20.0,
-            end_wall_clearance=20.0,
             max_block_step_displacement=5.0,
             num_steps=5,
         )
@@ -151,28 +168,45 @@ class SyntheticGenerationTests(unittest.TestCase):
         self.assertIn("episode_glitch_motion", reasons)
 
     def test_mode_profile_acceptance_differs_between_train_and_planning(self):
-        diagnostics = RolloutDiagnostics(
+        diagnostics = make_rollout_diagnostics(
             total_block_translation_path=18.0,
             net_block_translation=18.0,
             total_absolute_angle_change=0.5,
-            motion_fraction=0.2,
-            contact_fraction=0.2,
             first_contact_step=1,
             first_meaningful_motion_step=1,
-            wall_adjacent_fraction=0.0,
-            suspicious_no_contact_motion_count=0,
-            out_of_bounds_steps=0,
             min_wall_clearance=40.0,
             start_wall_clearance=40.0,
             end_wall_clearance=38.0,
             max_block_step_displacement=3.0,
-            num_steps=8,
         )
         train_rejected, _ = reject_rollout(diagnostics, mode_profile="train", quality_profile="strict")
         planning_rejected, planning_reasons = reject_rollout(diagnostics, mode_profile="planning", quality_profile="strict")
         self.assertFalse(train_rejected)
         self.assertTrue(planning_rejected)
         self.assertIn("episode_low_translation", planning_reasons)
+
+    def test_reject_rollout_marks_short_episode_once(self):
+        diagnostics = make_rollout_diagnostics(num_steps=7, steps_requirement=False)
+        rejected, reasons = reject_rollout(diagnostics, mode_profile="balanced", quality_profile="strict")
+        self.assertTrue(rejected)
+        self.assertEqual(reasons.count("episode_too_short"), 1)
+
+    def test_reject_rollout_does_not_use_hidden_length_floor(self):
+        diagnostics = make_rollout_diagnostics(
+            total_block_translation_path=40.0,
+            net_block_translation=40.0,
+            contact_fraction=0.5,
+            motion_fraction=0.5,
+            num_steps=8,
+            steps_requirement=True,
+        )
+        rejected, reasons = reject_rollout(diagnostics, mode_profile="planning", quality_profile="strict")
+        self.assertFalse(rejected, msg=str(reasons))
+
+    def test_analyze_rollout_zero_length_sets_steps_requirement(self):
+        diagnostics = analyze_rollout([], [], [], T=8, quality_profile="strict")
+        self.assertEqual(diagnostics.num_steps, 0)
+        self.assertFalse(diagnostics.steps_requirement)
 
     def test_generate_split_retries_after_failed_episode_batch(self):
         original_rollout = GENERATE_SYNTH.rollout_contact_aware_episode
@@ -187,7 +221,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                     states=np.zeros((1, 7), dtype=np.float32),
                     actions=np.zeros((1, 2), dtype=np.float32),
                     actions_abs=np.zeros((1, 2), dtype=np.float32),
-                    diagnostics=RolloutDiagnostics(
+                    diagnostics=make_rollout_diagnostics(
                         total_block_translation_path=0.0,
                         net_block_translation=0.0,
                         total_absolute_angle_change=0.0,
@@ -195,12 +229,6 @@ class SyntheticGenerationTests(unittest.TestCase):
                         contact_fraction=0.0,
                         first_contact_step=-1,
                         first_meaningful_motion_step=-1,
-                        wall_adjacent_fraction=0.0,
-                        suspicious_no_contact_motion_count=0,
-                        out_of_bounds_steps=0,
-                        min_wall_clearance=20.0,
-                        start_wall_clearance=20.0,
-                        end_wall_clearance=20.0,
                         max_block_step_displacement=0.0,
                         num_steps=1,
                     ),
@@ -213,20 +241,13 @@ class SyntheticGenerationTests(unittest.TestCase):
                 states=np.zeros((1, 7), dtype=np.float32),
                 actions=np.zeros((1, 2), dtype=np.float32),
                 actions_abs=np.zeros((1, 2), dtype=np.float32),
-                diagnostics=RolloutDiagnostics(
+                diagnostics=make_rollout_diagnostics(
                     total_block_translation_path=40.0,
                     net_block_translation=40.0,
-                    total_absolute_angle_change=0.1,
                     motion_fraction=0.5,
                     contact_fraction=0.5,
                     first_contact_step=0,
                     first_meaningful_motion_step=0,
-                    wall_adjacent_fraction=0.0,
-                    suspicious_no_contact_motion_count=0,
-                    out_of_bounds_steps=0,
-                    min_wall_clearance=20.0,
-                    start_wall_clearance=20.0,
-                    end_wall_clearance=20.0,
                     max_block_step_displacement=2.0,
                     num_steps=1,
                 ),

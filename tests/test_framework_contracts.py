@@ -11,6 +11,7 @@ from omegaconf import OmegaConf
 
 from hudm.metrics import pose_metrics
 from hudm.session_exec import run_closed_loop
+from hudm.session_helpers import sample_init_goal_states
 from hudm.world_io import checkpoint_epochs, latest_checkpoint_epoch, load_world_checkpoint, save_world_checkpoint
 from models.world.model import HierWorldModel
 from pusht.pusht_particle_backend import PushTParticleBackend
@@ -64,6 +65,30 @@ class FrameworkContractTests(unittest.TestCase):
             with open(os.path.join(ROOT, rel_path), "r", encoding="utf-8") as f:
                 content = f.read()
             self.assertNotIn("pdb.set_trace()", content, msg=rel_path)
+
+    def test_sample_init_goal_states_random_without_dataset_uses_none_seed(self):
+        class DummyEnv:
+            def sample_random_init_goal_states(self, seed=None):
+                return np.asarray([seed], dtype=object), np.asarray([seed], dtype=object)
+
+        cfg = OmegaConf.create({"init_goal": {"source": "random"}})
+        init_state, goal_state, meta = sample_init_goal_states(DummyEnv(), cfg, wm_cfg=None)
+
+        self.assertIsNone(init_state[0])
+        self.assertIsNone(goal_state[0])
+        self.assertEqual(meta, {"source": "random"})
+
+    def test_sample_init_goal_states_random_with_dataset_uses_dataset_seed(self):
+        class DummyEnv:
+            def sample_random_init_goal_states(self, seed=None):
+                return np.asarray([seed], dtype=np.int64), np.asarray([seed], dtype=np.int64)
+
+        cfg = OmegaConf.create({"init_goal": {"source": "random", "dataset": {"seed": 17}}})
+        init_state, goal_state, meta = sample_init_goal_states(DummyEnv(), cfg, wm_cfg=None)
+
+        self.assertEqual(int(init_state[0]), 17)
+        self.assertEqual(int(goal_state[0]), 17)
+        self.assertEqual(meta, {"source": "random"})
 
     def test_particle_backend_done_ignores_pose_metric_success(self):
         class DummySim:

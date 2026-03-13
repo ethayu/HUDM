@@ -41,37 +41,41 @@ def write_video_mp4(
     if out_hw <= 0:
         raise ValueError(f"output_size must be > 0, got {output_size}")
     h = w = out_hw
-    processed_frames: list[np.ndarray] = []
-    for fr in frames:
-        x = np.asarray(fr)
-        if x.dtype == object:
-            x = x.astype(np.float32)
-        if x.ndim == 2:
-            x = x[:, :, None]
-        if x.ndim != 3:
-            raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
-        if x.shape[2] == 1:
-            x = np.repeat(x, 3, axis=2)
-        elif x.shape[2] != 3:
-            raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
-        if x.shape[0] != h or x.shape[1] != w:
-            if x.dtype != np.uint8:
-                x = np.clip(x, 0, 255).astype(np.uint8)
-            x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
-        if x.dtype != np.uint8:
-            x = np.clip(x, 0, 255).astype(np.uint8)
-        processed_frames.append(x)
-
     try:
-        imageio.mimwrite(
+        writer = imageio.get_writer(
             str(path),
-            processed_frames,
+            format="FFMPEG",
+            mode="I",
             fps=float(max(1, int(fps))),
+            codec="libx264",
+            pixelformat="yuv420p",
         )
+        try:
+            for fr in frames:
+                x = np.asarray(fr)
+                if x.dtype == object:
+                    x = x.astype(np.float32)
+                if x.ndim == 2:
+                    x = x[:, :, None]
+                if x.ndim != 3:
+                    raise ValueError(f"Video frame must have rank 3 (H,W,C), got shape {x.shape}")
+                if x.shape[2] == 1:
+                    x = np.repeat(x, 3, axis=2)
+                elif x.shape[2] != 3:
+                    raise ValueError(f"Expected 1 or 3 channels, got {x.shape[2]}")
+                if x.shape[0] != h or x.shape[1] != w:
+                    if x.dtype != np.uint8:
+                        x = np.clip(x, 0, 255).astype(np.uint8)
+                    x = cv2.resize(x, (w, h), interpolation=cv2.INTER_NEAREST)
+                if x.dtype != np.uint8:
+                    x = np.clip(x, 0, 255).astype(np.uint8)
+                writer.append_data(x)
+        finally:
+            writer.close()
     except Exception as exc:
         raise RuntimeError(
             f"Failed to write MP4 via imageio for {path}. "
-            "Ensure imageio ffmpeg support is installed (e.g. imageio-ffmpeg)."
+            "Install project dependencies from requirements.txt so imageio ffmpeg support is available."
         ) from exc
 
 

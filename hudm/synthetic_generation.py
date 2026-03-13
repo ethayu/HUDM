@@ -624,6 +624,7 @@ def analyze_rollout(
     local_polygons: Sequence[np.ndarray] = T_LOCAL_POLYGONS,
 ) -> RolloutDiagnostics:
     quality = QUALITY_PROFILES[str(quality_profile)]
+    required_steps = max(0, int(T))
     if len(states_before) != len(states_after) or len(states_before) != len(contacts):
         raise ValueError("rollout record lengths must match")
     if len(states_after) <= 0:
@@ -643,6 +644,7 @@ def analyze_rollout(
             end_wall_clearance=0.0,
             max_block_step_displacement=0.0,
             num_steps=0,
+            steps_requirement=bool(0 >= required_steps),
         )
 
     block_before = np.stack([np.asarray(s, dtype=np.float32)[2:4] for s in states_before], axis=0)
@@ -705,7 +707,7 @@ def analyze_rollout(
         end_wall_clearance=float(clearances[-1]),
         max_block_step_displacement=float(np.max(block_step)) if block_step.size > 0 else 0.0,
         num_steps=int(len(states_after)),
-        steps_requirement=int(len(states_after))>=T,
+        steps_requirement=bool(len(states_after) >= required_steps),
     )
 
 
@@ -718,19 +720,17 @@ def reject_rollout(
     spec = resolve_acceptance_spec(mode_profile, quality_profile)
     reasons: list[str] = []
 
-    if not diagnostics.steps_requirement:
+    too_short = not diagnostics.steps_requirement
+    if too_short:
         reasons.append("episode_too_short")
     if diagnostics.out_of_bounds_steps > 0:
         reasons.append("episode_block_oob")
     if diagnostics.suspicious_no_contact_motion_count > 0:
         reasons.append("episode_glitch_motion")
-    if diagnostics.num_steps < 50:
-        reasons.append("episode_too_short")
     if quality.max_wall_adjacent_fraction is not None and diagnostics.wall_adjacent_fraction > float(
         quality.max_wall_adjacent_fraction
     ):
         reasons.append("episode_wall_adjacent")
-    
 
     if quality.name == "loose":
         if diagnostics.contact_fraction < quality.min_contact_fraction_floor:

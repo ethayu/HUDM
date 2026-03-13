@@ -507,37 +507,46 @@ def save_zarr(
     root = zarr.group(zarr_out, overwrite=True)
     g_data = root.create_group('data')
     g_meta = root.create_group('meta')
-    # NOTE: zarr.Group.create(...) ignores `data=` in zarr 2.x and writes zeros.
-    # Use create_dataset so arrays are materialized from provided numpy buffers.
-    g_data.create_dataset(
+    # NOTE: zarr 3.x requires an explicit shape when creating datasets from buffers.
+    # Keep using create_dataset so arrays are materialized directly from numpy data.
+    def _create_dataset(group, name: str, array: np.ndarray, chunks: tuple[int, ...]) -> None:
+        group.create_dataset(
+            name,
+            shape=array.shape,
+            data=array,
+            chunks=chunks,
+            dtype=array.dtype,
+        )
+
+    _create_dataset(
+        g_data,
         'img',
-        data=frames.astype(np.float32),
+        frames.astype(np.float32),
         chunks=(min(160, frames.shape[0]),) + frames.shape[1:],
-        dtype=np.float32,
     )
-    g_data.create_dataset(
+    _create_dataset(
+        g_data,
         'action',
-        data=actions.astype(np.float32),
+        actions.astype(np.float32),
         chunks=(min(160, actions.shape[0]), actions.shape[1]),
-        dtype=np.float32,
     )
-    g_data.create_dataset(
+    _create_dataset(
+        g_data,
         'action_abs',
-        data=actions_abs.astype(np.float32),
+        actions_abs.astype(np.float32),
         chunks=(min(160, actions_abs.shape[0]), actions_abs.shape[1]),
-        dtype=np.float32,
     )
-    g_data.create_dataset(
+    _create_dataset(
+        g_data,
         'state',
-        data=states.astype(np.float32),
+        states.astype(np.float32),
         chunks=(min(160, states.shape[0]), states.shape[1]),
-        dtype=np.float32,
     )
-    g_meta.create_dataset(
+    _create_dataset(
+        g_meta,
         'episode_ends',
-        data=ends.astype(np.int64),
+        ends.astype(np.int64),
         chunks=(max(1, min(1024, len(ends))),),
-        dtype=np.int64,
     )
     root.attrs.update({
         "action_format": "env_input",
