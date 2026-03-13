@@ -219,6 +219,9 @@ def _experiment_defaults() -> dict[str, Any]:
             "mode": "auto",
             "max_workers": 2,
         },
+        "terminal": {
+            "mode": "compact",
+        },
         "reporting": {
             "output_root": "rollouts",
         },
@@ -469,7 +472,7 @@ def _resolve_plan_fragment_bundle(bundle_cfg, *, base_dir: str, name: str) -> An
 def validate_experiment_cfg(cfg: DictConfig) -> None:
     _reject_unknown_keys(
         cfg,
-        {"name", "shared_plan", "rollouts", "execution", "reporting", "baseline", "variants"},
+        {"name", "shared_plan", "rollouts", "execution", "terminal", "reporting", "baseline", "variants"},
         "experiment",
     )
     _reject_unknown_keys(cfg.shared_plan, {"imports", "plan"}, "experiment.shared_plan")
@@ -479,6 +482,7 @@ def validate_experiment_cfg(cfg: DictConfig) -> None:
         "experiment.rollouts",
     )
     _reject_unknown_keys(cfg.execution, {"mode", "max_workers"}, "experiment.execution")
+    _reject_unknown_keys(cfg.terminal, {"mode"}, "experiment.terminal")
     _reject_unknown_keys(cfg.reporting, {"output_root"}, "experiment.reporting")
     if cfg.variants is None or len(cfg.variants) <= 0:
         raise ValueError("experiment.variants must contain at least one variant.")
@@ -499,6 +503,8 @@ def validate_experiment_cfg(cfg: DictConfig) -> None:
         raise ValueError("experiment.variants contains duplicate names.")
     if str(getattr(cfg.execution, "mode", "auto")).lower() not in {"auto", "serial", "process"}:
         raise ValueError("experiment.execution.mode must be one of auto|serial|process.")
+    if str(getattr(cfg.terminal, "mode", "compact")).lower() not in {"quiet", "compact", "verbose"}:
+        raise ValueError("experiment.terminal.mode must be one of quiet|compact|verbose.")
     if int(getattr(cfg.execution, "max_workers", 1)) <= 0:
         raise ValueError("experiment.execution.max_workers must be > 0.")
     if int(cfg.rollouts.num_rollouts) <= 0:
@@ -581,6 +587,7 @@ def resolve_experiment_spec(cfg_path: str) -> ExperimentSpec:
         baseline=str(cfg.baseline),
         rollouts=dict(OmegaConf.to_container(cfg.rollouts, resolve=True)),
         execution=dict(OmegaConf.to_container(cfg.execution, resolve=True)),
+        terminal=dict(OmegaConf.to_container(cfg.terminal, resolve=True)),
         reporting=dict(OmegaConf.to_container(cfg.reporting, resolve=True)),
     )
 

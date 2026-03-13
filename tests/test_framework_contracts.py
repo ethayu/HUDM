@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import tempfile
 import unittest
@@ -10,6 +11,7 @@ import torch
 from omegaconf import OmegaConf
 
 from hudm.metrics import pose_metrics
+from hudm.session import save_plan_result
 from hudm.session_exec import run_closed_loop
 from hudm.session_helpers import sample_init_goal_states
 from hudm.world_io import checkpoint_epochs, latest_checkpoint_epoch, load_world_checkpoint, save_world_checkpoint
@@ -205,6 +207,156 @@ class FrameworkContractTests(unittest.TestCase):
         self.assertEqual(run_stats["termination_reason"], "env_done")
         self.assertTrue(run_stats["termination_done"])
         self.assertFalse(run_stats["termination_metric_success"])
+
+    def test_save_plan_result_persists_action_overlay_metadata(self):
+        cfg = OmegaConf.create({"save": False, "render": False})
+        runtime = {
+            "backend": "gt_env",
+            "env": SimpleNamespace(relative=True, action_scale=100.0, window_size=512.0),
+        }
+        result = {
+            "cfg": cfg,
+            "runtime": runtime,
+            "success": False,
+            "trajectory": [np.zeros(5, dtype=np.float32), np.zeros(5, dtype=np.float32)],
+            "frames": [],
+            "planner_frames": [],
+            "run_stats": {
+                "plans": 1,
+                "bits_used_total": 0,
+                "flops_used_total": 0,
+                "plan_time_total_sec": 0.0,
+                "termination_reason": "max_steps",
+                "termination_step": 1,
+                "termination_metric_success": False,
+                "termination_done": False,
+                "termination_pos_diff": None,
+                "termination_angle_diff": None,
+                "termination_eef_diff": None,
+                "termination_coverage": None,
+            },
+            "trace": {
+                "executed_actions": [[0.25, 0.0]],
+                "trajectory": [[256.0, 256.0, 0.0, 0.0, 0.0], [281.0, 256.0, 0.0, 0.0, 0.0]],
+                "pos_diffs": [],
+                "angle_diffs": [],
+                "eef_diffs": [],
+                "coverages": [],
+                "metric_success_flags": [],
+                "done_flags": [],
+                "state_dists": [],
+                "replans": [],
+            },
+            "init_state": np.zeros(5, dtype=np.float32),
+            "goal_state": np.zeros(5, dtype=np.float32),
+            "sample_meta": {"source": "random"},
+            "schedule_name": None,
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            save_plan_result(result, tmpdir, save_media=False)
+            with open(os.path.join(tmpdir, "trace.json"), "r", encoding="utf-8") as f:
+                trace_meta = json.load(f)
+            with open(os.path.join(tmpdir, "metadata.json"), "r", encoding="utf-8") as f:
+                metadata = json.load(f)
+
+        for payload in (trace_meta, metadata):
+            self.assertEqual(payload["action_format"], "env_input")
+            self.assertTrue(payload["action_relative"])
+            self.assertEqual(payload["action_scale"], 100.0)
+
+    def test_run_closed_loop_continues_recording_saved_media_after_env_done(self):
+        class DummyPlanner:
+            def plan(self, **kwargs):
+                del kwargs
+                info = SimpleNamespace(
+                    base_level_idx=0,
+                    rollout_level_indices=[0, 0],
+                    bits_used_estimate=0,
+                    plan_time_sec=0.0,
+                    base_k=None,
+                    base_spacing=None,
+                    base_num_particles=None,
+                )
+                return torch.zeros((2, 2), dtype=torch.float32), info
+
+        class DummyEnv:
+            def __init__(self):
+                self.cur_state = np.zeros(7, dtype=np.float32)
+                self._planning_fidelity_num_levels = 1
+                self.relative = True
+                self.action_scale = 1.0
+                self.window_size = 512.0
+                self._step_count = 0
+
+            def set_task_start(self, pose):
+                del pose
+
+            def set_planning_fidelity_level(self, level_idx):
+                del level_idx
+
+            def prepare(self, seed, init_state, goal_state=None):
+                del seed, goal_state
+                self.cur_state = np.asarray(init_state, dtype=np.float32).copy()
+                obs = {"visual": np.zeros((8, 8, 3), dtype=np.uint8)}
+                return obs, self.cur_state.copy()
+
+            def render(self, mode, include_start_pose=False):
+                del mode, include_start_pose
+                return np.zeros((8, 8, 3), dtype=np.uint8)
+
+            def step(self, action):
+                del action
+                self._step_count += 1
+                self.cur_state = np.asarray([self._step_count, 0, 200, 200, 0, 0, 0], dtype=np.float32)
+                obs = {"visual": np.zeros((8, 8, 3), dtype=np.uint8)}
+                done = self._step_count == 1
+                info = {"state": self.cur_state.copy(), "final_coverage": 0.99 if done else 0.0}
+                return obs, 1.0, done, info
+
+            def eval_termination(self, goal_state, cur_state, done=None, info=None):
+                del goal_state, cur_state
+                coverage = None if info is None else float(info.get("final_coverage", 0.0))
+                done_flag = False if done is None else bool(done)
+                return {
+                    "success": False,
+                    "pos_diff": 50.0,
+                    "angle_diff": 1.0,
+                    "eef_diff": 0.0,
+                    "state_dist": 50.0,
+                    "done": done_flag,
+                    "coverage": coverage,
+                    "success_and_done": False,
+                }
+
+        cfg = OmegaConf.create(
+            {
+                "save": True,
+                "render": False,
+                "mpc": {
+                    "steps": 2,
+                    "horizon": 2,
+                    "replan_every": 2,
+                },
+            }
+        )
+        env = DummyEnv()
+        success, _, frames, planner_frames, run_stats, trace = run_closed_loop(
+            env=env,
+            wm=None,
+            planner=DummyPlanner(),
+            backend="gt_env",
+            cfg=cfg,
+            init_state=np.zeros(7, dtype=np.float32),
+            goal_state=np.zeros(7, dtype=np.float32),
+            device=torch.device("cpu"),
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(run_stats["termination_reason"], "env_done")
+        self.assertEqual(len(trace["executed_actions"]), 1)
+        self.assertEqual(len(frames), 3)
+        self.assertEqual(len(planner_frames), 3)
 
 
 if __name__ == "__main__":

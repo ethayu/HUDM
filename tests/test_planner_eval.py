@@ -28,6 +28,7 @@ class ExperimentConfigTests(unittest.TestCase):
         sel_b = select_rollouts(spec.rollouts, candidates)
         self.assertEqual(sel_a, sel_b)
         self.assertEqual(len({item["rollout_id"] for item in sel_a}), len(sel_a))
+        self.assertEqual(spec.terminal["mode"], "compact")
 
     def test_variant_rejects_task_override(self):
         task_cfg = os.path.join(ROOT, "configs/task/pusht_smoke_dataset.yaml")

@@ -19,6 +19,8 @@ from hudm.session_helpers import (
 )
 from pusht.pusht_wrapper import PushTWrapper
 
+DEFAULT_ACTION_REFERENCE_SIZE = 512.0
+
 
 def resize_image_hw(img: np.ndarray, target_hw: tuple[int, int]) -> np.ndarray:
     out = np.asarray(img)
@@ -77,6 +79,173 @@ def write_video_mp4(
             f"Failed to write MP4 via imageio for {path}. "
             "Install project dependencies from requirements.txt so imageio ffmpeg support is available."
         ) from exc
+
+
+def action_overlay_spec_from_env(
+    env: object | None,
+    *,
+    action_format: str = "env_input",
+) -> dict[str, Any]:
+    if env is None:
+        return {
+            "action_format": str(action_format),
+            "action_relative": True,
+            "action_scale": 1.0,
+            "reference_size": float(DEFAULT_ACTION_REFERENCE_SIZE),
+        }
+    return {
+        "action_format": str(action_format),
+        "action_relative": bool(getattr(env, "relative", True)),
+        "action_scale": float(getattr(env, "action_scale", 1.0)),
+        "reference_size": float(getattr(env, "window_size", DEFAULT_ACTION_REFERENCE_SIZE)),
+    }
+
+
+def infer_action_overlay_spec(
+    trace_meta: dict[str, Any] | None,
+    actions: np.ndarray | list,
+    *,
+    env: object | None = None,
+) -> dict[str, Any]:
+    spec = action_overlay_spec_from_env(env)
+    meta = dict(trace_meta or {})
+    if ("action_relative" in meta) and ("action_scale" in meta):
+        spec["action_format"] = str(meta.get("action_format", "env_input"))
+        spec["action_relative"] = bool(meta["action_relative"])
+        spec["action_scale"] = float(meta["action_scale"])
+        return spec
+
+    action_arr = np.asarray(actions, dtype=np.float32)
+    finite = action_arr[np.isfinite(action_arr)]
+    if finite.size <= 0:
+        return spec
+    if np.any(finite < 0.0):
+        return spec
+    ref_size = float(spec["reference_size"])
+    if np.all((finite >= 0.0) & (finite <= ref_size)):
+        return {
+            "action_format": "absolute_target",
+            "action_relative": False,
+            "action_scale": 1.0,
+            "reference_size": ref_size,
+        }
+    return spec
+
+
+def resolve_action_target(
+    agent_pos: np.ndarray | list[float],
+    action: np.ndarray | list[float],
+    *,
+    action_format: str,
+    action_relative: bool,
+    action_scale: float,
+) -> np.ndarray:
+    agent = np.asarray(agent_pos, dtype=np.float32).reshape(-1)
+    act = np.asarray(action, dtype=np.float32).reshape(-1)
+    if agent.shape[0] < 2 or act.shape[0] < 2:
+        raise ValueError(
+            f"Action target resolution requires 2D agent/action, got agent={agent.shape}, action={act.shape}"
+        )
+    if str(action_format).strip().lower() == "absolute_target":
+        return act[:2].astype(np.float32)
+    if bool(action_relative):
+        return (agent[:2] + act[:2] * float(action_scale)).astype(np.float32)
+    return (act[:2] * float(action_scale)).astype(np.float32)
+
+
+def _project_target_to_frame(
+    target_xy: np.ndarray | list[float],
+    frame_shape: tuple[int, ...],
+    *,
+    reference_size: float,
+) -> tuple[int, int]:
+    h = max(1, int(frame_shape[0]))
+    w = max(1, int(frame_shape[1]))
+    ref = max(1.0, float(reference_size))
+    target = np.asarray(target_xy, dtype=np.float32).reshape(-1)
+    if target.shape[0] < 2:
+        raise ValueError(f"Target must be 2D, got shape {target.shape}")
+    x = float(target[0]) / ref * float(max(1, w - 1))
+    y = float(target[1]) / ref * float(max(1, h - 1))
+    return int(np.clip(np.rint(x), 0, w - 1)), int(np.clip(np.rint(y), 0, h - 1))
+
+
+def draw_action_target_cross(
+    frame: np.ndarray,
+    target_xy: np.ndarray | list[float],
+    *,
+    reference_size: float = DEFAULT_ACTION_REFERENCE_SIZE,
+    color: tuple[int, int, int] = (255, 0, 0),
+) -> np.ndarray:
+    out = np.asarray(frame).copy()
+    if out.dtype == object:
+        out = out.astype(np.float32)
+    if out.ndim == 2:
+        out = np.repeat(out[:, :, None], 3, axis=2)
+    if out.ndim != 3:
+        raise ValueError(f"Expected frame with rank 3, got shape {out.shape}")
+    if out.shape[2] == 1:
+        out = np.repeat(out, 3, axis=2)
+    if out.shape[2] != 3:
+        raise ValueError(f"Expected RGB frame, got shape {out.shape}")
+    if out.dtype != np.uint8:
+        out = np.clip(out, 0, 255).astype(np.uint8)
+
+    x, y = _project_target_to_frame(target_xy, out.shape, reference_size=reference_size)
+    min_side = max(1, min(int(out.shape[0]), int(out.shape[1])))
+    marker_size = max(6, int(round(min_side * (8.0 / 96.0))))
+    thickness = max(1, int(round(min_side * (1.0 / 96.0))))
+    cv2.drawMarker(
+        out,
+        (x, y),
+        color=color,
+        markerType=cv2.MARKER_CROSS,
+        markerSize=marker_size,
+        thickness=thickness,
+        line_type=cv2.LINE_AA,
+    )
+    return out
+
+
+def overlay_action_targets_on_frames(
+    frames: list[np.ndarray] | np.ndarray,
+    states: list[np.ndarray] | np.ndarray,
+    actions: list[np.ndarray] | np.ndarray,
+    overlay_spec: dict[str, Any],
+) -> list[np.ndarray]:
+    out_frames = [np.asarray(frame).copy() for frame in list(frames)]
+    if len(out_frames) <= 0:
+        return out_frames
+
+    state_arr = np.asarray(states, dtype=np.float32)
+    action_arr = np.asarray(actions, dtype=np.float32)
+    if state_arr.ndim < 2:
+        return out_frames
+
+    if action_arr.size <= 0 or action_arr.ndim < 2:
+        out_frames[0] = draw_action_target_cross(
+            out_frames[0],
+            state_arr[0, :2],
+            reference_size=float(overlay_spec.get("reference_size", DEFAULT_ACTION_REFERENCE_SIZE)),
+        )
+        return out_frames
+
+    overlay_count = min(len(out_frames), int(state_arr.shape[0]), int(action_arr.shape[0]))
+    for idx in range(overlay_count):
+        agent_pos = state_arr[idx, :2]
+        target_xy = resolve_action_target(
+            agent_pos,
+            action_arr[idx],
+            action_format=str(overlay_spec.get("action_format", "env_input")),
+            action_relative=bool(overlay_spec.get("action_relative", True)),
+            action_scale=float(overlay_spec.get("action_scale", 1.0)),
+        )
+        out_frames[idx] = draw_action_target_cross(
+            out_frames[idx],
+            target_xy,
+            reference_size=float(overlay_spec.get("reference_size", DEFAULT_ACTION_REFERENCE_SIZE)),
+        )
+    return out_frames
 
 
 def overlay_start_pose(
@@ -253,6 +422,15 @@ def render_dataset_gt_frames(
         env.prepare(seed=0, init_state=s)
         set_goal_pose(env, goal_state)
         frames.append(env.render("rgb_array", include_start_pose=True))
+    if actions is not None:
+        action_arr = np.asarray(actions, dtype=np.float32)
+        if action_arr.ndim >= 2 and state_seq.shape[0] >= action_arr.shape[0]:
+            frames = overlay_action_targets_on_frames(
+                frames=frames,
+                states=np.asarray(state_seq[: action_arr.shape[0]], dtype=np.float32),
+                actions=action_arr,
+                overlay_spec=action_overlay_spec_from_env(env),
+            )
     return frames
 
 
@@ -360,6 +538,7 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
     arrays = trace_arrays_from_trace(result["trace"])
     arrays_path = os.path.join(run_dir, "trace.npz")
     np.savez_compressed(arrays_path, **arrays)
+    action_overlay = action_overlay_spec_from_env(result["runtime"].get("env", None))
     meta = {
         "trace_version": 1,
         "backend": result["runtime"]["backend"],
@@ -371,6 +550,9 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
         "goal_state": np.asarray(result["goal_state"], dtype=np.float32).tolist(),
         "plan_config": OmegaConf.to_container(result["cfg"], resolve=True),
         "arrays_file": "trace.npz",
+        "action_format": str(action_overlay["action_format"]),
+        "action_relative": bool(action_overlay["action_relative"]),
+        "action_scale": float(action_overlay["action_scale"]),
         "replans": [
             {
                 "replan_idx": int(replan.get("replan_idx", idx)),
@@ -407,6 +589,7 @@ def save_plan_result(
     created_at = datetime.now().strftime("%Y%m%d_%H%M%S")
     trace_json_path, trace_npz_path = save_trace_bundle(run_dir, result)
     save_error_curves(os.path.join(run_dir, "pos_diffs_angle_diffs_eef_diffs.png"), result["trace"])
+    action_overlay = action_overlay_spec_from_env(result["runtime"].get("env", None))
     meta = {
         "created_at": created_at,
         "backend": backend,
@@ -432,6 +615,9 @@ def save_plan_result(
         "sample": result["sample_meta"],
         "schedule_name": result.get("schedule_name", None),
         "plan_config": OmegaConf.to_container(cfg, resolve=True),
+        "action_format": str(action_overlay["action_format"]),
+        "action_relative": bool(action_overlay["action_relative"]),
+        "action_scale": float(action_overlay["action_scale"]),
         "trace_json": os.path.basename(trace_json_path),
         "trace_npz": os.path.basename(trace_npz_path),
     }
@@ -442,10 +628,20 @@ def save_plan_result(
         return meta
 
     if len(result["frames"]) > 0:
+        rollout_frames = list(result["frames"])
+        executed_actions = np.asarray(result["trace"].get("executed_actions", []), dtype=np.float32)
+        trajectory = np.asarray(result["trace"].get("trajectory", []), dtype=np.float32)
+        if executed_actions.ndim >= 2 and trajectory.ndim >= 2:
+            rollout_frames = overlay_action_targets_on_frames(
+                frames=rollout_frames,
+                states=trajectory,
+                actions=executed_actions,
+                overlay_spec=action_overlay,
+            )
         out_path = os.path.join(run_dir, "planned.mp4")
         print(f"[save] Writing rollout MP4 to {out_path}")
-        write_video_mp4(out_path, result["frames"], fps=15)
-        print(f"[save] Video saved ({len(result['frames'])} frames)")
+        write_video_mp4(out_path, rollout_frames, fps=15)
+        print(f"[save] Video saved ({len(rollout_frames)} frames)")
 
     if source == "dataset":
         gt_frames = render_dataset_gt_frames(
@@ -461,8 +657,18 @@ def save_plan_result(
             print(f"[save] Dataset GT video saved ({len(gt_frames)} frames)")
 
     if len(result["planner_frames"]) > 0:
+        planner_frames = list(result["planner_frames"])
+        executed_actions = np.asarray(result["trace"].get("executed_actions", []), dtype=np.float32)
+        trajectory = np.asarray(result["trace"].get("trajectory", []), dtype=np.float32)
+        if executed_actions.ndim >= 2 and trajectory.ndim >= 2:
+            planner_frames = overlay_action_targets_on_frames(
+                frames=planner_frames,
+                states=trajectory,
+                actions=executed_actions,
+                overlay_spec=action_overlay,
+            )
         planner_path = os.path.join(run_dir, "planner_view.mp4")
         print(f"[save] Writing planner-view MP4 to {planner_path}")
-        write_video_mp4(planner_path, result["planner_frames"], fps=15)
-        print(f"[save] Planner-view video saved ({len(result['planner_frames'])} frames)")
+        write_video_mp4(planner_path, planner_frames, fps=15)
+        print(f"[save] Planner-view video saved ({len(planner_frames)} frames)")
     return meta

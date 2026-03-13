@@ -81,6 +81,7 @@ class ExperimentSpec:
     baseline: str
     rollouts: dict[str, Any]
     execution: dict[str, Any]
+    terminal: dict[str, Any]
     reporting: dict[str, Any]
 
     def variant_names(self) -> list[str]:

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import contextlib
 import csv
+import io
 import json
 import os
+import sys
+import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
@@ -14,6 +18,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from hudm.artifacts import save_plan_result
 from hudm.config import resolve_experiment_spec
+from hudm.experiment_report import write_experiment_report
 from hudm.runtime import (
     bits_to_flops_estimate,
     build_plan_runtime,
@@ -112,6 +117,7 @@ def result_row(result: dict, run_dir: str) -> dict:
         "run_dir": run_dir,
         "trace_json": os.path.join(run_dir, "trace.json"),
         "trace_npz": os.path.join(run_dir, "trace.npz"),
+        "run_log": os.path.join(run_dir, "run.log"),
     }
 
 
@@ -128,6 +134,88 @@ def _write_rows_csv(path: str, rows: Sequence[dict]) -> None:
         writer.writeheader()
         for row in rows:
             writer.writerow(row)
+
+
+class _TeeStream(io.TextIOBase):
+    def __init__(self, *targets: io.TextIOBase | None):
+        self._targets = [target for target in targets if target is not None]
+
+    def write(self, s: str) -> int:
+        for target in self._targets:
+            target.write(s)
+        return len(s)
+
+    def flush(self) -> None:
+        for target in self._targets:
+            target.flush()
+
+
+class _ExperimentProgress:
+    def __init__(self, *, total_runs: int, mode: str):
+        self.total_runs = max(0, int(total_runs))
+        self.mode = str(mode).lower()
+        self.completed = 0
+        self.successes = 0
+        self.start_time = time.time()
+        self._interactive = bool(getattr(sys.stdout, "isatty", lambda: False)())
+
+    def _status_line(self, row: dict | None = None) -> str:
+        elapsed = max(0.0, time.time() - self.start_time)
+        rate = 0.0 if self.completed <= 0 else elapsed / float(self.completed)
+        remaining = max(0, self.total_runs - self.completed)
+        eta = rate * float(remaining)
+        parts = [
+            f"[experiment] {self.completed}/{self.total_runs}",
+            f"success={self.successes}",
+            f"elapsed={elapsed:.1f}s",
+            f"eta={eta:.1f}s",
+        ]
+        if row is not None:
+            parts.extend(
+                [
+                    f"variant={row.get('variant_name', '')}",
+                    f"rollout={row.get('rollout_id', '')}",
+                    f"term={row.get('termination_reason', '')}",
+                ]
+            )
+        return "  ".join(parts)
+
+    def advance(self, row: dict) -> None:
+        self.completed += 1
+        self.successes += int(bool(row.get("success", 0)))
+        if self.mode == "quiet":
+            return
+        line = self._status_line(row)
+        if self.mode == "compact" and self._interactive:
+            print("\r" + line + " " * 8, end="", flush=True)
+        else:
+            print(line)
+
+    def finish(self) -> None:
+        if self.mode == "compact" and self._interactive:
+            print()
+
+
+def _ensure_parent_dir(path: str) -> None:
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+
+
+def _capture_output(mode: str, fn):
+    buffer = io.StringIO()
+    stdout_target = sys.stdout if str(mode).lower() == "verbose" else None
+    stderr_target = sys.stderr if str(mode).lower() == "verbose" else None
+    tee_out = _TeeStream(buffer, stdout_target)
+    tee_err = _TeeStream(buffer, stderr_target)
+    with contextlib.redirect_stdout(tee_out), contextlib.redirect_stderr(tee_err):
+        result = fn()
+    return result, buffer.getvalue()
+
+
+def _write_run_log(run_dir: str, log_text: str) -> None:
+    path = os.path.join(run_dir, "run.log")
+    _ensure_parent_dir(path)
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(log_text)
 
 
 def _load_trace_npz(path: str) -> dict:
@@ -347,15 +435,28 @@ def save_summary_plots(rows: Sequence[dict], summary_rows: Sequence[dict], out_d
 
 def _run_variant_task(task: dict) -> dict:
     cfg = OmegaConf.create(task["cfg"])
-    result = run_plan_session(
-        cfg,
-        rollout_selection=task["selection"],
-        schedule_name=task["variant_name"],
-        print_summary=False,
-    )
-    result["variant_name"] = task["variant_name"]
-    save_plan_result(result, task["run_dir"], save_media=False)
-    return result_row(result, task["run_dir"])
+    terminal_mode = str(task.get("terminal_mode", "compact")).lower()
+    run_dir = str(task["run_dir"])
+
+    def _execute():
+        result = run_plan_session(
+            cfg,
+            rollout_selection=task["selection"],
+            schedule_name=task["variant_name"],
+            print_summary=False,
+        )
+        result["variant_name"] = task["variant_name"]
+        save_plan_result(result, run_dir, save_media=bool(result["cfg"].save))
+        return result
+
+    try:
+        result, log_text = _capture_output(terminal_mode, _execute)
+    except Exception as exc:
+        _write_run_log(run_dir, f"{type(exc).__name__}: {exc}\n")
+        raise
+
+    _write_run_log(run_dir, log_text)
+    return result_row(result, run_dir)
 
 
 def _make_exec_env(cfg: DictConfig):
@@ -400,85 +501,203 @@ def _run_wm_batched_variants(
     selection: dict,
     run_root: str,
     seed_base: int,
+    terminal_mode: str,
 ) -> list[dict]:
     runtime_cfgs = [variant.plan.runtime_cfg for variant in variants]
-    runtime = build_plan_runtime(runtime_cfgs[0])
-    wm = runtime["wm"]
-    device = runtime["device"]
-    envs = [runtime["env"]]
-    for _ in range(1, len(runtime_cfgs)):
-        envs.append(_make_exec_env(runtime_cfgs[0]))
+    run_dirs = [
+        os.path.join(run_root, "traces", variant.name, selection["rollout_id"])
+        for variant in variants
+    ]
 
-    fidelity_cfgs = [OmegaConf.to_container(cfg.fidelity, resolve=True) for cfg in runtime_cfgs]
-    batch_planner = BatchedLatentCEMPlanner(
-        world_model=wm,
-        fidelity_cfgs=fidelity_cfgs,
-        horizon=int(runtime_cfgs[0].mpc.horizon),
-        action_dim=int(envs[0].action_dim),
-        pop_size=int(runtime_cfgs[0].cem.pop_size),
-        elite_frac=float(runtime_cfgs[0].cem.elite_frac),
-        n_iter=int(runtime_cfgs[0].cem.n_iter),
-        init_std=float(runtime_cfgs[0].cem.init_std),
-        action_low=runtime_cfgs[0].cem.action_low,
-        action_high=runtime_cfgs[0].cem.action_high,
-        objective_cfg=OmegaConf.to_container(runtime_cfgs[0].objective, resolve=True),
-        drop_tail_on_coarsen=True,
-        warm_start=bool(runtime_cfgs[0].cem.warm_start),
-        device=device,
-    )
-    init_state, goal_state, sample_meta = load_selected_rollout(
-        envs[0],
-        runtime_cfgs[0],
-        runtime["wm_cfg"],
-        selection,
-    )
-    goal_obs, _ = envs[0].prepare(seed=0, init_state=goal_state)
-    set_goal_pose(envs[0], goal_state)
-    goal_obs["visual"] = envs[0].render("rgb_array", include_start_pose=False)
-    z_goal = encode_visual(wm, goal_obs["visual"], device)
+    def _execute() -> list[dict]:
+        runtime = build_plan_runtime(runtime_cfgs[0])
+        wm = runtime["wm"]
+        device = runtime["device"]
+        envs = [runtime["env"]]
+        for _ in range(1, len(runtime_cfgs)):
+            envs.append(_make_exec_env(runtime_cfgs[0]))
 
-    variant_states: list[dict] = []
-    for env, cfg, variant in zip(envs, runtime_cfgs, variants):
-        set_start_pose(env, init_state)
-        obs, cur_state = env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
-        set_execution_fidelity_finest(env)
-        obs["visual"] = env.render("rgb_array", include_start_pose=False)
-        variant_states.append(
-            {
-                "env": env,
-                "cfg": cfg,
-                "variant_name": variant.name,
-                "obs": obs,
-                "cur_state": np.asarray(cur_state, dtype=np.float32),
-                "executed_actions": [],
-                "trajectory": [np.asarray(cur_state, dtype=np.float32).copy()],
-                "pos_diffs": [],
-                "angle_diffs": [],
-                "eef_diffs": [],
-                "coverages": [],
-                "metric_success_flags": [],
-                "done_flags": [],
-                "state_dists": [],
-                "replans": [],
-                "bits_total": 0,
-                "flops_total": 0,
-                "plan_time_total": 0.0,
-                "n_plans": 0,
-                "last_term": None,
-                "done": False,
-            }
+        fidelity_cfgs = [OmegaConf.to_container(cfg.fidelity, resolve=True) for cfg in runtime_cfgs]
+        batch_planner = BatchedLatentCEMPlanner(
+            world_model=wm,
+            fidelity_cfgs=fidelity_cfgs,
+            horizon=int(runtime_cfgs[0].mpc.horizon),
+            action_dim=int(envs[0].action_dim),
+            pop_size=int(runtime_cfgs[0].cem.pop_size),
+            elite_frac=float(runtime_cfgs[0].cem.elite_frac),
+            n_iter=int(runtime_cfgs[0].cem.n_iter),
+            init_std=float(runtime_cfgs[0].cem.init_std),
+            action_low=runtime_cfgs[0].cem.action_low,
+            action_high=runtime_cfgs[0].cem.action_high,
+            objective_cfg=OmegaConf.to_container(runtime_cfgs[0].objective, resolve=True),
+            drop_tail_on_coarsen=True,
+            warm_start=bool(runtime_cfgs[0].cem.warm_start),
+            device=device,
         )
+        init_state, goal_state, sample_meta = load_selected_rollout(
+            envs[0],
+            runtime_cfgs[0],
+            runtime["wm_cfg"],
+            selection,
+        )
+        goal_obs, _ = envs[0].prepare(seed=0, init_state=goal_state)
+        set_goal_pose(envs[0], goal_state)
+        goal_obs["visual"] = envs[0].render("rgb_array", include_start_pose=False)
+        z_goal = encode_visual(wm, goal_obs["visual"], device)
 
-    initial_term = envs[0].eval_termination(goal_state, variant_states[0]["cur_state"], done=None, info=None)
-    if bool(initial_term["done"]):
+        variant_states: list[dict] = []
+        for env, cfg, variant in zip(envs, runtime_cfgs, variants):
+            set_start_pose(env, init_state)
+            obs, cur_state = env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
+            set_execution_fidelity_finest(env)
+            obs["visual"] = env.render("rgb_array", include_start_pose=False)
+            variant_states.append(
+                {
+                    "env": env,
+                    "cfg": cfg,
+                    "variant_name": variant.name,
+                    "obs": obs,
+                    "cur_state": np.asarray(cur_state, dtype=np.float32),
+                    "executed_actions": [],
+                    "trajectory": [np.asarray(cur_state, dtype=np.float32).copy()],
+                    "pos_diffs": [],
+                    "angle_diffs": [],
+                    "eef_diffs": [],
+                    "coverages": [],
+                    "metric_success_flags": [],
+                    "done_flags": [],
+                    "state_dists": [],
+                    "replans": [],
+                    "bits_total": 0,
+                    "flops_total": 0,
+                    "plan_time_total": 0.0,
+                    "n_plans": 0,
+                    "last_term": None,
+                    "done": False,
+                }
+            )
+
+        initial_term = envs[0].eval_termination(goal_state, variant_states[0]["cur_state"], done=None, info=None)
+        if bool(initial_term["done"]):
+            rows = []
+            for state, run_dir in zip(variant_states, run_dirs):
+                state["last_term"] = initial_term
+                trace, run_stats = _finalize_wm_state(state, "initial_env_done", 0)
+                result = {
+                    "cfg": state["cfg"],
+                    "runtime": {"backend": "wm"},
+                    "success": True,
+                    "trajectory": state["trajectory"],
+                    "frames": [],
+                    "planner_frames": [],
+                    "run_stats": run_stats,
+                    "trace": trace,
+                    "init_state": np.asarray(init_state, dtype=np.float32),
+                    "goal_state": np.asarray(goal_state, dtype=np.float32),
+                    "sample_meta": {**sample_meta, "rollout_id": selection["rollout_id"], "rollout_index": selection["rollout_index"]},
+                    "variant_name": state["variant_name"],
+                }
+                save_plan_result(result, run_dir, save_media=bool(state["cfg"].save))
+                rows.append(result_row(result, run_dir))
+            return rows
+
+        steps = int(runtime_cfgs[0].mpc.steps)
+        horizon = int(runtime_cfgs[0].mpc.horizon)
+        replan_every = int(runtime_cfgs[0].mpc.replan_every)
+        n_replans = max(1, int(np.ceil(steps / replan_every)))
+        t = 0
+        replan_idx = 0
+        prev_exec_steps = 0
+
+        while t < steps and any(not state["done"] for state in variant_states):
+            mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
+            z_batch = torch.cat(
+                [encode_visual(wm, state["obs"]["visual"], device) for state in variant_states],
+                dim=0,
+            )
+            plan_seeds = [
+                int(seed_base + 1000003 * idx + 7919 * replan_idx + 101 * t)
+                for idx in range(len(variant_states))
+            ]
+            batch_results = batch_planner.plan_batch(
+                z0=z_batch,
+                z_goal=z_goal.expand(len(variant_states), -1),
+                mpc_progress=mpc_progress,
+                warm_start_steps=int(prev_exec_steps),
+                seeds=plan_seeds,
+            )
+
+            for variant_idx, (state, batch_result) in enumerate(zip(variant_states, batch_results)):
+                info = batch_result.info
+                action_seq = np.asarray(batch_result.action_seq.detach().cpu().numpy(), dtype=np.float32)
+                bits_used = int(getattr(info, "bits_used_estimate", 0))
+                flops_used = int(bits_to_flops_estimate(bits_used))
+                plan_time = float(getattr(info, "plan_time_sec", 0.0))
+                state["bits_total"] += bits_used
+                state["flops_total"] += flops_used
+                state["plan_time_total"] += plan_time
+                state["n_plans"] += 1
+                state["replans"].append(
+                    {
+                        "replan_idx": int(replan_idx),
+                        "step_start": int(t),
+                        "mpc_progress": float(mpc_progress),
+                        "seed": int(plan_seeds[variant_idx]),
+                        "action_seq": action_seq.tolist(),
+                        "base_level_idx": int(getattr(info, "base_level_idx", -1)),
+                        "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
+                        "bits_used_estimate": bits_used,
+                        "flops_used_estimate": flops_used,
+                        "plan_time_sec": plan_time,
+                        "base_k": None if getattr(info, "base_k", None) is None else int(getattr(info, "base_k")),
+                        "base_spacing": None,
+                        "base_num_particles": None,
+                        "start_state": np.asarray(state["cur_state"], dtype=np.float32).tolist(),
+                    }
+                )
+
+            n_exec = min(replan_every, horizon, steps - t)
+            for exec_idx in range(n_exec):
+                for state in variant_states:
+                    if state["done"]:
+                        continue
+                    action_seq = np.asarray(state["replans"][-1]["action_seq"], dtype=np.float32)
+                    action = np.asarray(action_seq[exec_idx], dtype=np.float32)
+                    state["executed_actions"].append(action.copy())
+                    obs, _, done, step_info = state["env"].step(action)
+                    cur_state = np.asarray(step_info["state"], dtype=np.float32)
+                    state["obs"] = obs
+                    state["cur_state"] = cur_state
+                    state["trajectory"].append(cur_state.copy())
+                    term = state["env"].eval_termination(goal_state, cur_state, done=done, info=step_info)
+                    state["last_term"] = term
+                    state["pos_diffs"].append(float(term["pos_diff"]))
+                    state["angle_diffs"].append(float(term["angle_diff"]))
+                    state["eef_diffs"].append(float(term["eef_diff"]))
+                    state["coverages"].append(float(term["coverage"]) if term["coverage"] is not None else float("nan"))
+                    state["metric_success_flags"].append(bool(term["success"]))
+                    state["done_flags"].append(bool(term["done"]))
+                    state["state_dists"].append(float(term["state_dist"]))
+                    if bool(term["done"]):
+                        state["done"] = True
+                t += 1
+                if t >= steps or all(state["done"] for state in variant_states):
+                    break
+
+            prev_exec_steps = int(n_exec)
+            replan_idx += 1
+
         rows = []
-        for state in variant_states:
-            state["last_term"] = initial_term
-            trace, run_stats = _finalize_wm_state(state, "initial_env_done", 0)
+        for state, run_dir in zip(variant_states, run_dirs):
+            trace, run_stats = _finalize_wm_state(
+                state,
+                "env_done" if state["done"] else "max_steps",
+                max(0, len(state["trajectory"]) - 1),
+            )
             result = {
                 "cfg": state["cfg"],
                 "runtime": {"backend": "wm"},
-                "success": True,
+                "success": bool(state["done"]),
                 "trajectory": state["trajectory"],
                 "frames": [],
                 "planner_frames": [],
@@ -489,121 +708,19 @@ def _run_wm_batched_variants(
                 "sample_meta": {**sample_meta, "rollout_id": selection["rollout_id"], "rollout_index": selection["rollout_index"]},
                 "variant_name": state["variant_name"],
             }
-            run_dir = os.path.join(run_root, "traces", state["variant_name"], selection["rollout_id"])
-            save_plan_result(result, run_dir, save_media=False)
+            save_plan_result(result, run_dir, save_media=bool(state["cfg"].save))
             rows.append(result_row(result, run_dir))
         return rows
 
-    steps = int(runtime_cfgs[0].mpc.steps)
-    horizon = int(runtime_cfgs[0].mpc.horizon)
-    replan_every = int(runtime_cfgs[0].mpc.replan_every)
-    n_replans = max(1, int(np.ceil(steps / replan_every)))
-    t = 0
-    replan_idx = 0
-    prev_exec_steps = 0
+    try:
+        rows, log_text = _capture_output(terminal_mode, _execute)
+    except Exception as exc:
+        for run_dir in run_dirs:
+            _write_run_log(run_dir, f"{type(exc).__name__}: {exc}\n")
+        raise
 
-    while t < steps and any(not state["done"] for state in variant_states):
-        mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
-        z_batch = torch.cat(
-            [encode_visual(wm, state["obs"]["visual"], device) for state in variant_states],
-            dim=0,
-        )
-        plan_seeds = [
-            int(seed_base + 1000003 * idx + 7919 * replan_idx + 101 * t)
-            for idx in range(len(variant_states))
-        ]
-        batch_results = batch_planner.plan_batch(
-            z0=z_batch,
-            z_goal=z_goal.expand(len(variant_states), -1),
-            mpc_progress=mpc_progress,
-            warm_start_steps=int(prev_exec_steps),
-            seeds=plan_seeds,
-        )
-
-        for variant_idx, (state, batch_result) in enumerate(zip(variant_states, batch_results)):
-            info = batch_result.info
-            action_seq = np.asarray(batch_result.action_seq.detach().cpu().numpy(), dtype=np.float32)
-            bits_used = int(getattr(info, "bits_used_estimate", 0))
-            flops_used = int(bits_to_flops_estimate(bits_used))
-            plan_time = float(getattr(info, "plan_time_sec", 0.0))
-            state["bits_total"] += bits_used
-            state["flops_total"] += flops_used
-            state["plan_time_total"] += plan_time
-            state["n_plans"] += 1
-            state["replans"].append(
-                {
-                    "replan_idx": int(replan_idx),
-                    "step_start": int(t),
-                    "mpc_progress": float(mpc_progress),
-                    "seed": int(plan_seeds[variant_idx]),
-                    "action_seq": action_seq.tolist(),
-                    "base_level_idx": int(getattr(info, "base_level_idx", -1)),
-                    "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
-                    "bits_used_estimate": bits_used,
-                    "flops_used_estimate": flops_used,
-                    "plan_time_sec": plan_time,
-                    "base_k": None if getattr(info, "base_k", None) is None else int(getattr(info, "base_k")),
-                    "base_spacing": None,
-                    "base_num_particles": None,
-                    "start_state": np.asarray(state["cur_state"], dtype=np.float32).tolist(),
-                }
-            )
-
-        n_exec = min(replan_every, horizon, steps - t)
-        for exec_idx in range(n_exec):
-            for state in variant_states:
-                if state["done"]:
-                    continue
-                action_seq = np.asarray(state["replans"][-1]["action_seq"], dtype=np.float32)
-                action = np.asarray(action_seq[exec_idx], dtype=np.float32)
-                state["executed_actions"].append(action.copy())
-                obs, _, done, step_info = state["env"].step(action)
-                cur_state = np.asarray(step_info["state"], dtype=np.float32)
-                state["obs"] = obs
-                state["cur_state"] = cur_state
-                state["trajectory"].append(cur_state.copy())
-                term = state["env"].eval_termination(goal_state, cur_state, done=done, info=step_info)
-                state["last_term"] = term
-                state["pos_diffs"].append(float(term["pos_diff"]))
-                state["angle_diffs"].append(float(term["angle_diff"]))
-                state["eef_diffs"].append(float(term["eef_diff"]))
-                state["coverages"].append(float(term["coverage"]) if term["coverage"] is not None else float("nan"))
-                state["metric_success_flags"].append(bool(term["success"]))
-                state["done_flags"].append(bool(term["done"]))
-                state["state_dists"].append(float(term["state_dist"]))
-                if bool(term["done"]):
-                    state["done"] = True
-            t += 1
-            if t >= steps or all(state["done"] for state in variant_states):
-                break
-
-        prev_exec_steps = int(n_exec)
-        replan_idx += 1
-
-    rows = []
-    for state in variant_states:
-        trace, run_stats = _finalize_wm_state(
-            state,
-            "env_done" if state["done"] else "max_steps",
-            max(0, len(state["trajectory"]) - 1),
-        )
-        result = {
-            "cfg": state["cfg"],
-            "runtime": {"backend": "wm"},
-            "success": bool(state["done"]),
-            "trajectory": state["trajectory"],
-            "frames": [],
-            "planner_frames": [],
-            "run_stats": run_stats,
-            "trace": trace,
-            "init_state": np.asarray(init_state, dtype=np.float32),
-            "goal_state": np.asarray(goal_state, dtype=np.float32),
-            "sample_meta": {**sample_meta, "rollout_id": selection["rollout_id"], "rollout_index": selection["rollout_index"]},
-            "variant_name": state["variant_name"],
-        }
-        run_dir = os.path.join(run_root, "traces", state["variant_name"], selection["rollout_id"])
-        save_plan_result(result, run_dir, save_media=False)
-        rows.append(result_row(result, run_dir))
+    for run_dir in run_dirs:
+        _write_run_log(run_dir, log_text)
     return rows
 
 
@@ -630,6 +747,7 @@ def _resolved_experiment_dict(spec: ExperimentSpec) -> dict:
         "baseline": spec.baseline,
         "rollouts": spec.rollouts,
         "execution": spec.execution,
+        "terminal": spec.terminal,
         "reporting": spec.reporting,
         "shared_plan": OmegaConf.to_container(spec.shared_plan.clean_cfg, resolve=True),
         "variants": [
@@ -647,6 +765,8 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
     candidates = enumerate_rollout_candidates(spec.shared_plan)
     selected = select_rollouts(spec.rollouts, candidates)
     variant_order = spec.variant_names()
+    terminal_mode = str(spec.terminal.get("mode", "compact")).lower()
+    progress = _ExperimentProgress(total_runs=len(selected) * len(spec.variants), mode=terminal_mode)
 
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_root = output_root or spec.reporting.get("output_root", "rollouts")
@@ -663,14 +783,16 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
     for selection in selected:
         for group_idx, variants in enumerate(batched_groups):
             seed_base = int(spec.rollouts["seed"] + 100003 * selection["rollout_index"] + 10007 * group_idx)
-            rows.extend(
-                _run_wm_batched_variants(
-                    variants=variants,
-                    selection=selection,
-                    run_root=run_dir,
-                    seed_base=seed_base,
-                )
+            group_rows = _run_wm_batched_variants(
+                variants=variants,
+                selection=selection,
+                run_root=run_dir,
+                seed_base=seed_base,
+                terminal_mode=terminal_mode,
             )
+            rows.extend(group_rows)
+            for row in group_rows:
+                progress.advance(row)
 
     tasks = []
     for selection in selected:
@@ -681,6 +803,7 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
                     "selection": selection,
                     "variant_name": variant.name,
                     "run_dir": os.path.join(run_dir, "traces", variant.name, selection["rollout_id"]),
+                    "terminal_mode": terminal_mode,
                 }
             )
 
@@ -693,14 +816,22 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
             with ProcessPoolExecutor(max_workers=max_workers) as ex:
                 futures = [ex.submit(_run_variant_task, task) for task in tasks]
                 for fut in as_completed(futures):
-                    rows.append(fut.result())
+                    row = fut.result()
+                    rows.append(row)
+                    progress.advance(row)
         except Exception as exc:
             print(f"[experiment][warn] process parallelism unavailable ({exc}); falling back to serial.")
             for task in tasks:
-                rows.append(_run_variant_task(task))
+                row = _run_variant_task(task)
+                rows.append(row)
+                progress.advance(row)
     else:
         for task in tasks:
-            rows.append(_run_variant_task(task))
+            row = _run_variant_task(task)
+            rows.append(row)
+            progress.advance(row)
+
+    progress.finish()
 
     rows = sorted(rows, key=lambda row: (row["rollout_index"], row["variant_name"]))
     summary_rows, paired_rows = aggregate_summary(
@@ -726,13 +857,29 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
             indent=2,
         )
     save_summary_plots(rows, summary_rows, run_dir, max_steps=int(spec.shared_plan.budget["max_env_steps"]))
-    print(f"[experiment] wrote results to {run_dir}")
-    for summary in summary_rows:
-        print(
-            f"[experiment][summary] variant={summary['variant_name']} "
-            f"success_rate={summary['success_rate']:.3f} "
-            f"mean_final_pos_diff={summary['mean_final_pos_diff']:.3f} "
-            f"mean_bits_used_total={summary['mean_bits_used_total']:.1f} "
-            f"mean_plan_time_total_sec={summary['mean_plan_time_total_sec']:.3f}"
-        )
+    report_path = write_experiment_report(
+        run_dir,
+        summary_rows,
+        rows,
+        experiment_name=spec.name,
+        baseline_variant=spec.baseline,
+        summary_plot_files=(
+            "success_rates.png",
+            "final_metrics_boxplots.png",
+            "compute_vs_success.png",
+            "median_stepwise_curves.png",
+        ),
+    )
+    if terminal_mode != "quiet":
+        print(f"[experiment] wrote results to {run_dir}")
+        print(f"[experiment] report: {report_path}")
+        print(f"[experiment] review: python3 scripts/experiment_review.py --run-dir {run_dir}")
+        for summary in summary_rows:
+            print(
+                f"[experiment][summary] variant={summary['variant_name']} "
+                f"success_rate={summary['success_rate']:.3f} "
+                f"mean_final_pos_diff={summary['mean_final_pos_diff']:.3f} "
+                f"mean_bits_used_total={summary['mean_bits_used_total']:.1f} "
+                f"mean_plan_time_total_sec={summary['mean_plan_time_total_sec']:.3f}"
+            )
     return run_dir

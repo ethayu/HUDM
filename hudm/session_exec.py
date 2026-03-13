@@ -7,9 +7,12 @@ import torch
 from omegaconf import DictConfig
 
 from hudm.artifacts import (
+    action_overlay_spec_from_env,
+    draw_action_target_cross,
     overlay_start_pose,
     particle_planner_view_frame,
     planner_view_frame,
+    resolve_action_target,
     rollout_level_for_exec_step,
     wm_decode_frame,
 )
@@ -123,6 +126,80 @@ def run_closed_loop(
     total_plan_time = 0.0
     n_plans = 0
     prev_exec_steps = 0
+    action_overlay = action_overlay_spec_from_env(env) if bool(cfg.save) else None
+
+    def _overlay_target_on_last_frames(state: np.ndarray, action: np.ndarray) -> None:
+        if not bool(cfg.save) or action_overlay is None:
+            return
+        target_xy = resolve_action_target(
+            np.asarray(state, dtype=np.float32)[:2],
+            np.asarray(action, dtype=np.float32),
+            action_format=str(action_overlay["action_format"]),
+            action_relative=bool(action_overlay["action_relative"]),
+            action_scale=float(action_overlay["action_scale"]),
+        )
+        if len(frames) > 0:
+            frames[-1] = draw_action_target_cross(
+                frames[-1],
+                target_xy,
+                reference_size=float(action_overlay["reference_size"]),
+            )
+        if len(planner_frames) > 0:
+            planner_frames[-1] = draw_action_target_cross(
+                planner_frames[-1],
+                target_xy,
+                reference_size=float(action_overlay["reference_size"]),
+            )
+
+    def _append_saved_frames_for_step(cur_obs: dict[str, Any], cur_state_after: np.ndarray, exec_step_in_replan: int) -> None:
+        if not bool(cfg.save):
+            return
+        frame_with_start = env.render("rgb_array", include_start_pose=True)
+        frames.append(frame_with_start)
+        li_exec = rollout_level_for_exec_step(info, exec_step_in_replan=exec_step_in_replan)
+        if backend == "gt_env":
+            frame = planner_view_frame(
+                env=env,
+                base_visual=np.asarray(cur_obs["visual"]),
+                level_idx=li_exec,
+                target_hw=frames[-1].shape[:2],
+            )
+            planner_frames.append(
+                overlay_start_pose(
+                    planner_img=frame,
+                    exec_with_start=np.asarray(frame_with_start),
+                    exec_without_start=np.asarray(cur_obs["visual"]),
+                    target_hw=frames[-1].shape[:2],
+                )
+            )
+        elif backend == "wm":
+            z_exec = encode_visual(wm, cur_obs["visual"], device)
+            frame = wm_decode_frame(
+                wm=wm,
+                z=z_exec,
+                level_idx=li_exec,
+                target_hw=frames[-1].shape[:2],
+            )
+            planner_frames.append(
+                overlay_start_pose(
+                    planner_img=frame,
+                    exec_with_start=np.asarray(frame_with_start),
+                    exec_without_start=np.asarray(cur_obs["visual"]),
+                    target_hw=frames[-1].shape[:2],
+                )
+            )
+        else:
+            planner_frames.append(
+                particle_planner_view_frame(
+                    particle_backend=particle_backend,
+                    start_state=init_state,
+                    cur_state=cur_state_after,
+                    goal_state=goal_state,
+                    level_idx=li_exec,
+                    target_hw=frames[-1].shape[:2],
+                )
+            )
+
     while t < steps:
         mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
         z_cur_for_plan = None
@@ -243,6 +320,7 @@ def run_closed_loop(
         n_exec = min(replan_every, horizon, steps - t)
         for i in range(n_exec):
             action = np.asarray(planned_actions_np[i], dtype=np.float32)
+            _overlay_target_on_last_frames(cur_state, action)
             executed_actions.append(action.copy())
             obs, _, done, step_info = env.step(action)
             cur_state = step_info["state"]
@@ -280,54 +358,16 @@ def run_closed_loop(
                     print(f"[render disabled] {exc}")
                     render_enabled = False
 
-            if bool(cfg.save):
-                frame_with_start = env.render("rgb_array", include_start_pose=True)
-                frames.append(frame_with_start)
-                li_exec = rollout_level_for_exec_step(info, exec_step_in_replan=i)
-                if backend == "gt_env":
-                    frame = planner_view_frame(
-                        env=env,
-                        base_visual=np.asarray(obs["visual"]),
-                        level_idx=li_exec,
-                        target_hw=frames[-1].shape[:2],
-                    )
-                    planner_frames.append(
-                        overlay_start_pose(
-                            planner_img=frame,
-                            exec_with_start=np.asarray(frame_with_start),
-                            exec_without_start=np.asarray(obs["visual"]),
-                            target_hw=frames[-1].shape[:2],
-                        )
-                    )
-                elif backend == "wm":
-                    z_exec = encode_visual(wm, obs["visual"], device)
-                    frame = wm_decode_frame(
-                        wm=wm,
-                        z=z_exec,
-                        level_idx=li_exec,
-                        target_hw=frames[-1].shape[:2],
-                    )
-                    planner_frames.append(
-                        overlay_start_pose(
-                            planner_img=frame,
-                            exec_with_start=np.asarray(frame_with_start),
-                            exec_without_start=np.asarray(obs["visual"]),
-                            target_hw=frames[-1].shape[:2],
-                        )
-                    )
-                else:
-                    planner_frames.append(
-                        particle_planner_view_frame(
-                            particle_backend=particle_backend,
-                            start_state=init_state,
-                            cur_state=cur_state,
-                            goal_state=goal_state,
-                            level_idx=li_exec,
-                            target_hw=frames[-1].shape[:2],
-                        )
-                    )
+            _append_saved_frames_for_step(obs, cur_state, i)
 
             if bool(term["done"]):
+                if bool(cfg.save):
+                    for j in range(i + 1, n_exec):
+                        cont_action = np.asarray(planned_actions_np[j], dtype=np.float32)
+                        _overlay_target_on_last_frames(cur_state, cont_action)
+                        obs, _, _, step_info = env.step(cont_action)
+                        cur_state = step_info["state"]
+                        _append_saved_frames_for_step(obs, cur_state, j)
                 term_reason = "env_done"
                 cov_s = "n/a" if term["coverage"] is None else f"{float(term['coverage']):.4f}"
                 print(
