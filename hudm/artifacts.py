@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import csv
 from datetime import datetime
 from typing import Any
 
@@ -451,10 +452,13 @@ def trace_arrays_from_trace(trace: dict) -> dict:
         if state_dim == 0:
             state_dim = int(np.asarray(replans[0]["start_state"], dtype=np.float32).shape[-1])
     rollout_len_max = max((len(r.get("rollout_level_indices", [])) for r in replans), default=0)
+    latent_len_max = max((len(r.get("rollout_latent_losses", [])) for r in replans), default=0)
     replan_action_seqs = np.zeros((n_replans, horizon, action_dim), dtype=np.float32)
     replan_start_states = np.zeros((n_replans, state_dim), dtype=np.float32)
     replan_rollout_levels = np.full((n_replans, rollout_len_max), -1, dtype=np.int32)
     replan_rollout_lengths = np.zeros((n_replans,), dtype=np.int32)
+    replan_rollout_latent_losses = np.full((n_replans, latent_len_max), np.nan, dtype=np.float32)
+    replan_rollout_latent_lengths = np.zeros((n_replans,), dtype=np.int32)
     replan_step_starts = np.zeros((n_replans,), dtype=np.int32)
     replan_mpc_progress = np.zeros((n_replans,), dtype=np.float32)
     replan_seeds = np.zeros((n_replans,), dtype=np.int64)
@@ -472,6 +476,10 @@ def trace_arrays_from_trace(trace: dict) -> dict:
         replan_rollout_lengths[idx] = int(rl.shape[0])
         if rl.shape[0] > 0:
             replan_rollout_levels[idx, : rl.shape[0]] = rl
+        latent_losses = np.asarray(replan.get("rollout_latent_losses", []), dtype=np.float32)
+        replan_rollout_latent_lengths[idx] = int(latent_losses.shape[0])
+        if latent_losses.shape[0] > 0:
+            replan_rollout_latent_losses[idx, : latent_losses.shape[0]] = latent_losses
         replan_step_starts[idx] = int(replan.get("step_start", 0))
         replan_mpc_progress[idx] = float(replan.get("mpc_progress", 0.0))
         replan_seeds[idx] = int(replan.get("seed", 0))
@@ -499,6 +507,8 @@ def trace_arrays_from_trace(trace: dict) -> dict:
         "replan_start_states": replan_start_states,
         "replan_rollout_levels": replan_rollout_levels,
         "replan_rollout_lengths": replan_rollout_lengths,
+        "replan_rollout_latent_losses": replan_rollout_latent_losses,
+        "replan_rollout_latent_lengths": replan_rollout_latent_lengths,
         "replan_step_starts": replan_step_starts,
         "replan_mpc_progress": replan_mpc_progress,
         "replan_seeds": replan_seeds,
@@ -526,12 +536,109 @@ def save_error_curves(path: str, trace: dict) -> None:
     if len(pos_diffs) > 0:
         plt.plot(range(len(pos_diffs)), pos_diffs, label="pos_diffs")
     if len(angle_diffs) > 0:
-        plt.plot(range(len(angle_diffs)), angle_diffs, label="angle_diffs")
+        angle_diffs_scaled = [100.0 * float(x) for x in angle_diffs]
+        plt.plot(range(len(angle_diffs_scaled)), angle_diffs_scaled, label="angle_diffs_x100")
     if len(eef_diffs) > 0:
         plt.plot(range(len(eef_diffs)), eef_diffs, label="eef_diffs")
     plt.legend()
     plt.savefig(path)
     plt.close()
+
+
+def save_termination_loss_curve(path: str, trace: dict, backend: str) -> None:
+    import matplotlib.pyplot as plt
+
+    losses = list(trace.get("state_dists", []))
+    if len(losses) == 0:
+        return
+    plt.xlabel("Step")
+    plt.ylabel("Loss")
+    if str(backend).lower() == "wm":
+        plt.title("Termination Latent Loss (z_cur vs z_goal) vs Step")
+        label = "latent_loss"
+    else:
+        plt.title("Termination State Distance vs Step")
+        label = "state_dist"
+    plt.plot(range(len(losses)), losses, label=label)
+    plt.legend()
+    plt.savefig(path)
+    plt.close()
+
+
+def save_cem_rollout_latent_loss_curves(path: str, trace: dict, backend: str) -> None:
+    import matplotlib.pyplot as plt
+
+    if str(backend).lower() != "wm":
+        return
+    replans = list(trace.get("replans", []))
+    if len(replans) == 0:
+        return
+    plotted = 0
+    for replan in replans:
+        per_iter = list(replan.get("iter_best_rollout_latent_losses", []))
+        if len(per_iter) > 0:
+            for it_idx, losses in enumerate(per_iter):
+                if len(losses) <= 0:
+                    continue
+                plt.plot(
+                    range(len(losses)),
+                    losses,
+                    alpha=0.35,
+                    label=f"replan:it{it_idx}",
+                )
+                plotted += 1
+            continue
+        losses = list(replan.get("rollout_latent_losses", []))
+        if len(losses) <= 0:
+            continue
+        plt.plot(range(len(losses)), losses, alpha=0.5, label=f"replan")
+        plotted += 1
+    if plotted <= 0:
+        return
+    plt.xlabel("Horizon Step")
+    plt.ylabel("Latent Loss")
+    plt.title("CEM Rollout Latent Loss (z_t vs z_goal) per Replan")
+    if plotted <= 12:
+        plt.legend()
+    plt.savefig(path)
+    plt.close()
+
+
+def save_coverage_curve(path: str, trace: dict) -> None:
+    import matplotlib.pyplot as plt
+
+    cov = np.asarray(trace.get("coverages", []), dtype=np.float32)
+    if cov.size <= 0:
+        return
+    mask = np.isfinite(cov)
+    if not bool(np.any(mask)):
+        return
+    x = np.arange(cov.shape[0], dtype=np.int32)
+    plt.xlabel("Step")
+    plt.ylabel("Coverage")
+    plt.title("Coverage vs Step")
+    plt.plot(x[mask], cov[mask], label="coverage")
+    plt.ylim(0.0, 1.0)
+    plt.legend()
+    plt.savefig(path)
+    plt.close()
+
+
+def save_step_metrics_csv(path: str, trace: dict) -> None:
+    pos_diffs = list(trace.get("pos_diffs", []))
+    angle_diffs = list(trace.get("angle_diffs", []))
+    eef_diffs = list(trace.get("eef_diffs", []))
+    n = max(len(pos_diffs), len(angle_diffs), len(eef_diffs))
+    if n <= 0:
+        return
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["step", "pos_diff", "angle_diff", "eef_diff"])
+        for i in range(n):
+            pos_v = float(pos_diffs[i]) if i < len(pos_diffs) else float("nan")
+            ang_v = float(angle_diffs[i]) if i < len(angle_diffs) else float("nan")
+            eef_v = float(eef_diffs[i]) if i < len(eef_diffs) else float("nan")
+            writer.writerow([i, pos_v, ang_v, eef_v])
 
 
 def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
@@ -561,6 +668,11 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
                 "seed": int(replan.get("seed", 0)),
                 "base_level_idx": int(replan.get("base_level_idx", -1)),
                 "rollout_level_indices": [int(x) for x in list(replan.get("rollout_level_indices", []))],
+                "rollout_latent_losses": [float(x) for x in list(replan.get("rollout_latent_losses", []))],
+                "iter_best_rollout_latent_losses": [
+                    [float(y) for y in list(x)]
+                    for x in list(replan.get("iter_best_rollout_latent_losses", []))
+                ],
                 "bits_used_estimate": int(replan.get("bits_used_estimate", 0)),
                 "flops_used_estimate": int(replan.get("flops_used_estimate", 0)),
                 "plan_time_sec": float(replan.get("plan_time_sec", 0.0)),
@@ -589,6 +701,24 @@ def save_plan_result(
     created_at = datetime.now().strftime("%Y%m%d_%H%M%S")
     trace_json_path, trace_npz_path = save_trace_bundle(run_dir, result)
     save_error_curves(os.path.join(run_dir, "pos_diffs_angle_diffs_eef_diffs.png"), result["trace"])
+    save_termination_loss_curve(
+        os.path.join(run_dir, "termination_loss.png"),
+        result["trace"],
+        backend=str(backend),
+    )
+    save_cem_rollout_latent_loss_curves(
+        os.path.join(run_dir, "cem_rollout_latent_losses.png"),
+        result["trace"],
+        backend=str(backend),
+    )
+    save_coverage_curve(
+        os.path.join(run_dir, "coverage_vs_step.png"),
+        result["trace"],
+    )
+    save_step_metrics_csv(
+        os.path.join(run_dir, "step_metrics.csv"),
+        result["trace"],
+    )
     action_overlay = action_overlay_spec_from_env(result["runtime"].get("env", None))
     meta = {
         "created_at": created_at,

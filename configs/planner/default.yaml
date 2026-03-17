@@ -1,6 +1,6 @@
 plan:
   budget:
-    max_env_steps: 10
+    max_env_steps: 15
   planner:
     horizon: 15
     replan_every: 15

@@ -1,0 +1,20 @@
+plan:
+  planner:
+    fidelity:
+      enabled: true
+      num_levels: 1
+      mpc:
+        mode: "fixed"
+        level: "coarsest"
+      cem:
+        mode: "fixed"
+        level: "base"
+      rollout:
+        mode: "fixed"
+        level: "base"
+        uncertainty:
+          criterion: "mean"
+          threshold: 0.05
+          percentile: 0.8
+          min_level: "coarsest"
+          max_downshifts_per_step: 1
