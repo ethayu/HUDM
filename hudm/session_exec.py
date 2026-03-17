@@ -204,6 +204,7 @@ def run_closed_loop(
         mpc_progress = 0.0 if n_replans <= 1 else replan_idx / (n_replans - 1)
         z_cur_for_plan = None
         plan_seed = int(1009 * replan_idx + 7919 * t)
+        plan_start_state = np.asarray(cur_state, dtype=np.float32).copy()
         if backend == "wm":
             z_cur_for_plan = encode_visual(wm, obs["visual"], device)
             action_seq, info = planner.plan(
@@ -266,7 +267,7 @@ def run_closed_loop(
                 "base_k": None if getattr(info, "base_k", None) is None else int(getattr(info, "base_k")),
                 "base_spacing": None if getattr(info, "base_spacing", None) is None else float(getattr(info, "base_spacing")),
                 "base_num_particles": None if getattr(info, "base_num_particles", None) is None else int(getattr(info, "base_num_particles")),
-                "start_state": np.asarray(cur_state, dtype=np.float32).tolist(),
+                "start_state": plan_start_state.tolist(),
             }
         )
 

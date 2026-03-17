@@ -169,6 +169,159 @@ class PlanningMediaTests(unittest.TestCase):
             self.assertGreater(int(np.sum(captured["frames"][0][:, :, 0])), 0)
             self.assertEqual(int(np.sum(captured["frames"][-1])), 0)
 
+    def test_planner_view_replay_gt_env_uses_single_execution_replay(self):
+        class SettlingEnv:
+            def __init__(self):
+                self.relative = True
+                self.action_scale = 1.0
+                self.window_size = 512.0
+                self._state = np.zeros((5,), dtype=np.float32)
+                self._planning_fidelity_level_idx = 0
+
+            def prepare(self, seed, init_state, goal_state=None):
+                del seed, goal_state
+                self._state = np.asarray(init_state, dtype=np.float32).copy()
+                self._state[0] += 10.0
+                return {"visual": self.render("rgb_array", include_start_pose=False)}, self._state.copy()
+
+            def render(self, mode, include_start_pose=False):
+                del mode
+                frame = np.zeros((4, 4, 3), dtype=np.uint8)
+                frame[:, :, 0] = int(round(float(self._state[0])))
+                if include_start_pose:
+                    frame[0, 0, 1] = 255
+                return frame
+
+            def step(self, action):
+                action = np.asarray(action, dtype=np.float32)
+                self._state[0] += float(action[0])
+                return {"visual": self.render("rgb_array", include_start_pose=False)}, 0.0, False, {"state": self._state.copy()}
+
+            def set_planning_fidelity_level(self, level_idx):
+                self._planning_fidelity_level_idx = int(level_idx)
+
+            def _apply_planning_fidelity_visual(self, img):
+                return np.asarray(img).copy()
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(os.path.join(tmpdir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "plan_config": {"env": {"render_size": 4}},
+                        "sample": {},
+                        "init_state": [0.0, 0, 0, 0, 0],
+                        "goal_state": [0.0, 0, 0, 0, 0],
+                    },
+                    f,
+                )
+            np.savez_compressed(
+                os.path.join(tmpdir, "trace.npz"),
+                executed_actions=np.asarray([[1.0, 0.0], [1.0, 0.0]], dtype=np.float32),
+                trajectory=np.asarray(
+                    [
+                        [0.0, 0, 0, 0, 0],
+                        [2.0, 0, 0, 0, 0],
+                        [4.0, 0, 0, 0, 0],
+                    ],
+                    dtype=np.float32,
+                ),
+                replan_rollout_levels=np.asarray([[0, 0]], dtype=np.int32),
+                replan_rollout_lengths=np.asarray([2], dtype=np.int32),
+                replan_step_starts=np.asarray([0], dtype=np.int32),
+            )
+            captured = {}
+
+            def _capture_video(path, frames, fps=15, output_size=256):
+                del path, fps, output_size
+                captured["frames"] = [np.asarray(fr).copy() for fr in frames]
+
+            with mock.patch.object(
+                planning_media,
+                "_build_runtime",
+                return_value=(OmegaConf.create({"env": {"render_size": 4}}), {"env": SettlingEnv(), "backend": "gt_env"}),
+            ):
+                with mock.patch.object(planning_media, "overlay_action_targets_on_frames", side_effect=lambda frames, states, actions, overlay_spec: frames):
+                    with mock.patch.object(planning_media.single_plan, "_write_video_mp4", side_effect=_capture_video):
+                        planning_media.render_media(tmpdir, schedule=None, rollout_id=None, media=["planner_view_replay"])
+
+            self.assertEqual([int(fr[1, 1, 0]) for fr in captured["frames"]], [10, 11, 12])
+            self.assertTrue(all(int(fr[0, 0, 1]) == 255 for fr in captured["frames"]))
+
+    def test_predicted_backend_replay_gt_env_uses_trajectory_start_state(self):
+        class SettlingEnv:
+            def __init__(self):
+                self.relative = True
+                self.action_scale = 1.0
+                self.window_size = 512.0
+                self._state = np.zeros((5,), dtype=np.float32)
+                self._planning_fidelity_level_idx = 0
+
+            def prepare(self, seed, init_state, goal_state=None):
+                del seed, goal_state
+                self._state = np.asarray(init_state, dtype=np.float32).copy()
+                self._state[0] += 10.0
+                return {"visual": self.render("rgb_array", include_start_pose=False)}, self._state.copy()
+
+            def render(self, mode, include_start_pose=False):
+                del mode
+                frame = np.zeros((4, 4, 3), dtype=np.uint8)
+                frame[:, :, 0] = int(round(float(self._state[0])))
+                if include_start_pose:
+                    frame[0, 0, 1] = 255
+                return frame
+
+            def step(self, action):
+                del action
+                return {"visual": self.render("rgb_array", include_start_pose=False)}, 0.0, False, {"state": self._state.copy()}
+
+            def set_planning_fidelity_level(self, level_idx):
+                self._planning_fidelity_level_idx = int(level_idx)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(os.path.join(tmpdir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "plan_config": {"env": {"render_size": 4}},
+                        "sample": {},
+                        "init_state": [0.0, 0, 0, 0, 0],
+                        "goal_state": [0.0, 0, 0, 0, 0],
+                    },
+                    f,
+                )
+            np.savez_compressed(
+                os.path.join(tmpdir, "trace.npz"),
+                replan_action_seqs=np.asarray([[[0.0, 0.0], [0.0, 0.0]]], dtype=np.float32),
+                replan_start_states=np.asarray([[10.0, 0, 0, 0, 0]], dtype=np.float32),
+                replan_rollout_levels=np.asarray([[0, 0]], dtype=np.int32),
+                replan_rollout_lengths=np.asarray([2], dtype=np.int32),
+                replan_step_starts=np.asarray([0], dtype=np.int32),
+                trajectory=np.asarray(
+                    [
+                        [0.0, 0, 0, 0, 0],
+                        [1.0, 0, 0, 0, 0],
+                        [2.0, 0, 0, 0, 0],
+                    ],
+                    dtype=np.float32,
+                ),
+                executed_actions=np.asarray([[0.0, 0.0], [0.0, 0.0]], dtype=np.float32),
+            )
+            captured = {}
+
+            def _capture_video(path, frames, fps=15, output_size=256):
+                del path, fps, output_size
+                captured["frames"] = [np.asarray(fr).copy() for fr in frames]
+
+            with mock.patch.object(
+                planning_media,
+                "_build_runtime",
+                return_value=(OmegaConf.create({"env": {"render_size": 4}}), {"env": SettlingEnv(), "backend": "gt_env"}),
+            ):
+                with mock.patch.object(planning_media, "overlay_action_targets_on_frames", side_effect=lambda frames, states, actions, overlay_spec: frames):
+                    with mock.patch.object(planning_media.single_plan, "_write_video_mp4", side_effect=_capture_video):
+                        planning_media.render_media(tmpdir, schedule=None, rollout_id=None, media=["predicted_backend_replay"])
+
+            self.assertEqual([int(fr[1, 1, 0]) for fr in captured["frames"]], [10, 10, 10])
+
 
 if __name__ == "__main__":
     unittest.main()
