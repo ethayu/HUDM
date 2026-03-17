@@ -74,6 +74,15 @@ def _auc(values: Sequence[float]) -> float:
     return float(np.sum(np.asarray(values, dtype=np.float32)))
 
 
+def _trace_mean_value(values: Sequence[float], fallback: Any) -> float:
+    if len(values) > 0:
+        arr = np.asarray(values, dtype=np.float32)
+        finite = arr[np.isfinite(arr)]
+        if finite.size > 0:
+            return float(np.mean(finite))
+    return float(fallback) if fallback is not None else float("nan")
+
+
 def result_row(result: dict, run_dir: str) -> dict:
     trace = result["trace"]
     run_stats = result["run_stats"]
@@ -104,6 +113,9 @@ def result_row(result: dict, run_dir: str) -> dict:
         "best_pos_diff": _trace_best_value(trace.get("pos_diffs", []), run_stats.get("termination_pos_diff")),
         "best_angle_diff": _trace_best_value(trace.get("angle_diffs", []), run_stats.get("termination_angle_diff")),
         "best_eef_diff": _trace_best_value(trace.get("eef_diffs", []), run_stats.get("termination_eef_diff")),
+        "avg_pos_diff": _trace_mean_value(trace.get("pos_diffs", []), run_stats.get("termination_pos_diff")),
+        "avg_angle_diff": _trace_mean_value(trace.get("angle_diffs", []), run_stats.get("termination_angle_diff")),
+        "avg_eef_diff": _trace_mean_value(trace.get("eef_diffs", []), run_stats.get("termination_eef_diff")),
         "final_coverage": _coverage_final(trace.get("coverages", []), run_stats.get("termination_coverage")),
         "auc_pos_diff": _auc(trace.get("pos_diffs", [])),
         "auc_angle_diff": _auc(trace.get("angle_diffs", [])),
@@ -275,6 +287,9 @@ def aggregate_summary(
         best_pos = _metric_array(variant_rows, "best_pos_diff")
         best_angle = _metric_array(variant_rows, "best_angle_diff")
         best_eef = _metric_array(variant_rows, "best_eef_diff")
+        avg_pos = _metric_array(variant_rows, "avg_pos_diff")
+        avg_angle = _metric_array(variant_rows, "avg_angle_diff")
+        avg_eef = _metric_array(variant_rows, "avg_eef_diff")
         final_cov = _metric_array(variant_rows, "final_coverage")
         auc_pos = _metric_array(variant_rows, "auc_pos_diff")
         auc_angle = _metric_array(variant_rows, "auc_angle_diff")
@@ -305,6 +320,9 @@ def aggregate_summary(
             "mean_best_pos_diff": float(np.nanmean(best_pos)) if best_pos.size > 0 else float("nan"),
             "mean_best_angle_diff": float(np.nanmean(best_angle)) if best_angle.size > 0 else float("nan"),
             "mean_best_eef_diff": float(np.nanmean(best_eef)) if best_eef.size > 0 else float("nan"),
+            "mean_avg_pos_diff": float(np.nanmean(avg_pos)) if avg_pos.size > 0 else float("nan"),
+            "mean_avg_angle_diff": float(np.nanmean(avg_angle)) if avg_angle.size > 0 else float("nan"),
+            "mean_avg_eef_diff": float(np.nanmean(avg_eef)) if avg_eef.size > 0 else float("nan"),
             "mean_final_coverage": float(np.nanmean(final_cov)) if final_cov.size > 0 else float("nan"),
             "median_final_coverage": float(np.nanmedian(final_cov)) if final_cov.size > 0 else float("nan"),
             "mean_auc_pos_diff": float(np.nanmean(auc_pos)) if auc_pos.size > 0 else float("nan"),
