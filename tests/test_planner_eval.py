@@ -76,7 +76,48 @@ experiment:
         finally:
             os.unlink(tmp_path)
 
-    def test_aggregate_summary_uses_explicit_baseline(self):
+    def test_experiment_config_does_not_require_baseline(self):
+        task_cfg = os.path.join(ROOT, "configs/task/pusht_smoke_dataset.yaml")
+        planner_cfg = os.path.join(ROOT, "configs/planner/smoke.yaml")
+        backend_cfg = os.path.join(ROOT, "configs/backend/gt_env_state.yaml")
+        fidelity_cfg = os.path.join(ROOT, "configs/fidelity/finest.yaml")
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write(
+                f"""
+experiment:
+  name: "no_baseline"
+  shared_plan:
+    imports:
+      - "{task_cfg}"
+      - "{planner_cfg}"
+    plan:
+      artifacts:
+        render: false
+        save: false
+  rollouts:
+    seed: 0
+    num_rollouts: 1
+    sample_without_replacement: true
+  execution:
+    mode: "serial"
+    max_workers: 1
+  reporting:
+    output_root: "rollouts"
+  variants:
+    - name: "variant_a"
+      imports:
+        - "{backend_cfg}"
+        - "{fidelity_cfg}"
+"""
+            )
+            tmp_path = f.name
+        try:
+            spec = resolve_experiment_spec(tmp_path)
+            self.assertEqual(spec.variant_names(), ["variant_a"])
+        finally:
+            os.unlink(tmp_path)
+
+    def test_aggregate_summary_returns_variant_aggregates_without_pairwise_rows(self):
         rows = [
             {
                 "variant_name": "baseline",
@@ -129,15 +170,10 @@ experiment:
                 "plan_time_per_replan_sec": 1.5,
             },
         ]
-        summary_rows, paired_rows = aggregate_summary(
-            rows,
-            baseline_variant="baseline",
-            variant_order=["baseline", "challenger"],
-        )
+        summary_rows, paired_rows = aggregate_summary(rows, variant_order=["baseline", "challenger"])
         self.assertEqual(summary_rows[0]["variant_name"], "baseline")
         self.assertEqual(summary_rows[1]["variant_name"], "challenger")
-        self.assertEqual(paired_rows[0]["baseline_variant"], "baseline")
-        self.assertEqual(paired_rows[0]["success_delta"], -1)
+        self.assertEqual(paired_rows, [])
 
     def test_benchmark_spec_resolves_entries(self):
         spec = load_benchmark_spec(os.path.join(ROOT, "configs/benchmark.yaml"))
