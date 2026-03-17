@@ -6,13 +6,13 @@ plan:
       with_target: true
       add_noise: 0
       noise_std: [0.5, 0.5]
-      render_size: 512
+      render_size: 96
     init_goal:
       source: "dataset"
       dataset:
-        zarr_path: "synthetic/pusht_synth.zarr"
+        zarr_path: "synthetic/pusht_synth_large.zarr"
         split: "valid"
         split_ratio: null
-        trajectory_len: 5
+        trajectory_len: 10
         seed: 10
         reconstruct_goal_state: 3

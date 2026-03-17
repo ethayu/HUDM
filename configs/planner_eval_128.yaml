@@ -1,0 +1,25 @@
+experiment:
+  name: "wm_128_100_rollouts"
+  shared_plan:
+    imports:
+      - task/pusht_dataset.yaml
+      - planner/default.yaml
+    plan:
+      artifacts:
+        render: false
+        save: false
+  rollouts:
+    seed: 0
+    num_rollouts: 100
+    sample_without_replacement: true
+  execution:
+    mode: "auto"
+    max_workers: 2
+  reporting:
+    output_root: "rollouts"
+  baseline: "wm_128"
+  variants:
+    - name: "wm_128"
+      imports:
+        - backend/wm_128.yaml
+        - fidelity/single.yaml

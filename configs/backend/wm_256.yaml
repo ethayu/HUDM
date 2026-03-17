@@ -1,0 +1,18 @@
+plan:
+  backend:
+    kind: "wm"
+    wm:
+      world_model:
+        config_path: "/home/aurora/HUDM-mwm-ethan/configs/world_256.yaml"
+        run_dir: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260313_154635"
+        epoch: 199
+        checkpoint_root: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260313_154635"
+        device: "auto"
+        ensemble:
+          enabled: false
+          run_dirs: []
+      objective:
+        latent_metric: "l2"
+        terminal_weight: 1.0
+        running_weight: 0.0
+        action_l2_weight: 0.1
