@@ -22,6 +22,7 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 from models.world.model import HierWorldModel
 from datasets.zarr_episodes import ZarrPushTEpisodes
+from hudm.world_io import latest_checkpoint_epoch, load_world_checkpoint
 
 
 @torch.no_grad()
@@ -40,6 +41,7 @@ def main():
         K=list(cfg.model.K),
         D=int(cfg.model.D),
         action_dim=cfg.data.action_dim,
+        input=str(getattr(cfg.model, "input", "images")),
         decoder_mode=str(getattr(cfg.model, "decoder_mode", "per_level")),
         dynamics_mode=str(getattr(cfg.model, "dynamics_mode", "per_level")),
     ).to(device)
@@ -57,19 +59,7 @@ def main():
         print('No checkpoint run directories found; using random weights')
     else:
         latest = max(run_dirs, key=os.path.getmtime)
-        enc_p = os.path.join(latest, 'encoder.pt')
-        if os.path.isfile(enc_p):
-            wm.encoder.load_state_dict(torch.load(enc_p, map_location=device))
-        decoder_mode = str(getattr(cfg.model, "decoder_mode", "per_level"))
-        if decoder_mode == "shared":
-            dp = os.path.join(latest, "decoder.pt")
-            if os.path.isfile(dp):
-                wm.decoder.load_state_dict(torch.load(dp, map_location=device))
-        else:
-            for li in range(len(cfg.model.K)):
-                dp = os.path.join(latest, f'decoder_l{li}.pt')
-                if os.path.isfile(dp):
-                    wm.decoders[li].load_state_dict(torch.load(dp, map_location=device))
+        load_world_checkpoint(wm, latest, latest_checkpoint_epoch(latest), device)
 
     wm.eval()
 

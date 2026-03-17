@@ -27,7 +27,6 @@ class HierWorldModel(nn.Module):
         self.D = D
         self.decoder_mode = decoder_mode
         self.dynamics_mode = dynamics_mode
-        print(f"input: {input}")
         if input == "images":
             self.encoder = CNNEncoder(out_dim=D)
             if decoder_mode == "per_level":

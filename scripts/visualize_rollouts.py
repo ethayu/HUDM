@@ -19,7 +19,7 @@ Notes:
 """
 
 import argparse
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 from omegaconf import OmegaConf
@@ -38,7 +38,6 @@ def load_episodes_from_zarr(zarr_path: str, split: str = "train", split_ratio: f
     """
     if zarr is None:
         raise ImportError("zarr not installed. pip install zarr")
-    
     root = zarr.open_group(zarr_path, mode="r")
     data = root["data"]
     meta = root["meta"]
@@ -69,6 +68,43 @@ def load_episodes_from_zarr(zarr_path: str, split: str = "train", split_ratio: f
         episodes.append(ep_imgs)
     
     return episodes
+
+
+def collect_episodes_to_show(data, *, split_name: str, source: str, count: int) -> tuple[list[np.ndarray], list[str]]:
+    split_ratio = float(data.split_ratio)
+    real_episodes: list[np.ndarray] = []
+    synth_episodes: list[np.ndarray] | None = None
+
+    if source in {"real", "mixed"}:
+        real_episodes = load_episodes_from_zarr(data.zarr_path, split=split_name, split_ratio=split_ratio)
+
+    if source in {"synthetic", "mixed"} and getattr(data, "synthetic", None) and getattr(data.synthetic, "zarr_path", None):
+        synth_episodes = load_episodes_from_zarr(
+            data.synthetic.zarr_path,
+            split=split_name,
+            split_ratio=split_ratio,
+        )
+
+    if source == "real":
+        n = min(count, len(real_episodes))
+        return real_episodes[:n], [f"Real Episode {i+1}/{n}" for i in range(n)]
+
+    if source == "synthetic":
+        if synth_episodes is None:
+            raise SystemExit("No synthetic.zarr_path configured in data.synthetic.zarr_path")
+        n = min(count, len(synth_episodes))
+        return synth_episodes[:n], [f"Synthetic Episode {i+1}/{n}" for i in range(n)]
+
+    if synth_episodes is None:
+        raise SystemExit("No synthetic.zarr_path configured in data.synthetic.zarr_path for mixed source")
+    half = max(1, count // 2)
+    n_real = min(half, len(real_episodes))
+    n_synth = min(count - half, len(synth_episodes))
+    episodes = real_episodes[:n_real] + synth_episodes[:n_synth]
+    titles = [f"Real Episode {i+1}/{n_real}" for i in range(n_real)] + [
+        f"Synthetic Episode {i+1}/{n_synth}" for i in range(n_synth)
+    ]
+    return episodes, titles
 
 
 def display_episode(episode: np.ndarray, title: str, fps: int = 15):
@@ -126,44 +162,13 @@ def main():
 
     cfg = OmegaConf.load(args.config)
     data = cfg.data
-    split_ratio = float(data.split_ratio)
     split_name = 'valid' if args.split in ('valid','val') else 'train'
-
-    # Load real episodes
-    real_episodes = load_episodes_from_zarr(data.zarr_path, split=split_name, split_ratio=split_ratio)
-    
-    # Load synthetic episodes if available
-    synth_episodes = None
-    if getattr(data, 'synthetic', None) and getattr(data.synthetic, 'zarr_path', None):
-        synth_episodes = load_episodes_from_zarr(
-            data.synthetic.zarr_path, 
-            split=split_name, 
-            split_ratio=split_ratio
-        )
-
-    # Collect episodes to display
-    episodes_to_show = []
-    titles = []
-    
-    if args.source == 'real':
-        n = min(args.count, len(real_episodes))
-        episodes_to_show = real_episodes[:n]
-        titles = [f'Real Episode {i+1}/{n}' for i in range(n)]
-    elif args.source == 'synthetic':
-        if synth_episodes is None:
-            raise SystemExit('No synthetic.zarr_path configured in data.synthetic.zarr_path')
-        n = min(args.count, len(synth_episodes))
-        episodes_to_show = synth_episodes[:n]
-        titles = [f'Synthetic Episode {i+1}/{n}' for i in range(n)]
-    else:  # mixed
-        if synth_episodes is None:
-            raise SystemExit('No synthetic.zarr_path configured in data.synthetic.zarr_path for mixed source')
-        half = max(1, args.count // 2)
-        n_real = min(half, len(real_episodes))
-        n_synth = min(args.count - half, len(synth_episodes))
-        episodes_to_show = real_episodes[:n_real] + synth_episodes[:n_synth]
-        titles = ([f'Real Episode {i+1}/{n_real}' for i in range(n_real)] +
-                 [f'Synthetic Episode {i+1}/{n_synth}' for i in range(n_synth)])
+    episodes_to_show, titles = collect_episodes_to_show(
+        data,
+        split_name=split_name,
+        source=args.source,
+        count=args.count,
+    )
     
     # Display each episode
     print(f"Displaying {len(episodes_to_show)} episodes. Close window to advance to next episode.")

@@ -1,80 +1,85 @@
 from __future__ import annotations
 
+import os
+import tempfile
 import unittest
 
-from omegaconf import OmegaConf
+from hudm.benchmark import load_benchmark_spec
+from hudm.config import resolve_experiment_spec, resolve_plan_spec
+from hudm.experiment import aggregate_summary
+from hudm.task_sampling import enumerate_rollout_candidates, select_rollouts
 
-import plan as single_plan
-import planner_eval
-from validate_cfg import validate_planner_eval_cfg
+
+ROOT = os.path.dirname(os.path.dirname(__file__))
 
 
-class PlannerEvalConfigTests(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.base_cfg = single_plan.load_plan_cfg("configs/plan.yaml")
-
-    def test_validate_rejects_duplicate_schedule_names(self):
-        cfg = OmegaConf.create(
-            {
-                "plan_config": "configs/plan.yaml",
-                "seed": 0,
-                "num_rollouts": 2,
-                "sample_without_replacement": True,
-                "output_root": "rollouts",
-                "parallel": {"mode": "auto", "max_workers": 1, "wm_schedule_batch_size": 1},
-                "schedules": [
-                    {"name": "dup", "fidelity": {"mpc": {"mode": "fixed", "level": "finest"}}},
-                    {"name": "dup", "fidelity": {"mpc": {"mode": "fixed", "level": "coarsest"}}},
-                ],
-            }
-        )
-        with self.assertRaises(ValueError):
-            validate_planner_eval_cfg(cfg, base_plan_cfg=self.base_cfg)
+class ExperimentConfigTests(unittest.TestCase):
+    def test_resolve_plan_spec_prunes_inactive_backend_blocks(self):
+        spec = resolve_plan_spec(os.path.join(ROOT, "configs/plan_smoke_gt_env.yaml"))
+        self.assertEqual(spec.active_backend_kind(), "gt_env")
+        self.assertNotIn("wm", spec.clean_cfg.backend)
+        self.assertNotIn("particle_sim", spec.clean_cfg.backend)
+        self.assertEqual(str(spec.runtime_cfg.backend), "gt_env")
 
     def test_select_rollouts_is_deterministic(self):
-        cfg = OmegaConf.create(
-            {
-                "plan_config": "configs/plan.yaml",
-                "seed": 17,
-                "num_rollouts": 3,
-                "sample_without_replacement": True,
-                "output_root": "rollouts",
-                "parallel": {"mode": "auto", "max_workers": 1, "wm_schedule_batch_size": 1},
-                "schedules": [
-                    {"name": "sched_a", "fidelity": {"mpc": {"mode": "fixed", "level": "finest"}}},
-                ],
-            }
-        )
-        validate_planner_eval_cfg(cfg, base_plan_cfg=self.base_cfg)
-        candidates = planner_eval.enumerate_rollout_candidates(self.base_cfg)
-        sel_a = planner_eval.select_rollouts(cfg, candidates)
-        sel_b = planner_eval.select_rollouts(cfg, candidates)
+        spec = resolve_experiment_spec(os.path.join(ROOT, "configs/planner_eval_smoke_gt_env.yaml"))
+        candidates = enumerate_rollout_candidates(spec.shared_plan)
+        sel_a = select_rollouts(spec.rollouts, candidates)
+        sel_b = select_rollouts(spec.rollouts, candidates)
         self.assertEqual(sel_a, sel_b)
         self.assertEqual(len({item["rollout_id"] for item in sel_a}), len(sel_a))
+        self.assertEqual(spec.terminal["mode"], "compact")
 
-    def test_select_rollouts_rejects_impossible_without_replacement(self):
-        cfg = OmegaConf.create(
-            {
-                "plan_config": "configs/plan.yaml",
-                "seed": 0,
-                "num_rollouts": 10_000_000,
-                "sample_without_replacement": True,
-                "output_root": "rollouts",
-                "parallel": {"mode": "auto", "max_workers": 1, "wm_schedule_batch_size": 1},
-                "schedules": [
-                    {"name": "sched_a", "fidelity": {"mpc": {"mode": "fixed", "level": "finest"}}},
-                ],
-            }
-        )
-        candidates = planner_eval.enumerate_rollout_candidates(self.base_cfg)
-        with self.assertRaises(ValueError):
-            planner_eval.select_rollouts(cfg, candidates)
+    def test_variant_rejects_task_override(self):
+        task_cfg = os.path.join(ROOT, "configs/task/pusht_smoke_dataset.yaml")
+        planner_cfg = os.path.join(ROOT, "configs/planner/smoke.yaml")
+        backend_cfg = os.path.join(ROOT, "configs/backend/gt_env_state.yaml")
+        fidelity_cfg = os.path.join(ROOT, "configs/fidelity/finest.yaml")
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
+            f.write(
+                f"""
+experiment:
+  name: "bad_variant"
+  shared_plan:
+    imports:
+      - "{task_cfg}"
+      - "{planner_cfg}"
+    plan:
+      artifacts:
+        render: false
+        save: false
+  rollouts:
+    seed: 0
+    num_rollouts: 1
+    sample_without_replacement: true
+  execution:
+    mode: "serial"
+    max_workers: 1
+  reporting:
+    output_root: "rollouts"
+  baseline: "bad"
+  variants:
+    - name: "bad"
+      imports:
+        - "{backend_cfg}"
+        - "{fidelity_cfg}"
+      overrides:
+        task:
+          env:
+            render_size: 64
+"""
+            )
+            tmp_path = f.name
+        try:
+            with self.assertRaises(ValueError):
+                resolve_experiment_spec(tmp_path)
+        finally:
+            os.unlink(tmp_path)
 
-    def test_aggregate_summary_uses_first_schedule_as_baseline(self):
+    def test_aggregate_summary_uses_explicit_baseline(self):
         rows = [
             {
-                "schedule_name": "zeta",
+                "variant_name": "baseline",
                 "rollout_id": "r0",
                 "success": 1,
                 "success_and_done": 1,
@@ -99,7 +104,7 @@ class PlannerEvalConfigTests(unittest.TestCase):
                 "plan_time_per_replan_sec": 0.5,
             },
             {
-                "schedule_name": "alpha",
+                "variant_name": "challenger",
                 "rollout_id": "r0",
                 "success": 0,
                 "success_and_done": 0,
@@ -124,16 +129,20 @@ class PlannerEvalConfigTests(unittest.TestCase):
                 "plan_time_per_replan_sec": 1.5,
             },
         ]
-        summary_rows, paired_rows = planner_eval.aggregate_summary(
+        summary_rows, paired_rows = aggregate_summary(
             rows,
-            self.base_cfg,
-            baseline_schedule="zeta",
-            schedule_order=["zeta", "alpha"],
+            baseline_variant="baseline",
+            variant_order=["baseline", "challenger"],
         )
-        self.assertEqual(summary_rows[0]["schedule_name"], "zeta")
-        self.assertEqual(summary_rows[1]["schedule_name"], "alpha")
-        self.assertEqual(paired_rows[0]["baseline_schedule"], "zeta")
+        self.assertEqual(summary_rows[0]["variant_name"], "baseline")
+        self.assertEqual(summary_rows[1]["variant_name"], "challenger")
+        self.assertEqual(paired_rows[0]["baseline_variant"], "baseline")
         self.assertEqual(paired_rows[0]["success_delta"], -1)
+
+    def test_benchmark_spec_resolves_entries(self):
+        spec = load_benchmark_spec(os.path.join(ROOT, "configs/benchmark.yaml"))
+        self.assertGreaterEqual(len(spec.entries), 1)
+        self.assertTrue(spec.entries[0].experiment_config.endswith(".yaml"))
 
 
 if __name__ == "__main__":

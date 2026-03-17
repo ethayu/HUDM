@@ -1,0 +1,25 @@
+experiment:
+  name: "gt_env_many_rollouts"
+  shared_plan:
+    imports:
+      - task/pusht_dataset.yaml
+      - planner/default.yaml
+    plan:
+      artifacts:
+        render: false
+        save: false
+  rollouts:
+    seed: 0
+    num_rollouts: 32
+    sample_without_replacement: true
+  execution:
+    mode: "auto"
+    max_workers: 2
+  reporting:
+    output_root: "rollouts"
+  baseline: "gt_env_finest"
+  variants:
+    - name: "gt_env_finest"
+      imports:
+        - backend/gt_env_image.yaml
+        - fidelity/finest.yaml

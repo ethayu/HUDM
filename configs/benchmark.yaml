@@ -1,0 +1,10 @@
+benchmark:
+  name: "pusht_suite"
+  output_root: "rollouts"
+  experiments:
+    - name: "multi_backend_compare"
+      config: "planner_eval.yaml"
+    - name: "smoke_gt_env"
+      config: "planner_eval_smoke_gt_env.yaml"
+    - name: "smoke_particle"
+      config: "planner_eval_smoke_particle.yaml"

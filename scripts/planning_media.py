@@ -13,6 +13,7 @@ from omegaconf import OmegaConf
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import plan as single_plan
+from hudm.artifacts import infer_action_overlay_spec, overlay_action_targets_on_frames
 
 
 MEDIA_ALIASES = {
@@ -93,6 +94,9 @@ def _render_closed_loop_replay(trace_dir: str, meta: dict, arrays: dict) -> str:
     for action in actions:
         env.step(action)
         frames.append(env.render("rgb_array", include_start_pose=True))
+    trajectory = np.asarray(arrays.get("trajectory", []), dtype=np.float32)
+    overlay_spec = infer_action_overlay_spec(meta, actions, env=env)
+    frames = overlay_action_targets_on_frames(frames, trajectory, actions, overlay_spec)
     out_path = os.path.join(trace_dir, "closed_loop_replay.mp4")
     single_plan._write_video_mp4(out_path, frames, fps=15)
     return out_path
@@ -147,6 +151,7 @@ def _render_planner_view_replay(trace_dir: str, meta: dict, arrays: dict) -> str
         raise ValueError("Trace trajectory is empty.")
     goal_state = np.asarray(meta["goal_state"], dtype=np.float32)
     init_state = np.asarray(meta["init_state"], dtype=np.float32)
+    executed_actions = np.asarray(arrays.get("executed_actions", []), dtype=np.float32)
     levels = _levels_for_steps(arrays, total_steps=max(1, trajectory.shape[0] - 1))
     frames = []
     particle_backend = None
@@ -187,6 +192,8 @@ def _render_planner_view_replay(trace_dir: str, meta: dict, arrays: dict) -> str
                 target_hw=(int(cfg.env.render_size), int(cfg.env.render_size)),
             )
             frames.append(frame)
+    overlay_spec = infer_action_overlay_spec(meta, executed_actions, env=env)
+    frames = overlay_action_targets_on_frames(frames, trajectory, executed_actions, overlay_spec)
     out_path = os.path.join(trace_dir, "planner_view_replay.mp4")
     single_plan._write_video_mp4(out_path, frames, fps=15)
     return out_path
@@ -205,6 +212,7 @@ def _render_predicted_backend_replay(trace_dir: str, meta: dict, arrays: dict) -
     replan_start_states = np.asarray(arrays["replan_start_states"], dtype=np.float32)
     replan_rollout_levels = np.asarray(arrays["replan_rollout_levels"], dtype=np.int32)
     replan_rollout_lengths = np.asarray(arrays["replan_rollout_lengths"], dtype=np.int32)
+    overlay_spec = infer_action_overlay_spec(meta, replan_action_seqs, env=env)
 
     if backend == "wm":
         wm = runtime["wm"]
@@ -216,8 +224,21 @@ def _render_predicted_backend_replay(trace_dir: str, meta: dict, arrays: dict) -
             z = single_plan._encode_visual(wm, obs["visual"], runtime["device"])
             z_cur = z.clone()
             horizon = int(replan_rollout_lengths[r_idx])
+            if horizon <= 0:
+                continue
+            seg_frames = []
+            seg_states = [np.asarray(start_state, dtype=np.float32).copy()]
+            seg_actions = np.asarray(replan_action_seqs[r_idx, :horizon], dtype=np.float32)
             for t in range(horizon):
                 level_idx = int(replan_rollout_levels[r_idx, t])
+                seg_frames.append(
+                    single_plan._wm_decode_frame(
+                        wm=wm,
+                        z=z_cur,
+                        level_idx=level_idx,
+                        target_hw=(int(cfg.env.render_size), int(cfg.env.render_size)),
+                    )
+                )
                 action_t = torch.as_tensor(replan_action_seqs[r_idx, t : t + 1], dtype=torch.float32, device=runtime["device"])
                 z_next_k, _ = planner._predict_next_stats(level_idx, z_cur, action_t)
                 k = int(planner.K[level_idx])
@@ -226,24 +247,40 @@ def _render_predicted_backend_replay(trace_dir: str, meta: dict, arrays: dict) -
                 if k < planner.D:
                     z_next[:, k:] = 0.0
                 z_cur = z_next
-                frames.append(
-                    single_plan._wm_decode_frame(
-                        wm=wm,
-                        z=z_cur,
-                        level_idx=level_idx,
-                        target_hw=(int(cfg.env.render_size), int(cfg.env.render_size)),
-                    )
+                _, _, _, step_info = env.step(replan_action_seqs[r_idx, t])
+                seg_states.append(np.asarray(step_info["state"], dtype=np.float32).copy())
+            last_level = int(replan_rollout_levels[r_idx, max(0, horizon - 1)])
+            seg_frames.append(
+                single_plan._wm_decode_frame(
+                    wm=wm,
+                    z=z_cur,
+                    level_idx=last_level,
+                    target_hw=(int(cfg.env.render_size), int(cfg.env.render_size)),
                 )
+            )
+            frames.extend(overlay_action_targets_on_frames(seg_frames, seg_states, seg_actions, overlay_spec))
     elif backend == "gt_env":
         for r_idx in range(replan_action_seqs.shape[0]):
             start_state = replan_start_states[r_idx]
             env.prepare(seed=0, init_state=start_state, goal_state=goal_state)
             horizon = int(replan_rollout_lengths[r_idx])
+            if horizon <= 0:
+                continue
+            seg_frames = []
+            seg_states = [np.asarray(start_state, dtype=np.float32).copy()]
+            seg_actions = np.asarray(replan_action_seqs[r_idx, :horizon], dtype=np.float32)
+            first_level = int(replan_rollout_levels[r_idx, 0])
+            env.set_planning_fidelity_level(first_level)
+            seg_frames.append(env.render("rgb_array", include_start_pose=True))
             for t in range(horizon):
                 level_idx = int(replan_rollout_levels[r_idx, t])
                 env.set_planning_fidelity_level(level_idx)
-                env.step(replan_action_seqs[r_idx, t])
-                frames.append(env.render("rgb_array", include_start_pose=True))
+                _, _, _, step_info = env.step(replan_action_seqs[r_idx, t])
+                seg_states.append(np.asarray(step_info["state"], dtype=np.float32).copy())
+                next_level = int(replan_rollout_levels[r_idx, min(t + 1, horizon - 1)])
+                env.set_planning_fidelity_level(next_level)
+                seg_frames.append(env.render("rgb_array", include_start_pose=True))
+            frames.extend(overlay_action_targets_on_frames(seg_frames, seg_states, seg_actions, overlay_spec))
     else:
         particle_backend = getattr(runtime["planner"], "backend", None)
         for r_idx in range(replan_action_seqs.shape[0]):
@@ -253,11 +290,21 @@ def _render_predicted_backend_replay(trace_dir: str, meta: dict, arrays: dict) -
                 continue
             level_idx = int(replan_rollout_levels[r_idx, 0])
             particle_backend.set_planning_fidelity_level(level_idx)
-            particle_backend.prepare(seed=0, init_state=start_state, goal_state=goal_state, with_visual=True)
+            obs, cur_state = particle_backend.prepare(
+                seed=0,
+                init_state=start_state,
+                goal_state=goal_state,
+                with_visual=True,
+            )
+            seg_frames = [np.asarray(obs["visual"])]
+            seg_states = [np.asarray(cur_state, dtype=np.float32).copy()]
+            seg_actions = np.asarray(replan_action_seqs[r_idx, :horizon], dtype=np.float32)
             for t in range(horizon):
                 particle_backend.set_planning_fidelity_level(int(replan_rollout_levels[r_idx, t]))
-                obs, _, _, _ = particle_backend.step(replan_action_seqs[r_idx, t], with_visual=True)
-                frames.append(np.asarray(obs["visual"]))
+                obs, cur_state, _, _ = particle_backend.step(replan_action_seqs[r_idx, t], with_visual=True)
+                seg_states.append(np.asarray(cur_state, dtype=np.float32).copy())
+                seg_frames.append(np.asarray(obs["visual"]))
+            frames.extend(overlay_action_targets_on_frames(seg_frames, seg_states, seg_actions, overlay_spec))
 
     if len(frames) <= 0:
         raise ValueError("No predicted backend frames were generated for this trace.")

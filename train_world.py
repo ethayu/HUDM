@@ -1,5 +1,6 @@
 import os
 import datetime
+from functools import partial
 from typing import Dict, List, Tuple
 
 import torch
@@ -15,6 +16,7 @@ except Exception:
 from models.world.model import HierWorldModel
 from datasets.zarr_episodes import ZarrPushTEpisodes, collate_episodes
 from datasets.mixed_zarr import build_mixed_zarr_episodes
+from hudm.world_io import save_world_checkpoint
 from validate_cfg import validate_world_cfg
 
 
@@ -141,18 +143,8 @@ def run_epoch(
     return avg_loss, avg_logs
 
 
-def save_checkpoint(model: HierWorldModel, run_dir: str) -> None:
-    torch.save(model.encoder.state_dict(), os.path.join(run_dir, "encoder.pt"))
-    if model.decoder_mode == "per_level":
-        for li in range(len(model.K)):
-            torch.save(model.decoders[li].state_dict(), os.path.join(run_dir, f"decoder_l{li}.pt"))
-    else:
-        torch.save(model.decoder.state_dict(), os.path.join(run_dir, "decoder.pt"))
-    if model.dynamics_mode == "per_level":
-        for li in range(len(model.K)):
-            torch.save(model.dynamics[li].state_dict(), os.path.join(run_dir, f"dyn_l{li}.pt"))
-    else:
-        torch.save(model.dynamics.state_dict(), os.path.join(run_dir, "dyn.pt"))
+def save_checkpoint(model: HierWorldModel, run_dir: str, epoch: int) -> None:
+    save_world_checkpoint(model, run_dir, epoch=epoch)
 
 
 def main(cfg_path: str):
@@ -176,11 +168,13 @@ def main(cfg_path: str):
         "model": {
             "D": 512,
             "K": [64, 128, 256, 512],
+            "input": "images",
             "decoder_mode": "per_level",
             "dynamics_mode": "per_level",
         },
         "train": {
             "batch_size": 8,
+            "horizon": 50,
             "num_workers": 4,
             "no_cuda": False,
             "checkpoint_dir": "checkpoints_world",
@@ -215,6 +209,7 @@ def main(cfg_path: str):
         K=K,
         D=D,
         action_dim=cfg.data.action_dim,
+        input=str(getattr(cfg.model, "input", "images")),
         decoder_mode=str(getattr(cfg.model, "decoder_mode", "per_level")),
         dynamics_mode=str(getattr(cfg.model, "dynamics_mode", "per_level")),
     ).to(device)
@@ -230,14 +225,20 @@ def main(cfg_path: str):
         batch_size=cfg.train.batch_size,
         shuffle=True,
         num_workers=cfg.train.num_workers,
-        collate_fn=collate_episodes,
+        collate_fn=partial(
+            collate_episodes,
+            length=int(getattr(cfg.train, "horizon", getattr(cfg.data, "horizon_T", 0))),
+        ),
     )
     va_loader = DataLoader(
         va_ds,
         batch_size=cfg.train.batch_size,
         shuffle=False,
         num_workers=cfg.train.num_workers,
-        collate_fn=collate_episodes,
+        collate_fn=partial(
+            collate_episodes,
+            length=int(getattr(cfg.train, "horizon", getattr(cfg.data, "horizon_T", 0))),
+        ),
     )
 
     # Run dir and metadata
@@ -280,7 +281,7 @@ def main(cfg_path: str):
         if val_loss + min_delta < best_val:
             best_val = val_loss
             no_improve = 0
-            save_checkpoint(wm, run_dir)
+            save_checkpoint(wm, run_dir, epoch=epoch)
         else:
             no_improve += 1
             if no_improve >= patience:

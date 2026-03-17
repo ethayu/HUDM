@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import torch
+from hudm.metrics import pose_metrics
 from pusht.pusht_env import PushTEnv, pymunk_to_shapely
 from pusht.utils import aggregate_dct
 from planning.fidelity import apply_fidelity
@@ -729,31 +730,15 @@ class PushTWrapper(PushTEnv):
         self.shape = env_info['shape']
     
     def eval_state(self, goal_state, cur_state):
-        """
-        Return True if the goal is reached
-        [agent_x, agent_y, T_x, T_y, angle, agent_vx, agent_vy]
-        """
-        # if position difference is < 10, and angle difference < np.pi/9, then success
-        eef_diff = np.linalg.norm(goal_state[:2] - cur_state[:2])
-        pos_diff = np.linalg.norm(goal_state[2:4] - cur_state[2:4])
-        angle_diff = np.abs(goal_state[4] - cur_state[4])
-        angle_diff = np.minimum(angle_diff, 2 * np.pi - angle_diff)
-        success = pos_diff < 10 and angle_diff < np.pi / 9 #and eef_diff < 20
-        state_dist = np.linalg.norm(goal_state - cur_state)
-        return {
-            'success': success,
-            'pos_diff': pos_diff,
-            'angle_diff': angle_diff,
-            'eef_diff': eef_diff,
-            'state_dist': state_dist,
-        }
+        return pose_metrics(goal_state, cur_state)
 
     def eval_termination(self, goal_state, cur_state, done=None, info=None):
         """
         Unified termination eval used by planners and debug logging.
 
-        Returns metric success (wrapper thresholds), env-done status, coverage,
-        and the strict success gate requiring both metric success and done.
+        Returns pose-metric success (for planner analysis/objectives), the
+        coverage-based env done flag, coverage, and a compatibility field
+        combining both.
         """
         metrics = self.eval_state(goal_state, cur_state)
 

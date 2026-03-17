@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import cv2
 import numpy as np
 
+from hudm.metrics import pose_metrics
 from pusht.pusht_particle_warp import PushTWarpEnv, PushTWarpParams, wp
 
 
@@ -370,7 +371,10 @@ class PushTParticleBackend:
             "state": cur_state.copy(),
         }
         metrics = self.eval_state(self._goal_state, cur_state)
-        done = bool(done_sim) or bool(metrics["success"])
+        # Keep planner metrics separate from env termination. The particle
+        # backend should terminate only when the simulated env reports success,
+        # which is coverage-based like the real PushT env.
+        done = bool(done_sim)
 
         info = {
             "state": cur_state.copy(),
@@ -384,17 +388,4 @@ class PushTParticleBackend:
     def eval_state(self, goal_state: np.ndarray, cur_state: np.ndarray) -> dict:
         goal_state = self._ensure_state_dim(goal_state)
         cur_state = self._ensure_state_dim(cur_state)
-
-        eef_diff = np.linalg.norm(goal_state[:2] - cur_state[:2])
-        pos_diff = np.linalg.norm(goal_state[2:4] - cur_state[2:4])
-        angle_diff = np.abs(float(goal_state[4] - cur_state[4]))
-        angle_diff = np.minimum(angle_diff, 2 * np.pi - angle_diff)
-        success = bool(pos_diff < 10.0 and angle_diff < np.pi / 9)
-        state_dist = np.linalg.norm(goal_state - cur_state)
-        return {
-            "success": success,
-            "pos_diff": float(pos_diff),
-            "angle_diff": float(angle_diff),
-            "eef_diff": float(eef_diff),
-            "state_dist": float(state_dist),
-        }
+        return pose_metrics(goal_state, cur_state)
