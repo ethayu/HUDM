@@ -10,11 +10,11 @@ experiment:
         save: false
   rollouts:
     seed: 0
-    num_rollouts: 32
+    num_rollouts: 6
     sample_without_replacement: true
   execution:
     mode: "auto"
-    max_workers: 2
+    max_workers: 6
   reporting:
     output_root: "rollouts"
   baseline: "gt_env_finest"
