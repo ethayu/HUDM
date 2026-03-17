@@ -559,6 +559,7 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
                 "step_start": int(replan.get("step_start", 0)),
                 "mpc_progress": float(replan.get("mpc_progress", 0.0)),
                 "seed": int(replan.get("seed", 0)),
+                "action_horizon": int(len(replan.get("action_seq", []))),
                 "base_level_idx": int(replan.get("base_level_idx", -1)),
                 "rollout_level_indices": [int(x) for x in list(replan.get("rollout_level_indices", []))],
                 "bits_used_estimate": int(replan.get("bits_used_estimate", 0)),
