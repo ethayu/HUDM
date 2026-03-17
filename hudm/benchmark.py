@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Sequence
 
 from hudm.config import resolve_benchmark_spec
+from hudm.experiment_bundle import EXPERIMENT_JSON
 from hudm.experiment import run_experiment
 from hudm.specs import BenchmarkSpec
 
@@ -39,7 +40,7 @@ def run_benchmark(spec_or_path: str | BenchmarkSpec) -> str:
     rows: list[dict] = []
     for entry in spec.entries:
         experiment_dir = run_experiment(entry.experiment_config, output_root=run_dir)
-        summary_path = os.path.join(experiment_dir, "summary.json")
+        summary_path = os.path.join(experiment_dir, EXPERIMENT_JSON)
         with open(summary_path, "r", encoding="utf-8") as f:
             summary = json.load(f)
         rows.append(
@@ -47,9 +48,8 @@ def run_benchmark(spec_or_path: str | BenchmarkSpec) -> str:
                 "benchmark_name": spec.name,
                 "experiment_name": entry.name,
                 "experiment_dir": experiment_dir,
-                "baseline_variant": summary.get("baseline_variant"),
                 "num_rollouts": summary.get("num_rollouts"),
-                "num_variants": len(summary.get("summary", [])),
+                "num_variants": len(summary.get("variants", [])),
             }
         )
 
