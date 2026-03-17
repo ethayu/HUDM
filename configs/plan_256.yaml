@@ -1,8 +1,8 @@
 imports:
   - task/pusht_dataset.yaml
   - planner/default.yaml
-  - backend/wm.yaml
-  - fidelity/finest.yaml
+  - backend/wm_256.yaml
+  - fidelity/single.yaml
 
 plan:
   artifacts:

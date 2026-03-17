@@ -263,10 +263,26 @@ class BatchedLatentCEMPlanner:
             else:
                 final_rollout_levels = planner.core.rollout_level_indices(final_level_idx)
 
+            z_cur = z0_sched[sched_idx : sched_idx + 1].clone()
+            z_goal_cur = z_goal_sched[sched_idx : sched_idx + 1]
+            action_seq = planner.core.mu.detach().to(self.device)
+            per_step_losses: List[float] = []
+            for t in range(self.horizon):
+                li = int(final_rollout_levels[t]) if t < len(final_rollout_levels) else int(final_level_idx)
+                k = planner.K[li]
+                a_t = action_seq[t : t + 1, :]
+                z_next_k, _ = planner._predict_next_stats(li, z_cur, a_t)
+                z_next = z_cur.clone()
+                z_next[:, :k] = z_next_k
+                if planner.drop_tail_on_coarsen and k < planner.D:
+                    z_next[:, k:] = 0.0
+                z_cur = z_next
+                per_step_losses.append(float(planner._latent_distance(z_cur, z_goal_cur, k).item()))
             info = LatentCEMInfo(
                 base_level_idx=int(final_level_idx),
                 base_k=self.K[int(final_level_idx)],
                 rollout_level_indices=[int(x) for x in final_rollout_levels],
+                rollout_latent_losses=per_step_losses,
                 bits_used_estimate=int(total_bits[sched_idx]),
                 plan_time_sec=elapsed,
             )

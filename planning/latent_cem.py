@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 import torch
@@ -13,6 +13,8 @@ class LatentCEMInfo:
     base_level_idx: int
     base_k: int
     rollout_level_indices: List[int]
+    rollout_latent_losses: List[float] = field(default_factory=list)
+    iter_best_rollout_latent_losses: List[List[float]] = field(default_factory=list)
     bits_used_estimate: int = 0
     plan_time_sec: float = 0.0
 
@@ -120,6 +122,8 @@ class LatentCEMPlanner:
             raise ValueError(
                 f"max_downshifts_per_step must be > 0, got {self.max_downshifts_per_step}"
             )
+        self._latest_rollout_latent_losses: List[float] = []
+        self._iter_best_rollout_latent_losses: List[List[float]] = []
 
     def _predict_next_stats(
         self,
@@ -167,15 +171,27 @@ class LatentCEMPlanner:
         z_goal: torch.Tensor,           # (1,D)
         base_level_idx: int,
         rollout_levels: List[int],
+        capture_rollout_latent_losses: bool = False,
     ) -> tuple[torch.Tensor, List[int], int]:
         if self.rollout_mode == "uncertainty_downshift":
-            return self._evaluate_population_uncertainty(actions, z0, z_goal, base_level_idx)
+            return self._evaluate_population_uncertainty(
+                actions,
+                z0,
+                z_goal,
+                base_level_idx,
+                capture_rollout_latent_losses=capture_rollout_latent_losses,
+            )
 
         P = actions.shape[0]
         z = z0.expand(P, -1).clone()
         z_goal_exp = z_goal.expand(P, -1)
         running = torch.zeros(P, device=self.device)
         bits_used = 0
+        step_latent = (
+            torch.zeros((P, self.horizon), device=self.device)
+            if capture_rollout_latent_losses
+            else None
+        )
 
         for t in range(self.horizon):
             li = rollout_levels[t]
@@ -189,8 +205,11 @@ class LatentCEMPlanner:
                 z_next[:, k:] = 0.0
             z = z_next
 
+            step_dist = self._latent_distance(z, z_goal_exp, k)
+            if step_latent is not None:
+                step_latent[:, t] = step_dist
             if self.running_weight > 0.0:
-                running = running + self.running_weight * self._latent_distance(z, z_goal_exp, k)
+                running = running + self.running_weight * step_dist
 
         k_terminal = self.K[base_level_idx]
         terminal = self.terminal_weight * self._latent_distance(z, z_goal_exp, k_terminal)
@@ -199,6 +218,11 @@ class LatentCEMPlanner:
         if self.action_l2_weight > 0.0:
             action_penalty = actions.pow(2).mean(dim=(1, 2))
             cost = cost + self.action_l2_weight * action_penalty
+        if step_latent is not None:
+            best_idx = int(torch.argmin(cost).item())
+            self._latest_rollout_latent_losses = [
+                float(x) for x in step_latent[best_idx].detach().cpu().tolist()
+            ]
 
         return cost, rollout_levels, bits_used
 
@@ -209,12 +233,18 @@ class LatentCEMPlanner:
         z0: torch.Tensor,               # (1,D)
         z_goal: torch.Tensor,           # (1,D)
         base_level_idx: int,
+        capture_rollout_latent_losses: bool = False,
     ) -> tuple[torch.Tensor, List[int], int]:
         P = actions.shape[0]
         z = z0.expand(P, -1).clone()
         z_goal_exp = z_goal.expand(P, -1)
         running = torch.zeros(P, device=self.device)
         bits_used = 0
+        step_latent = (
+            torch.zeros((P, self.horizon), device=self.device)
+            if capture_rollout_latent_losses
+            else None
+        )
 
         current_level = base_level_idx
         min_level = self.uncertainty_min_level
@@ -246,8 +276,11 @@ class LatentCEMPlanner:
                 z_next[:, k:] = 0.0
             z = z_next
 
+            step_dist = self._latent_distance(z, z_goal_exp, k)
+            if step_latent is not None:
+                step_latent[:, t] = step_dist
             if self.running_weight > 0.0:
-                running = running + self.running_weight * self._latent_distance(z, z_goal_exp, k)
+                running = running + self.running_weight * step_dist
             rollout_levels.append(current_level)
 
         k_terminal = self.K[current_level]
@@ -257,6 +290,11 @@ class LatentCEMPlanner:
         if self.action_l2_weight > 0.0:
             action_penalty = actions.pow(2).mean(dim=(1, 2))
             cost = cost + self.action_l2_weight * action_penalty
+        if step_latent is not None:
+            best_idx = int(torch.argmin(cost).item())
+            self._latest_rollout_latent_losses = [
+                float(x) for x in step_latent[best_idx].detach().cpu().tolist()
+            ]
 
         return cost, rollout_levels, bits_used
 
@@ -270,6 +308,8 @@ class LatentCEMPlanner:
         seed: Optional[int] = None,
     ) -> tuple[torch.Tensor, LatentCEMInfo]:
         t0 = time.perf_counter()
+        self._latest_rollout_latent_losses = []
+        self._iter_best_rollout_latent_losses = []
         if z0.shape[-1] != self.D or z_goal.shape[-1] != self.D:
             raise ValueError(
                 f"Latent dim mismatch: expected D={self.D}, got z0={tuple(z0.shape)}, z_goal={tuple(z_goal.shape)}"
@@ -282,7 +322,16 @@ class LatentCEMPlanner:
             iter_idx: int,
         ) -> tuple[torch.Tensor, List[int], int]:
             del iter_idx
-            return self._evaluate_population(actions, z0, z_goal, base_level_idx, rollout_levels)
+            costs, levels_used, bits_used = self._evaluate_population(
+                actions,
+                z0,
+                z_goal,
+                base_level_idx,
+                rollout_levels,
+                capture_rollout_latent_losses=True,
+            )
+            self._iter_best_rollout_latent_losses.append(list(self._latest_rollout_latent_losses))
+            return costs, levels_used, bits_used
 
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
@@ -296,6 +345,8 @@ class LatentCEMPlanner:
             base_level_idx=final_level_idx,
             base_k=self.K[final_level_idx],
             rollout_level_indices=final_rollout_levels,
+            rollout_latent_losses=list(self._latest_rollout_latent_losses),
+            iter_best_rollout_latent_losses=[list(x) for x in self._iter_best_rollout_latent_losses],
             bits_used_estimate=int(total_bits),
             plan_time_sec=float(time.perf_counter() - t0),
         )

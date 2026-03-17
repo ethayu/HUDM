@@ -78,6 +78,17 @@ def _auc(values: Sequence[float]) -> float:
     return float(np.sum(np.asarray(values, dtype=np.float32)))
 
 
+def _wm_termination_latent_loss(
+    wm: object,
+    z_goal: torch.Tensor,
+    visual_obs: np.ndarray,
+    device: torch.device,
+) -> float:
+    z_cur = encode_visual(wm, visual_obs, device)
+    diff = z_cur - z_goal
+    return float(torch.sqrt(diff.pow(2).mean() + 1e-8).item())
+
+
 def result_row(result: dict, run_dir: str) -> dict:
     trace = result["trace"]
     run_stats = result["run_stats"]
@@ -428,6 +439,14 @@ def _run_wm_batched_variants(
             )
 
         initial_term = envs[0].eval_termination(goal_state, variant_states[0]["cur_state"], done=None, info=None)
+        initial_latent = _wm_termination_latent_loss(
+            wm,
+            z_goal,
+            np.asarray(variant_states[0]["obs"]["visual"]),
+            device,
+        )
+        initial_term["latent_loss"] = float(initial_latent)
+        initial_term["state_dist"] = float(initial_latent)
         if bool(initial_term["done"]):
             rows = []
             for state, run_dir in zip(variant_states, run_dirs):
@@ -496,6 +515,11 @@ def _run_wm_batched_variants(
                         "action_seq": action_seq.tolist(),
                         "base_level_idx": int(getattr(info, "base_level_idx", -1)),
                         "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
+                        "rollout_latent_losses": [float(x) for x in list(getattr(info, "rollout_latent_losses", []))],
+                        "iter_best_rollout_latent_losses": [
+                            [float(y) for y in list(x)]
+                            for x in list(getattr(info, "iter_best_rollout_latent_losses", []))
+                        ],
                         "bits_used_estimate": bits_used,
                         "flops_used_estimate": flops_used,
                         "plan_time_sec": plan_time,
@@ -520,6 +544,14 @@ def _run_wm_batched_variants(
                     state["cur_state"] = cur_state
                     state["trajectory"].append(cur_state.copy())
                     term = state["env"].eval_termination(goal_state, cur_state, done=done, info=step_info)
+                    latent_loss = _wm_termination_latent_loss(
+                        wm,
+                        z_goal,
+                        np.asarray(obs["visual"]),
+                        device,
+                    )
+                    term["latent_loss"] = float(latent_loss)
+                    term["state_dist"] = float(latent_loss)
                     state["last_term"] = term
                     state["pos_diffs"].append(float(term["pos_diff"]))
                     state["angle_diffs"].append(float(term["angle_diff"]))

@@ -30,6 +30,17 @@ from hudm.session_helpers import (
 from pusht.pusht_wrapper import PushTWrapper
 
 
+def _wm_termination_latent_loss(
+    wm: object,
+    z_goal: torch.Tensor,
+    visual_obs: np.ndarray,
+    device: torch.device,
+) -> float:
+    z_cur = encode_visual(wm, visual_obs, device)
+    diff = z_cur - z_goal
+    return float(torch.sqrt(diff.pow(2).mean() + 1e-8).item())
+
+
 def run_closed_loop(
     env: PushTWrapper,
     wm: object | None,
@@ -75,6 +86,10 @@ def run_closed_loop(
         frames.append(env.render("rgb_array", include_start_pose=True))
 
     initial_term = env.eval_termination(goal_state, cur_state, done=None, info=None)
+    if backend == "wm":
+        latent_loss = _wm_termination_latent_loss(wm, z_goal, np.asarray(obs["visual"]), device)
+        initial_term["latent_loss"] = float(latent_loss)
+        initial_term["state_dist"] = float(latent_loss)
     if bool(initial_term["done"]):
         cov_s = "n/a" if initial_term["coverage"] is None else f"{float(initial_term['coverage']):.4f}"
         print(
@@ -261,6 +276,11 @@ def run_closed_loop(
                 "action_seq": planned_actions_np.tolist(),
                 "base_level_idx": int(getattr(info, "base_level_idx", -1)),
                 "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
+                "rollout_latent_losses": [float(x) for x in list(getattr(info, "rollout_latent_losses", []))],
+                "iter_best_rollout_latent_losses": [
+                    [float(y) for y in list(x)]
+                    for x in list(getattr(info, "iter_best_rollout_latent_losses", []))
+                ],
                 "bits_used_estimate": bits_used,
                 "flops_used_estimate": flops_used,
                 "plan_time_sec": plan_time,
@@ -326,8 +346,12 @@ def run_closed_loop(
             obs, _, done, step_info = env.step(action)
             cur_state = step_info["state"]
             trajectory.append(cur_state.copy())
-
+            
             term = env.eval_termination(goal_state, cur_state, done=done, info=step_info)
+            if backend == "wm":
+                latent_loss = _wm_termination_latent_loss(wm, z_goal, np.asarray(obs["visual"]), device)
+                term["latent_loss"] = float(latent_loss)
+                term["state_dist"] = float(latent_loss)
             last_term = term
             pd = term["pos_diff"]
             ad = term["angle_diff"]

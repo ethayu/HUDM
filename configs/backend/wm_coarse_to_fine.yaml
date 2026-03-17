@@ -14,5 +14,5 @@ plan:
       objective:
         latent_metric: "l2"
         terminal_weight: 1.0
-        running_weight: .2
-        action_l2_weight: 0.0
+        running_weight: 0.0
+        action_l2_weight: 0.1
