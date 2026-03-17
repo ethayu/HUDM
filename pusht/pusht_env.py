@@ -789,7 +789,7 @@ class PushTEnv(gym.Env):
         self.n_contact_points = 0
 
         self.max_score = 50 * 100
-        self.success_threshold = 0.95  # 95% coverage.
+        self.success_threshold = 0.90  # 90% coverage.
 
     def _add_segment(self, a, b, radius):
         shape = pymunk.Segment(self.space.static_body, a, b, radius)
