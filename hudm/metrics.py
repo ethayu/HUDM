@@ -6,7 +6,7 @@ from typing import Any, Dict
 import numpy as np
 
 
-SUCCESS_POS_THRESHOLD = 10.0
+SUCCESS_POS_THRESHOLD = 1.0
 SUCCESS_ANGLE_THRESHOLD = math.pi / 9.0
 
 

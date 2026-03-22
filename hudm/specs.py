@@ -78,7 +78,6 @@ class ExperimentSpec:
     config_path: str | None
     shared_plan: PlanSpec
     variants: list[ExperimentVariant]
-    baseline: str
     rollouts: dict[str, Any]
     execution: dict[str, Any]
     terminal: dict[str, Any]
@@ -86,12 +85,6 @@ class ExperimentSpec:
 
     def variant_names(self) -> list[str]:
         return [variant.name for variant in self.variants]
-
-    def baseline_variant(self) -> ExperimentVariant:
-        for variant in self.variants:
-            if variant.name == self.baseline:
-                return variant
-        raise KeyError(f"Unknown baseline variant: {self.baseline}")
 
 
 @dataclass(frozen=True)

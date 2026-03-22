@@ -513,12 +513,6 @@ def validate_experiment_cfg(cfg: DictConfig) -> None:
         raise ValueError("experiment.rollouts.seed must be >= 0.")
     if not isinstance(cfg.rollouts.sample_without_replacement, bool):
         raise ValueError("experiment.rollouts.sample_without_replacement must be a bool.")
-    baseline = getattr(cfg, "baseline", None)
-    if baseline is None or not str(baseline).strip():
-        raise ValueError("experiment.baseline must be set explicitly.")
-    if str(baseline) not in set(names):
-        raise ValueError(f"experiment.baseline={baseline!r} does not match any variant name.")
-
 
 def resolve_experiment_spec(cfg_path: str) -> ExperimentSpec:
     root = load_config_with_imports(cfg_path)
@@ -584,7 +578,6 @@ def resolve_experiment_spec(cfg_path: str) -> ExperimentSpec:
         config_path=os.path.abspath(cfg_path),
         shared_plan=shared_plan,
         variants=variants,
-        baseline=str(cfg.baseline),
         rollouts=dict(OmegaConf.to_container(cfg.rollouts, resolve=True)),
         execution=dict(OmegaConf.to_container(cfg.execution, resolve=True)),
         terminal=dict(OmegaConf.to_container(cfg.terminal, resolve=True)),

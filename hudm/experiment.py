@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import contextlib
-import csv
 import io
 import json
 import os
@@ -17,8 +16,13 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 
 from hudm.artifacts import save_plan_result
+from hudm.experiment_bundle import (
+    EXPERIMENT_SCHEMA_VERSION,
+    REVIEWER_SCHEMA_VERSION,
+    trace_dir,
+    write_experiment_bundle,
+)
 from hudm.config import resolve_experiment_spec
-from hudm.experiment_report import write_experiment_report
 from hudm.runtime import (
     bits_to_flops_estimate,
     build_plan_runtime,
@@ -132,21 +136,6 @@ def result_row(result: dict, run_dir: str) -> dict:
     }
 
 
-def _write_rows_csv(path: str, rows: Sequence[dict]) -> None:
-    if len(rows) <= 0:
-        return
-    fieldnames: list[str] = []
-    for row in rows:
-        for key in row.keys():
-            if key not in fieldnames:
-                fieldnames.append(key)
-    with open(path, "w", encoding="utf-8", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        for row in rows:
-            writer.writerow(row)
-
-
 class _TeeStream(io.TextIOBase):
     def __init__(self, *targets: io.TextIOBase | None):
         self._targets = [target for target in targets if target is not None]
@@ -229,48 +218,18 @@ def _write_run_log(run_dir: str, log_text: str) -> None:
         f.write(log_text)
 
 
-def _load_trace_npz(path: str) -> dict:
-    with np.load(path, allow_pickle=False) as data:
-        return {key: data[key] for key in data.files}
-
-
-def _stepwise_curve(rows: Sequence[dict], key: str, max_steps: int) -> tuple[np.ndarray, np.ndarray]:
-    if len(rows) <= 0:
-        return np.zeros((0,), dtype=np.float32), np.zeros((0,), dtype=np.float32)
-    stacked = []
-    for row in rows:
-        trace = _load_trace_npz(row["trace_npz"])
-        arr = np.asarray(trace[key], dtype=np.float32)
-        if arr.size <= 0:
-            arr = np.full((max_steps,), np.nan, dtype=np.float32)
-        elif arr.shape[0] < max_steps:
-            pad_value = arr[-1]
-            arr = np.concatenate(
-                [arr, np.full((max_steps - arr.shape[0],), pad_value, dtype=np.float32)],
-                axis=0,
-            )
-        else:
-            arr = arr[:max_steps]
-        stacked.append(arr)
-    mat = np.stack(stacked, axis=0)
-    return np.nanmedian(mat, axis=0), np.nanmean(mat, axis=0)
-
-
 def _metric_array(rows: Sequence[dict], key: str) -> np.ndarray:
     return np.asarray([row[key] for row in rows], dtype=np.float32)
 
 
 def aggregate_summary(
     rows: Sequence[dict],
-    baseline_variant: str,
     variant_order: Sequence[str],
 ) -> tuple[list[dict], list[dict]]:
     by_variant: dict[str, list[dict]] = {}
     for row in rows:
         by_variant.setdefault(str(row["variant_name"]), []).append(row)
-    baseline_rows = {str(row["rollout_id"]): row for row in by_variant.get(str(baseline_variant), [])}
     summary_rows: list[dict] = []
-    paired_rows: list[dict] = []
     ordered_variant_names = [name for name in variant_order if name in by_variant]
     ordered_variant_names.extend(sorted(name for name in by_variant if name not in ordered_variant_names))
 
@@ -332,116 +291,7 @@ def aggregate_summary(
         for reason, count in reason_counts.items():
             summary_row[f"termination_reason__{_safe_name(reason)}"] = int(count)
         summary_rows.append(summary_row)
-
-        if variant_name == baseline_variant:
-            continue
-
-        success_win_count = 0
-        success_loss_count = 0
-        success_tie_count = 0
-        pos_better_count = 0
-        pos_worse_count = 0
-        pos_tie_count = 0
-        for row in variant_rows:
-            base_row = baseline_rows.get(str(row["rollout_id"]))
-            if base_row is None:
-                continue
-            success_delta = int(row["success"]) - int(base_row["success"])
-            final_pos_diff_delta = float(row["final_pos_diff"]) - float(base_row["final_pos_diff"])
-            if success_delta > 0:
-                success_win_count += 1
-            elif success_delta < 0:
-                success_loss_count += 1
-            else:
-                success_tie_count += 1
-            if final_pos_diff_delta < 0:
-                pos_better_count += 1
-            elif final_pos_diff_delta > 0:
-                pos_worse_count += 1
-            else:
-                pos_tie_count += 1
-            paired_rows.append(
-                {
-                    "baseline_variant": baseline_variant,
-                    "variant_name": variant_name,
-                    "rollout_id": row["rollout_id"],
-                    "success_delta": success_delta,
-                    "final_pos_diff_delta": final_pos_diff_delta,
-                    "final_angle_diff_delta": float(row["final_angle_diff"]) - float(base_row["final_angle_diff"]),
-                    "final_eef_diff_delta": float(row["final_eef_diff"]) - float(base_row["final_eef_diff"]),
-                    "final_coverage_delta": float(row["final_coverage"]) - float(base_row["final_coverage"]),
-                    "bits_used_total_delta": float(row["bits_used_total"]) - float(base_row["bits_used_total"]),
-                    "plan_time_total_sec_delta": float(row["plan_time_total_sec"]) - float(base_row["plan_time_total_sec"]),
-                }
-            )
-        summary_rows[-1]["paired_success_wins_vs_baseline"] = int(success_win_count)
-        summary_rows[-1]["paired_success_losses_vs_baseline"] = int(success_loss_count)
-        summary_rows[-1]["paired_success_ties_vs_baseline"] = int(success_tie_count)
-        summary_rows[-1]["paired_final_pos_better_vs_baseline"] = int(pos_better_count)
-        summary_rows[-1]["paired_final_pos_worse_vs_baseline"] = int(pos_worse_count)
-        summary_rows[-1]["paired_final_pos_ties_vs_baseline"] = int(pos_tie_count)
-    return summary_rows, paired_rows
-
-
-def save_summary_plots(rows: Sequence[dict], summary_rows: Sequence[dict], out_dir: str, max_steps: int) -> None:
-    import matplotlib.pyplot as plt
-
-    by_variant: dict[str, list[dict]] = {}
-    for row in rows:
-        by_variant.setdefault(str(row["variant_name"]), []).append(row)
-    variant_names = [row["variant_name"] for row in summary_rows]
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    ax.bar(variant_names, [row["success_rate"] for row in summary_rows])
-    ax.set_ylabel("Success Rate")
-    ax.set_title("Success Rate by Variant")
-    fig.tight_layout()
-    fig.savefig(os.path.join(out_dir, "success_rates.png"))
-    plt.close(fig)
-
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-    axes[0].boxplot([[row["final_pos_diff"] for row in by_variant[name]] for name in variant_names], tick_labels=variant_names)
-    axes[0].set_title("Final Pos Diff")
-    axes[1].boxplot([[row["final_angle_diff"] for row in by_variant[name]] for name in variant_names], tick_labels=variant_names)
-    axes[1].set_title("Final Angle Diff")
-    axes[2].boxplot([[row["final_coverage"] for row in by_variant[name]] for name in variant_names], tick_labels=variant_names)
-    axes[2].set_title("Final Coverage")
-    fig.tight_layout()
-    fig.savefig(os.path.join(out_dir, "final_metrics_boxplots.png"))
-    plt.close(fig)
-
-    fig, ax = plt.subplots(figsize=(7, 5))
-    ax.scatter(
-        [row["mean_bits_used_total"] for row in summary_rows],
-        [row["success_rate"] for row in summary_rows],
-    )
-    for row in summary_rows:
-        ax.annotate(row["variant_name"], (row["mean_bits_used_total"], row["success_rate"]))
-    ax.set_xlabel("Mean Bits Used Total")
-    ax.set_ylabel("Success Rate")
-    ax.set_title("Compute vs Success")
-    fig.tight_layout()
-    fig.savefig(os.path.join(out_dir, "compute_vs_success.png"))
-    plt.close(fig)
-
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4))
-    for variant_name in variant_names:
-        variant_rows = by_variant[variant_name]
-        med, _ = _stepwise_curve(variant_rows, "pos_diffs", max_steps=max_steps)
-        axes[0].plot(med, label=variant_name)
-        med, _ = _stepwise_curve(variant_rows, "angle_diffs", max_steps=max_steps)
-        axes[1].plot(med, label=variant_name)
-        med, _ = _stepwise_curve(variant_rows, "eef_diffs", max_steps=max_steps)
-        axes[2].plot(med, label=variant_name)
-    axes[0].set_title("Median Pos Diff")
-    axes[1].set_title("Median Angle Diff")
-    axes[2].set_title("Median EEF Diff")
-    for ax in axes:
-        ax.set_xlabel("Step")
-    axes[0].legend()
-    fig.tight_layout()
-    fig.savefig(os.path.join(out_dir, "median_stepwise_curves.png"))
-    plt.close(fig)
+    return summary_rows, []
 
 
 def _run_variant_task(task: dict) -> dict:
@@ -516,7 +366,7 @@ def _run_wm_batched_variants(
 ) -> list[dict]:
     runtime_cfgs = [variant.plan.runtime_cfg for variant in variants]
     run_dirs = [
-        os.path.join(run_root, "traces", variant.name, selection["rollout_id"])
+        trace_dir(run_root, variant.name, selection["rollout_id"])
         for variant in variants
     ]
 
@@ -773,25 +623,6 @@ def _group_wm_variants(variants: Sequence[ExperimentVariant]) -> tuple[list[list
     return batched, singles
 
 
-def _resolved_experiment_dict(spec: ExperimentSpec) -> dict:
-    return {
-        "name": spec.name,
-        "baseline": spec.baseline,
-        "rollouts": spec.rollouts,
-        "execution": spec.execution,
-        "terminal": spec.terminal,
-        "reporting": spec.reporting,
-        "shared_plan": OmegaConf.to_container(spec.shared_plan.clean_cfg, resolve=True),
-        "variants": [
-            {
-                "name": variant.name,
-                "plan": OmegaConf.to_container(variant.plan.clean_cfg, resolve=True),
-            }
-            for variant in spec.variants
-        ],
-    }
-
-
 def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | None = None) -> str:
     spec = load_experiment_spec(spec_or_path) if isinstance(spec_or_path, str) else spec_or_path
     candidates = enumerate_rollout_candidates(spec.shared_plan)
@@ -804,11 +635,6 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
     run_root = output_root or spec.reporting.get("output_root", "rollouts")
     run_dir = os.path.join(str(run_root), f"experiment_{_safe_name(spec.name)}_{run_ts}")
     os.makedirs(run_dir, exist_ok=True)
-
-    with open(os.path.join(run_dir, "experiment_resolved.json"), "w", encoding="utf-8") as f:
-        json.dump(_resolved_experiment_dict(spec), f, indent=2)
-    with open(os.path.join(run_dir, "selected_rollouts.json"), "w", encoding="utf-8") as f:
-        json.dump(selected, f, indent=2)
 
     rows: list[dict] = []
     batched_groups, single_variants = _group_wm_variants(spec.variants)
@@ -834,7 +660,7 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
                     "cfg": OmegaConf.to_container(variant.plan.runtime_cfg, resolve=True),
                     "selection": selection,
                     "variant_name": variant.name,
-                    "run_dir": os.path.join(run_dir, "traces", variant.name, selection["rollout_id"]),
+                    "run_dir": trace_dir(run_dir, variant.name, selection["rollout_id"]),
                     "terminal_mode": terminal_mode,
                 }
             )
@@ -868,50 +694,36 @@ def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | Non
     rows = sorted(rows, key=lambda row: (row["rollout_index"], row["variant_name"]))
     summary_rows, paired_rows = aggregate_summary(
         rows,
-        baseline_variant=spec.baseline,
         variant_order=variant_order,
     )
-    _write_rows_csv(os.path.join(run_dir, "per_rollout.csv"), rows)
-    _write_rows_csv(os.path.join(run_dir, "summary.csv"), summary_rows)
-    baseline_filename = f"paired_deltas_vs_{_safe_name(spec.baseline)}.csv"
-    _write_rows_csv(os.path.join(run_dir, baseline_filename), paired_rows)
-    _write_rows_csv(os.path.join(run_dir, "paired_deltas_vs_baseline.csv"), paired_rows)
-    with open(os.path.join(run_dir, "summary.json"), "w", encoding="utf-8") as f:
-        json.dump(
-            {
-                "experiment_name": spec.name,
-                "created_at": run_ts,
-                "num_rollouts": int(spec.rollouts["num_rollouts"]),
-                "baseline_variant": spec.baseline,
-                "summary": summary_rows,
-            },
-            f,
-            indent=2,
-        )
-    save_summary_plots(rows, summary_rows, run_dir, max_steps=int(spec.shared_plan.budget["max_env_steps"]))
-    report_path = write_experiment_report(
+    write_experiment_bundle(
         run_dir,
-        summary_rows,
-        rows,
-        experiment_name=spec.name,
-        baseline_variant=spec.baseline,
-        summary_plot_files=(
-            "success_rates.png",
-            "final_metrics_boxplots.png",
-            "compute_vs_success.png",
-            "median_stepwise_curves.png",
-        ),
+        experiment_payload={
+            "schema_version": EXPERIMENT_SCHEMA_VERSION,
+            "reviewer_version": REVIEWER_SCHEMA_VERSION,
+            "experiment_name": spec.name,
+            "created_at": run_ts,
+            "variant_order": variant_order,
+            "num_rollouts": int(spec.rollouts["num_rollouts"]),
+            "rollouts": dict(spec.rollouts),
+            "execution": dict(spec.execution),
+            "terminal": dict(spec.terminal),
+            "reporting": dict(spec.reporting),
+            "shared_plan": OmegaConf.to_container(spec.shared_plan.clean_cfg, resolve=True),
+            "variants": [
+                {
+                    "name": variant.name,
+                    "plan": OmegaConf.to_container(variant.plan.clean_cfg, resolve=True),
+                }
+                for variant in spec.variants
+            ],
+        },
+        selected_rollouts=selected,
+        run_rows=rows,
+        variant_rows=summary_rows,
+        paired_rows=paired_rows,
     )
     if terminal_mode != "quiet":
         print(f"[experiment] wrote results to {run_dir}")
-        print(f"[experiment] report: {report_path}")
         print(f"[experiment] review: python3 scripts/experiment_review.py --run-dir {run_dir}")
-        for summary in summary_rows:
-            print(
-                f"[experiment][summary] variant={summary['variant_name']} "
-                f"success_rate={summary['success_rate']:.3f} "
-                f"mean_final_pos_diff={summary['mean_final_pos_diff']:.3f} "
-                f"mean_bits_used_total={summary['mean_bits_used_total']:.1f} "
-                f"mean_plan_time_total_sec={summary['mean_plan_time_total_sec']:.3f}"
-            )
     return run_dir
