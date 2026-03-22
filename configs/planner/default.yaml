@@ -1,13 +1,13 @@
 plan:
   budget:
-    max_env_steps: 15
+    max_env_steps: 20
   planner:
-    horizon: 15
-    replan_every: 15
+    horizon: 20
+    replan_every: 20
     cem:
       pop_size: 100
       elite_frac: 0.3
-      n_iter: 10
+      n_iter: 20
       init_std: 1.0
       warm_start: true
       action_low: null

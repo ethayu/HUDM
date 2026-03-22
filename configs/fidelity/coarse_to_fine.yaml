@@ -12,7 +12,7 @@ plan:
         start_level: "base"
         end_level: "finest"
       rollout:
-        mode: "fixed"
+        mode: "linear"
         level: "base"
         uncertainty:
           criterion: "mean"
