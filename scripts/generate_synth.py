@@ -50,9 +50,9 @@ from hudm.synthetic_generation import (
     QUALITY_PROFILES,
     RolloutDiagnostics,
     analyze_rollout,
+    bounded_env_action_from_abs_target,
     build_contact_candidates,
     choose_maneuver_family,
-    env_input_from_abs_target,
     reject_rollout,
     resolve_mode_weights,
     score_shadow_rollout,
@@ -174,6 +174,7 @@ def _simulate_candidate_rollout(
     contact_aware_ou_theta: float,
     contact_aware_ou_sigma: float,
     contact_aware_ou_dt: float,
+    max_env_input_norm: float,
     T: int,
 ) -> RolloutDiagnostics:
     shadow_env.headless = True
@@ -201,11 +202,12 @@ def _simulate_candidate_rollout(
             low=quality.bounds_low,
             high=quality.bounds_high,
         )
-        act = env_input_from_abs_target(
+        act, _ = bounded_env_action_from_abs_target(
             cur[:2],
             exec_abs_target,
             env_action_scale=float(shadow_env.action_scale),
             relative=bool(shadow_env.relative),
+            max_env_input_norm=max_env_input_norm,
         )
         _, _, _, info = shadow_env.step(act)
         state = np.asarray(info["state"], dtype=np.float32)
@@ -228,6 +230,7 @@ def _select_contact_aware_candidate(
     contact_aware_ou_theta: float,
     contact_aware_ou_sigma: float,
     contact_aware_ou_dt: float,
+    max_env_input_norm: float,
     T: int,
 ) -> tuple[str, Any, int | None]:
     family = choose_maneuver_family(
@@ -262,6 +265,7 @@ def _select_contact_aware_candidate(
             contact_aware_ou_theta=contact_aware_ou_theta,
             contact_aware_ou_sigma=contact_aware_ou_sigma,
             contact_aware_ou_dt=contact_aware_ou_dt,
+            max_env_input_norm=max_env_input_norm,
         )
         score = score_shadow_rollout(candidate.family, diag, mode_profile=mode_profile, quality_profile=quality_profile)
         if best_candidate is None or score > float(best_score):
@@ -286,6 +290,7 @@ def rollout_contact_aware_episode(
     contact_aware_ou_theta: float,
     contact_aware_ou_sigma: float,
     contact_aware_ou_dt: float,
+    max_env_input_norm: float,
 ) -> EpisodeAttempt:
     init_state = sample_valid_init_state(
         rng,
@@ -329,6 +334,7 @@ def rollout_contact_aware_episode(
                 contact_aware_ou_theta=contact_aware_ou_theta,
                 contact_aware_ou_sigma=contact_aware_ou_sigma,
                 contact_aware_ou_dt=contact_aware_ou_dt,
+                max_env_input_norm=max_env_input_norm,
             )
             current_candidate_ou_rng = (
                 None
@@ -350,15 +356,16 @@ def rollout_contact_aware_episode(
             low=quality.bounds_low,
             high=quality.bounds_high,
         )
-        act = env_input_from_abs_target(
+        act, executed_abs_target = bounded_env_action_from_abs_target(
             current_state[:2],
             abs_target,
             env_action_scale=float(env.action_scale),
             relative=bool(env.relative),
+            max_env_input_norm=max_env_input_norm,
         )
         states.append(current_state.copy())
         actions.append(act.astype(np.float32))
-        actions_abs.append(abs_target.astype(np.float32))
+        actions_abs.append(executed_abs_target.astype(np.float32))
 
         _, done, info = None, None, None
         _, _, done, info = env.step(act)
@@ -418,6 +425,7 @@ def rollout_baseline_episode(
     ou_sigma: float,
     ou_dt: float,
     ou_mu: Optional[np.ndarray],
+    max_env_input_norm: float,
 ) -> EpisodeAttempt:
     init_state = sample_valid_init_state(
         rng,
@@ -451,15 +459,16 @@ def rollout_baseline_episode(
 
         next_abs = agent_pos + act * float(env.action_scale) if env.relative else act * float(env.action_scale)
         next_abs = np.clip(next_abs, env_bounds.bounds_low, env_bounds.bounds_high).astype(np.float32)
-        act = env_input_from_abs_target(
+        act, executed_abs_target = bounded_env_action_from_abs_target(
             agent_pos,
             next_abs,
             env_action_scale=float(env.action_scale),
             relative=bool(env.relative),
+            max_env_input_norm=max_env_input_norm,
         )
         states.append(current_state.copy())
         actions.append(act.astype(np.float32))
-        actions_abs.append(next_abs.astype(np.float32))
+        actions_abs.append(executed_abs_target.astype(np.float32))
         _, _, done, info = env.step(act)
         state = np.asarray(info["state"], dtype=np.float32)
         states_after.append(state.copy())
@@ -490,6 +499,7 @@ def save_zarr(
     *,
     env_action_scale: float,
     env_relative: bool,
+    max_env_input_norm: float | None = None,
     extra_attrs: Mapping[str, Any] | None = None,
 ) -> None:
     if zarr is None:
@@ -554,6 +564,8 @@ def save_zarr(
         "env_action_scale": float(env_action_scale),
         "env_relative": bool(env_relative),
     })
+    if max_env_input_norm is not None:
+        root.attrs["max_env_input_norm"] = float(max_env_input_norm)
     if extra_attrs:
         root.attrs.update(dict(extra_attrs))
 
@@ -613,6 +625,7 @@ def _generate_single_episode_task(task: Mapping[str, Any]) -> dict[str, Any]:
                     contact_aware_ou_theta=float(task["contact_aware_ou_theta"]),
                     contact_aware_ou_sigma=float(task["contact_aware_ou_sigma"]),
                     contact_aware_ou_dt=float(task["contact_aware_ou_dt"]),
+                    max_env_input_norm=float(task["max_env_input_norm"]),
                 )
             else:
                 attempt = rollout_baseline_episode(
@@ -628,6 +641,7 @@ def _generate_single_episode_task(task: Mapping[str, Any]) -> dict[str, Any]:
                     ou_sigma=float(task["ou_sigma"]),
                     ou_dt=float(task["ou_dt"]),
                     ou_mu=ou_mu,
+                    max_env_input_norm=float(task["max_env_input_norm"]),
                 )
         except RuntimeError as exc:
             reasons = _generator_runtime_reasons(exc)
@@ -788,6 +802,7 @@ def generate_split(
     ou_sigma: float,
     ou_dt: float,
     ou_mu: Optional[np.ndarray],
+    max_env_input_norm: float,
 ) -> tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray], list[np.ndarray], dict[str, Any]]:
     actions_list: list[np.ndarray] = []
     actions_abs_list: list[np.ndarray] = []
@@ -822,6 +837,7 @@ def generate_split(
                 "ou_sigma": float(ou_sigma),
                 "ou_dt": float(ou_dt),
                 "ou_mu": None if ou_mu is None else np.asarray(ou_mu, dtype=np.float32).tolist(),
+                "max_env_input_norm": float(max_env_input_norm),
             }
         accepted, failed_episode_batches = _run_parallel_episode_tasks(
             split_name=split_name,
@@ -902,6 +918,7 @@ def generate_split(
                             contact_aware_ou_theta=contact_aware_ou_theta,
                             contact_aware_ou_sigma=contact_aware_ou_sigma,
                             contact_aware_ou_dt=contact_aware_ou_dt,
+                            max_env_input_norm=max_env_input_norm,
                         )
                     else:
                         attempt = rollout_baseline_episode(
@@ -917,6 +934,7 @@ def generate_split(
                             ou_sigma=ou_sigma,
                             ou_dt=ou_dt,
                             ou_mu=ou_mu,
+                            max_env_input_norm=max_env_input_norm,
                         )
                 except RuntimeError as exc:
                     reasons = _generator_runtime_reasons(exc)
@@ -1029,6 +1047,12 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--ou-sigma", type=float, default=0.2, help="OU process volatility")
     p.add_argument("--ou-dt", type=float, default=1.0, help="OU process time step")
     p.add_argument("--ou-mu", type=str, default=None, help="OU process mean (comma-separated per-dim or scalar)")
+    p.add_argument(
+        "--max-env-input-norm",
+        type=float,
+        default=1.0,
+        help="Maximum allowed norm for stored and executed env-input actions.",
+    )
     return p.parse_args()
 
 
@@ -1044,6 +1068,8 @@ def main() -> None:
         raise ValueError("max_failed_episode_batches must be >= -1")
     if int(args.workers) <= 0:
         raise ValueError("workers must be > 0")
+    if float(args.max_env_input_norm) <= 0.0:
+        raise ValueError("max_env_input_norm must be > 0")
     if str(args.quality_profile) not in QUALITY_PROFILES:
         raise ValueError(f"Unknown quality profile: {args.quality_profile}")
 
@@ -1089,6 +1115,7 @@ def main() -> None:
         ou_sigma=float(args.ou_sigma),
         ou_dt=float(args.ou_dt),
         ou_mu=ou_mu,
+        max_env_input_norm=float(args.max_env_input_norm),
     )
     val_actions, val_actions_abs, val_frames, val_states, val_stats = generate_split(
         n_eps=int(args.val_eps),
@@ -1116,6 +1143,7 @@ def main() -> None:
         ou_sigma=float(args.ou_sigma),
         ou_dt=float(args.ou_dt),
         ou_mu=ou_mu,
+        max_env_input_norm=float(args.max_env_input_norm),
     )
 
     frames_all = train_frames + val_frames
@@ -1132,6 +1160,7 @@ def main() -> None:
         states_all,
         env_action_scale=float(decision_env.action_scale),
         env_relative=bool(decision_env.relative),
+        max_env_input_norm=float(args.max_env_input_norm),
         extra_attrs={
             "generator_policy": str(policy),
             "mode_profile": str(args.mode_profile),

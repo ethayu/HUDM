@@ -11,7 +11,10 @@ import zarr
 from hudm.synthetic_generation import (
     DEFAULT_BOUNDS,
     RolloutDiagnostics,
+    abs_target_from_env_input,
     analyze_rollout,
+    bound_env_input_action,
+    bounded_env_action_from_abs_target,
     build_contact_candidates,
     block_world_vertices,
     reject_rollout,
@@ -53,10 +56,51 @@ def make_rollout_diagnostics(**overrides) -> RolloutDiagnostics:
 
 
 class SyntheticGenerationTests(unittest.TestCase):
+    def assert_action_encoding_matches_absolute_targets(self, states, actions, actions_abs, *, env_action_scale: float, relative: bool, max_norm: float) -> None:
+        self.assertGreater(len(actions), 0)
+        norms = np.linalg.norm(np.asarray(actions, dtype=np.float32), axis=1)
+        self.assertLessEqual(float(np.max(norms)), float(max_norm) + 1e-6)
+        expected_abs = np.asarray(
+            [
+                abs_target_from_env_input(
+                    np.asarray(state, dtype=np.float32)[:2],
+                    np.asarray(action, dtype=np.float32),
+                    env_action_scale=env_action_scale,
+                    relative=relative,
+                )
+                for state, action in zip(states, actions)
+            ],
+            dtype=np.float32,
+        )
+        self.assertTrue(np.allclose(expected_abs, actions_abs, atol=1e-5))
+
     def test_failed_episode_batch_limit_resolver_supports_unlimited(self):
         self.assertEqual(GENERATE_SYNTH._resolve_max_failed_episode_batches(10, -1), -1)
         self.assertEqual(GENERATE_SYNTH._resolve_max_failed_episode_batches(10, 0), 80)
         self.assertEqual(GENERATE_SYNTH._resolve_max_failed_episode_batches(10, 7), 7)
+
+    def test_bound_env_input_action_caps_norm(self):
+        clipped = bound_env_input_action(np.asarray([3.0, 4.0], dtype=np.float32), max_env_input_norm=1.0)
+        self.assertAlmostEqual(float(np.linalg.norm(clipped)), 1.0, places=6)
+        self.assertTrue(np.allclose(clipped, np.asarray([0.6, 0.8], dtype=np.float32), atol=1e-6))
+
+    def test_bounded_env_action_round_trip_matches_executed_absolute_target(self):
+        agent_pos = np.asarray([100.0, 200.0], dtype=np.float32)
+        action_env, executed_abs_target = bounded_env_action_from_abs_target(
+            agent_pos,
+            np.asarray([500.0, 700.0], dtype=np.float32),
+            env_action_scale=100.0,
+            relative=True,
+            max_env_input_norm=1.0,
+        )
+        self.assertLessEqual(float(np.linalg.norm(action_env)), 1.0 + 1e-6)
+        round_trip_abs = abs_target_from_env_input(
+            agent_pos,
+            action_env,
+            env_action_scale=100.0,
+            relative=True,
+        )
+        self.assertTrue(np.allclose(round_trip_abs, executed_abs_target, atol=1e-6))
 
     def test_contact_aware_ou_offset_is_deterministic(self):
         target = np.asarray([256.0, 256.0], dtype=np.float32)
@@ -125,6 +169,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                     contact_aware_ou_theta=0.35,
                     contact_aware_ou_sigma=0.0,
                     contact_aware_ou_dt=1.0,
+                    max_env_input_norm=1.0,
                     T=6,
                 ),
                 mode_profile="planning",
@@ -145,6 +190,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                     contact_aware_ou_theta=0.35,
                     contact_aware_ou_sigma=0.0,
                     contact_aware_ou_dt=1.0,
+                    max_env_input_norm=1.0,
                     T=6,
                 ),
                 mode_profile="planning",
@@ -288,6 +334,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                 ou_sigma=0.2,
                 ou_dt=1.0,
                 ou_mu=None,
+                max_env_input_norm=1.0,
             )
         finally:
             GENERATE_SYNTH.rollout_contact_aware_episode = original_rollout
@@ -331,6 +378,7 @@ class SyntheticGenerationTests(unittest.TestCase):
             ou_sigma=0.2,
             ou_dt=1.0,
             ou_mu=None,
+            max_env_input_norm=1.0,
         )
         valid = GENERATE_SYNTH.generate_split(
             n_eps=1,
@@ -358,6 +406,7 @@ class SyntheticGenerationTests(unittest.TestCase):
             ou_sigma=0.2,
             ou_dt=1.0,
             ou_mu=None,
+            max_env_input_norm=1.0,
         )
 
         train_actions, train_actions_abs, train_frames, train_states, train_stats = train
@@ -373,6 +422,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                 train_states + valid_states,
                 env_action_scale=float(decision_env.action_scale),
                 env_relative=bool(decision_env.relative),
+                max_env_input_norm=1.0,
                 extra_attrs={
                     "generator_policy": "contact_aware",
                     "mode_profile": "planning",
@@ -392,11 +442,68 @@ class SyntheticGenerationTests(unittest.TestCase):
             self.assertIn("state", root["data"])
             self.assertIn("episode_ends", root["meta"])
             self.assertEqual(int(root.attrs["accepted_episodes"]), 2)
+            self.assertEqual(float(root.attrs["max_env_input_norm"]), 1.0)
             self.assertEqual(int(root["meta"]["episode_ends"].shape[0]), 2)
+            actions = np.asarray(root["data"]["action"][:], dtype=np.float32)
+            norms = np.linalg.norm(actions, axis=1)
+            self.assertLessEqual(float(np.max(norms)), 1.0 + 1e-6)
             states = np.asarray(root["data"]["state"][:], dtype=np.float32)
             for state in states:
                 vertices = block_world_vertices(state)
                 self.assertFalse(np.any(vertices < DEFAULT_BOUNDS[0]) or np.any(vertices > DEFAULT_BOUNDS[1]))
+
+    def test_contact_aware_rollout_actions_are_bounded_and_consistent(self):
+        env = GENERATE_SYNTH.build_generator_env(with_velocity=True, headless=True)
+        shadow_env = GENERATE_SYNTH.build_generator_env(with_velocity=True, headless=True)
+        attempt = GENERATE_SYNTH.rollout_contact_aware_episode(
+            env,
+            shadow_env,
+            T=12,
+            rng=np.random.default_rng(17),
+            with_velocity=True,
+            mode_profile="planning",
+            quality_profile="strict",
+            weights=resolve_mode_weights("planning"),
+            spawn_attempts=32,
+            contact_aware_ou_theta=0.35,
+            contact_aware_ou_sigma=0.0,
+            contact_aware_ou_dt=1.0,
+            max_env_input_norm=1.0,
+        )
+        self.assert_action_encoding_matches_absolute_targets(
+            attempt.states,
+            attempt.actions,
+            attempt.actions_abs,
+            env_action_scale=float(env.action_scale),
+            relative=bool(env.relative),
+            max_norm=1.0,
+        )
+
+    def test_baseline_rollout_actions_are_bounded_and_consistent(self):
+        env = GENERATE_SYNTH.build_generator_env(with_velocity=True, headless=True)
+        attempt = GENERATE_SYNTH.rollout_baseline_episode(
+            env,
+            T=12,
+            policy="random",
+            action_scale=4.0,
+            rng=np.random.default_rng(23),
+            with_velocity=True,
+            quality_profile="strict",
+            spawn_attempts=32,
+            ou_theta=0.15,
+            ou_sigma=0.2,
+            ou_dt=1.0,
+            ou_mu=None,
+            max_env_input_norm=1.0,
+        )
+        self.assert_action_encoding_matches_absolute_targets(
+            attempt.states,
+            attempt.actions,
+            attempt.actions_abs,
+            env_action_scale=float(env.action_scale),
+            relative=bool(env.relative),
+            max_norm=1.0,
+        )
 
     def test_planning_profile_has_more_translation_than_train(self):
         train_rng = np.random.default_rng(11)
@@ -423,6 +530,7 @@ class SyntheticGenerationTests(unittest.TestCase):
                     contact_aware_ou_theta=0.35,
                     contact_aware_ou_sigma=0.0,
                     contact_aware_ou_dt=1.0,
+                    max_env_input_norm=10.0,
                 )
                 if attempt.accepted:
                     diags.append(attempt.diagnostics)
