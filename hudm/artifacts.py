@@ -462,6 +462,7 @@ def trace_arrays_from_trace(trace: dict) -> dict:
     replan_step_starts = np.zeros((n_replans,), dtype=np.int32)
     replan_mpc_progress = np.zeros((n_replans,), dtype=np.float32)
     replan_seeds = np.zeros((n_replans,), dtype=np.int64)
+    replan_start_levels = np.full((n_replans,), -1, dtype=np.int32)
     replan_base_levels = np.full((n_replans,), -1, dtype=np.int32)
     replan_bits = np.zeros((n_replans,), dtype=np.int64)
     replan_flops = np.zeros((n_replans,), dtype=np.int64)
@@ -483,6 +484,7 @@ def trace_arrays_from_trace(trace: dict) -> dict:
         replan_step_starts[idx] = int(replan.get("step_start", 0))
         replan_mpc_progress[idx] = float(replan.get("mpc_progress", 0.0))
         replan_seeds[idx] = int(replan.get("seed", 0))
+        replan_start_levels[idx] = int(replan.get("start_level_idx", replan.get("base_level_idx", -1)))
         replan_base_levels[idx] = int(replan.get("base_level_idx", -1))
         replan_bits[idx] = int(replan.get("bits_used_estimate", 0))
         replan_flops[idx] = int(replan.get("flops_used_estimate", 0))
@@ -512,6 +514,7 @@ def trace_arrays_from_trace(trace: dict) -> dict:
         "replan_step_starts": replan_step_starts,
         "replan_mpc_progress": replan_mpc_progress,
         "replan_seeds": replan_seeds,
+        "replan_start_levels": replan_start_levels,
         "replan_base_levels": replan_base_levels,
         "replan_bits": replan_bits,
         "replan_flops": replan_flops,
@@ -667,6 +670,7 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
                 "mpc_progress": float(replan.get("mpc_progress", 0.0)),
                 "seed": int(replan.get("seed", 0)),
                 "action_horizon": int(len(replan.get("action_seq", []))),
+                "start_level_idx": int(replan.get("start_level_idx", replan.get("base_level_idx", -1))),
                 "base_level_idx": int(replan.get("base_level_idx", -1)),
                 "rollout_level_indices": [int(x) for x in list(replan.get("rollout_level_indices", []))],
                 "rollout_latent_losses": [float(x) for x in list(replan.get("rollout_latent_losses", []))],
@@ -677,6 +681,12 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
                 "bits_used_estimate": int(replan.get("bits_used_estimate", 0)),
                 "flops_used_estimate": int(replan.get("flops_used_estimate", 0)),
                 "plan_time_sec": float(replan.get("plan_time_sec", 0.0)),
+                "shared_plan_time_sec": (
+                    None
+                    if replan.get("shared_plan_time_sec", None) is None
+                    else float(replan.get("shared_plan_time_sec"))
+                ),
+                "plan_time_allocation": replan.get("plan_time_allocation", None),
                 "base_k": replan.get("base_k", None),
                 "base_spacing": replan.get("base_spacing", None),
                 "base_num_particles": replan.get("base_num_particles", None),
@@ -733,6 +743,9 @@ def save_plan_result(
         "flops_used_total": int(result["run_stats"]["flops_used_total"]),
         "flops_used_total_human": format_flops_human(int(result["run_stats"]["flops_used_total"])),
         "plan_time_total_sec": float(result["run_stats"]["plan_time_total_sec"]),
+        "shared_plan_time_total_sec": float(
+            result["run_stats"].get("shared_plan_time_total_sec", result["run_stats"]["plan_time_total_sec"])
+        ),
         "termination_reason": str(result["run_stats"].get("termination_reason", "unknown")),
         "termination_step": int(result["run_stats"].get("termination_step", -1)),
         "termination_metric_success": bool(result["run_stats"].get("termination_metric_success", False)),

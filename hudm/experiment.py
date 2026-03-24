@@ -98,6 +98,7 @@ def result_row(result: dict, run_dir: str) -> dict:
     bits_total = int(run_stats["bits_used_total"])
     flops_total = int(run_stats["flops_used_total"])
     plan_time_total = float(run_stats["plan_time_total_sec"])
+    shared_plan_time_total = float(run_stats.get("shared_plan_time_total_sec", plan_time_total))
     return {
         "variant_name": str(result.get("variant_name", "")),
         "rollout_id": str(sample.get("rollout_id", rollout_id(sample))),
@@ -128,6 +129,7 @@ def result_row(result: dict, run_dir: str) -> dict:
         "flops_used_total": flops_total,
         "flops_used_per_step": float(flops_total / max(1, executed_steps)),
         "plan_time_total_sec": plan_time_total,
+        "shared_plan_time_total_sec": shared_plan_time_total,
         "plan_time_per_replan_sec": float(plan_time_total / max(1, plans)),
         "run_dir": run_dir,
         "trace_json": os.path.join(run_dir, "trace.json"),
@@ -333,6 +335,7 @@ def _finalize_wm_state(state: dict, term_reason: str, term_step: int) -> tuple[d
         "bits_used_total": int(state["bits_total"]),
         "flops_used_total": int(state["flops_total"]),
         "plan_time_total_sec": float(state["plan_time_total"]),
+        "shared_plan_time_total_sec": float(state.get("shared_plan_time_total", 0.0)),
         "termination_reason": str(term_reason),
         "termination_step": int(term_step),
         "termination_metric_success": False if last_term is None else bool(last_term["success"]),
@@ -432,6 +435,7 @@ def _run_wm_batched_variants(
                     "bits_total": 0,
                     "flops_total": 0,
                     "plan_time_total": 0.0,
+                    "shared_plan_time_total": 0.0,
                     "n_plans": 0,
                     "last_term": None,
                     "done": False,
@@ -501,10 +505,12 @@ def _run_wm_batched_variants(
                 action_seq = np.asarray(batch_result.action_seq.detach().cpu().numpy(), dtype=np.float32)
                 bits_used = int(getattr(info, "bits_used_estimate", 0))
                 flops_used = int(bits_to_flops_estimate(bits_used))
-                plan_time = float(getattr(info, "plan_time_sec", 0.0))
+                shared_plan_time = float(getattr(info, "plan_time_sec", 0.0))
+                plan_time = shared_plan_time / max(1, len(variant_states))
                 state["bits_total"] += bits_used
                 state["flops_total"] += flops_used
                 state["plan_time_total"] += plan_time
+                state["shared_plan_time_total"] += shared_plan_time
                 state["n_plans"] += 1
                 state["replans"].append(
                     {
@@ -513,6 +519,7 @@ def _run_wm_batched_variants(
                         "mpc_progress": float(mpc_progress),
                         "seed": int(plan_seeds[variant_idx]),
                         "action_seq": action_seq.tolist(),
+                        "start_level_idx": int(getattr(info, "start_level_idx", getattr(info, "base_level_idx", -1))),
                         "base_level_idx": int(getattr(info, "base_level_idx", -1)),
                         "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
                         "rollout_latent_losses": [float(x) for x in list(getattr(info, "rollout_latent_losses", []))],
@@ -523,6 +530,8 @@ def _run_wm_batched_variants(
                         "bits_used_estimate": bits_used,
                         "flops_used_estimate": flops_used,
                         "plan_time_sec": plan_time,
+                        "shared_plan_time_sec": shared_plan_time,
+                        "plan_time_allocation": "equal_split",
                         "base_k": None if getattr(info, "base_k", None) is None else int(getattr(info, "base_k")),
                         "base_spacing": None,
                         "base_num_particles": None,

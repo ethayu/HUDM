@@ -5,7 +5,11 @@ import json
 import os
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest import mock
+
+import numpy as np
+import torch
 
 from hudm import experiment
 from hudm.specs import ExperimentSpec, ExperimentVariant
@@ -24,6 +28,157 @@ from hudm.experiment_review import load_experiment_review_data
 
 
 class ExperimentReportingTests(unittest.TestCase):
+    def test_wm_batched_variants_allocate_shared_plan_time(self):
+        class FakeEnv:
+            action_dim = 2
+
+            def __init__(self):
+                self._step_calls = 0
+
+            def prepare(self, seed=0, init_state=None, goal_state=None):
+                del seed, goal_state
+                state = np.asarray(init_state, dtype=np.float32).copy()
+                obs = {"visual": np.zeros((4, 4, 3), dtype=np.uint8)}
+                return obs, state
+
+            def render(self, mode, include_start_pose=False):
+                del mode, include_start_pose
+                return np.zeros((4, 4, 3), dtype=np.uint8)
+
+            def eval_termination(self, goal_state, cur_state, done=None, info=None):
+                del goal_state, cur_state, info
+                reached = bool(done)
+                return {
+                    "done": reached,
+                    "success": reached,
+                    "pos_diff": 0.0,
+                    "angle_diff": 0.0,
+                    "eef_diff": 0.0,
+                    "coverage": 1.0 if reached else 0.0,
+                }
+
+            def step(self, action):
+                del action
+                self._step_calls += 1
+                next_state = np.full((7,), float(self._step_calls), dtype=np.float32)
+                obs = {"visual": np.zeros((4, 4, 3), dtype=np.uint8)}
+                return obs, 0.0, True, {"state": next_state}
+
+        class FakeBatchPlanner:
+            def __init__(self, *args, **kwargs):
+                del args, kwargs
+
+            def plan_batch(self, z0, z_goal, mpc_progress=0.0, warm_start_steps=0, seeds=None):
+                del z0, z_goal, mpc_progress, warm_start_steps, seeds
+                results = []
+                for fill_value in (0.0, 1.0):
+                    info = SimpleNamespace(
+                        base_level_idx=1,
+                        base_k=2,
+                        rollout_level_indices=[1],
+                        rollout_latent_losses=[0.5],
+                        iter_best_rollout_latent_losses=[],
+                        bits_used_estimate=32,
+                        plan_time_sec=8.0,
+                    )
+                    results.append(
+                        SimpleNamespace(
+                            action_seq=torch.full((1, 2), fill_value, dtype=torch.float32),
+                            info=info,
+                        )
+                    )
+                return results
+
+        runtime_cfg = OmegaConf.create(
+            {
+                "env_id": "pusht",
+                "env": {},
+                "backend": "wm",
+                "mpc": {"horizon": 1, "steps": 1, "replan_every": 1},
+                "cem": {
+                    "pop_size": 4,
+                    "elite_frac": 0.5,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "action_low": None,
+                    "action_high": None,
+                    "warm_start": True,
+                },
+                "objective": {},
+                "fidelity": {},
+                "save": False,
+            }
+        )
+        variants = [
+            SimpleNamespace(name="variant_a", plan=SimpleNamespace(runtime_cfg=runtime_cfg)),
+            SimpleNamespace(name="variant_b", plan=SimpleNamespace(runtime_cfg=runtime_cfg)),
+        ]
+        init_state = np.zeros((7,), dtype=np.float32)
+        goal_state = np.ones((7,), dtype=np.float32)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.object(
+                experiment,
+                "build_plan_runtime",
+                return_value={"env": FakeEnv(), "wm": object(), "device": torch.device("cpu"), "wm_cfg": None},
+            ):
+                with mock.patch.object(experiment, "_make_exec_env", side_effect=lambda cfg: FakeEnv()):
+                    with mock.patch.object(
+                        experiment,
+                        "load_selected_rollout",
+                        return_value=(init_state, goal_state, {"rollout_id": "r0", "rollout_index": 0}),
+                    ):
+                        with mock.patch.object(experiment, "set_goal_pose", side_effect=lambda env, state: None):
+                            with mock.patch.object(experiment, "set_start_pose", side_effect=lambda env, state: None):
+                                with mock.patch.object(
+                                    experiment,
+                                    "set_execution_fidelity_finest",
+                                    side_effect=lambda env: None,
+                                ):
+                                    with mock.patch.object(
+                                        experiment,
+                                        "encode_visual",
+                                        side_effect=lambda wm, visual, device: torch.zeros((1, 4), dtype=torch.float32),
+                                    ):
+                                        with mock.patch.object(
+                                            experiment,
+                                            "_wm_termination_latent_loss",
+                                            return_value=0.0,
+                                        ):
+                                            with mock.patch.object(
+                                                experiment,
+                                                "BatchedLatentCEMPlanner",
+                                                FakeBatchPlanner,
+                                            ):
+                                                with mock.patch.object(experiment, "save_plan_result", side_effect=lambda *args, **kwargs: None):
+                                                    with mock.patch.object(
+                                                        experiment,
+                                                        "result_row",
+                                                        side_effect=lambda result, run_dir: {
+                                                            "variant_name": result["variant_name"],
+                                                            "plan_time_total_sec": result["run_stats"]["plan_time_total_sec"],
+                                                            "shared_plan_time_total_sec": result["run_stats"]["shared_plan_time_total_sec"],
+                                                            "replan_plan_time_sec": result["trace"]["replans"][0]["plan_time_sec"],
+                                                            "replan_shared_plan_time_sec": result["trace"]["replans"][0]["shared_plan_time_sec"],
+                                                            "plan_time_allocation": result["trace"]["replans"][0]["plan_time_allocation"],
+                                                        },
+                                                    ):
+                                                        rows = experiment._run_wm_batched_variants(
+                                                            variants=variants,
+                                                            selection={"rollout_id": "r0", "rollout_index": 0},
+                                                            run_root=tmpdir,
+                                                            seed_base=0,
+                                                            terminal_mode="quiet",
+                                                        )
+
+        self.assertEqual(len(rows), 2)
+        for row in rows:
+            self.assertEqual(row["plan_time_total_sec"], 4.0)
+            self.assertEqual(row["shared_plan_time_total_sec"], 8.0)
+            self.assertEqual(row["replan_plan_time_sec"], 4.0)
+            self.assertEqual(row["replan_shared_plan_time_sec"], 8.0)
+            self.assertEqual(row["plan_time_allocation"], "equal_split")
+
     def test_dummy_multivariant_bundle_reuses_rollout_ids_across_variants(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             source_dir = os.path.join(tmpdir, "source_bundle")

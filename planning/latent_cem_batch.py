@@ -255,6 +255,7 @@ class BatchedLatentCEMPlanner:
         results: List[BatchedLatentPlanResult] = []
         elapsed = float(time.perf_counter() - t0)
         for sched_idx, planner in enumerate(self.planners):
+            start_level_idx = planner.core.base_level_index(mpc_progress, 0.0)
             final_level_idx = planner.core.base_level_index(mpc_progress, 1.0)
             if planner.rollout_mode == "uncertainty_downshift":
                 final_rollout_levels = list(eff_rollout_levels[sched_idx])
@@ -282,6 +283,7 @@ class BatchedLatentCEMPlanner:
                 base_level_idx=int(final_level_idx),
                 base_k=self.K[int(final_level_idx)],
                 rollout_level_indices=[int(x) for x in final_rollout_levels],
+                start_level_idx=int(start_level_idx),
                 rollout_latent_losses=per_step_losses,
                 bits_used_estimate=int(total_bits[sched_idx]),
                 plan_time_sec=elapsed,
