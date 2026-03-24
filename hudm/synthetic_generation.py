@@ -561,6 +561,61 @@ def env_input_from_abs_target(
     return target / float(env_action_scale)
 
 
+def abs_target_from_env_input(
+    agent_pos: Sequence[float],
+    action_env: Sequence[float],
+    *,
+    env_action_scale: float,
+    relative: bool,
+) -> np.ndarray:
+    action = np.asarray(action_env, dtype=np.float32)
+    if relative:
+        return np.asarray(agent_pos, dtype=np.float32) + action * float(env_action_scale)
+    return action * float(env_action_scale)
+
+
+def bound_env_input_action(
+    action_env: Sequence[float],
+    *,
+    max_env_input_norm: float,
+) -> np.ndarray:
+    action = np.asarray(action_env, dtype=np.float32)
+    limit = float(max_env_input_norm)
+    if limit <= 0.0:
+        raise ValueError(f"max_env_input_norm must be > 0, got {max_env_input_norm}")
+    norm = float(np.linalg.norm(action))
+    if norm <= limit or norm <= 1e-8:
+        return action.astype(np.float32)
+    return (action * (limit / norm)).astype(np.float32)
+
+
+def bounded_env_action_from_abs_target(
+    agent_pos: Sequence[float],
+    target_abs: Sequence[float],
+    *,
+    env_action_scale: float,
+    relative: bool,
+    max_env_input_norm: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    action_env = env_input_from_abs_target(
+        agent_pos,
+        target_abs,
+        env_action_scale=env_action_scale,
+        relative=relative,
+    )
+    action_env = bound_env_input_action(
+        action_env,
+        max_env_input_norm=max_env_input_norm,
+    )
+    executed_target = abs_target_from_env_input(
+        agent_pos,
+        action_env,
+        env_action_scale=env_action_scale,
+        relative=relative,
+    )
+    return action_env.astype(np.float32), executed_target.astype(np.float32)
+
+
 def weighted_choice(
     weights: Mapping[str, float],
     rng: np.random.Generator,
