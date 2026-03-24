@@ -13,6 +13,7 @@ class LatentCEMInfo:
     base_level_idx: int
     base_k: int
     rollout_level_indices: List[int]
+    start_level_idx: int = -1
     rollout_latent_losses: List[float] = field(default_factory=list)
     iter_best_rollout_latent_losses: List[List[float]] = field(default_factory=list)
     bits_used_estimate: int = 0
@@ -333,6 +334,7 @@ class LatentCEMPlanner:
             self._iter_best_rollout_latent_losses.append(list(self._latest_rollout_latent_losses))
             return costs, levels_used, bits_used
 
+        start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
             evaluate_population=_evaluate,
@@ -345,6 +347,7 @@ class LatentCEMPlanner:
             base_level_idx=final_level_idx,
             base_k=self.K[final_level_idx],
             rollout_level_indices=final_rollout_levels,
+            start_level_idx=int(start_level_idx),
             rollout_latent_losses=list(self._latest_rollout_latent_losses),
             iter_best_rollout_latent_losses=[list(x) for x in self._iter_best_rollout_latent_losses],
             bits_used_estimate=int(total_bits),

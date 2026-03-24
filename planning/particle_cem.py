@@ -25,6 +25,7 @@ class ParticleCEMInfo:
     plan_time_sec: float
     base_spacing: float
     base_num_particles: int
+    start_level_idx: int = -1
 
 
 class ParticleCEMPlanner:
@@ -316,6 +317,7 @@ class ParticleCEMPlanner:
 
             return torch.as_tensor(costs, device=self.device), rollout_levels, bits_iter
 
+        start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
             evaluate_population=_evaluate,
@@ -333,5 +335,6 @@ class ParticleCEMPlanner:
             plan_time_sec=float(time.perf_counter() - t0),
             base_spacing=base_spacing,
             base_num_particles=base_num_particles,
+            start_level_idx=int(start_level_idx),
         )
         return action_seq, info

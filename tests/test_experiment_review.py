@@ -169,6 +169,7 @@ class ExperimentReviewTests(unittest.TestCase):
                         "replan_idx": 2,
                         "step_start": 5,
                         "mpc_progress": 0.5,
+                        "start_level_idx": 1,
                         "base_level_idx": 3,
                         "bits_used_estimate": 94264885248,
                         "plan_time_sec": 1.25,
@@ -179,6 +180,7 @@ class ExperimentReviewTests(unittest.TestCase):
         )
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["action_horizon"], 15)
+        self.assertEqual(rows[0]["base_level_idx"], 1)
         self.assertEqual(rows[0]["bits_used_estimate__display"], "94.26 Gb")
 
     def test_replan_rows_fallback_to_rollout_level_length_when_action_horizon_missing(self):
@@ -199,6 +201,35 @@ class ExperimentReviewTests(unittest.TestCase):
         )
         self.assertEqual(rows[0]["action_horizon"], 4)
         self.assertEqual(rows[0]["bits_used_estimate__display"], "1.00 Kb")
+
+    def test_replan_rows_derive_start_level_from_plan_config_when_missing(self):
+        rows = _replan_rows(
+            {
+                "plan_config": {
+                    "mpc": {"horizon": 10},
+                    "cem": {"pop_size": 16, "elite_frac": 0.25, "n_iter": 4, "init_std": 1.0},
+                    "fidelity": {
+                        "enabled": True,
+                        "num_levels": 4,
+                        "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
+                        "cem": {"mode": "linear", "start_level": "base", "end_level": "finest"},
+                        "rollout": {"mode": "fixed", "level": "base"},
+                    },
+                },
+                "replans": [
+                    {
+                        "replan_idx": 1,
+                        "step_start": 5,
+                        "mpc_progress": 2.0 / 3.0,
+                        "base_level_idx": 3,
+                        "bits_used_estimate": 1000,
+                        "plan_time_sec": 0.1,
+                        "action_seq": [[0.0, 0.0]],
+                    }
+                ],
+            }
+        )
+        self.assertEqual(rows[0]["base_level_idx"], 2)
 
     def test_build_variant_page_contains_success_and_stepwise_sections(self):
         with tempfile.TemporaryDirectory() as tmpdir:

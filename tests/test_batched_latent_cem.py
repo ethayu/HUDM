@@ -89,6 +89,7 @@ class BatchedLatentPlannerTests(unittest.TestCase):
         for (serial_actions, serial_info), batched_result in zip(serial_results, batched_results):
             self.assertTrue(torch.allclose(serial_actions, batched_result.action_seq, atol=1e-6, rtol=1e-6))
             self.assertEqual(serial_info.base_level_idx, batched_result.info.base_level_idx)
+            self.assertEqual(serial_info.start_level_idx, batched_result.info.start_level_idx)
             self.assertEqual(serial_info.rollout_level_indices, batched_result.info.rollout_level_indices)
 
 

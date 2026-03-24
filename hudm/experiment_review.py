@@ -33,6 +33,7 @@ from hudm.experiment_bundle import (
     trace_dir,
 )
 from hudm.runtime import format_bits_human
+from planning.cem_core import SharedCEMCore
 from scripts import planning_media
 
 try:
@@ -1502,7 +1503,7 @@ def _single_run_trace_figure(
             marker_meta.append(
                 [
                     int(replan.get("replan_idx", -1)),
-                    int(replan.get("base_level_idx", -1)),
+                    _replan_display_level(trace_meta, replan),
                     _format_bits_value(replan.get("bits_used_estimate")),
                     _format_number(replan.get("plan_time_sec")),
                 ]
@@ -1565,12 +1566,13 @@ def _replan_rows(trace_meta: dict[str, Any]) -> list[dict[str, Any]]:
             action_horizon = len(replan.get("action_seq", []))
         if int(action_horizon) <= 0:
             action_horizon = len(replan.get("rollout_level_indices", []))
+        display_level = _replan_display_level(trace_meta, replan)
         rows.append(
             {
                 "replan_idx": int(replan.get("replan_idx", -1)),
                 "step_start": int(replan.get("step_start", -1)),
                 "mpc_progress": _format_number(replan.get("mpc_progress")),
-                "base_level_idx": int(replan.get("base_level_idx", -1)),
+                "base_level_idx": display_level,
                 "bits_used_estimate": bits_value,
                 "bits_used_estimate__display": _format_bits_value(bits_value),
                 "bits_used_estimate__sort": bits_value,
@@ -1579,6 +1581,43 @@ def _replan_rows(trace_meta: dict[str, Any]) -> list[dict[str, Any]]:
             }
         )
     return rows
+
+
+def _replan_display_level(trace_meta: dict[str, Any], replan: dict[str, Any]) -> int:
+    if "start_level_idx" in replan:
+        return int(replan.get("start_level_idx", -1))
+
+    plan_cfg = trace_meta.get("plan_config", {})
+    fidelity_cfg = plan_cfg.get("fidelity", {}) if isinstance(plan_cfg, dict) else {}
+    cem_cfg = plan_cfg.get("cem", {}) if isinstance(plan_cfg, dict) else {}
+    mpc_cfg = plan_cfg.get("mpc", {}) if isinstance(plan_cfg, dict) else {}
+    num_levels = fidelity_cfg.get("num_levels", None)
+    if num_levels is None:
+        return int(replan.get("base_level_idx", -1))
+
+    horizon = replan.get("action_horizon", None)
+    if horizon is None:
+        horizon = len(replan.get("action_seq", [])) or int(mpc_cfg.get("horizon", 1))
+    action_seq = replan.get("action_seq", [])
+    action_dim = len(action_seq[0]) if len(action_seq) > 0 else 2
+
+    try:
+        core = SharedCEMCore(
+            horizon=max(1, int(horizon)),
+            action_dim=max(1, int(action_dim)),
+            pop_size=max(1, int(cem_cfg.get("pop_size", 1))),
+            elite_frac=float(cem_cfg.get("elite_frac", 0.5)),
+            n_iter=max(1, int(cem_cfg.get("n_iter", 1))),
+            init_std=max(1e-6, float(cem_cfg.get("init_std", 1.0))),
+            action_low=cem_cfg.get("action_low", None),
+            action_high=cem_cfg.get("action_high", None),
+            fidelity_cfg=fidelity_cfg,
+            num_levels=int(num_levels),
+            rollout_modes={"fixed", "linear", "uncertainty_downshift"},
+        )
+        return int(core.base_level_index(float(replan.get("mpc_progress", 0.0)), 0.0))
+    except Exception:
+        return int(replan.get("base_level_idx", -1))
 
 
 def _media_path_for_name(media_dir: str, media_name: str) -> str | None:

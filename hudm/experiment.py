@@ -513,6 +513,7 @@ def _run_wm_batched_variants(
                         "mpc_progress": float(mpc_progress),
                         "seed": int(plan_seeds[variant_idx]),
                         "action_seq": action_seq.tolist(),
+                        "start_level_idx": int(getattr(info, "start_level_idx", getattr(info, "base_level_idx", -1))),
                         "base_level_idx": int(getattr(info, "base_level_idx", -1)),
                         "rollout_level_indices": [int(x) for x in list(getattr(info, "rollout_level_indices", []))],
                         "rollout_latent_losses": [float(x) for x in list(getattr(info, "rollout_latent_losses", []))],

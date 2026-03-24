@@ -23,6 +23,7 @@ class GTEnvCEMInfo:
     rollout_level_indices: List[int]
     bits_used_estimate: int
     plan_time_sec: float
+    start_level_idx: int = -1
 
 
 class GTEnvCEMPlanner:
@@ -313,6 +314,7 @@ class GTEnvCEMPlanner:
 
             return torch.as_tensor(costs, device=self.device), rollout_levels, bits_iter
 
+        start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
             evaluate_population=_evaluate,
@@ -326,5 +328,6 @@ class GTEnvCEMPlanner:
             rollout_level_indices=final_rollout_levels,
             bits_used_estimate=int(total_bits),
             plan_time_sec=float(time.perf_counter() - t0),
+            start_level_idx=int(start_level_idx),
         )
         return action_seq, info
