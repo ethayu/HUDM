@@ -23,6 +23,7 @@ from hudm.experiment_review import (
     _variant_success_figure,
     _variant_histogram_figure,
     ExperimentReviewApp,
+    MediaRenderTask,
     build_run_media_section,
     build_run_page,
     build_summary_page,
@@ -157,6 +158,8 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn("width: min(100%, 320px)", html)
             self.assertIn("resizePlotlyFigures", html)
             self.assertIn("100.00 b", html)
+            self.assertIn("Mean FLOPs", html)
+            self.assertIn("200.00 FLOPs", html)
             self.assertNotIn("Cross-Variant Compute Distributions", html)
             self.assertNotIn("Final Pos", html)
             self.assertNotIn("kpi-label'>Baseline", html)
@@ -169,6 +172,7 @@ class ExperimentReviewTests(unittest.TestCase):
                         "replan_idx": 2,
                         "step_start": 5,
                         "mpc_progress": 0.5,
+                        "start_level_idx": 1,
                         "base_level_idx": 3,
                         "bits_used_estimate": 94264885248,
                         "plan_time_sec": 1.25,
@@ -179,6 +183,7 @@ class ExperimentReviewTests(unittest.TestCase):
         )
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["action_horizon"], 15)
+        self.assertEqual(rows[0]["base_level_idx"], 1)
         self.assertEqual(rows[0]["bits_used_estimate__display"], "94.26 Gb")
 
     def test_replan_rows_fallback_to_rollout_level_length_when_action_horizon_missing(self):
@@ -200,6 +205,35 @@ class ExperimentReviewTests(unittest.TestCase):
         self.assertEqual(rows[0]["action_horizon"], 4)
         self.assertEqual(rows[0]["bits_used_estimate__display"], "1.00 Kb")
 
+    def test_replan_rows_derive_start_level_from_plan_config_when_missing(self):
+        rows = _replan_rows(
+            {
+                "plan_config": {
+                    "mpc": {"horizon": 10},
+                    "cem": {"pop_size": 16, "elite_frac": 0.25, "n_iter": 4, "init_std": 1.0},
+                    "fidelity": {
+                        "enabled": True,
+                        "num_levels": 4,
+                        "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
+                        "cem": {"mode": "linear", "start_level": "base", "end_level": "finest"},
+                        "rollout": {"mode": "fixed", "level": "base"},
+                    },
+                },
+                "replans": [
+                    {
+                        "replan_idx": 1,
+                        "step_start": 5,
+                        "mpc_progress": 2.0 / 3.0,
+                        "base_level_idx": 3,
+                        "bits_used_estimate": 1000,
+                        "plan_time_sec": 0.1,
+                        "action_seq": [[0.0, 0.0]],
+                    }
+                ],
+            }
+        )
+        self.assertEqual(rows[0]["base_level_idx"], 2)
+
     def test_build_variant_page_contains_success_and_stepwise_sections(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir, _ = self._make_experiment_dir(tmpdir)
@@ -208,6 +242,8 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn("Success Analysis", html)
             self.assertIn("Stepwise Trace Summary", html)
             self.assertIn("variantRunsTable", html)
+            self.assertIn("Mean FLOPs", html)
+            self.assertIn("200.00 FLOPs", html)
             self.assertNotIn("Final Pos", html)
             self.assertNotIn("Reference Comparison", html)
 
@@ -467,6 +503,14 @@ class ExperimentReviewTests(unittest.TestCase):
             overview_fig = _compute_vs_outcome_figure(data)
             self.assertTrue(all(not trace.showlegend for trace in overview_fig.data))
             self.assertTrue(all("<extra></extra>" in (trace.hovertemplate or "") for trace in overview_fig.data))
+            self.assertEqual(len(overview_fig.data), 4)
+            self.assertEqual(overview_fig.layout.annotations[0].text, "Bits vs Success")
+            self.assertEqual(overview_fig.layout.annotations[1].text, "Plan Time vs Success")
+            self.assertEqual(overview_fig.layout.annotations[2].text, "Bits vs Coverage")
+            self.assertEqual(overview_fig.layout.annotations[3].text, "Plan Time vs Coverage")
+            hovertemplates = [trace.hovertemplate for trace in overview_fig.data]
+            self.assertIn("Success Rate: %{y:.1%}<extra></extra>", hovertemplates[0])
+            self.assertIn("Mean Coverage: %{y:.4f}<extra></extra>", hovertemplates[2])
 
             variant_fig = _variant_success_figure(data.run_rows, "variant_a")
             self.assertTrue(all(not trace.showlegend for trace in variant_fig.data))
@@ -580,6 +624,9 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIsNotNone(fig)
             assert fig is not None
             self.assertFalse(fig.layout.showlegend)
+            self.assertEqual(len(fig.data), 2)
+            self.assertEqual(fig.layout.annotations[0].text, "Success vs variant_a")
+            self.assertEqual(fig.layout.annotations[1].text, "Coverage vs variant_a")
             self.assertTrue(all(not trace.showlegend for trace in fig.data))
             self.assertTrue(all((trace.hovertemplate or "").endswith("<extra></extra>") for trace in fig.data))
 
@@ -826,6 +873,50 @@ class ExperimentReviewTests(unittest.TestCase):
                 done_html = app.run_page(variant_name="variant_a", rollout_id="rollout_0")
                 self.assertIn("/files/review_cache/media/variant_a/rollout_0/closed_loop_replay.mp4", done_html)
 
+    def test_particle_media_render_task_uses_serialized_lock(self):
+        class RecorderLock:
+            def __init__(self):
+                self.enter_count = 0
+                self.exit_count = 0
+
+            def __enter__(self):
+                self.enter_count += 1
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                self.exit_count += 1
+                return False
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            app = ExperimentReviewApp(run_dir)
+            key = ("variant_a", "rollout_0", "closed_loop_replay")
+            app._media_tasks[key] = MediaRenderTask(
+                variant_name="variant_a",
+                rollout_id="rollout_0",
+                media_name="closed_loop_replay",
+                status="pending",
+            )
+            recorder_lock = RecorderLock()
+
+            with mock.patch("hudm.experiment_review._trace_backend_for_run", return_value="particle_sim"):
+                with mock.patch("hudm.experiment_review._PARTICLE_MEDIA_RENDER_LOCK", recorder_lock):
+                    with mock.patch(
+                        "hudm.experiment_review.render_media_for_run",
+                        return_value=(["/tmp/closed_loop_replay.mp4"], []),
+                    ):
+                        app._run_media_render_task(
+                            variant_name="variant_a",
+                            rollout_id="rollout_0",
+                            media_name="closed_loop_replay",
+                        )
+
+            task = app.media_tasks_for_run("variant_a", "rollout_0")["closed_loop_replay"]
+            self.assertEqual(recorder_lock.enter_count, 1)
+            self.assertEqual(recorder_lock.exit_count, 1)
+            self.assertEqual(task.status, "succeeded")
+            self.assertEqual(task.outputs, ["/tmp/closed_loop_replay.mp4"])
+
     def test_build_run_media_section_marks_active_media(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir, _ = self._make_experiment_dir(tmpdir)
@@ -867,6 +958,22 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn("media_html", body)
             self.assertTrue(body["active_media"])
             self.assertEqual(body["notice_html"], "")
+
+    def test_handler_ignores_client_disconnect_without_sending_error(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            app = ExperimentReviewApp(run_dir)
+            handler_cls = make_review_handler(app)
+            handler = handler_cls.__new__(handler_cls)
+            handler.path = "/run?variant=variant_a&rollout_id=rollout_0"
+            handler.review_app = app
+            handler._send_html = mock.Mock(side_effect=BrokenPipeError())
+            handler.send_error = mock.Mock(side_effect=AssertionError("send_error should not be called"))
+
+            handler.do_GET()
+
+            handler._send_html.assert_called_once()
+            handler.send_error.assert_not_called()
 
 
 if __name__ == "__main__":
