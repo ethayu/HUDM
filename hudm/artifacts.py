@@ -681,6 +681,12 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
                 "bits_used_estimate": int(replan.get("bits_used_estimate", 0)),
                 "flops_used_estimate": int(replan.get("flops_used_estimate", 0)),
                 "plan_time_sec": float(replan.get("plan_time_sec", 0.0)),
+                "shared_plan_time_sec": (
+                    None
+                    if replan.get("shared_plan_time_sec", None) is None
+                    else float(replan.get("shared_plan_time_sec"))
+                ),
+                "plan_time_allocation": replan.get("plan_time_allocation", None),
                 "base_k": replan.get("base_k", None),
                 "base_spacing": replan.get("base_spacing", None),
                 "base_num_particles": replan.get("base_num_particles", None),
@@ -737,6 +743,9 @@ def save_plan_result(
         "flops_used_total": int(result["run_stats"]["flops_used_total"]),
         "flops_used_total_human": format_flops_human(int(result["run_stats"]["flops_used_total"])),
         "plan_time_total_sec": float(result["run_stats"]["plan_time_total_sec"]),
+        "shared_plan_time_total_sec": float(
+            result["run_stats"].get("shared_plan_time_total_sec", result["run_stats"]["plan_time_total_sec"])
+        ),
         "termination_reason": str(result["run_stats"].get("termination_reason", "unknown")),
         "termination_step": int(result["run_stats"].get("termination_step", -1)),
         "termination_metric_success": bool(result["run_stats"].get("termination_metric_success", False)),
