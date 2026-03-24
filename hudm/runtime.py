@@ -317,6 +317,8 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
     else:
         spacings = list(cfg.particle_env.fidelity_env.spacings)
         cfg.fidelity.num_levels = len(spacings)
+        particle_seed = resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
+        cfg.init_goal.dataset.seed = particle_seed
         particle_backend = PushTParticleBackend(
             with_velocity=bool(cfg.env.with_velocity),
             with_target=bool(cfg.env.with_target),
@@ -326,7 +328,7 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             device=str(cfg.particle_env.fidelity_env.device),
             fidelity_spacings=[float(s) for s in spacings],
             warp_cfg=OmegaConf.to_container(cfg.particle_env.fidelity_env, resolve=True),
-            seed=int(getattr(cfg.init_goal.dataset, "seed", 0)),
+            seed=particle_seed,
         )
         planner = ParticleCEMPlanner(
             particle_backend=particle_backend,

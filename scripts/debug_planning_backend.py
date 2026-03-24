@@ -20,6 +20,7 @@ from omegaconf import OmegaConf
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+from hudm.session import load_plan_cfg
 from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_wrapper import PushTWrapper
 
@@ -250,9 +251,7 @@ def main() -> None:
     ap.add_argument("--stop-on-done", action="store_true", help="Stop automatically when env returns done=true")
     args = ap.parse_args()
 
-    cfg_root = OmegaConf.load(args.config)
-    cfg = OmegaConf.to_container(OmegaConf.merge({}, cfg_root.get("plan", cfg_root)), resolve=True)
-    cfg = OmegaConf.create(cfg)
+    cfg = load_plan_cfg(args.config)
 
     backend = str(args.backend or cfg.backend).lower()
     if backend not in {"gt_env", "particle_sim"}:

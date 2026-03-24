@@ -133,6 +133,71 @@ class ParticleCEMPlanner:
         return cost
 
     @staticmethod
+    def _particle_angle_delta(
+        cur_particles_xy: np.ndarray,
+        goal_particles_xy: np.ndarray,
+    ) -> float:
+        cur = np.asarray(cur_particles_xy, dtype=np.float32).reshape(-1, 2)
+        goal = np.asarray(goal_particles_xy, dtype=np.float32).reshape(-1, 2)
+        if cur.shape != goal.shape:
+            raise ValueError(
+                f"Particle-cloud shape mismatch in particle objective: cur={cur.shape}, goal={goal.shape}"
+            )
+        if cur.shape[0] <= 1:
+            return 0.0
+        cur_centered = cur - cur.mean(axis=0, keepdims=True)
+        goal_centered = goal - goal.mean(axis=0, keepdims=True)
+        if float(np.linalg.norm(cur_centered)) <= 1e-8 or float(np.linalg.norm(goal_centered)) <= 1e-8:
+            return 0.0
+        a = float(np.sum(goal_centered[:, 0] * cur_centered[:, 1] - goal_centered[:, 1] * cur_centered[:, 0]))
+        b = float(np.sum(goal_centered[:, 0] * cur_centered[:, 0] + goal_centered[:, 1] * cur_centered[:, 1]))
+        return abs(math.atan2(a, b))
+
+    @classmethod
+    def _particle_state_terms(
+        cls,
+        cur_cloud: Dict[str, np.ndarray],
+        goal_cloud: Dict[str, np.ndarray],
+    ) -> tuple[float, float, float, float]:
+        cur_pusher = np.asarray(cur_cloud["pusher_xy"], dtype=np.float32).reshape(2)
+        goal_pusher = np.asarray(goal_cloud["pusher_xy"], dtype=np.float32).reshape(2)
+        cur_particles = np.asarray(cur_cloud["particle_xy"], dtype=np.float32).reshape(-1, 2)
+        goal_particles = np.asarray(goal_cloud["particle_xy"], dtype=np.float32).reshape(-1, 2)
+        if cur_particles.shape != goal_particles.shape:
+            raise ValueError(
+                f"Particle-cloud shape mismatch in particle objective: cur={cur_particles.shape}, goal={goal_particles.shape}"
+            )
+
+        eef = float(np.linalg.norm(cur_pusher - goal_pusher))
+        cur_center = cur_particles.mean(axis=0) if cur_particles.shape[0] > 0 else np.zeros((2,), dtype=np.float32)
+        goal_center = goal_particles.mean(axis=0) if goal_particles.shape[0] > 0 else np.zeros((2,), dtype=np.float32)
+        block_pos = float(np.linalg.norm(cur_center - goal_center))
+        block_ang = cls._particle_angle_delta(cur_particles, goal_particles)
+
+        flat_cur = np.concatenate([cur_pusher.reshape(-1), cur_particles.reshape(-1)], axis=0)
+        flat_goal = np.concatenate([goal_pusher.reshape(-1), goal_particles.reshape(-1)], axis=0)
+        state_l2 = float(np.sqrt(np.mean((flat_cur - flat_goal) ** 2)))
+        return eef, block_pos, block_ang, state_l2
+
+    def _particle_state_cost(
+        self,
+        cur_cloud: Dict[str, np.ndarray],
+        goal_cloud: Dict[str, np.ndarray],
+        actions: np.ndarray,
+    ) -> float:
+        eef, block_pos, block_ang, state_l2 = self._particle_state_terms(cur_cloud, goal_cloud)
+        cost = (
+            self.eef_weight * eef
+            + self.block_pos_weight * block_pos
+            + self.block_angle_weight * block_ang
+        )
+        if self.state_l2_weight > 0.0:
+            cost += self.state_l2_weight * state_l2
+        if self.action_l2_weight > 0.0:
+            cost += self.action_l2_weight * float(np.mean(actions ** 2))
+        return cost
+
+    @staticmethod
     def _to_float_image(x: np.ndarray | torch.Tensor) -> np.ndarray:
         if torch.is_tensor(x):
             x = x.detach().cpu().numpy()
@@ -175,6 +240,25 @@ class ParticleCEMPlanner:
             by_level[li] = self._to_float_image(visual)
         return by_level
 
+    def _goal_particle_clouds_by_level(
+        self,
+        goal_state: np.ndarray,
+        rollout_levels: List[int],
+        seed: int,
+    ) -> Dict[int, Dict[str, np.ndarray]]:
+        by_level: Dict[int, Dict[str, np.ndarray]] = {}
+        unique_levels = sorted({int(li) for li in rollout_levels})
+        for li in unique_levels:
+            self.backend.set_planning_fidelity_level(li)
+            self.backend.prepare(
+                seed=seed + 17 * li,
+                init_state=goal_state,
+                goal_state=goal_state,
+                with_visual=False,
+            )
+            by_level[li] = self.backend.current_particle_cloud_state(level_idx=li, pixel=True)
+        return by_level
+
     def _image_cost(
         self,
         final_dist: float,
@@ -214,6 +298,7 @@ class ParticleCEMPlanner:
         rollout_levels: List[int],
         seed: int,
         goal_visual_by_level: Dict[int, np.ndarray],
+        goal_particle_cloud_by_level: Dict[int, Dict[str, np.ndarray]],
     ) -> tuple[float, int]:
         # Fixed rollout mode: all entries are the same level.
         level_idx = int(rollout_levels[0])
@@ -230,8 +315,15 @@ class ParticleCEMPlanner:
         bits_used = 0
         running_dists: List[float] = []
         final_dist = 0.0
+        cur_particle_cloud = (
+            self.backend.current_particle_cloud_state(level_idx=level_idx, pixel=True)
+            if self.objective_space == "state"
+            else {}
+        )
 
         for t in range(self.horizon):
+            level_idx = int(rollout_levels[t])
+            self.backend.set_planning_fidelity_level(level_idx)
             obs_t, _, done, info = self.backend.step(actions[t], with_visual=need_visual)
             state = np.asarray(info["state"], dtype=np.float32)
             bits_used += int(self.backend.num_particles(level_idx=level_idx) * 2 * 32)
@@ -246,6 +338,8 @@ class ParticleCEMPlanner:
                 final_dist = float(d)
                 if self.running_weight > 0.0:
                     running_dists.append(float(d))
+            else:
+                cur_particle_cloud = self.backend.current_particle_cloud_state(level_idx=level_idx, pixel=True)
 
             if done:
                 break
@@ -253,7 +347,11 @@ class ParticleCEMPlanner:
         if self.objective_space == "image":
             cost = self._image_cost(final_dist=final_dist, running_dists=running_dists, actions=actions)
         else:
-            cost = self._state_cost(np.asarray(state), np.asarray(goal_state), actions)
+            cost = self._particle_state_cost(
+                cur_particle_cloud,
+                goal_particle_cloud_by_level[int(level_idx)],
+                actions,
+            )
         return cost, bits_used
 
     @torch.no_grad()
@@ -287,8 +385,14 @@ class ParticleCEMPlanner:
                     rollout_levels=rollout_levels,
                     seed=int(seed + 700001 * iter_idx),
                 )
+                goal_particle_cloud_by_level = {}
             else:
                 goal_visual_by_level = {}
+                goal_particle_cloud_by_level = self._goal_particle_clouds_by_level(
+                    goal_state=goal_state_np,
+                    rollout_levels=rollout_levels,
+                    seed=int(seed + 700001 * iter_idx),
+                )
 
             costs = np.zeros((pop,), dtype=np.float32)
             bits_iter = 0
@@ -305,6 +409,7 @@ class ParticleCEMPlanner:
                             rollout_levels=rollout_levels,
                             seed=int(seed + 1000003 * iter_idx + 1009 * p + 7 * s_idx),
                             goal_visual_by_level=goal_visual_by_level,
+                            goal_particle_cloud_by_level=goal_particle_cloud_by_level,
                         )
                         sample_costs.append(c)
                         bits_iter += int(b)

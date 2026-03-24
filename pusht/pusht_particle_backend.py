@@ -120,6 +120,11 @@ class PushTParticleBackend:
         self._goal_state = np.zeros((self.state_dim,), dtype=np.float32)
         self._start_state = np.zeros((self.state_dim,), dtype=np.float32)
 
+    def _sim_for_level(self, level_idx: Optional[int] = None) -> PushTWarpEnv:
+        li = self._planning_fidelity_level_idx if level_idx is None else int(level_idx)
+        li = max(0, min(li, len(self._sims) - 1))
+        return self._sims[li]
+
     def _resolve_device(self, device: str) -> str:
         d = (device or "auto").strip().lower()
         if d in {"auto", ""}:
@@ -175,6 +180,38 @@ class PushTParticleBackend:
         li = self._planning_fidelity_level_idx if level_idx is None else int(level_idx)
         li = max(0, min(li, len(self._sims) - 1))
         return float(self._sims[li].pr)
+
+    def _world_xy_to_pix(self, xy_world: Sequence[float] | np.ndarray) -> np.ndarray:
+        xy = np.asarray(xy_world, dtype=np.float32)
+        out = np.empty(xy.shape, dtype=np.float32)
+        out[..., 0] = (xy[..., 0] - self.xmin) / self._xrange * 512.0
+        out[..., 1] = (xy[..., 1] - self.ymin) / self._yrange * 512.0
+        return out.astype(np.float32)
+
+    def current_pusher_position(self, *, level_idx: Optional[int] = None, pixel: bool = True) -> np.ndarray:
+        sim = self._sim_for_level(level_idx)
+        xy_world = np.asarray(sim.pusher_pos[:2], dtype=np.float32)
+        if not bool(pixel):
+            return xy_world.copy()
+        return self._world_xy_to_pix(xy_world)
+
+    def current_particle_positions(self, *, level_idx: Optional[int] = None, pixel: bool = True) -> np.ndarray:
+        sim = self._sim_for_level(level_idx)
+        pts_world = np.asarray(sim.get_particle_positions(), dtype=np.float32)[:, :2]
+        if not bool(pixel):
+            return pts_world.copy()
+        return self._world_xy_to_pix(pts_world)
+
+    def current_particle_cloud_state(
+        self,
+        *,
+        level_idx: Optional[int] = None,
+        pixel: bool = True,
+    ) -> dict[str, np.ndarray]:
+        return {
+            "pusher_xy": self.current_pusher_position(level_idx=level_idx, pixel=pixel),
+            "particle_xy": self.current_particle_positions(level_idx=level_idx, pixel=pixel),
+        }
 
     def _ensure_state_dim(self, state: np.ndarray) -> np.ndarray:
         s = np.asarray(state, dtype=np.float32).reshape(-1)
