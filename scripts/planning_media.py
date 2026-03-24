@@ -363,8 +363,8 @@ def _render_predicted_backend_replay(trace_dir: str, meta: dict, arrays: dict, *
             seg_actions = np.asarray(replan_action_seqs[r_idx, :horizon], dtype=np.float32)
             for t in range(horizon):
                 particle_backend.set_planning_fidelity_level(int(replan_rollout_levels[r_idx, t]))
-                obs, cur_state, _, _ = particle_backend.step(replan_action_seqs[r_idx, t], with_visual=True)
-                seg_states.append(np.asarray(cur_state, dtype=np.float32).copy())
+                obs, _, _, info = particle_backend.step(replan_action_seqs[r_idx, t], with_visual=True)
+                seg_states.append(np.asarray(info["state"], dtype=np.float32).copy())
                 seg_frames.append(np.asarray(obs["visual"]))
             frames.extend(overlay_action_targets_on_frames(seg_frames, seg_states, seg_actions, overlay_spec))
 

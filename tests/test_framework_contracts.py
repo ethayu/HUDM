@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 from types import SimpleNamespace
 
 import numpy as np
@@ -11,11 +12,13 @@ import torch
 from omegaconf import OmegaConf
 
 from hudm.metrics import pose_metrics
+from hudm.runtime import build_plan_runtime
 from hudm.session import save_plan_result
 from hudm.session_exec import run_closed_loop
 from hudm.session_helpers import sample_init_goal_states
 from hudm.world_io import checkpoint_epochs, latest_checkpoint_epoch, load_world_checkpoint, save_world_checkpoint
 from models.world.model import HierWorldModel
+from planning.particle_cem import ParticleCEMPlanner
 from pusht.pusht_particle_backend import PushTParticleBackend
 
 
@@ -122,6 +125,153 @@ class FrameworkContractTests(unittest.TestCase):
 
         _, _, done, _ = PushTParticleBackend.step(backend, np.zeros(2, dtype=np.float32), with_visual=False)
         self.assertFalse(done)
+
+    def test_particle_backend_particle_cloud_state_uses_pusht_pixel_coordinates(self):
+        class DummySim:
+            pusher_pos = np.asarray([0.0, 0.0, 0.0], dtype=np.float32)
+
+            def get_particle_positions(self):
+                return np.asarray(
+                    [
+                        [-0.25, -0.25, 0.0],
+                        [0.25, 0.25, 0.0],
+                    ],
+                    dtype=np.float32,
+                )
+
+        backend = SimpleNamespace(
+            _planning_fidelity_level_idx=0,
+            _sims=[DummySim()],
+            xmin=-0.25,
+            ymin=-0.25,
+            _xrange=0.5,
+            _yrange=0.5,
+        )
+        backend._sim_for_level = lambda level_idx=None: PushTParticleBackend._sim_for_level(backend, level_idx)
+        backend._world_xy_to_pix = lambda xy_world: PushTParticleBackend._world_xy_to_pix(backend, xy_world)
+        backend.current_pusher_position = lambda **kwargs: PushTParticleBackend.current_pusher_position(backend, **kwargs)
+        backend.current_particle_positions = lambda **kwargs: PushTParticleBackend.current_particle_positions(backend, **kwargs)
+
+        cloud = PushTParticleBackend.current_particle_cloud_state(backend)
+
+        np.testing.assert_allclose(cloud["pusher_xy"], np.asarray([256.0, 256.0], dtype=np.float32))
+        np.testing.assert_allclose(
+            cloud["particle_xy"],
+            np.asarray(
+                [
+                    [0.0, 0.0],
+                    [512.0, 512.0],
+                ],
+                dtype=np.float32,
+            ),
+        )
+
+    def test_particle_state_terms_use_particle_coordinates_for_pose_like_losses(self):
+        cur_cloud = {
+            "pusher_xy": np.asarray([3.0, 0.0], dtype=np.float32),
+            "particle_xy": np.asarray(
+                [
+                    [1.0, -1.0],
+                    [1.0, 1.0],
+                ],
+                dtype=np.float32,
+            ),
+        }
+        goal_cloud = {
+            "pusher_xy": np.asarray([0.0, 0.0], dtype=np.float32),
+            "particle_xy": np.asarray(
+                [
+                    [0.0, 0.0],
+                    [2.0, 0.0],
+                ],
+                dtype=np.float32,
+            ),
+        }
+
+        eef, block_pos, block_ang, state_l2 = ParticleCEMPlanner._particle_state_terms(cur_cloud, goal_cloud)
+
+        self.assertAlmostEqual(eef, 3.0, places=5)
+        self.assertAlmostEqual(block_pos, 0.0, places=5)
+        self.assertAlmostEqual(block_ang, np.pi / 2.0, places=5)
+        self.assertGreater(state_l2, 0.0)
+
+    def test_particle_state_terms_ignore_angle_when_single_particle_has_no_orientation_signal(self):
+        cur_cloud = {
+            "pusher_xy": np.asarray([0.0, 0.0], dtype=np.float32),
+            "particle_xy": np.asarray([[1.0, 1.0]], dtype=np.float32),
+        }
+        goal_cloud = {
+            "pusher_xy": np.asarray([0.0, 0.0], dtype=np.float32),
+            "particle_xy": np.asarray([[1.0, 1.0]], dtype=np.float32),
+        }
+
+        _eef, _block_pos, block_ang, _state_l2 = ParticleCEMPlanner._particle_state_terms(cur_cloud, goal_cloud)
+        self.assertEqual(block_ang, 0.0)
+
+    def test_build_plan_runtime_resolves_random_particle_seed(self):
+        cfg = OmegaConf.create(
+            {
+                "env_id": "pusht",
+                "env": {
+                    "with_velocity": True,
+                    "with_target": True,
+                },
+                "backend": "particle_sim",
+                "world_model": {
+                    "device": "cpu",
+                },
+                "mpc": {
+                    "horizon": 2,
+                },
+                "cem": {
+                    "pop_size": 4,
+                    "elite_frac": 0.5,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "warm_start": False,
+                    "action_low": None,
+                    "action_high": None,
+                },
+                "objective": {
+                    "action_l2_weight": 0.0,
+                },
+                "fidelity": {
+                    "num_levels": 1,
+                },
+                "particle_env": {
+                    "fidelity_env": {
+                        "spacings": [0.02, 0.01],
+                        "device": "cpu",
+                    },
+                },
+                "init_goal": {
+                    "dataset": {
+                        "seed": "random",
+                    },
+                },
+            }
+        )
+
+        dummy_env = SimpleNamespace(
+            action_dim=2,
+            render_size=96,
+            relative=True,
+            action_scale=100.0,
+        )
+
+        with mock.patch("hudm.runtime.register_plan_env"):
+            with mock.patch("hudm.runtime.gym_make_versioned", return_value=dummy_env):
+                with mock.patch("hudm.runtime.unwrap_env", return_value=dummy_env):
+                    with mock.patch("hudm.runtime.PushTParticleBackend") as backend_cls:
+                        with mock.patch("hudm.runtime.ParticleCEMPlanner") as planner_cls:
+                            build_plan_runtime(cfg)
+
+        backend_seed = backend_cls.call_args.kwargs["seed"]
+        self.assertIsInstance(backend_seed, int)
+        self.assertNotEqual(backend_seed, "random")
+        self.assertEqual(cfg.init_goal.dataset.seed, backend_seed)
+        self.assertEqual(cfg.fidelity.num_levels, 2)
+        planner_cls.assert_called_once()
 
     def test_run_closed_loop_terminates_on_env_done_even_without_metric_success(self):
         class DummyPlanner:

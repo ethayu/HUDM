@@ -322,6 +322,82 @@ class PlanningMediaTests(unittest.TestCase):
 
             self.assertEqual([int(fr[1, 1, 0]) for fr in captured["frames"]], [10, 10, 10])
 
+    def test_predicted_backend_replay_particle_uses_info_state_not_reward(self):
+        class DummyRuntimeEnv:
+            relative = True
+            action_scale = 1.0
+            window_size = 512.0
+
+        class DummyParticleBackend:
+            def __init__(self):
+                self._state = np.asarray([10.0, 20.0, 0, 0, 0], dtype=np.float32)
+
+            def set_planning_fidelity_level(self, level_idx):
+                del level_idx
+
+            def prepare(self, seed, init_state, goal_state=None, with_visual=True):
+                del seed, goal_state, with_visual
+                self._state = np.asarray(init_state, dtype=np.float32).copy()
+                obs = {
+                    "visual": np.zeros((4, 4, 3), dtype=np.uint8),
+                    "state": self._state.copy(),
+                }
+                return obs, self._state.copy()
+
+            def step(self, action, with_visual=True):
+                del action, with_visual
+                self._state = self._state.copy()
+                self._state[0] += 1.0
+                obs = {
+                    "visual": np.zeros((4, 4, 3), dtype=np.uint8),
+                    "state": self._state.copy(),
+                }
+                return obs, 123.0, False, {"state": self._state.copy()}
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(os.path.join(tmpdir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "plan_config": {"env": {"render_size": 4}},
+                        "sample": {},
+                        "init_state": [10.0, 20.0, 0, 0, 0],
+                        "goal_state": [15.0, 20.0, 0, 0, 0],
+                        "action_format": "env_input",
+                        "action_relative": True,
+                        "action_scale": 1.0,
+                    },
+                    f,
+                )
+            np.savez_compressed(
+                os.path.join(tmpdir, "trace.npz"),
+                replan_action_seqs=np.asarray([[[1.0, 0.0], [1.0, 0.0]]], dtype=np.float32),
+                replan_start_states=np.asarray([[10.0, 20.0, 0, 0, 0]], dtype=np.float32),
+                replan_rollout_levels=np.asarray([[0, 0]], dtype=np.int32),
+                replan_rollout_lengths=np.asarray([2], dtype=np.int32),
+            )
+            captured = {}
+
+            def _capture_video(path, frames, fps=15, output_size=256):
+                del path, fps, output_size
+                captured["frames"] = [np.asarray(fr).copy() for fr in frames]
+
+            runtime = {
+                "env": DummyRuntimeEnv(),
+                "backend": "particle_sim",
+                "planner": type("Planner", (), {"backend": DummyParticleBackend()})(),
+            }
+            with mock.patch.object(
+                planning_media,
+                "_build_runtime",
+                return_value=(OmegaConf.create({"env": {"render_size": 4}}), runtime),
+            ):
+                with mock.patch.object(planning_media.single_plan, "_write_video_mp4", side_effect=_capture_video):
+                    outputs = planning_media.render_media(tmpdir, schedule=None, rollout_id=None, media=["predicted_backend_replay"])
+
+            self.assertEqual(outputs, [os.path.join(tmpdir, "predicted_backend_replay.mp4")])
+            self.assertEqual(len(captured["frames"]), 3)
+            self.assertGreater(int(np.sum(captured["frames"][0][:, :, 0])), 0)
+
 
 if __name__ == "__main__":
     unittest.main()
