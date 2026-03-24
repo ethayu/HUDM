@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import csv
 import hashlib
 import html
@@ -32,7 +33,7 @@ from hudm.experiment_bundle import (
     review_media_dir,
     trace_dir,
 )
-from hudm.runtime import format_bits_human
+from hudm.runtime import format_bits_human, format_flops_human
 from planning.cem_core import SharedCEMCore
 from scripts import planning_media
 
@@ -92,6 +93,7 @@ STEPWISE_METRICS = (
 
 _FIGURE_COUNTER = itertools.count()
 _COVERAGE_BINS = dict(start=0.0, end=1.0, size=0.02)
+_PARTICLE_MEDIA_RENDER_LOCK = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -238,6 +240,9 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
         wins = 0
         losses = 0
         ties = 0
+        coverage_better = 0
+        coverage_worse = 0
+        coverage_ties = 0
         matched = 0
         for row in rows:
             rollout_id = str(row.get("rollout_id", ""))
@@ -252,13 +257,21 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
                 losses += 1
             else:
                 ties += 1
+            coverage_delta = _safe_float(row.get("final_coverage")) - _safe_float(reference_row.get("final_coverage"))
+            if np.isfinite(coverage_delta):
+                if coverage_delta > 1e-9:
+                    coverage_better += 1
+                elif coverage_delta < -1e-9:
+                    coverage_worse += 1
+                else:
+                    coverage_ties += 1
             paired_rows.append(
                 {
                     "reference_variant": reference_variant,
                     "variant_name": variant_name,
                     "rollout_id": rollout_id,
                     "success_delta": success_delta,
-                    "final_coverage_delta": _safe_float(row.get("final_coverage")) - _safe_float(reference_row.get("final_coverage")),
+                    "final_coverage_delta": coverage_delta,
                     "bits_used_total_delta": _safe_float(row.get("bits_used_total")) - _safe_float(reference_row.get("bits_used_total")),
                     "plan_time_total_sec_delta": _safe_float(row.get("plan_time_total_sec")) - _safe_float(reference_row.get("plan_time_total_sec")),
                 }
@@ -270,6 +283,9 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
                     "wins": wins,
                     "losses": losses,
                     "ties": ties,
+                    "coverage_better": coverage_better,
+                    "coverage_worse": coverage_worse,
+                    "coverage_ties": coverage_ties,
                     "matched_rollouts": matched,
                 }
             )
@@ -585,6 +601,19 @@ def _format_bits_value(value: Any) -> str:
         return "nan"
     sign = "-" if fval < 0 else ""
     return f"{sign}{format_bits_human(int(round(abs(fval))))}"
+
+
+def _format_flops_value(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    try:
+        fval = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if not np.isfinite(fval):
+        return "nan"
+    sign = "-" if fval < 0 else ""
+    return f"{sign}{format_flops_human(int(round(abs(fval))))}"
 
 
 def _notice_html(message: str | None, *, kind: str = "info") -> str:
@@ -999,15 +1028,25 @@ def _success_rate_figure(data: ExperimentReviewData) -> Any:
 
 def _compute_vs_outcome_figure(data: ExperimentReviewData) -> Any:
     _require_plotly()
-    fig = make_subplots(rows=1, cols=2, subplot_titles=["Bits vs Success", "Plan Time vs Success"])
+    fig = make_subplots(
+        rows=2,
+        cols=2,
+        subplot_titles=[
+            "Bits vs Success",
+            "Plan Time vs Success",
+            "Bits vs Coverage",
+            "Plan Time vs Coverage",
+        ],
+    )
     bits_x = [float(row.get("mean_bits_used_total", float("nan"))) for row in data.variant_rows]
     time_x = [float(row.get("mean_plan_time_total_sec", float("nan"))) for row in data.variant_rows]
-    y = [float(row.get("success_rate", float("nan"))) for row in data.variant_rows]
+    success_y = [float(row.get("success_rate", float("nan"))) for row in data.variant_rows]
+    coverage_y = [float(row.get("mean_final_coverage", float("nan"))) for row in data.variant_rows]
     labels = [str(row.get("variant_name", "")) for row in data.variant_rows]
     fig.add_trace(
         go.Scatter(
             x=bits_x,
-            y=y,
+            y=success_y,
             mode="markers+text",
             text=labels,
             customdata=[[_format_bits_value(value)] for value in bits_x],
@@ -1021,7 +1060,7 @@ def _compute_vs_outcome_figure(data: ExperimentReviewData) -> Any:
     fig.add_trace(
         go.Scatter(
             x=time_x,
-            y=y,
+            y=success_y,
             mode="markers+text",
             text=labels,
             textposition="top center",
@@ -1031,10 +1070,41 @@ def _compute_vs_outcome_figure(data: ExperimentReviewData) -> Any:
         row=1,
         col=2,
     )
+    fig.add_trace(
+        go.Scatter(
+            x=bits_x,
+            y=coverage_y,
+            mode="markers+text",
+            text=labels,
+            customdata=[[_format_bits_value(value)] for value in bits_x],
+            textposition="top center",
+            hovertemplate="Variant %{text}<br>Mean Bits Used Total: %{customdata[0]}<br>Mean Coverage: %{y:.4f}<extra></extra>",
+            showlegend=False,
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=time_x,
+            y=coverage_y,
+            mode="markers+text",
+            text=labels,
+            textposition="top center",
+            hovertemplate="Variant %{text}<br>Mean Plan Time Total: %{x:.4g}s<br>Mean Coverage: %{y:.4f}<extra></extra>",
+            showlegend=False,
+        ),
+        row=2,
+        col=2,
+    )
     fig.update_xaxes(title_text="Mean Bits Used Total", row=1, col=1)
     fig.update_xaxes(title_text="Mean Plan Time Total (s)", row=1, col=2)
+    fig.update_xaxes(title_text="Mean Bits Used Total", row=2, col=1)
+    fig.update_xaxes(title_text="Mean Plan Time Total (s)", row=2, col=2)
     fig.update_yaxes(title_text="Success Rate", row=1, col=1)
     fig.update_yaxes(title_text="Success Rate", row=1, col=2)
+    fig.update_yaxes(title_text="Mean Coverage", row=2, col=1)
+    fig.update_yaxes(title_text="Mean Coverage", row=2, col=2)
     fig.update_layout(title="Compute vs Outcome")
     return fig
 
@@ -1046,21 +1116,58 @@ def _paired_summary_figure(data: ExperimentReviewData, reference_variant: str) -
     if len(rows) <= 0:
         return None
     names = [str(row["variant_name"]) for row in rows]
-    fig = make_subplots(rows=1, cols=1, subplot_titles=[f"Success vs {reference_variant}"])
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        subplot_titles=[f"Success vs {reference_variant}", f"Coverage vs {reference_variant}"],
+    )
     fig.add_trace(
-        go.Bar(name="wins", x=names, y=[int(row.get("wins", 0)) for row in rows]),
+        go.Bar(name="wins", x=names, y=[int(row.get("wins", 0)) for row in rows], hovertemplate="Variant %{x}<br>Wins: %{y}<extra></extra>"),
         row=1,
         col=1,
     )
     fig.add_trace(
-        go.Bar(name="losses", x=names, y=[int(row.get("losses", 0)) for row in rows]),
+        go.Bar(name="losses", x=names, y=[int(row.get("losses", 0)) for row in rows], hovertemplate="Variant %{x}<br>Losses: %{y}<extra></extra>"),
         row=1,
         col=1,
     )
     fig.add_trace(
-        go.Bar(name="ties", x=names, y=[int(row.get("ties", 0)) for row in rows]),
+        go.Bar(name="ties", x=names, y=[int(row.get("ties", 0)) for row in rows], hovertemplate="Variant %{x}<br>Ties: %{y}<extra></extra>"),
         row=1,
         col=1,
+    )
+    fig.add_trace(
+        go.Bar(
+            name="coverage better",
+            x=names,
+            y=[int(row.get("coverage_better", 0)) for row in rows],
+            hovertemplate="Variant %{x}<br>Coverage Better: %{y}<extra></extra>",
+            showlegend=False,
+        ),
+        row=1,
+        col=2,
+    )
+    fig.add_trace(
+        go.Bar(
+            name="coverage worse",
+            x=names,
+            y=[int(row.get("coverage_worse", 0)) for row in rows],
+            hovertemplate="Variant %{x}<br>Coverage Worse: %{y}<extra></extra>",
+            showlegend=False,
+        ),
+        row=1,
+        col=2,
+    )
+    fig.add_trace(
+        go.Bar(
+            name="coverage ties",
+            x=names,
+            y=[int(row.get("coverage_ties", 0)) for row in rows],
+            hovertemplate="Variant %{x}<br>Coverage Ties: %{y}<extra></extra>",
+            showlegend=False,
+        ),
+        row=1,
+        col=2,
     )
     fig.update_layout(title=f"Reference Comparison vs {reference_variant}", barmode="group")
     return fig
@@ -1413,7 +1520,11 @@ def _variant_paired_summary_figure(data: ExperimentReviewData, variant_name: str
     summary_row = next((row for row in payload["summary_rows"] if str(row.get("variant_name")) == variant_name), None)
     if summary_row is None:
         return None
-    fig = make_subplots(rows=1, cols=1, subplot_titles=[f"Success vs {reference_variant}"])
+    fig = make_subplots(
+        rows=1,
+        cols=2,
+        subplot_titles=[f"Success vs {reference_variant}", f"Coverage vs {reference_variant}"],
+    )
     fig.add_trace(
         go.Bar(
             x=["wins", "losses", "ties"],
@@ -1427,6 +1538,20 @@ def _variant_paired_summary_figure(data: ExperimentReviewData, variant_name: str
         ),
         row=1,
         col=1,
+    )
+    fig.add_trace(
+        go.Bar(
+            x=["better", "worse", "ties"],
+            y=[
+                int(summary_row.get("coverage_better", 0)),
+                int(summary_row.get("coverage_worse", 0)),
+                int(summary_row.get("coverage_ties", 0)),
+            ],
+            hovertemplate="Coverage: %{x}<br>Count: %{y}<extra></extra>",
+            showlegend=False,
+        ),
+        row=1,
+        col=2,
     )
     fig.update_layout(showlegend=False)
     fig.update_layout(title=f"{variant_name}: Reference Comparison vs {reference_variant}")
@@ -1628,6 +1753,17 @@ def _media_path_for_name(media_dir: str, media_name: str) -> str | None:
     return None
 
 
+def _trace_backend_for_run(experiment_root: str, *, variant_name: str, rollout_id: str) -> str:
+    trace_json_path = os.path.join(trace_dir(experiment_root, variant_name, rollout_id), "trace.json")
+    if not os.path.isfile(trace_json_path):
+        return ""
+    with open(trace_json_path, "r", encoding="utf-8") as f:
+        trace_meta = json.load(f)
+    plan_cfg = trace_meta.get("plan_config", {})
+    backend = plan_cfg.get("backend") or trace_meta.get("backend") or ""
+    return str(backend).strip().lower()
+
+
 def render_media_for_run(
     experiment_root: str,
     *,
@@ -1815,13 +1951,22 @@ def _representative_run_rows(rows: Sequence[dict[str, Any]], *, success: bool, l
 
 
 def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None) -> str:
-    kpi_html = _kpi_cards(
-        [
-            ("Experiment", data.experiment_name),
-            ("Variants", str(len(data.variant_rows))),
-            ("Runs", str(len(data.run_rows))),
-        ]
-    )
+    kpi_items: list[tuple[str, str]] = [
+        ("Experiment", data.experiment_name),
+        ("Variants", str(len(data.variant_rows))),
+        ("Runs", str(len(data.run_rows))),
+    ]
+    if len(data.variant_rows) == 1:
+        only_variant = data.variant_rows[0]
+        kpi_items.extend(
+            [
+                ("Mean Coverage", _format_number(only_variant.get("mean_final_coverage"))),
+                ("Mean Bits", _format_bits_value(only_variant.get("mean_bits_used_total"))),
+                ("Mean FLOPs", _format_flops_value(only_variant.get("mean_flops_used_total"))),
+                ("Mean Plan Time", _format_number(only_variant.get("mean_plan_time_total_sec"))),
+            ]
+        )
+    kpi_html = _kpi_cards(kpi_items)
 
     variant_rows = []
     for row in data.variant_rows:
@@ -1835,6 +1980,9 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
                 "mean_bits_used_total": row.get("mean_bits_used_total"),
                 "mean_bits_used_total__display": _format_bits_value(row.get("mean_bits_used_total")),
                 "mean_bits_used_total__sort": row.get("mean_bits_used_total"),
+                "mean_flops_used_total": row.get("mean_flops_used_total"),
+                "mean_flops_used_total__display": _format_flops_value(row.get("mean_flops_used_total")),
+                "mean_flops_used_total__sort": row.get("mean_flops_used_total"),
                 "mean_plan_time_total_sec": row.get("mean_plan_time_total_sec"),
             }
         )
@@ -2050,6 +2198,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
             ("Success Rate", "success_rate", "number"),
             ("Mean Coverage", "mean_final_coverage", "number"),
             ("Mean Bits", "mean_bits_used_total", "number"),
+            ("Mean FLOPs", "mean_flops_used_total", "number"),
             ("Mean Plan Time", "mean_plan_time_total_sec", "number"),
         ],
     )}
@@ -2154,6 +2303,7 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
             ("Success Rate", _format_number(variant_row.get("success_rate"))),
             ("Mean Coverage", _format_number(variant_row.get("mean_final_coverage"))),
             ("Mean Bits", _format_bits_value(variant_row.get("mean_bits_used_total"))),
+            ("Mean FLOPs", _format_flops_value(variant_row.get("mean_flops_used_total"))),
             ("Mean Plan Time", _format_number(variant_row.get("mean_plan_time_total_sec"))),
         ]
     )
@@ -2426,12 +2576,19 @@ class ExperimentReviewApp:
             task = self._media_tasks[key]
             task.status = "running"
             task.updated_at = time.time()
-        outputs, errors = render_media_for_run(
+        backend = _trace_backend_for_run(
             self.data.run_dir,
             variant_name=variant_name,
             rollout_id=rollout_id,
-            media=[media_name],
         )
+        render_context = _PARTICLE_MEDIA_RENDER_LOCK if backend == "particle_sim" else contextlib.nullcontext()
+        with render_context:
+            outputs, errors = render_media_for_run(
+                self.data.run_dir,
+                variant_name=variant_name,
+                rollout_id=rollout_id,
+                media=[media_name],
+            )
         with self._media_tasks_lock:
             task = self._media_tasks[key]
             task.outputs = outputs
@@ -2443,6 +2600,17 @@ class ExperimentReviewApp:
 def make_review_handler(app: ExperimentReviewApp):
     class ReviewHandler(BaseHTTPRequestHandler):
         review_app = app
+
+        @staticmethod
+        def _is_client_disconnect(exc: BaseException) -> bool:
+            return isinstance(exc, (BrokenPipeError, ConnectionResetError))
+
+        def _send_error_quietly(self, status: HTTPStatus, message: str) -> None:
+            try:
+                self.send_error(status, message)
+            except Exception as exc:  # pragma: no cover - defensive server path
+                if not self._is_client_disconnect(exc):
+                    raise
 
         def _send_json(self, payload: dict[str, Any], status: int = HTTPStatus.OK) -> None:
             raw = json.dumps(payload).encode("utf-8")
@@ -2528,13 +2696,15 @@ def make_review_handler(app: ExperimentReviewApp):
                     rel_path = unquote(parsed.path[len("/files/") :])
                     self._serve_file(rel_path)
                     return
-                self.send_error(HTTPStatus.NOT_FOUND, "Not found")
+                self._send_error_quietly(HTTPStatus.NOT_FOUND, "Not found")
+            except (BrokenPipeError, ConnectionResetError):
+                return
             except KeyError as exc:
-                self.send_error(HTTPStatus.NOT_FOUND, str(exc))
+                self._send_error_quietly(HTTPStatus.NOT_FOUND, str(exc))
             except ValueError as exc:
-                self.send_error(HTTPStatus.BAD_REQUEST, str(exc))
+                self._send_error_quietly(HTTPStatus.BAD_REQUEST, str(exc))
             except Exception as exc:  # pragma: no cover - defensive server path
-                self.send_error(HTTPStatus.INTERNAL_SERVER_ERROR, f"{type(exc).__name__}: {exc}")
+                self._send_error_quietly(HTTPStatus.INTERNAL_SERVER_ERROR, f"{type(exc).__name__}: {exc}")
 
         def log_message(self, format: str, *args) -> None:  # noqa: A003
             return
