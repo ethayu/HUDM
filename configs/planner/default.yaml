@@ -1,9 +1,9 @@
 plan:
   budget:
-    max_env_steps: 20
+    max_env_steps: 50
   planner:
-    horizon: 20
-    replan_every: 20
+    horizon: 100
+    replan_every: 10
     cem:
       pop_size: 100
       elite_frac: 0.3

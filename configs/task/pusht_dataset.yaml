@@ -13,6 +13,6 @@ plan:
         zarr_path: "synthetic/pusht_synth_large.zarr"
         split: "valid"
         split_ratio: null
-        trajectory_len: 10
+        trajectory_len: 50
         seed: 20
         reconstruct_goal_state: 3
