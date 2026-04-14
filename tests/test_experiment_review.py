@@ -12,6 +12,7 @@ from unittest import mock
 from hudm.experiment_bundle import EXPERIMENT_JSON, PAIRED_VS_BASELINE_CSV, RUNS_CSV, SELECTED_ROLLOUTS_JSON, VARIANTS_CSV
 from hudm.experiment_review import (
     _compute_vs_outcome_figure,
+    _default_reference_variant,
     _figure_html,
     _media_description,
     _paired_summary_figure,
@@ -337,6 +338,84 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn("/variant?name=variant_b", html)
             self.assertNotIn("rollout_pending", html)
 
+    def test_partial_review_preserves_configured_variant_order_and_baseline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = self._make_partial_experiment_dir(tmpdir, include_second_variant=True)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "partial_demo",
+                        "baseline_variant": "variant_b",
+                        "variant_order": ["variant_b", "variant_a"],
+                    },
+                    f,
+                )
+
+            runs_csv = os.path.join(run_dir, RUNS_CSV)
+            if os.path.exists(runs_csv):
+                os.remove(runs_csv)
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "partial_demo")
+            self.assertEqual(data.variant_order, ["variant_b", "variant_a"])
+            self.assertEqual(data.baseline_variant, "variant_b")
+
+            html = build_summary_page(data)
+            self.assertIn("Configured baseline/reference variant: <code>variant_b</code>", html)
+            self.assertIn("<option value='variant_b' selected>variant_b</option>", html)
+
+    def test_load_experiment_review_data_allows_pending_bundle_without_completed_runs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = os.path.join(tmpdir, "experiment_pending")
+            os.makedirs(run_dir, exist_ok=True)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "pending_demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a", "variant_b"],
+                        "completed_runs": 0,
+                        "total_runs": 8,
+                        "bundle_status": "pending",
+                        "partial_bundle": True,
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "pending_demo")
+            self.assertEqual(data.variant_order, ["variant_a", "variant_b"])
+            self.assertEqual(len(data.run_rows), 0)
+            self.assertTrue(bool(data.meta.get("partial_bundle")))
+
+            html = build_summary_page(data)
+            self.assertIn("Waiting for the first completed rollout", html)
+            self.assertIn("http-equiv='refresh'", html)
+            self.assertIn("variant_a", html)
+            self.assertIn("variant_b", html)
+            self.assertIn("0/8", html)
+            self.assertIn("Configured baseline/reference variant: <code>variant_a</code>", html)
+
+    def test_load_experiment_review_data_allows_empty_run_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = os.path.join(tmpdir, "experiment_empty")
+            os.makedirs(run_dir, exist_ok=True)
+
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "experiment_empty")
+            self.assertEqual(len(data.run_rows), 0)
+            self.assertEqual(data.variant_order, [])
+
+            html = build_summary_page(data)
+            self.assertIn("Waiting for experiment bundle metadata or the first completed rollout", html)
+            self.assertIn("http-equiv='refresh'", html)
+
     def test_experiment_review_app_refreshes_partial_trace_snapshot(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir = self._make_partial_experiment_dir(tmpdir, include_second_variant=False)
@@ -545,6 +624,158 @@ class ExperimentReviewTests(unittest.TestCase):
             success_analysis_section = html.split("Variant Success Analysis", 1)[1].split("Compute vs Outcome", 1)[0]
             self.assertNotIn("data-barmode-target=", success_analysis_section)
             self.assertNotIn("kpi-label'>Baseline", html)
+
+    def test_default_reference_variant_prefers_configured_baseline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            _write_csv(
+                os.path.join(run_dir, VARIANTS_CSV),
+                [
+                    {"variant_name": "variant_a", "n_rollouts": 1, "success_rate": 1.0},
+                    {"variant_name": "variant_b", "n_rollouts": 1, "success_rate": 0.0},
+                ],
+            )
+            _write_csv(
+                os.path.join(run_dir, RUNS_CSV),
+                [
+                    {"variant_name": "variant_a", "rollout_id": "rollout_0", "rollout_index": 0, "success": 1},
+                    {"variant_name": "variant_b", "rollout_id": "rollout_0", "rollout_index": 0, "success": 0},
+                ],
+            )
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_b",
+                        "variant_order": ["variant_a", "variant_b"],
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+            self.assertEqual(_default_reference_variant(data), "variant_b")
+            self.assertEqual(_default_reference_variant(data, current_variant="variant_a"), "variant_b")
+            self.assertEqual(_default_reference_variant(data, current_variant="variant_b"), "variant_a")
+
+    def test_summary_and_variant_pages_select_configured_baseline_by_default(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            _write_csv(
+                os.path.join(run_dir, VARIANTS_CSV),
+                [
+                    {
+                        "variant_name": "variant_a",
+                        "n_rollouts": 1,
+                        "success_rate": 1.0,
+                        "mean_final_coverage": 0.9,
+                        "mean_bits_used_total": 100.0,
+                        "mean_flops_used_total": 200.0,
+                        "mean_plan_time_total_sec": 0.5,
+                    },
+                    {
+                        "variant_name": "variant_b",
+                        "n_rollouts": 1,
+                        "success_rate": 0.0,
+                        "mean_final_coverage": 0.4,
+                        "mean_bits_used_total": 150.0,
+                        "mean_flops_used_total": 300.0,
+                        "mean_plan_time_total_sec": 1.0,
+                    },
+                ],
+            )
+            _write_csv(
+                os.path.join(run_dir, RUNS_CSV),
+                [
+                    {
+                        "variant_name": "variant_a",
+                        "rollout_id": "rollout_0",
+                        "rollout_index": 0,
+                        "success": 1,
+                        "termination_reason": "env_done",
+                        "final_coverage": 0.9,
+                        "bits_used_total": 100.0,
+                        "flops_used_total": 200.0,
+                        "plan_time_total_sec": 0.5,
+                        "executed_steps": 3,
+                        "plans": 1,
+                    },
+                    {
+                        "variant_name": "variant_b",
+                        "rollout_id": "rollout_0",
+                        "rollout_index": 0,
+                        "success": 0,
+                        "termination_reason": "max_steps",
+                        "final_coverage": 0.4,
+                        "bits_used_total": 150.0,
+                        "flops_used_total": 300.0,
+                        "plan_time_total_sec": 1.0,
+                        "executed_steps": 3,
+                        "plans": 1,
+                    },
+                ],
+            )
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_b",
+                        "variant_order": ["variant_a", "variant_b"],
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+            summary_html = build_summary_page(data)
+            variant_html = build_variant_page(data, "variant_a")
+
+            self.assertIn("Configured baseline/reference variant: <code>variant_b</code>", summary_html)
+            self.assertIn("<option value='variant_b' selected>variant_b</option>", summary_html)
+            self.assertIn("<option value='variant_b' selected>variant_b</option>", variant_html)
+            self.assertIn("Default reference comparisons use <code>variant_b</code>.", variant_html)
+
+    def test_media_section_uses_backend_specific_titles_and_explainer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, trace_dir = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backend": "wm",
+                        "plan_config": {
+                            "backend": "wm",
+                            "world_model": {"run_dir": "/tmp/checkpoints/world_model_demo"},
+                        },
+                        "replans": [
+                            {
+                                "replan_idx": 0,
+                                "step_start": 0,
+                                "mpc_progress": 0.0,
+                                "base_level_idx": 0,
+                                "bits_used_estimate": 0,
+                                "plan_time_sec": 0.1,
+                                "action_seq": [[0.0, 0.0]],
+                            }
+                        ],
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+            row = resolve_row(data, "variant_a", "rollout_0")
+            media_html, _ = build_run_media_section(data, row)
+
+            self.assertIn("Closed-Loop Replay (GT env)", media_html)
+            self.assertIn("Planner-View Replay (wm (world_model_demo))", media_html)
+            self.assertIn("Predicted-Backend Replay (wm (world_model_demo))", media_html)
+            self.assertIn("Dataset Replay (GT env)", media_html)
+            self.assertIn(
+                "Execution replays use the GT environment. Planner-view and predicted-backend replays use this run's planner backend",
+                media_html,
+            )
+            self.assertIn("Render planner-backend media", media_html)
 
     def test_render_media_for_run_writes_into_review_cache_and_run_page_links_it(self):
         with tempfile.TemporaryDirectory() as tmpdir:

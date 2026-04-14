@@ -26,6 +26,11 @@ class ParticleCEMInfo:
     base_spacing: float
     base_num_particles: int
     start_level_idx: int = -1
+    batch_impl: str = "serial"
+
+
+class BatchedParticlePlannerUnavailable(RuntimeError):
+    """Raised when the particle backend cannot support the batched planner path."""
 
 
 class ParticleCEMPlanner:
@@ -443,5 +448,438 @@ class ParticleCEMPlanner:
             base_spacing=base_spacing,
             base_num_particles=base_num_particles,
             start_level_idx=int(start_level_idx),
+            batch_impl="serial",
+        )
+        return action_seq, info
+
+
+class BatchedParticleCEMPlanner(ParticleCEMPlanner):
+    """
+    Particle planner variant that evaluates the population through the backend's
+    additive batch APIs while preserving the scalar planner contract.
+    """
+
+    @staticmethod
+    def _image_distance_batch(
+        imgs: np.ndarray,
+        goal_img: np.ndarray,
+        *,
+        metric: str,
+    ) -> np.ndarray:
+        img_arr = np.asarray(imgs, dtype=np.float32)
+        goal_arr = np.asarray(goal_img, dtype=np.float32)
+        if img_arr.ndim != 4:
+            raise ValueError(f"Expected image batch with rank 4, got {tuple(img_arr.shape)}")
+        if goal_arr.shape != img_arr.shape[1:]:
+            raise ValueError(
+                f"Image shape mismatch in particle objective batch: imgs={img_arr.shape}, goal={goal_arr.shape}"
+            )
+        lane_needs_rescale = (np.max(img_arr, axis=(1, 2, 3), keepdims=True) > 1.5).astype(np.float32)
+        img_arr = np.where(lane_needs_rescale > 0.0, img_arr / 255.0, img_arr)
+        img_arr = np.clip(img_arr, 0.0, 1.0)
+        if float(goal_arr.max()) > 1.5:
+            goal_arr = goal_arr / 255.0
+        goal_arr = np.clip(goal_arr, 0.0, 1.0)
+        diff = img_arr - goal_arr[None, ...]
+        if str(metric).lower() == "l1":
+            return np.mean(np.abs(diff), axis=(1, 2, 3), dtype=np.float32).astype(np.float32)
+        return np.sqrt(np.mean(diff ** 2, axis=(1, 2, 3), dtype=np.float32) + 1e-8).astype(np.float32)
+
+    @classmethod
+    def _particle_state_cost_batch(
+        cls,
+        cur_cloud_batch: Dict[str, np.ndarray],
+        goal_cloud: Dict[str, np.ndarray],
+        actions: np.ndarray,
+        *,
+        eef_weight: float,
+        block_pos_weight: float,
+        block_angle_weight: float,
+        state_l2_weight: float,
+        action_l2_weight: float,
+    ) -> np.ndarray:
+        cur_pusher = np.asarray(cur_cloud_batch["pusher_xy"], dtype=np.float32)
+        cur_particles = np.asarray(cur_cloud_batch["particle_xy"], dtype=np.float32)
+        goal_pusher = np.asarray(goal_cloud["pusher_xy"], dtype=np.float32).reshape(1, 2)
+        goal_particles = np.asarray(goal_cloud["particle_xy"], dtype=np.float32).reshape(1, -1, 2)
+        if cur_pusher.ndim != 2 or cur_particles.ndim != 3:
+            raise ValueError(
+                f"Unexpected particle-cloud batch shapes: pusher={cur_pusher.shape}, particles={cur_particles.shape}"
+            )
+        if cur_particles.shape[1:] != goal_particles.shape[1:]:
+            raise ValueError(
+                f"Particle-cloud shape mismatch in particle objective batch: cur={cur_particles.shape}, goal={goal_particles.shape}"
+            )
+
+        eef = np.linalg.norm(cur_pusher - goal_pusher, axis=1).astype(np.float32)
+        cur_center = cur_particles.mean(axis=1)
+        goal_center = goal_particles.mean(axis=1)
+        block_pos = np.linalg.norm(cur_center - goal_center, axis=1).astype(np.float32)
+
+        if cur_particles.shape[1] <= 1:
+            block_ang = np.zeros((cur_particles.shape[0],), dtype=np.float32)
+        else:
+            cur_centered = cur_particles - cur_particles.mean(axis=1, keepdims=True)
+            goal_centered = goal_particles - goal_particles.mean(axis=1, keepdims=True)
+            cur_norm = np.linalg.norm(cur_centered.reshape(cur_centered.shape[0], -1), axis=1)
+            goal_norm = float(np.linalg.norm(goal_centered.reshape(-1)))
+            singular = (cur_norm <= 1e-8) | (goal_norm <= 1e-8)
+            a = np.sum(
+                goal_centered[:, :, 0] * cur_centered[:, :, 1]
+                - goal_centered[:, :, 1] * cur_centered[:, :, 0],
+                axis=1,
+                dtype=np.float32,
+            )
+            b = np.sum(
+                goal_centered[:, :, 0] * cur_centered[:, :, 0]
+                + goal_centered[:, :, 1] * cur_centered[:, :, 1],
+                axis=1,
+                dtype=np.float32,
+            )
+            block_ang = np.abs(np.arctan2(a, b)).astype(np.float32)
+            block_ang[singular] = 0.0
+
+        cost = (
+            float(eef_weight) * eef
+            + float(block_pos_weight) * block_pos
+            + float(block_angle_weight) * block_ang
+        ).astype(np.float32)
+
+        if float(state_l2_weight) > 0.0:
+            goal_flat = np.concatenate([goal_pusher.reshape(1, -1), goal_particles.reshape(1, -1)], axis=1)
+            cur_flat = np.concatenate([cur_pusher.reshape(cur_pusher.shape[0], -1), cur_particles.reshape(cur_particles.shape[0], -1)], axis=1)
+            state_l2 = np.sqrt(np.mean((cur_flat - goal_flat) ** 2, axis=1, dtype=np.float32)).astype(np.float32)
+            cost = cost + float(state_l2_weight) * state_l2
+        if float(action_l2_weight) > 0.0:
+            action_penalty = np.mean(np.asarray(actions, dtype=np.float32) ** 2, axis=(1, 2), dtype=np.float32)
+            cost = cost + float(action_l2_weight) * action_penalty.astype(np.float32)
+        return cost.astype(np.float32)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        missing = [
+            name
+            for name in ("prepare_batch", "step_batch", "current_particle_cloud_state_batch")
+            if not callable(getattr(self.backend, name, None))
+        ]
+        if missing:
+            raise BatchedParticlePlannerUnavailable(
+                "particle backend does not expose required batch APIs: " + ", ".join(missing)
+            )
+
+    def _backend_supports_device_batch(self) -> bool:
+        supports = getattr(self.backend, "supports_cuda_native_batch", None)
+        if not callable(supports):
+            return False
+        if not bool(supports()):
+            return False
+        required = (
+            "prepare_batch_device",
+            "step_batch_device",
+            "current_particle_cloud_state_batch_device",
+        )
+        return all(callable(getattr(self.backend, name, None)) for name in required)
+
+    def _evaluate_population_device_batch(
+        self,
+        *,
+        init_state_np: np.ndarray,
+        goal_state_np: np.ndarray,
+        actions_np: np.ndarray,
+        rollout_levels: List[int],
+        iter_idx: int,
+        seed: int,
+    ) -> tuple[np.ndarray, int]:
+        pop = int(actions_np.shape[0])
+        lane_count = int(pop * self.rollout_samples)
+        lane_actions = np.repeat(actions_np, self.rollout_samples, axis=0)
+        lane_candidate_indices = np.repeat(np.arange(pop, dtype=np.int64), self.rollout_samples)
+        lane_init_states = np.repeat(init_state_np[None, :], lane_count, axis=0)
+        lane_goal_states = np.repeat(goal_state_np[None, :], lane_count, axis=0)
+
+        if self.objective_space == "image":
+            goal_visual_by_level = self._goal_visuals_by_level(
+                goal_state=goal_state_np,
+                rollout_levels=rollout_levels,
+                seed=int(seed + 700001 * iter_idx),
+            )
+            goal_particle_cloud_by_level = {}
+        else:
+            goal_visual_by_level = {}
+            goal_particle_cloud_by_level = self._goal_particle_clouds_by_level(
+                goal_state=goal_state_np,
+                rollout_levels=rollout_levels,
+                seed=int(seed + 700001 * iter_idx),
+            )
+
+        initial_level_idx = int(rollout_levels[0])
+        _obs0, lane_states, context = self.backend.prepare_batch_device(
+            level_idx=initial_level_idx,
+            init_states=lane_init_states,
+            goal_states=lane_goal_states,
+            with_visual=self.objective_space == "image",
+        )
+        del _obs0
+
+        done_mask = np.zeros((lane_count,), dtype=bool)
+        last_level_idx = np.full((lane_count,), initial_level_idx, dtype=np.int32)
+        final_dists = np.zeros((lane_count,), dtype=np.float32)
+        running_sum = np.zeros((lane_count,), dtype=np.float32)
+        bits_iter = 0
+        current_level_idx = initial_level_idx
+
+        total_rollouts = int(pop * self.rollout_samples)
+        pbar = self._make_rollout_progress_bar(total_rollouts, iter_idx)
+        try:
+            for t in range(self.horizon):
+                active_mask = ~done_mask
+                active_idx = np.flatnonzero(active_mask)
+                if active_idx.size <= 0:
+                    break
+                level_idx = int(rollout_levels[t])
+                if level_idx != current_level_idx:
+                    context = self.backend._relevel_batch_device_context(context, level_idx)
+                    current_level_idx = level_idx
+                last_level_idx[active_idx] = level_idx
+
+                obs_t, _rewards, done_t, _infos = self.backend.step_batch_device(
+                    context=context,
+                    actions=lane_actions[:, t, :],
+                    active_mask=active_mask,
+                    with_visual=self.objective_space == "image",
+                )
+                lane_states = np.asarray(obs_t["state"], dtype=np.float32).copy()
+                done_mask[active_idx] = np.asarray(done_t, dtype=bool)[active_idx]
+                bits_iter += int(active_idx.size) * int(self.backend.num_particles(level_idx=level_idx) * 2 * 32)
+
+                if self.objective_space == "image":
+                    visual_batch = obs_t.get("visual", None)
+                    if visual_batch is None:
+                        raise ValueError("particle_sim image objective requires batched visual observations.")
+                    dists = self._image_distance_batch(
+                        np.asarray(visual_batch, dtype=np.float32),
+                        goal_visual_by_level[int(level_idx)],
+                        metric=self.metric,
+                    )
+                    final_dists[active_idx] = dists[active_idx]
+                    if self.running_weight > 0.0:
+                        running_sum[active_idx] = running_sum[active_idx] + dists[active_idx]
+
+            lane_costs = np.zeros((lane_count,), dtype=np.float32)
+            if self.objective_space == "image":
+                lane_costs = (
+                    float(self.terminal_weight) * final_dists
+                    + float(self.running_weight) * running_sum
+                ).astype(np.float32)
+                if self.action_l2_weight > 0.0:
+                    lane_costs = lane_costs + float(self.action_l2_weight) * np.mean(
+                        lane_actions ** 2,
+                        axis=(1, 2),
+                        dtype=np.float32,
+                    )
+            else:
+                for level_idx in sorted({int(li) for li in last_level_idx.tolist()}):
+                    level_lane_idx = np.flatnonzero(last_level_idx == int(level_idx))
+                    if level_idx != current_level_idx:
+                        context = self.backend._relevel_batch_device_context(context, int(level_idx))
+                        current_level_idx = int(level_idx)
+                    cloud_batch = self.backend.current_particle_cloud_state_batch_device(
+                        context=context,
+                        pixel=True,
+                        lane_indices=level_lane_idx,
+                    )
+                    lane_costs[level_lane_idx] = self._particle_state_cost_batch(
+                        cloud_batch,
+                        goal_particle_cloud_by_level[int(level_idx)],
+                        lane_actions[level_lane_idx],
+                        eef_weight=self.eef_weight,
+                        block_pos_weight=self.block_pos_weight,
+                        block_angle_weight=self.block_angle_weight,
+                        state_l2_weight=self.state_l2_weight,
+                        action_l2_weight=self.action_l2_weight,
+                    )
+        finally:
+            if pbar is not None:
+                pbar.update(total_rollouts)
+                pbar.close()
+
+        costs = np.zeros((pop,), dtype=np.float32)
+        for candidate_idx in range(pop):
+            costs[candidate_idx] = float(
+                np.mean(lane_costs[lane_candidate_indices == candidate_idx], dtype=np.float32)
+            )
+        return costs.astype(np.float32), int(bits_iter)
+
+    @torch.no_grad()
+    def plan(
+        self,
+        init_state: np.ndarray,
+        goal_state: np.ndarray,
+        mpc_progress: float = 0.0,
+        seed: int = 0,
+        warm_start_steps: int = 0,
+        rng_seed: Optional[int] = None,
+    ) -> tuple[torch.Tensor, ParticleCEMInfo]:
+        t0 = time.perf_counter()
+
+        init_state_np = np.asarray(init_state, dtype=np.float32)
+        goal_state_np = np.asarray(goal_state, dtype=np.float32)
+
+        def _evaluate(
+            actions: torch.Tensor,
+            base_level_idx: int,
+            rollout_levels: List[int],
+            iter_idx: int,
+        ) -> tuple[torch.Tensor, List[int], int]:
+            del base_level_idx
+            actions_np = np.asarray(actions.detach().cpu().numpy(), dtype=np.float32)
+            if self._backend_supports_device_batch():
+                costs, bits_iter = self._evaluate_population_device_batch(
+                    init_state_np=init_state_np,
+                    goal_state_np=goal_state_np,
+                    actions_np=actions_np,
+                    rollout_levels=rollout_levels,
+                    iter_idx=iter_idx,
+                    seed=seed,
+                )
+                return torch.as_tensor(costs, device=self.device), rollout_levels, int(bits_iter)
+            pop = int(actions_np.shape[0])
+            lane_count = int(pop * self.rollout_samples)
+            lane_actions = np.repeat(actions_np, self.rollout_samples, axis=0)
+            lane_candidate_indices = np.repeat(np.arange(pop, dtype=np.int64), self.rollout_samples)
+            lane_init_states = np.repeat(init_state_np[None, :], lane_count, axis=0)
+            lane_goal_states = np.repeat(goal_state_np[None, :], lane_count, axis=0)
+
+            if self.objective_space == "image":
+                goal_visual_by_level = self._goal_visuals_by_level(
+                    goal_state=goal_state_np,
+                    rollout_levels=rollout_levels,
+                    seed=int(seed + 700001 * iter_idx),
+                )
+                goal_particle_cloud_by_level = {}
+            else:
+                goal_visual_by_level = {}
+                goal_particle_cloud_by_level = self._goal_particle_clouds_by_level(
+                    goal_state=goal_state_np,
+                    rollout_levels=rollout_levels,
+                    seed=int(seed + 700001 * iter_idx),
+                )
+
+            initial_level_idx = int(rollout_levels[0])
+            lane_seeds = [
+                int(seed + 1000003 * iter_idx + 1009 * int(lane_candidate_indices[i]) + 7 * (i % self.rollout_samples))
+                for i in range(lane_count)
+            ]
+            _obs0, lane_states, lane_snapshots = self.backend.prepare_batch(
+                level_idx=initial_level_idx,
+                seeds=lane_seeds,
+                init_states=lane_init_states,
+                goal_states=lane_goal_states,
+                with_visual=self.objective_space == "image",
+            )
+            del _obs0
+
+            done_mask = np.zeros((lane_count,), dtype=bool)
+            last_level_idx = np.full((lane_count,), initial_level_idx, dtype=np.int32)
+            final_dists = np.zeros((lane_count,), dtype=np.float32)
+            running_sum = np.zeros((lane_count,), dtype=np.float32)
+            bits_iter = 0
+
+            total_rollouts = int(pop * self.rollout_samples)
+            pbar = self._make_rollout_progress_bar(total_rollouts, iter_idx)
+            try:
+                for t in range(self.horizon):
+                    active_idx = np.flatnonzero(~done_mask)
+                    if active_idx.size <= 0:
+                        break
+                    level_idx = int(rollout_levels[t])
+                    last_level_idx[active_idx] = int(level_idx)
+
+                    active_obs, _rewards, active_done, active_infos, active_snapshots = self.backend.step_batch(
+                        level_idx=level_idx,
+                        snapshots=[lane_snapshots[int(idx)] for idx in active_idx],
+                        goal_states=lane_goal_states[active_idx],
+                        actions=lane_actions[active_idx, t, :],
+                        with_visual=self.objective_space == "image",
+                    )
+                    bits_iter += int(active_idx.size) * int(self.backend.num_particles(level_idx=level_idx) * 2 * 32)
+                    for local_idx, lane_idx in enumerate(active_idx.tolist()):
+                        lane_snapshots[lane_idx] = active_snapshots[local_idx]
+                        lane_states[lane_idx] = np.asarray(active_infos[local_idx]["state"], dtype=np.float32).copy()
+                        done_mask[lane_idx] = bool(active_done[local_idx])
+
+                    if self.objective_space == "image":
+                        visual_batch = active_obs.get("visual", None)
+                        if visual_batch is None:
+                            raise ValueError("particle_sim image objective requires batched visual observations.")
+                        dists = self._image_distance_batch(
+                            np.asarray(visual_batch, dtype=np.float32),
+                            goal_visual_by_level[int(level_idx)],
+                            metric=self.metric,
+                        )
+                        final_dists[active_idx] = dists
+                        if self.running_weight > 0.0:
+                            running_sum[active_idx] = running_sum[active_idx] + dists
+
+                lane_costs = np.zeros((lane_count,), dtype=np.float32)
+                if self.objective_space == "image":
+                    lane_costs = (
+                        float(self.terminal_weight) * final_dists
+                        + float(self.running_weight) * running_sum
+                    ).astype(np.float32)
+                    if self.action_l2_weight > 0.0:
+                        lane_costs = lane_costs + float(self.action_l2_weight) * np.mean(
+                            lane_actions ** 2,
+                            axis=(1, 2),
+                            dtype=np.float32,
+                        )
+                else:
+                    for level_idx in sorted({int(li) for li in last_level_idx.tolist()}):
+                        level_lane_idx = np.flatnonzero(last_level_idx == int(level_idx))
+                        cloud_batch = self.backend.current_particle_cloud_state_batch(
+                            level_idx=int(level_idx),
+                            snapshots=[lane_snapshots[int(idx)] for idx in level_lane_idx],
+                            pixel=True,
+                        )
+                        lane_costs[level_lane_idx] = self._particle_state_cost_batch(
+                            cloud_batch,
+                            goal_particle_cloud_by_level[int(level_idx)],
+                            lane_actions[level_lane_idx],
+                            eef_weight=self.eef_weight,
+                            block_pos_weight=self.block_pos_weight,
+                            block_angle_weight=self.block_angle_weight,
+                            state_l2_weight=self.state_l2_weight,
+                            action_l2_weight=self.action_l2_weight,
+                        )
+            finally:
+                if pbar is not None:
+                    pbar.update(total_rollouts)
+                    pbar.close()
+
+            costs = np.zeros((pop,), dtype=np.float32)
+            for candidate_idx in range(pop):
+                costs[candidate_idx] = float(np.mean(lane_costs[lane_candidate_indices == candidate_idx], dtype=np.float32))
+            return torch.as_tensor(costs, device=self.device), rollout_levels, int(bits_iter)
+
+        start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
+        action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
+            mpc_progress=mpc_progress,
+            evaluate_population=_evaluate,
+            warm_start=self.warm_start,
+            shift_steps=int(warm_start_steps),
+            rng_seed=rng_seed,
+        )
+
+        base_spacing = float(self.backend.spacing(final_level_idx))
+        base_num_particles = int(self.backend.num_particles(final_level_idx))
+        info = ParticleCEMInfo(
+            base_level_idx=int(final_level_idx),
+            rollout_level_indices=final_rollout_levels,
+            bits_used_estimate=int(total_bits),
+            plan_time_sec=float(time.perf_counter() - t0),
+            base_spacing=base_spacing,
+            base_num_particles=base_num_particles,
+            start_level_idx=int(start_level_idx),
+            batch_impl="cuda_native" if self._backend_supports_device_batch() else "host_batch",
         )
         return action_seq, info

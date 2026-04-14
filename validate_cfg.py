@@ -100,7 +100,7 @@ def validate_plan_cfg(cfg) -> None:
     )
     _reject_unknown_keys(
         cfg.particle_env,
-        {"rollout_samples", "objective_space", "progress", "progress_leave", "fidelity_env"},
+        {"rollout_samples", "objective_space", "batch_mode", "progress", "progress_leave", "fidelity_env"},
         "plan.particle_env",
     )
     _reject_unknown_keys(
@@ -186,6 +186,12 @@ def validate_plan_cfg(cfg) -> None:
         raise ValueError(
             "plan.particle_env.objective_space must be 'image' or 'state', "
             f"got {cfg.particle_env.objective_space}"
+        )
+    particle_batch_mode = str(getattr(cfg.particle_env, "batch_mode", "auto")).lower()
+    if particle_batch_mode not in {"auto", "off", "force"}:
+        raise ValueError(
+            "plan.particle_env.batch_mode must be one of auto|off|force, "
+            f"got {cfg.particle_env.batch_mode}"
         )
     particle_counts = [int(c) for c in list(getattr(cfg.particle_env.fidelity_env, "particle_counts", []))]
     if len(particle_counts) <= 0:

@@ -1031,6 +1031,342 @@ if wp is not None:
         v[i] = wp.vec3(vi[0] * scale, vi[1] * scale, 0.0)
 
 
+    @wp.kernel
+    def _batch_predict_positions(
+        x: wp.array(dtype=wp.vec3),
+        v: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        x_pred: wp.array(dtype=wp.vec3),
+        dt: float,
+        lin_damp: float,
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            x_pred[i] = wp.vec3(x[i][0], x[i][1], 0.0)
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            x_pred[i] = wp.vec3(x[i][0], x[i][1], 0.0)
+            v[i] = wp.vec3(0.0, 0.0, 0.0)
+            return
+
+        vi = v[i] * lin_damp
+        xi = x[i] + dt * vi
+        x_pred[i] = wp.vec3(xi[0], xi[1], 0.0)
+        v[i] = wp.vec3(vi[0], vi[1], 0.0)
+
+
+    @wp.kernel
+    def _batch_project_walls_aabb(
+        x_pred: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        xmin: float,
+        xmax: float,
+        ymin: float,
+        ymax: float,
+        pr: float,
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            return
+        xi = x_pred[i]
+        xw = wp.clamp(xi[0], xmin + pr, xmax - pr)
+        yw = wp.clamp(xi[1], ymin + pr, ymax - pr)
+        x_pred[i] = wp.vec3(xw, yw, 0.0)
+
+
+    @wp.kernel
+    def _batch_pusher_swept_contact(
+        x_prev: wp.array(dtype=wp.vec3),
+        x_pred: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        pusher_start: wp.array(dtype=wp.vec3),
+        pusher_end: wp.array(dtype=wp.vec3),
+        pusher_r: float,
+        pr: float,
+        mu: float,
+        contact_alpha: float,
+        contact_delta: wp.array(dtype=wp.vec3),
+        contact_weight: wp.array(dtype=float),
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        contact_delta[i] = wp.vec3(0.0, 0.0, 0.0)
+        contact_weight[i] = 0.0
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            return
+
+        xi = x_pred[i]
+        seg = pusher_end[lane] - pusher_start[lane]
+        seg_len2 = wp.dot(seg, seg)
+        closest = pusher_start[lane]
+        if seg_len2 > 1e-8:
+            t = wp.clamp(wp.dot(xi - pusher_start[lane], seg) / seg_len2, 0.0, 1.0)
+            closest = pusher_start[lane] + seg * t
+
+        d = xi - closest
+        dist = wp.length(d)
+        min_dist = pusher_r + pr
+
+        if dist < min_dist:
+            n = wp.vec3(1.0, 0.0, 0.0)
+            if dist > 1e-8:
+                n = d / dist
+            elif seg_len2 > 1e-8:
+                seg_len = wp.sqrt(seg_len2)
+                n = wp.vec3(-seg[1] / seg_len, seg[0] / seg_len, 0.0)
+            raw_pen = min_dist - dist
+            pen = raw_pen * contact_alpha
+
+            xi = xi + n * pen
+
+            dp = xi - x_prev[i]
+            tang = dp - n * wp.dot(dp, n)
+            tang_len = wp.length(tang)
+            max_tang = mu * raw_pen
+
+            if tang_len > max_tang and tang_len > 1e-8:
+                tang = tang * (max_tang / tang_len)
+                xi = x_prev[i] + (n * wp.dot(dp, n) + tang)
+
+            contact_delta[i] = wp.vec3(xi[0] - x_pred[i][0], xi[1] - x_pred[i][1], 0.0)
+            contact_weight[i] = raw_pen
+
+
+    @wp.kernel
+    def _batch_apply_rigid_transform(
+        x_pred: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        center: wp.array(dtype=wp.vec3),
+        tx: wp.array(dtype=float),
+        ty: wp.array(dtype=float),
+        dtheta: wp.array(dtype=float),
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            return
+
+        xi = x_pred[i]
+        rel = xi - center[lane]
+        ct = wp.cos(dtheta[lane])
+        st = wp.sin(dtheta[lane])
+        rx = ct * rel[0] - st * rel[1]
+        ry = st * rel[0] + ct * rel[1]
+        x_pred[i] = wp.vec3(center[lane][0] + tx[lane] + rx, center[lane][1] + ty[lane] + ry, 0.0)
+
+
+    @wp.kernel
+    def _batch_accum_com(
+        x_pred: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        sum_m: wp.array(dtype=float),
+        sum_x: wp.array(dtype=float),
+        sum_y: wp.array(dtype=float),
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        invmi = inv_m[local]
+        if invmi == 0.0:
+            return
+        mi = 1.0 / invmi
+        xi = x_pred[i]
+        wp.atomic_add(sum_m, lane, mi)
+        wp.atomic_add(sum_x, lane, mi * xi[0])
+        wp.atomic_add(sum_y, lane, mi * xi[1])
+
+
+    @wp.kernel
+    def _batch_accum_ab(
+        x_pred: wp.array(dtype=wp.vec3),
+        r0: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        center: wp.array(dtype=wp.vec3),
+        sum_a: wp.array(dtype=float),
+        sum_b: wp.array(dtype=float),
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        invmi = inv_m[local]
+        if invmi == 0.0:
+            return
+        mi = 1.0 / invmi
+
+        ri0 = r0[local]
+        ri = x_pred[i] - center[lane]
+
+        a = ri0[0] * ri[1] - ri0[1] * ri[0]
+        b = ri0[0] * ri[0] + ri0[1] * ri[1]
+
+        wp.atomic_add(sum_a, lane, mi * a)
+        wp.atomic_add(sum_b, lane, mi * b)
+
+
+    @wp.kernel
+    def _batch_shape_match_project(
+        x_pred: wp.array(dtype=wp.vec3),
+        r0: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        center: wp.array(dtype=wp.vec3),
+        theta: wp.array(dtype=float),
+        alpha: float,
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            return
+
+        ct = wp.cos(theta[lane])
+        st = wp.sin(theta[lane])
+        ri0 = r0[local]
+
+        rx = ct * ri0[0] - st * ri0[1]
+        ry = st * ri0[0] + ct * ri0[1]
+        target = wp.vec3(center[lane][0] + rx, center[lane][1] + ry, 0.0)
+
+        xi = x_pred[i]
+        x_pred[i] = xi + alpha * (target - xi)
+
+
+    @wp.kernel
+    def _batch_finalize(
+        x: wp.array(dtype=wp.vec3),
+        v: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        x_pred: wp.array(dtype=wp.vec3),
+        dt: float,
+        vel_damp: float,
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            return
+        vi = (x_pred[i] - x[i]) / dt
+        v[i] = wp.vec3(vi[0], vi[1], 0.0) * vel_damp
+        x[i] = wp.vec3(x_pred[i][0], x_pred[i][1], 0.0)
+
+
+    @wp.kernel
+    def _batch_apply_ground_friction(
+        v: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        dt: float,
+        friction_accel: float,
+        rest_speed_eps: float,
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        local = i - lane * num_particles
+        if inv_m[local] == 0.0:
+            return
+
+        vi = v[i]
+        speed = wp.sqrt(vi[0] * vi[0] + vi[1] * vi[1])
+        if speed <= rest_speed_eps:
+            v[i] = wp.vec3(0.0, 0.0, 0.0)
+            return
+
+        new_speed = speed - friction_accel * dt
+        if new_speed <= rest_speed_eps:
+            v[i] = wp.vec3(0.0, 0.0, 0.0)
+            return
+
+        scale = new_speed / speed
+        v[i] = wp.vec3(vi[0] * scale, vi[1] * scale, 0.0)
+
+
+    @wp.kernel
+    def _batch_accum_contact_fit(
+        x_pred: wp.array(dtype=wp.vec3),
+        contact_delta: wp.array(dtype=wp.vec3),
+        contact_weight: wp.array(dtype=float),
+        center: wp.array(dtype=wp.vec3),
+        sum_w: wp.array(dtype=float),
+        weighted_px: wp.array(dtype=float),
+        weighted_py: wp.array(dtype=float),
+        weighted_dx: wp.array(dtype=float),
+        weighted_dy: wp.array(dtype=float),
+        max_disp_sq: wp.array(dtype=float),
+        r_max_sq: wp.array(dtype=float),
+        num_particles: int,
+        active: wp.array(dtype=int),
+    ):
+        i = wp.tid()
+        lane = i // num_particles
+        if active[lane] == 0:
+            return
+
+        wi = contact_weight[i]
+        if wi <= 1e-8:
+            return
+
+        xi = x_pred[i]
+        di = contact_delta[i]
+        rel = xi - center[lane]
+        disp_sq = di[0] * di[0] + di[1] * di[1]
+        r_sq = rel[0] * rel[0] + rel[1] * rel[1]
+
+        wp.atomic_add(sum_w, lane, wi)
+        wp.atomic_add(weighted_px, lane, wi * xi[0])
+        wp.atomic_add(weighted_py, lane, wi * xi[1])
+        wp.atomic_add(weighted_dx, lane, wi * di[0])
+        wp.atomic_add(weighted_dy, lane, wi * di[1])
+        wp.atomic_max(max_disp_sq, lane, disp_sq)
+        wp.atomic_max(r_max_sq, lane, r_sq)
+
+
 # -----------------------------
 # Environment
 # -----------------------------
@@ -1632,6 +1968,653 @@ class PushTWarpEnv:
             path[step_idx + 1, :2] = pos.astype(np.float32)
 
         return path, vel.astype(np.float32)
+
+
+class PushTWarpBatchEnv:
+    def __init__(
+        self,
+        device: str = "cuda:0",
+        params: Optional[PushTWarpParams] = None,
+        batch_size: int = 1,
+        seed: int = 0,
+        **kwargs,
+    ):
+        if wp is None:  # pragma: no cover - depends on optional package
+            raise ImportError(
+                "warp-lang is required for particle_sim backend. Install with `pip install warp-lang`."
+            ) from _WARP_IMPORT_ERROR
+
+        wp.init()
+        if params is None:
+            self.params = PushTWarpParams(**kwargs) if kwargs else PushTWarpParams()
+        else:
+            if len(kwargs) > 0:
+                raise ValueError("Provide either `params=PushTWarpParams(...)` or direct kwargs, not both.")
+            self.params = params
+        self.device_name = str(device)
+        self.device = wp.get_device(self.device_name)
+
+        p = self.params
+        self.xmin, self.xmax, self.ymin, self.ymax = float(p.xmin), float(p.xmax), float(p.ymin), float(p.ymax)
+        self.spacing = float(p.spacing)
+
+        self.stem_w = float(p.stem_w)
+        self.stem_h = float(p.stem_h)
+        self.bar_w = float(p.bar_w)
+        self.bar_h = float(p.bar_h)
+        if p.pose_offset_local is None:
+            self.pose_offset_local = np.zeros((3,), dtype=np.float32)
+        else:
+            self.pose_offset_local = np.asarray(p.pose_offset_local, dtype=np.float32).reshape(3).copy()
+        self.gt_body_com_local = _gt_tee_body_com_local(
+            stem_w=self.stem_w,
+            stem_h=self.stem_h,
+            bar_w=self.bar_w,
+            bar_h=self.bar_h,
+        )
+        self.body_com_from_cloud_local = (
+            self.gt_body_com_local - self.pose_offset_local
+        ).astype(np.float32)
+        self.gt_body_inertia = float(
+            _gt_tee_body_inertia(
+                stem_w=self.stem_w,
+                stem_h=self.stem_h,
+                bar_w=self.bar_w,
+                bar_h=self.bar_h,
+            )
+        )
+
+        self.pusher_r = float(p.pusher_radius)
+        self.sim_hz = int(p.sim_hz)
+        self.control_hz = int(p.control_hz)
+        if self.sim_hz <= 0:
+            raise ValueError(f"sim_hz must be > 0, got {self.sim_hz}")
+        if self.control_hz <= 0:
+            raise ValueError(f"control_hz must be > 0, got {self.control_hz}")
+        if self.sim_hz % self.control_hz != 0:
+            raise ValueError(
+                f"sim_hz must be divisible by control_hz, got sim_hz={self.sim_hz}, control_hz={self.control_hz}"
+            )
+        self.pusher_k_p = float(p.pusher_k_p)
+        self.pusher_k_v = float(p.pusher_k_v)
+        self.control_dt = 1.0 / float(self.control_hz)
+        self.sim_dt = 1.0 / float(self.sim_hz)
+        self.controller_steps = self.sim_hz // self.control_hz
+
+        self.substeps = int(p.substeps)
+        self.iters = int(p.iters)
+        self.mu = float(p.mu)
+        self.contact_alpha = float(p.contact_alpha)
+        self.ground_friction_accel = float(p.ground_friction_accel)
+        self.rest_speed_eps = float(p.rest_speed_eps)
+        self.lin_damp = float(p.lin_damp)
+        self.vel_damp = float(p.vel_damp)
+        self.alpha_rigid = float(p.alpha_rigid)
+
+        self.rng = np.random.default_rng(seed)
+
+        self.force_single_particle = bool(p.force_single_particle)
+        if p.rest_offsets is not None:
+            x0 = np.asarray(p.rest_offsets, dtype=np.float32).reshape(-1, 3).copy()
+            if x0.shape[0] <= 0:
+                raise ValueError("rest_offsets must contain at least one particle.")
+            x0[:, :2] -= x0[:, :2].mean(axis=0, keepdims=True)
+        elif self.force_single_particle:
+            x0 = np.array([[0.0, 0.0, 0.0]], dtype=np.float32)
+        else:
+            x0 = _points_in_t_grid(
+                stem_w=self.stem_w,
+                stem_h=self.stem_h,
+                bar_w=self.bar_w,
+                bar_h=self.bar_h,
+                spacing=self.spacing,
+                min_particles=int(p.min_particles),
+            )
+        self.N = int(x0.shape[0])
+        self.batch_size = max(1, int(batch_size))
+        self.total_particles = int(self.batch_size * self.N)
+
+        area_t = self.stem_w * self.stem_h + self.bar_w * self.bar_h
+        if p.particle_radius is None:
+            r = math.sqrt(area_t / (self.N * math.pi)) * float(p.radius_scale)
+            if bool(p.radius_clip_spacing) and self.N > 1:
+                r = float(np.clip(r, 0.35 * self.spacing, 1.50 * self.spacing))
+            self.pr = float(r)
+        else:
+            self.pr = float(p.particle_radius)
+
+        c0 = x0[:, :2].mean(axis=0, keepdims=True).astype(np.float32)
+        r0 = x0.copy()
+        r0[:, 0] -= c0[0, 0]
+        r0[:, 1] -= c0[0, 1]
+        self._r0_host = r0.copy()
+        self._inv_m_host = np.full((self.N,), 1.0, dtype=np.float32)
+
+        self.x = wp.zeros(shape=self.total_particles, dtype=wp.vec3, device=self.device)
+        self.v = wp.zeros(shape=self.total_particles, dtype=wp.vec3, device=self.device)
+        self.x_pred = wp.zeros(shape=self.total_particles, dtype=wp.vec3, device=self.device)
+        self.contact_delta = wp.zeros(shape=self.total_particles, dtype=wp.vec3, device=self.device)
+        self.contact_weight = wp.zeros(shape=self.total_particles, dtype=float, device=self.device)
+
+        self.inv_m = wp.array(self._inv_m_host, dtype=float, device=self.device)
+        self.r0 = wp.array(self._r0_host, dtype=wp.vec3, device=self.device)
+
+        self.active = wp.zeros(shape=self.batch_size, dtype=int, device=self.device)
+        self.all_active = wp.full(shape=self.batch_size, value=1, dtype=int, device=self.device)
+        self.sum_m = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.sum_x = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.sum_y = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.sum_a = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.sum_b = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.sum_w = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.weighted_px = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.weighted_py = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.weighted_dx = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.weighted_dy = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.max_disp_sq = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.r_max_sq = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+
+        self.pusher_start = wp.zeros(shape=self.batch_size, dtype=wp.vec3, device=self.device)
+        self.pusher_end = wp.zeros(shape=self.batch_size, dtype=wp.vec3, device=self.device)
+        self.cloud_center = wp.zeros(shape=self.batch_size, dtype=wp.vec3, device=self.device)
+        self.body_com_center = wp.zeros(shape=self.batch_size, dtype=wp.vec3, device=self.device)
+        self.shape_match_center = wp.zeros(shape=self.batch_size, dtype=wp.vec3, device=self.device)
+        self.tx = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.ty = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.dtheta = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+        self.theta_target = wp.zeros(shape=self.batch_size, dtype=float, device=self.device)
+
+        self.pusher_pos = np.zeros((self.batch_size, 3), dtype=np.float32)
+        self.pusher_velocity = np.zeros((self.batch_size, 2), dtype=np.float32)
+        self.goal_pose = np.zeros((self.batch_size, 3), dtype=np.float32)
+        self._theta_state = np.zeros((self.batch_size,), dtype=np.float32)
+        self._last_pose = np.zeros((self.batch_size, 3), dtype=np.float32)
+        self._active_host = np.ones((self.batch_size,), dtype=np.int32)
+
+        self._update_active(np.ones((self.batch_size,), dtype=np.int32))
+        default_obj_xy = np.tile(np.asarray([[-0.08, -0.02]], dtype=np.float32), (self.batch_size, 1))
+        default_obj_pose = np.concatenate(
+            [default_obj_xy, np.full((self.batch_size, 1), 0.6, dtype=np.float32)],
+            axis=1,
+        )
+        default_pusher_xy = np.tile(np.asarray([[-0.12, -0.18]], dtype=np.float32), (self.batch_size, 1))
+        default_goal_pose = np.tile(np.asarray([[0.10, 0.10, 0.0]], dtype=np.float32), (self.batch_size, 1))
+        self.set_state_batch(
+            pusher_xy=default_pusher_xy,
+            obj_pose=default_obj_pose,
+            goal_pose=default_goal_pose,
+            active_mask=np.ones((self.batch_size,), dtype=np.int32),
+        )
+
+    @property
+    def num_particles(self) -> int:
+        return int(self.N)
+
+    def rest_offsets(self) -> np.ndarray:
+        return self._r0_host.copy()
+
+    def _update_active(self, active_mask: np.ndarray) -> None:
+        active_arr = np.asarray(active_mask, dtype=np.int32).reshape(-1)
+        if active_arr.shape[0] != self.batch_size:
+            raise ValueError(
+                f"active_mask must have length {self.batch_size}, got {active_arr.shape[0]}"
+            )
+        self._active_host = active_arr.copy()
+        self.active.assign(self._active_host)
+
+    def _body_com_world_from_cloud_pose_batch(
+        self,
+        cloud_center_xy: np.ndarray,
+        theta: np.ndarray,
+    ) -> np.ndarray:
+        centers = np.asarray(cloud_center_xy, dtype=np.float32).reshape(self.batch_size, 2)
+        theta_arr = np.asarray(theta, dtype=np.float32).reshape(self.batch_size)
+        offset = np.asarray(self.body_com_from_cloud_local[:2], dtype=np.float32).reshape(1, 2)
+        ct = np.cos(theta_arr).reshape(-1, 1).astype(np.float32)
+        st = np.sin(theta_arr).reshape(-1, 1).astype(np.float32)
+        rot = np.concatenate(
+            [
+                ct * offset[:, :1] - st * offset[:, 1:2],
+                st * offset[:, :1] + ct * offset[:, 1:2],
+            ],
+            axis=1,
+        ).astype(np.float32)
+        return (centers + rot).astype(np.float32)
+
+    def _cloud_center_world_from_body_com_batch(
+        self,
+        body_com_xy: np.ndarray,
+        theta: np.ndarray,
+    ) -> np.ndarray:
+        centers = np.asarray(body_com_xy, dtype=np.float32).reshape(self.batch_size, 2)
+        theta_arr = np.asarray(theta, dtype=np.float32).reshape(self.batch_size)
+        offset = np.asarray(self.body_com_from_cloud_local[:2], dtype=np.float32).reshape(1, 2)
+        ct = np.cos(theta_arr).reshape(-1, 1).astype(np.float32)
+        st = np.sin(theta_arr).reshape(-1, 1).astype(np.float32)
+        rot = np.concatenate(
+            [
+                ct * offset[:, :1] - st * offset[:, 1:2],
+                st * offset[:, :1] + ct * offset[:, 1:2],
+            ],
+            axis=1,
+        ).astype(np.float32)
+        return (centers - rot).astype(np.float32)
+
+    def _build_particle_state_batch(
+        self,
+        obj_pose: np.ndarray,
+        obj_twist: Optional[np.ndarray] = None,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        pose = np.asarray(obj_pose, dtype=np.float32).reshape(self.batch_size, 3)
+        theta = pose[:, 2].astype(np.float32)
+        ct = np.cos(theta).reshape(-1, 1).astype(np.float32)
+        st = np.sin(theta).reshape(-1, 1).astype(np.float32)
+
+        r = self._r0_host[None, :, :2]
+        rx = ct * r[:, :, 0] - st * r[:, :, 1]
+        ry = st * r[:, :, 0] + ct * r[:, :, 1]
+
+        x_host = np.zeros((self.batch_size, self.N, 3), dtype=np.float32)
+        x_host[:, :, 0] = rx + pose[:, None, 0]
+        x_host[:, :, 1] = ry + pose[:, None, 1]
+
+        v_host = np.zeros_like(x_host)
+        if obj_twist is not None:
+            twist = np.asarray(obj_twist, dtype=np.float32).reshape(self.batch_size, 3)
+            center = x_host[:, :, :2].mean(axis=1, keepdims=True)
+            rel = x_host[:, :, :2] - center
+            perp = np.stack([-rel[:, :, 1], rel[:, :, 0]], axis=2).astype(np.float32)
+            v_host[:, :, :2] = twist[:, None, :2] + twist[:, None, 2:3] * perp
+        return x_host.reshape(self.total_particles, 3), v_host.reshape(self.total_particles, 3)
+
+    def set_state_batch(
+        self,
+        *,
+        pusher_xy: np.ndarray,
+        obj_pose: np.ndarray,
+        goal_pose: Optional[np.ndarray] = None,
+        obj_twist: Optional[np.ndarray] = None,
+        pusher_velocity: Optional[np.ndarray] = None,
+        active_mask: Optional[np.ndarray] = None,
+    ) -> None:
+        pusher_xy_arr = np.asarray(pusher_xy, dtype=np.float32).reshape(self.batch_size, 2)
+        obj_pose_arr = np.asarray(obj_pose, dtype=np.float32).reshape(self.batch_size, 3)
+        if goal_pose is None:
+            goal_pose_arr = self.goal_pose.copy()
+        else:
+            goal_pose_arr = np.asarray(goal_pose, dtype=np.float32).reshape(self.batch_size, 3)
+        if pusher_velocity is None:
+            pusher_velocity_arr = np.zeros((self.batch_size, 2), dtype=np.float32)
+        else:
+            pusher_velocity_arr = np.asarray(pusher_velocity, dtype=np.float32).reshape(self.batch_size, 2)
+
+        x_host, v_host = self._build_particle_state_batch(obj_pose_arr, obj_twist=obj_twist)
+        self.x.assign(x_host)
+        self.v.assign(v_host)
+        self.x_pred.assign(x_host)
+        self.contact_delta.zero_()
+        self.contact_weight.zero_()
+
+        self.pusher_pos[:, :2] = pusher_xy_arr
+        self.pusher_pos[:, 2] = 0.0
+        self.pusher_velocity[:, :] = pusher_velocity_arr
+        self.goal_pose[:, :] = goal_pose_arr
+        self._theta_state[:] = obj_pose_arr[:, 2]
+        self._last_pose[:, :] = obj_pose_arr
+        if active_mask is None:
+            self._update_active(np.ones((self.batch_size,), dtype=np.int32))
+        else:
+            self._update_active(np.asarray(active_mask, dtype=np.int32).reshape(self.batch_size))
+
+    def _compute_com_and_theta_batch(self) -> np.ndarray:
+        self.sum_m.zero_()
+        self.sum_x.zero_()
+        self.sum_y.zero_()
+        wp.launch(
+            kernel=_batch_accum_com,
+            dim=self.total_particles,
+            inputs=[self.x_pred, self.inv_m, self.sum_m, self.sum_x, self.sum_y, self.N, self.all_active],
+            device=self.device,
+        )
+
+        sum_m = self.sum_m.numpy().astype(np.float32)
+        sum_x = self.sum_x.numpy().astype(np.float32)
+        sum_y = self.sum_y.numpy().astype(np.float32)
+
+        center = np.zeros((self.batch_size, 3), dtype=np.float32)
+        valid = sum_m > 1e-8
+        center[valid, 0] = sum_x[valid] / np.maximum(sum_m[valid], 1e-8)
+        center[valid, 1] = sum_y[valid] / np.maximum(sum_m[valid], 1e-8)
+        self.cloud_center.assign(center)
+
+        self.sum_a.zero_()
+        self.sum_b.zero_()
+        wp.launch(
+            kernel=_batch_accum_ab,
+            dim=self.total_particles,
+            inputs=[self.x_pred, self.r0, self.inv_m, self.cloud_center, self.sum_a, self.sum_b, self.N, self.all_active],
+            device=self.device,
+        )
+
+        sum_a = self.sum_a.numpy().astype(np.float32)
+        sum_b = self.sum_b.numpy().astype(np.float32)
+        theta = self._theta_state.astype(np.float32).copy()
+        if self.N > 1:
+            informative = valid & ((np.abs(sum_a) + np.abs(sum_b)) > 1e-12)
+            theta[informative] = np.arctan2(sum_a[informative], sum_b[informative]).astype(np.float32)
+            theta[informative] = np.asarray([_wrap_pi(float(v)) for v in theta[informative]], dtype=np.float32)
+            self._theta_state[:] = theta
+
+        pose = np.zeros((self.batch_size, 3), dtype=np.float32)
+        pose[:, :2] = center[:, :2]
+        pose[:, 2] = theta
+        return pose
+
+    def get_object_pose_batch(self) -> np.ndarray:
+        return self._compute_com_and_theta_batch().astype(np.float32)
+
+    def get_object_twist_batch(self) -> np.ndarray:
+        x_host = self.x.numpy().astype(np.float32).reshape(self.batch_size, self.N, 3)[:, :, :2]
+        v_host = self.v.numpy().astype(np.float32).reshape(self.batch_size, self.N, 3)[:, :, :2]
+        if self.N <= 0:
+            return np.zeros((self.batch_size, 3), dtype=np.float32)
+
+        v_com = v_host.mean(axis=1)
+        center = x_host.mean(axis=1, keepdims=True)
+        rel = x_host - center
+        perp = np.stack([-rel[:, :, 1], rel[:, :, 0]], axis=2).astype(np.float32)
+        num = np.sum(perp * (v_host - v_com[:, None, :]), axis=(1, 2), dtype=np.float32)
+        den = np.sum(perp * perp, axis=(1, 2), dtype=np.float32) + 1e-9
+        omega = (num / den).astype(np.float32)
+        return np.concatenate([v_com.astype(np.float32), omega[:, None]], axis=1)
+
+    def get_particle_positions_batch(self) -> np.ndarray:
+        return self.x.numpy().astype(np.float32).reshape(self.batch_size, self.N, 3)[:, :, :2].copy()
+
+    def get_particle_velocities_batch(self) -> np.ndarray:
+        return self.v.numpy().astype(np.float32).reshape(self.batch_size, self.N, 3)[:, :, :2].copy()
+
+    def get_pusher_velocity_batch(self) -> np.ndarray:
+        return self.pusher_velocity.astype(np.float32).copy()
+
+    def _compute_contact_fit_batch(self, body_com_world: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        body_com = np.zeros((self.batch_size, 3), dtype=np.float32)
+        body_com[:, :2] = np.asarray(body_com_world, dtype=np.float32).reshape(self.batch_size, 2)
+        self.body_com_center.assign(body_com)
+
+        self.sum_w.zero_()
+        self.weighted_px.zero_()
+        self.weighted_py.zero_()
+        self.weighted_dx.zero_()
+        self.weighted_dy.zero_()
+        self.max_disp_sq.zero_()
+        self.r_max_sq.zero_()
+        wp.launch(
+            kernel=_batch_accum_contact_fit,
+            dim=self.total_particles,
+            inputs=[
+                self.x_pred,
+                self.contact_delta,
+                self.contact_weight,
+                self.body_com_center,
+                self.sum_w,
+                self.weighted_px,
+                self.weighted_py,
+                self.weighted_dx,
+                self.weighted_dy,
+                self.max_disp_sq,
+                self.r_max_sq,
+                self.N,
+                self.active,
+            ],
+            device=self.device,
+        )
+
+        sum_w = self.sum_w.numpy().astype(np.float32)
+        weighted_px = self.weighted_px.numpy().astype(np.float32)
+        weighted_py = self.weighted_py.numpy().astype(np.float32)
+        weighted_dx = self.weighted_dx.numpy().astype(np.float32)
+        weighted_dy = self.weighted_dy.numpy().astype(np.float32)
+        max_disp = np.sqrt(np.maximum(self.max_disp_sq.numpy().astype(np.float32), 0.0))
+        r_max = np.sqrt(np.maximum(self.r_max_sq.numpy().astype(np.float32), 0.0))
+
+        tx = np.zeros((self.batch_size,), dtype=np.float32)
+        ty = np.zeros((self.batch_size,), dtype=np.float32)
+        dtheta = np.zeros((self.batch_size,), dtype=np.float32)
+
+        valid = sum_w > 1e-8
+        if np.any(valid):
+            delta_x = np.zeros((self.batch_size,), dtype=np.float32)
+            delta_y = np.zeros((self.batch_size,), dtype=np.float32)
+            contact_x = np.zeros((self.batch_size,), dtype=np.float32)
+            contact_y = np.zeros((self.batch_size,), dtype=np.float32)
+            delta_x[valid] = weighted_dx[valid] / sum_w[valid]
+            delta_y[valid] = weighted_dy[valid] / sum_w[valid]
+            contact_x[valid] = weighted_px[valid] / sum_w[valid]
+            contact_y[valid] = weighted_py[valid] / sum_w[valid]
+
+            tx = delta_x.astype(np.float32)
+            ty = delta_y.astype(np.float32)
+            lever_x = contact_x - np.asarray(body_com_world, dtype=np.float32)[:, 0]
+            lever_y = contact_y - np.asarray(body_com_world, dtype=np.float32)[:, 1]
+            raw_dtheta = (lever_x * delta_y - lever_y * delta_x) / max(float(self.gt_body_inertia), 1e-8)
+            dtheta = raw_dtheta.astype(np.float32)
+
+            trans_mag = np.hypot(tx, ty).astype(np.float32)
+            scale_mask = (max_disp > 0.0) & np.isfinite(trans_mag) & (trans_mag > max_disp)
+            tx[scale_mask] = tx[scale_mask] * (max_disp[scale_mask] / np.maximum(trans_mag[scale_mask], 1e-8))
+            ty[scale_mask] = ty[scale_mask] * (max_disp[scale_mask] / np.maximum(trans_mag[scale_mask], 1e-8))
+            bad_mask = ~np.isfinite(trans_mag)
+            tx[bad_mask] = 0.0
+            ty[bad_mask] = 0.0
+
+            bad_theta = ~np.isfinite(dtheta)
+            dtheta[bad_theta] = 0.0
+            theta_cap = np.where(max_disp > 0.0, max_disp / np.maximum(r_max, 1e-6), 0.0).astype(np.float32)
+            clip_mask = max_disp > 0.0
+            dtheta[clip_mask] = np.clip(dtheta[clip_mask], -theta_cap[clip_mask], theta_cap[clip_mask]).astype(np.float32)
+            dtheta[~clip_mask] = 0.0
+
+        return tx.astype(np.float32), ty.astype(np.float32), dtheta.astype(np.float32)
+
+    def _build_pusher_path_batch(
+        self,
+        target_xy: np.ndarray,
+        active_mask: np.ndarray,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        target = np.asarray(target_xy, dtype=np.float64).reshape(self.batch_size, 2)
+        pos = np.asarray(self.pusher_pos[:, :2], dtype=np.float64).copy()
+        vel = np.asarray(self.pusher_velocity, dtype=np.float64).copy()
+        active = np.asarray(active_mask, dtype=bool).reshape(self.batch_size)
+
+        path = np.zeros((self.controller_steps + 1, self.batch_size, 3), dtype=np.float32)
+        path[0, :, :2] = pos.astype(np.float32)
+
+        for step_idx in range(self.controller_steps):
+            acc = self.pusher_k_p * (target - pos) - self.pusher_k_v * vel
+            vel_next = vel + acc * self.sim_dt
+            pos_next = pos + vel_next * self.sim_dt
+            vel[active] = vel_next[active]
+            pos[active] = pos_next[active]
+            path[step_idx + 1, :, :2] = pos.astype(np.float32)
+
+        return path, vel.astype(np.float32)
+
+    def step_batch(
+        self,
+        action_world: np.ndarray,
+        active_mask: Optional[np.ndarray] = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        action_arr = np.asarray(action_world, dtype=np.float32).reshape(self.batch_size, 2)
+        step_active = (
+            np.asarray(active_mask, dtype=bool).reshape(self.batch_size)
+            if active_mask is not None
+            else self._active_host.astype(bool)
+        )
+        self._update_active(step_active.astype(np.int32))
+
+        target_xy = self.pusher_pos[:, :2].copy()
+        target_xy[step_active] = target_xy[step_active] + action_arr[step_active]
+        pusher_path, final_velocity = self._build_pusher_path_batch(target_xy, step_active)
+        resolved_path = pusher_path.copy()
+        resolved_path[0, :, :2] = self.pusher_pos[:, :2].copy()
+
+        for seg_idx in range(self.controller_steps):
+            prev_pxy = resolved_path[seg_idx, :, :2].astype(np.float32, copy=False)
+            commanded_pxy = pusher_path[seg_idx + 1, :, :2].astype(np.float32, copy=False)
+
+            start_host = np.zeros((self.batch_size, 3), dtype=np.float32)
+            end_host = np.zeros((self.batch_size, 3), dtype=np.float32)
+            start_host[:, :2] = prev_pxy
+            end_host[:, :2] = commanded_pxy
+            self.pusher_start.assign(start_host)
+            self.pusher_end.assign(end_host)
+
+            wp.launch(
+                kernel=_batch_predict_positions,
+                dim=self.total_particles,
+                inputs=[self.x, self.v, self.inv_m, self.x_pred, self.sim_dt, self.lin_damp, self.N, self.active],
+                device=self.device,
+            )
+
+            for _ in range(self.iters):
+                wp.launch(
+                    kernel=_batch_project_walls_aabb,
+                    dim=self.total_particles,
+                    inputs=[self.x_pred, self.inv_m, self.xmin, self.xmax, self.ymin, self.ymax, self.pr, self.N, self.active],
+                    device=self.device,
+                )
+                wp.launch(
+                    kernel=_batch_pusher_swept_contact,
+                    dim=self.total_particles,
+                    inputs=[
+                        self.x,
+                        self.x_pred,
+                        self.inv_m,
+                        self.pusher_start,
+                        self.pusher_end,
+                        self.pusher_r,
+                        self.pr,
+                        self.mu,
+                        self.contact_alpha,
+                        self.contact_delta,
+                        self.contact_weight,
+                        self.N,
+                        self.active,
+                    ],
+                    device=self.device,
+                )
+
+                pose = self._compute_com_and_theta_batch()
+                body_com_world_xy = self._body_com_world_from_cloud_pose_batch(pose[:, :2], pose[:, 2])
+                tx, ty, dtheta = self._compute_contact_fit_batch(body_com_world_xy)
+
+                body_com_host = np.zeros((self.batch_size, 3), dtype=np.float32)
+                body_com_host[:, :2] = body_com_world_xy
+                self.body_com_center.assign(body_com_host)
+                self.tx.assign(tx)
+                self.ty.assign(ty)
+                self.dtheta.assign(dtheta)
+
+                wp.launch(
+                    kernel=_batch_apply_rigid_transform,
+                    dim=self.total_particles,
+                    inputs=[
+                        self.x_pred,
+                        self.inv_m,
+                        self.body_com_center,
+                        self.tx,
+                        self.ty,
+                        self.dtheta,
+                        self.N,
+                        self.active,
+                    ],
+                    device=self.device,
+                )
+
+                theta_target = np.asarray([_wrap_pi(float(v)) for v in (pose[:, 2] + dtheta)], dtype=np.float32)
+                body_com_after_xy = body_com_world_xy + np.stack([tx, ty], axis=1).astype(np.float32)
+                shape_match_xy = self._cloud_center_world_from_body_com_batch(body_com_after_xy, theta_target)
+                shape_match_host = np.zeros((self.batch_size, 3), dtype=np.float32)
+                shape_match_host[:, :2] = shape_match_xy
+                self.shape_match_center.assign(shape_match_host)
+                self.theta_target.assign(theta_target)
+
+                wp.launch(
+                    kernel=_batch_shape_match_project,
+                    dim=self.total_particles,
+                    inputs=[
+                        self.x_pred,
+                        self.r0,
+                        self.inv_m,
+                        self.shape_match_center,
+                        self.theta_target,
+                        self.alpha_rigid,
+                        self.N,
+                        self.active,
+                    ],
+                    device=self.device,
+                )
+
+            wp.launch(
+                kernel=_batch_finalize,
+                dim=self.total_particles,
+                inputs=[self.x, self.v, self.inv_m, self.x_pred, self.sim_dt, self.vel_damp, self.N, self.active],
+                device=self.device,
+            )
+            wp.launch(
+                kernel=_batch_apply_ground_friction,
+                dim=self.total_particles,
+                inputs=[
+                    self.v,
+                    self.inv_m,
+                    self.sim_dt,
+                    self.ground_friction_accel,
+                    self.rest_speed_eps,
+                    self.N,
+                    self.active,
+                ],
+                device=self.device,
+            )
+
+            if np.any(step_active):
+                particle_xy = self.get_particle_positions_batch()
+                for lane_idx in np.flatnonzero(step_active):
+                    resolved_pxy = _resolve_particle_union_endpoint(
+                        prev_pxy[lane_idx],
+                        commanded_pxy[lane_idx],
+                        particle_xy[lane_idx],
+                        pusher_r=float(self.pusher_r),
+                        pr=float(self.pr),
+                    )
+                    resolved_path[seg_idx + 1, lane_idx, :2] = np.asarray(resolved_pxy, dtype=np.float32)
+
+        if np.any(step_active):
+            self.pusher_pos[step_active, :2] = resolved_path[-1, step_active, :2]
+            self.pusher_pos[step_active, 2] = 0.0
+            if resolved_path.shape[0] >= 2:
+                realized_velocity = (
+                    resolved_path[-1, step_active, :2] - resolved_path[-2, step_active, :2]
+                ) / max(self.sim_dt, 1e-8)
+                finite_mask = np.all(np.isfinite(realized_velocity), axis=1)
+                self.pusher_velocity[step_active, :] = final_velocity[step_active]
+                if np.any(finite_mask):
+                    step_indices = np.flatnonzero(step_active)
+                    self.pusher_velocity[step_indices[finite_mask], :] = realized_velocity[finite_mask].astype(np.float32)
+            else:
+                self.pusher_velocity[step_active, :] = final_velocity[step_active]
+
+        pose = self.get_object_pose_batch()
+        self._last_pose[:, :] = pose
+        dx = pose[:, 0] - self.goal_pose[:, 0]
+        dy = pose[:, 1] - self.goal_pose[:, 1]
+        dtheta = np.asarray(
+            [_wrap_pi(float(pose[idx, 2] - self.goal_pose[idx, 2])) for idx in range(self.batch_size)],
+            dtype=np.float32,
+        )
+        reward = -(dx * dx + dy * dy + 0.1 * dtheta * dtheta).astype(np.float32)
+        done = ((dx * dx + dy * dy) < (0.01 ** 2)) & (np.abs(dtheta) < 0.15)
+        return pose.astype(np.float32), reward.astype(np.float32), done.astype(bool)
 
 
 if __name__ == "__main__":

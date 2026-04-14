@@ -20,7 +20,11 @@ from hudm.session_exec import run_closed_loop
 from hudm.session_helpers import sample_init_goal_states
 from hudm.world_io import checkpoint_epochs, latest_checkpoint_epoch, load_world_checkpoint, save_world_checkpoint
 from models.world.model import HierWorldModel
-from planning.particle_cem import ParticleCEMPlanner
+from planning.particle_cem import (
+    BatchedParticleCEMPlanner,
+    BatchedParticlePlannerUnavailable,
+    ParticleCEMPlanner,
+)
 from pusht.pusht_env import PushTEnv
 from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_particle_warp import PushTWarpEnv
@@ -455,6 +459,87 @@ class FrameworkContractTests(unittest.TestCase):
         np.testing.assert_allclose(backend._goal_state, goal_state)
         self.assertEqual(list(backend._current_snapshot.keys()), ["live"])
 
+    def test_particle_backend_batch_size_one_matches_scalar_contract(self):
+        try:
+            backend = PushTParticleBackend(
+                with_velocity=True,
+                with_target=True,
+                render_size=64,
+                relative=True,
+                action_scale=100.0,
+                device="cpu",
+                particle_counts=[1, 4],
+                warp_cfg={
+                    "particle_radius": 0.01,
+                    "sim_hz": 20,
+                    "control_hz": 10,
+                    "substeps": 1,
+                    "iters": 1,
+                    "min_particles": 1,
+                },
+                seed=0,
+            )
+        except ImportError as exc:
+            self.skipTest(str(exc))
+
+        init_state = np.asarray([180.0, 170.0, 260.0, 250.0, 0.15, 4.0, -2.0], dtype=np.float32)
+        goal_state = np.asarray([0.0, 0.0, 300.0, 280.0, -0.2, 0.0, 0.0], dtype=np.float32)
+        action = np.asarray([0.015, -0.01], dtype=np.float32)
+
+        backend.set_planning_fidelity_level(1)
+        obs_scalar_0, state_scalar_0 = backend.prepare(
+            seed=0,
+            init_state=init_state,
+            goal_state=goal_state,
+            with_visual=True,
+        )
+        frame_scalar_0 = backend.render("rgb_array", include_start_pose=True)
+        obs_scalar_1, reward_scalar, done_scalar, info_scalar = backend.step(action, with_visual=True)
+        cloud_scalar_1 = backend.current_particle_cloud_state(level_idx=1, pixel=True)
+        frame_scalar_1 = backend.render("rgb_array", include_start_pose=True)
+
+        obs_batch_0, state_batch_0, snapshots = backend.prepare_batch(
+            level_idx=1,
+            seeds=[0],
+            init_states=init_state[None, :],
+            goal_states=goal_state[None, :],
+            with_visual=True,
+        )
+        frame_batch_0 = backend.render_batch(
+            level_idx=1,
+            snapshots=snapshots,
+            include_start_pose=True,
+        )
+        obs_batch_1, reward_batch, done_batch, info_batch, next_snapshots = backend.step_batch(
+            level_idx=1,
+            snapshots=snapshots,
+            goal_states=goal_state[None, :],
+            actions=action[None, :],
+            with_visual=True,
+        )
+        cloud_batch_1 = backend.current_particle_cloud_state_batch(
+            level_idx=1,
+            snapshots=next_snapshots,
+            pixel=True,
+        )
+        frame_batch_1 = backend.render_batch(
+            level_idx=1,
+            snapshots=next_snapshots,
+            include_start_pose=True,
+        )
+
+        np.testing.assert_allclose(state_scalar_0, state_batch_0[0], atol=1e-5, rtol=1e-5)
+        np.testing.assert_array_equal(obs_scalar_0["visual"], obs_batch_0["visual"][0])
+        np.testing.assert_array_equal(frame_scalar_0, frame_batch_0[0])
+        np.testing.assert_allclose(obs_scalar_1["state"], obs_batch_1["state"][0], atol=1e-5, rtol=1e-5)
+        np.testing.assert_array_equal(obs_scalar_1["visual"], obs_batch_1["visual"][0])
+        self.assertAlmostEqual(float(reward_scalar), float(reward_batch[0]), places=6)
+        self.assertEqual(bool(done_scalar), bool(done_batch[0]))
+        np.testing.assert_allclose(info_scalar["state"], info_batch[0]["state"], atol=1e-5, rtol=1e-5)
+        np.testing.assert_allclose(cloud_scalar_1["pusher_xy"], cloud_batch_1["pusher_xy"][0], atol=1e-5, rtol=1e-5)
+        np.testing.assert_allclose(cloud_scalar_1["particle_xy"], cloud_batch_1["particle_xy"][0], atol=1e-5, rtol=1e-5)
+        np.testing.assert_array_equal(frame_scalar_1, frame_batch_1[0])
+
     def test_particle_state_terms_use_particle_coordinates_for_pose_like_losses(self):
         cur_cloud = {
             "pusher_xy": np.asarray([3.0, 0.0], dtype=np.float32),
@@ -526,6 +611,7 @@ class FrameworkContractTests(unittest.TestCase):
                 },
                 "fidelity": {},
                 "particle_env": {
+                    "batch_mode": "off",
                     "fidelity_env": {
                         "particle_counts": [1, 8, 32],
                         "device": "cpu",
@@ -552,14 +638,271 @@ class FrameworkContractTests(unittest.TestCase):
                     with mock.patch("hudm.runtime.PushTParticleBackend") as backend_cls:
                         with mock.patch("hudm.runtime.ParticleCEMPlanner") as planner_cls:
                             backend_cls.return_value.num_levels = 4
-                            build_plan_runtime(cfg)
+                            runtime = build_plan_runtime(cfg)
 
         backend_seed = backend_cls.call_args.kwargs["seed"]
         self.assertIsInstance(backend_seed, int)
         self.assertNotEqual(backend_seed, "random")
-        self.assertEqual(cfg.init_goal.dataset.seed, backend_seed)
-        self.assertEqual(cfg.fidelity.num_levels, 4)
+        self.assertEqual(runtime["cfg"].init_goal.dataset.seed, backend_seed)
+        self.assertEqual(runtime["cfg"].fidelity.num_levels, 4)
+        self.assertEqual(cfg.init_goal.dataset.seed, "random")
+        self.assertIsNone(OmegaConf.select(cfg, "fidelity.num_levels"))
         planner_cls.assert_called_once()
+
+    def test_build_plan_runtime_uses_batched_particle_planner_by_default(self):
+        cfg = OmegaConf.create(
+            {
+                "env_id": "pusht",
+                "env": {
+                    "with_velocity": True,
+                    "with_target": True,
+                },
+                "backend": "particle_sim",
+                "world_model": {
+                    "device": "cpu",
+                },
+                "mpc": {
+                    "horizon": 2,
+                },
+                "cem": {
+                    "pop_size": 4,
+                    "elite_frac": 0.5,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "warm_start": False,
+                    "action_low": None,
+                    "action_high": None,
+                },
+                "objective": {
+                    "action_l2_weight": 0.0,
+                },
+                "fidelity": {},
+                "particle_env": {
+                    "batch_mode": "auto",
+                    "fidelity_env": {
+                        "particle_counts": [1, 8, 32],
+                        "device": "cpu",
+                    },
+                },
+                "init_goal": {
+                    "dataset": {
+                        "seed": 0,
+                    },
+                },
+            }
+        )
+        dummy_env = SimpleNamespace(
+            action_dim=2,
+            render_size=96,
+            relative=True,
+            action_scale=100.0,
+        )
+
+        with mock.patch("hudm.runtime.register_plan_env"):
+            with mock.patch("hudm.runtime.gym_make_versioned", return_value=dummy_env):
+                with mock.patch("hudm.runtime.unwrap_env", return_value=dummy_env):
+                    with mock.patch("hudm.runtime.PushTParticleBackend") as backend_cls:
+                        with mock.patch("hudm.runtime.BatchedParticleCEMPlanner") as batched_cls:
+                            with mock.patch("hudm.runtime.ParticleCEMPlanner") as serial_cls:
+                                backend_cls.return_value.num_levels = 4
+                                build_plan_runtime(cfg)
+
+        batched_cls.assert_called_once()
+        serial_cls.assert_not_called()
+
+    def test_build_plan_runtime_falls_back_to_serial_particle_planner_when_auto_batch_init_fails(self):
+        cfg = OmegaConf.create(
+            {
+                "env_id": "pusht",
+                "env": {
+                    "with_velocity": True,
+                    "with_target": True,
+                },
+                "backend": "particle_sim",
+                "world_model": {
+                    "device": "cpu",
+                },
+                "mpc": {
+                    "horizon": 2,
+                },
+                "cem": {
+                    "pop_size": 4,
+                    "elite_frac": 0.5,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "warm_start": False,
+                    "action_low": None,
+                    "action_high": None,
+                },
+                "objective": {
+                    "action_l2_weight": 0.0,
+                },
+                "fidelity": {},
+                "particle_env": {
+                    "batch_mode": "auto",
+                    "fidelity_env": {
+                        "particle_counts": [1, 8, 32],
+                        "device": "cpu",
+                    },
+                },
+                "init_goal": {
+                    "dataset": {
+                        "seed": 0,
+                    },
+                },
+            }
+        )
+        dummy_env = SimpleNamespace(
+            action_dim=2,
+            render_size=96,
+            relative=True,
+            action_scale=100.0,
+        )
+
+        with mock.patch("hudm.runtime.register_plan_env"):
+            with mock.patch("hudm.runtime.gym_make_versioned", return_value=dummy_env):
+                with mock.patch("hudm.runtime.unwrap_env", return_value=dummy_env):
+                    with mock.patch("hudm.runtime.PushTParticleBackend") as backend_cls:
+                        with mock.patch(
+                            "hudm.runtime.BatchedParticleCEMPlanner",
+                            side_effect=BatchedParticlePlannerUnavailable("batch init failed"),
+                        ) as batched_cls:
+                            with mock.patch("hudm.runtime.ParticleCEMPlanner") as serial_cls:
+                                backend_cls.return_value.num_levels = 4
+                                build_plan_runtime(cfg)
+
+        batched_cls.assert_called_once()
+        serial_cls.assert_called_once()
+
+    def test_build_plan_runtime_raises_when_force_batch_init_fails(self):
+        cfg = OmegaConf.create(
+            {
+                "env_id": "pusht",
+                "env": {
+                    "with_velocity": True,
+                    "with_target": True,
+                },
+                "backend": "particle_sim",
+                "world_model": {
+                    "device": "cpu",
+                },
+                "mpc": {
+                    "horizon": 2,
+                },
+                "cem": {
+                    "pop_size": 4,
+                    "elite_frac": 0.5,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "warm_start": False,
+                    "action_low": None,
+                    "action_high": None,
+                },
+                "objective": {
+                    "action_l2_weight": 0.0,
+                },
+                "fidelity": {},
+                "particle_env": {
+                    "batch_mode": "force",
+                    "fidelity_env": {
+                        "particle_counts": [1, 8, 32],
+                        "device": "cpu",
+                    },
+                },
+                "init_goal": {
+                    "dataset": {
+                        "seed": 0,
+                    },
+                },
+            }
+        )
+        dummy_env = SimpleNamespace(
+            action_dim=2,
+            render_size=96,
+            relative=True,
+            action_scale=100.0,
+        )
+
+        with mock.patch("hudm.runtime.register_plan_env"):
+            with mock.patch("hudm.runtime.gym_make_versioned", return_value=dummy_env):
+                with mock.patch("hudm.runtime.unwrap_env", return_value=dummy_env):
+                    with mock.patch("hudm.runtime.PushTParticleBackend") as backend_cls:
+                        with mock.patch(
+                            "hudm.runtime.BatchedParticleCEMPlanner",
+                            side_effect=BatchedParticlePlannerUnavailable("batch init failed"),
+                        ) as batched_cls:
+                            with mock.patch("hudm.runtime.ParticleCEMPlanner") as serial_cls:
+                                backend_cls.return_value.num_levels = 4
+                                with self.assertRaisesRegex(RuntimeError, "batch init failed"):
+                                    build_plan_runtime(cfg)
+
+        batched_cls.assert_called_once()
+        serial_cls.assert_not_called()
+
+    def test_build_plan_runtime_auto_batch_does_not_swallow_arbitrary_batched_errors(self):
+        cfg = OmegaConf.create(
+            {
+                "env_id": "pusht",
+                "env": {
+                    "with_velocity": True,
+                    "with_target": True,
+                },
+                "backend": "particle_sim",
+                "world_model": {
+                    "device": "cpu",
+                },
+                "mpc": {
+                    "horizon": 2,
+                },
+                "cem": {
+                    "pop_size": 4,
+                    "elite_frac": 0.5,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "warm_start": False,
+                    "action_low": None,
+                    "action_high": None,
+                },
+                "objective": {
+                    "action_l2_weight": 0.0,
+                },
+                "fidelity": {},
+                "particle_env": {
+                    "batch_mode": "auto",
+                    "fidelity_env": {
+                        "particle_counts": [1, 8, 32],
+                        "device": "cpu",
+                    },
+                },
+                "init_goal": {
+                    "dataset": {
+                        "seed": 0,
+                    },
+                },
+            }
+        )
+        dummy_env = SimpleNamespace(
+            action_dim=2,
+            render_size=96,
+            relative=True,
+            action_scale=100.0,
+        )
+
+        with mock.patch("hudm.runtime.register_plan_env"):
+            with mock.patch("hudm.runtime.gym_make_versioned", return_value=dummy_env):
+                with mock.patch("hudm.runtime.unwrap_env", return_value=dummy_env):
+                    with mock.patch("hudm.runtime.PushTParticleBackend") as backend_cls:
+                        with mock.patch(
+                            "hudm.runtime.BatchedParticleCEMPlanner",
+                            side_effect=RuntimeError("unexpected bug"),
+                        ) as batched_cls:
+                            with mock.patch("hudm.runtime.ParticleCEMPlanner") as serial_cls:
+                                backend_cls.return_value.num_levels = 4
+                                with self.assertRaisesRegex(RuntimeError, "unexpected bug"):
+                                    build_plan_runtime(cfg)
+
+        batched_cls.assert_called_once()
+        serial_cls.assert_not_called()
 
     def test_plan_spec_to_runtime_cfg_allows_missing_particle_num_levels(self):
         cfg = OmegaConf.create(_plan_defaults())

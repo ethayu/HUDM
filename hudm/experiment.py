@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import contextlib
 import io
 import json
@@ -9,7 +10,7 @@ import time
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 import numpy as np
 import torch
@@ -224,9 +225,60 @@ def _metric_array(rows: Sequence[dict], key: str) -> np.ndarray:
     return np.asarray([row[key] for row in rows], dtype=np.float32)
 
 
+def _paired_rows_vs_reference(
+    rows: Sequence[dict],
+    *,
+    reference_variant: str,
+    variant_order: Sequence[str],
+) -> list[dict]:
+    reference_name = str(reference_variant or "").strip()
+    if not reference_name:
+        return []
+
+    by_variant: dict[str, list[dict]] = defaultdict(list)
+    for row in rows:
+        by_variant.setdefault(str(row["variant_name"]), []).append(row)
+    reference_rows = {
+        str(row["rollout_id"]): row
+        for row in by_variant.get(reference_name, [])
+    }
+    if len(reference_rows) <= 0:
+        return []
+
+    ordered_variant_names = [name for name in variant_order if name in by_variant]
+    ordered_variant_names.extend(sorted(name for name in by_variant if name not in ordered_variant_names))
+
+    paired_rows: list[dict] = []
+    for variant_name in ordered_variant_names:
+        if variant_name == reference_name:
+            continue
+        for row in by_variant.get(variant_name, []):
+            rollout_id_value = str(row["rollout_id"])
+            reference_row = reference_rows.get(rollout_id_value)
+            if reference_row is None:
+                continue
+            paired_rows.append(
+                {
+                    "reference_variant": reference_name,
+                    "variant_name": variant_name,
+                    "rollout_id": rollout_id_value,
+                    "success_delta": int(row["success"]) - int(reference_row["success"]),
+                    "final_pos_diff_delta": float(row["final_pos_diff"]) - float(reference_row["final_pos_diff"]),
+                    "final_angle_diff_delta": float(row["final_angle_diff"]) - float(reference_row["final_angle_diff"]),
+                    "final_eef_diff_delta": float(row["final_eef_diff"]) - float(reference_row["final_eef_diff"]),
+                    "final_coverage_delta": float(row["final_coverage"]) - float(reference_row["final_coverage"]),
+                    "bits_used_total_delta": float(row["bits_used_total"]) - float(reference_row["bits_used_total"]),
+                    "plan_time_total_sec_delta": float(row["plan_time_total_sec"]) - float(reference_row["plan_time_total_sec"]),
+                }
+            )
+    return paired_rows
+
+
 def aggregate_summary(
     rows: Sequence[dict],
     variant_order: Sequence[str],
+    *,
+    baseline_variant: str | None = None,
 ) -> tuple[list[dict], list[dict]]:
     by_variant: dict[str, list[dict]] = {}
     for row in rows:
@@ -293,7 +345,93 @@ def aggregate_summary(
         for reason, count in reason_counts.items():
             summary_row[f"termination_reason__{_safe_name(reason)}"] = int(count)
         summary_rows.append(summary_row)
-    return summary_rows, []
+    paired_rows = _paired_rows_vs_reference(
+        rows,
+        reference_variant=str(baseline_variant or ""),
+        variant_order=ordered_variant_names,
+    )
+    return summary_rows, paired_rows
+
+
+def _experiment_payload(
+    spec: ExperimentSpec,
+    *,
+    run_ts: str,
+    variant_order: Sequence[str],
+) -> dict[str, Any]:
+    return {
+        "schema_version": EXPERIMENT_SCHEMA_VERSION,
+        "reviewer_version": REVIEWER_SCHEMA_VERSION,
+        "experiment_name": spec.name,
+        "created_at": run_ts,
+        "baseline_variant": spec.baseline or "",
+        "variant_order": list(variant_order),
+        "num_rollouts": int(spec.rollouts["num_rollouts"]),
+        "rollouts": dict(spec.rollouts),
+        "execution": dict(spec.execution),
+        "terminal": dict(spec.terminal),
+        "reporting": dict(spec.reporting),
+        "shared_plan": OmegaConf.to_container(spec.shared_plan.clean_cfg, resolve=True),
+        "variants": [
+            {
+                "name": variant.name,
+                "plan": OmegaConf.to_container(variant.plan.clean_cfg, resolve=True),
+            }
+            for variant in spec.variants
+        ],
+    }
+
+
+def _write_experiment_bundle_snapshot(
+    run_dir: str,
+    *,
+    experiment_payload: dict[str, Any],
+    selected_rollouts: Sequence[dict[str, Any]],
+    rows: Sequence[dict[str, Any]],
+    variant_order: Sequence[str],
+    total_runs: int,
+) -> None:
+    run_rows = sorted(
+        list(rows),
+        key=lambda row: (
+            int(row.get("rollout_index", -1)),
+            str(row.get("variant_name", "")),
+            str(row.get("rollout_id", "")),
+        ),
+    )
+    variant_rows: list[dict[str, Any]] = []
+    paired_rows: list[dict[str, Any]] = []
+    if len(run_rows) > 0:
+        variant_rows, paired_rows = aggregate_summary(
+            run_rows,
+            variant_order=variant_order,
+            baseline_variant=str(experiment_payload.get("baseline_variant", "")),
+        )
+
+    completed_runs = int(len(run_rows))
+    if total_runs <= 0:
+        bundle_status = "complete"
+    elif completed_runs <= 0:
+        bundle_status = "pending"
+    elif completed_runs < int(total_runs):
+        bundle_status = "running"
+    else:
+        bundle_status = "complete"
+
+    payload = dict(experiment_payload)
+    payload["completed_runs"] = completed_runs
+    payload["total_runs"] = int(total_runs)
+    payload["bundle_status"] = bundle_status
+    payload["partial_bundle"] = bundle_status != "complete"
+
+    write_experiment_bundle(
+        run_dir,
+        experiment_payload=payload,
+        selected_rollouts=selected_rollouts,
+        run_rows=run_rows,
+        variant_rows=variant_rows,
+        paired_rows=paired_rows,
+    )
 
 
 def _run_variant_task(task: dict) -> dict:
@@ -632,105 +770,281 @@ def _group_wm_variants(variants: Sequence[ExperimentVariant]) -> tuple[list[list
     return batched, singles
 
 
+def _normalize_execution_mode(mode: str | None) -> str:
+    exec_mode = str(mode or "auto").lower()
+    if exec_mode == "auto":
+        return "process"
+    return exec_mode
+
+
+def _build_variant_task(
+    *,
+    variant: ExperimentVariant,
+    selection: dict,
+    run_root: str,
+    terminal_mode: str,
+    backend_kind: str,
+    lane_key: str,
+) -> dict[str, Any]:
+    return {
+        "cfg": OmegaConf.to_container(variant.plan.runtime_cfg, resolve=True),
+        "selection": selection,
+        "variant_name": variant.name,
+        "run_dir": trace_dir(run_root, variant.name, selection["rollout_id"]),
+        "terminal_mode": terminal_mode,
+        "backend_kind": backend_kind,
+        "lane_key": lane_key,
+    }
+
+
+def _build_execution_lanes(
+    spec: ExperimentSpec,
+    *,
+    selected: Sequence[dict],
+    run_root: str,
+    terminal_mode: str,
+) -> list[dict[str, Any]]:
+    lanes: list[dict[str, Any]] = []
+    batched_groups, single_variants = _group_wm_variants(spec.variants)
+    for selection in selected:
+        for group_idx, variants in enumerate(batched_groups):
+            lanes.append(
+                {
+                    "lane_type": "wm_batch",
+                    "backend_kind": "wm",
+                    "lane_key": f"wm_batch:{selection['rollout_id']}:{group_idx}",
+                    "selection": selection,
+                    "variants": list(variants),
+                    "seed_base": int(spec.rollouts["seed"] + 100003 * selection["rollout_index"] + 10007 * group_idx),
+                }
+            )
+
+    tasks_by_backend: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for selection in selected:
+        for variant in single_variants:
+            backend_kind = variant.plan.active_backend_kind()
+            lane_key = f"task_pool:{backend_kind}"
+            tasks_by_backend[backend_kind].append(
+                _build_variant_task(
+                    variant=variant,
+                    selection=selection,
+                    run_root=run_root,
+                    terminal_mode=terminal_mode,
+                    backend_kind=backend_kind,
+                    lane_key=lane_key,
+                )
+            )
+
+    for backend_kind in ("wm", "particle_sim", "gt_env"):
+        tasks = tasks_by_backend.get(backend_kind, [])
+        if len(tasks) <= 0:
+            continue
+        lanes.append(
+            {
+                "lane_type": "task_pool",
+                "backend_kind": backend_kind,
+                "lane_key": f"task_pool:{backend_kind}",
+                "tasks": tasks,
+            }
+        )
+    return lanes
+
+
+def _normalize_device_slots(device_slots: Any) -> list[str]:
+    if device_slots is None:
+        return []
+    if isinstance(device_slots, str):
+        slots = [device_slots]
+    else:
+        slots = list(device_slots)
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for slot in slots:
+        slot_name = str(slot).strip()
+        if not slot_name or slot_name in seen:
+            continue
+        seen.add(slot_name)
+        normalized.append(slot_name)
+    return normalized
+
+
+def _particle_task_requested_device(task: dict[str, Any]) -> str:
+    cfg = task.get("cfg", {})
+    particle_env = cfg.get("particle_env", {}) if isinstance(cfg, dict) else {}
+    fidelity_env = particle_env.get("fidelity_env", {}) if isinstance(particle_env, dict) else {}
+    requested = str(fidelity_env.get("device", "auto")).strip().lower()
+    if requested in {"", "auto"}:
+        return "cuda:0" if torch.cuda.is_available() else "cpu"
+    if requested == "cuda":
+        return "cuda:0"
+    return requested
+
+
+def _task_with_particle_device(task: dict[str, Any], device_slot: str) -> dict[str, Any]:
+    patched = dict(task)
+    cfg = copy.deepcopy(task.get("cfg", {}))
+    particle_env = cfg.setdefault("particle_env", {})
+    fidelity_env = particle_env.setdefault("fidelity_env", {})
+    fidelity_env["device"] = str(device_slot)
+    patched["cfg"] = cfg
+    patched["device_slot"] = str(device_slot)
+    return patched
+
+
+def _prepare_task_lane(
+    tasks: Sequence[dict[str, Any]],
+    *,
+    backend_kind: str,
+    max_workers: int,
+    device_slots: Any = None,
+) -> tuple[list[dict[str, Any]], int]:
+    lane_tasks = list(tasks)
+    worker_count = min(int(max_workers), max(1, len(lane_tasks)))
+    if len(lane_tasks) <= 0 or str(backend_kind) != "particle_sim":
+        return lane_tasks, worker_count
+
+    normalized_slots = _normalize_device_slots(device_slots)
+    if len(normalized_slots) > 0:
+        slotted_tasks = [
+            _task_with_particle_device(task, normalized_slots[idx % len(normalized_slots)])
+            for idx, task in enumerate(lane_tasks)
+        ]
+        return slotted_tasks, min(worker_count, len(normalized_slots))
+
+    resolved_device = _particle_task_requested_device(lane_tasks[0])
+    if not resolved_device.startswith("cuda"):
+        return lane_tasks, worker_count
+
+    pinned_tasks = [
+        _task_with_particle_device(task, resolved_device)
+        for task in lane_tasks
+    ]
+    return pinned_tasks, 1
+
+
+def _run_task_lane(
+    tasks: Sequence[dict[str, Any]],
+    *,
+    exec_mode: str,
+    max_workers: int,
+    lane_key: str,
+    backend_kind: str,
+    device_slots: Any = None,
+    row_callback: Callable[[dict[str, Any]], None] | None = None,
+) -> list[dict]:
+    lane_rows: list[dict] = []
+    if len(tasks) <= 0:
+        return lane_rows
+    lane_tasks, worker_count = _prepare_task_lane(
+        tasks,
+        backend_kind=backend_kind,
+        max_workers=max_workers,
+        device_slots=device_slots,
+    )
+    if exec_mode == "process":
+        try:
+            with ProcessPoolExecutor(max_workers=worker_count) as ex:
+                futures = [ex.submit(_run_variant_task, task) for task in lane_tasks]
+                for fut in as_completed(futures):
+                    row = fut.result()
+                    lane_rows.append(row)
+            if row_callback is not None:
+                for row in lane_rows:
+                    row_callback(row)
+            return lane_rows
+        except Exception as exc:
+            print(
+                f"[experiment][warn] process parallelism unavailable ({exc}); "
+                f"falling back to serial. lane={lane_key}"
+            )
+    for task in lane_tasks:
+        row = _run_variant_task(task)
+        lane_rows.append(row)
+        if row_callback is not None:
+            row_callback(row)
+    return lane_rows
+
+
 def run_experiment(spec_or_path: str | ExperimentSpec, *, output_root: str | None = None) -> str:
     spec = load_experiment_spec(spec_or_path) if isinstance(spec_or_path, str) else spec_or_path
     candidates = enumerate_rollout_candidates(spec.shared_plan)
     selected = select_rollouts(spec.rollouts, candidates)
     variant_order = spec.variant_names()
+    total_runs = len(selected) * len(spec.variants)
     terminal_mode = str(spec.terminal.get("mode", "compact")).lower()
-    progress = _ExperimentProgress(total_runs=len(selected) * len(spec.variants), mode=terminal_mode)
+    progress = _ExperimentProgress(total_runs=total_runs, mode=terminal_mode)
 
     run_ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_root = output_root or spec.reporting.get("output_root", "rollouts")
     run_dir = os.path.join(str(run_root), f"experiment_{_safe_name(spec.name)}_{run_ts}")
     os.makedirs(run_dir, exist_ok=True)
 
+    experiment_payload = _experiment_payload(spec, run_ts=run_ts, variant_order=variant_order)
     rows: list[dict] = []
-    batched_groups, single_variants = _group_wm_variants(spec.variants)
-    for selection in selected:
-        for group_idx, variants in enumerate(batched_groups):
-            seed_base = int(spec.rollouts["seed"] + 100003 * selection["rollout_index"] + 10007 * group_idx)
-            group_rows = _run_wm_batched_variants(
-                variants=variants,
-                selection=selection,
+    _write_experiment_bundle_snapshot(
+        run_dir,
+        experiment_payload=experiment_payload,
+        selected_rollouts=selected,
+        rows=rows,
+        variant_order=variant_order,
+        total_runs=total_runs,
+    )
+
+    def _record_row(row: dict[str, Any]) -> None:
+        rows.append(row)
+        progress.advance(row)
+        _write_experiment_bundle_snapshot(
+            run_dir,
+            experiment_payload=experiment_payload,
+            selected_rollouts=selected,
+            rows=rows,
+            variant_order=variant_order,
+            total_runs=total_runs,
+        )
+
+    exec_mode = _normalize_execution_mode(spec.execution.get("mode", "auto"))
+    max_workers = int(spec.execution.get("max_workers", 1))
+    lanes = _build_execution_lanes(
+        spec,
+        selected=selected,
+        run_root=run_dir,
+        terminal_mode=terminal_mode,
+    )
+    for lane in lanes:
+        if lane["lane_type"] == "wm_batch":
+            lane_rows = _run_wm_batched_variants(
+                variants=lane["variants"],
+                selection=lane["selection"],
                 run_root=run_dir,
-                seed_base=seed_base,
+                seed_base=int(lane["seed_base"]),
                 terminal_mode=terminal_mode,
             )
-            rows.extend(group_rows)
-            for row in group_rows:
-                progress.advance(row)
-
-    tasks = []
-    for selection in selected:
-        for variant in single_variants:
-            tasks.append(
-                {
-                    "cfg": OmegaConf.to_container(variant.plan.runtime_cfg, resolve=True),
-                    "selection": selection,
-                    "variant_name": variant.name,
-                    "run_dir": trace_dir(run_dir, variant.name, selection["rollout_id"]),
-                    "terminal_mode": terminal_mode,
-                }
+            for row in lane_rows:
+                _record_row(row)
+        else:
+            _run_task_lane(
+                lane["tasks"],
+                exec_mode=exec_mode,
+                max_workers=max_workers,
+                lane_key=str(lane["lane_key"]),
+                backend_kind=str(lane["backend_kind"]),
+                device_slots=(
+                    spec.execution.get("particle", {}).get("device_slots")
+                    if str(lane["backend_kind"]) == "particle_sim"
+                    else None
+                ),
+                row_callback=_record_row,
             )
 
-    exec_mode = str(spec.execution.get("mode", "auto")).lower()
-    if exec_mode == "auto":
-        exec_mode = "process"
-    if exec_mode == "process" and len(tasks) > 0:
-        max_workers = min(int(spec.execution.get("max_workers", 1)), max(1, len(tasks)))
-        try:
-            with ProcessPoolExecutor(max_workers=max_workers) as ex:
-                futures = [ex.submit(_run_variant_task, task) for task in tasks]
-                for fut in as_completed(futures):
-                    row = fut.result()
-                    rows.append(row)
-                    progress.advance(row)
-        except Exception as exc:
-            print(f"[experiment][warn] process parallelism unavailable ({exc}); falling back to serial.")
-            for task in tasks:
-                row = _run_variant_task(task)
-                rows.append(row)
-                progress.advance(row)
-    else:
-        for task in tasks:
-            row = _run_variant_task(task)
-            rows.append(row)
-            progress.advance(row)
-
     progress.finish()
-
-    rows = sorted(rows, key=lambda row: (row["rollout_index"], row["variant_name"]))
-    summary_rows, paired_rows = aggregate_summary(
-        rows,
-        variant_order=variant_order,
-    )
-    write_experiment_bundle(
+    rows_sorted = sorted(rows, key=lambda row: (row["rollout_index"], row["variant_name"]))
+    _write_experiment_bundle_snapshot(
         run_dir,
-        experiment_payload={
-            "schema_version": EXPERIMENT_SCHEMA_VERSION,
-            "reviewer_version": REVIEWER_SCHEMA_VERSION,
-            "experiment_name": spec.name,
-            "created_at": run_ts,
-            "variant_order": variant_order,
-            "num_rollouts": int(spec.rollouts["num_rollouts"]),
-            "rollouts": dict(spec.rollouts),
-            "execution": dict(spec.execution),
-            "terminal": dict(spec.terminal),
-            "reporting": dict(spec.reporting),
-            "shared_plan": OmegaConf.to_container(spec.shared_plan.clean_cfg, resolve=True),
-            "variants": [
-                {
-                    "name": variant.name,
-                    "plan": OmegaConf.to_container(variant.plan.clean_cfg, resolve=True),
-                }
-                for variant in spec.variants
-            ],
-        },
+        experiment_payload=experiment_payload,
         selected_rollouts=selected,
-        run_rows=rows,
-        variant_rows=summary_rows,
-        paired_rows=paired_rows,
+        rows=rows_sorted,
+        variant_order=variant_order,
+        total_runs=total_runs,
     )
     if terminal_mode != "quiet":
         print(f"[experiment] wrote results to {run_dir}")

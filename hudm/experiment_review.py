@@ -57,6 +57,11 @@ REVIEW_MEDIA = (
     "gt_replay",
 )
 
+PLANNER_BACKEND_MEDIA = (
+    "planner_view_replay",
+    "predicted_backend_replay",
+)
+
 CANONICAL_DOWNLOADS = (
     EXPERIMENT_JSON,
     RUNS_CSV,
@@ -479,9 +484,69 @@ def _build_review_data(
     )
 
 
-def _load_partial_experiment_review_data(run_dir: str) -> ExperimentReviewData:
+def _empty_experiment_review_data(
+    run_dir: str,
+    *,
+    meta: dict[str, Any] | None = None,
+) -> ExperimentReviewData:
+    payload = {
+        "schema_version": EXPERIMENT_SCHEMA_VERSION,
+        "reviewer_version": REVIEWER_SCHEMA_VERSION,
+        "experiment_name": os.path.basename(os.path.abspath(run_dir)),
+        "baseline_variant": "",
+        "variant_order": [],
+        "partial_bundle": True,
+        "bundle_status": "pending",
+    }
+    if meta is not None:
+        payload.update(dict(meta))
+    payload["experiment_name"] = str(payload.get("experiment_name", os.path.basename(os.path.abspath(run_dir))))
+    payload["baseline_variant"] = str(payload.get("baseline_variant", ""))
+    payload["variant_order"] = [str(name) for name in payload.get("variant_order", [])]
+    return _build_review_data(
+        run_dir=os.path.abspath(run_dir),
+        meta=payload,
+        variant_rows=[],
+        run_rows=[],
+        paired_rows=[],
+    )
+
+
+def _resolved_variant_order(
+    discovered_variant_names: Sequence[str],
+    *,
+    meta: dict[str, Any] | None = None,
+) -> list[str]:
+    discovered = [str(name) for name in discovered_variant_names]
+    configured = [str(name) for name in (meta or {}).get("variant_order", [])]
+    ordered = [name for name in configured if name in discovered]
+    ordered.extend(name for name in discovered if name not in ordered)
+    if len(ordered) > 0:
+        return ordered
+    return configured
+
+
+def _resolved_baseline_variant(
+    variant_order: Sequence[str],
+    *,
+    meta: dict[str, Any] | None = None,
+) -> str:
+    configured = str((meta or {}).get("baseline_variant", "")).strip()
+    if configured and configured in {str(name) for name in variant_order}:
+        return configured
+    return str(variant_order[0]) if len(variant_order) > 0 else ""
+
+
+def _load_partial_experiment_review_data(
+    run_dir: str,
+    *,
+    meta: dict[str, Any] | None = None,
+    allow_empty: bool = False,
+) -> ExperimentReviewData:
     paths = bundle_paths(run_dir)
     if not os.path.isdir(paths.traces_dir):
+        if allow_empty and os.path.isdir(paths.root):
+            return _empty_experiment_review_data(paths.root, meta=meta)
         raise FileNotFoundError(f"Experiment bundle metadata not found: {paths.experiment_json}")
 
     variant_names = sorted(
@@ -504,23 +569,38 @@ def _load_partial_experiment_review_data(run_dir: str) -> ExperimentReviewData:
         if len(run_rows) > variant_rows_before:
             variant_order.append(str(variant_name))
     if len(run_rows) <= 0:
+        if allow_empty:
+            pending_meta = dict(meta or {})
+            variant_order = _resolved_variant_order(variant_names, meta=pending_meta)
+            pending_meta["variant_order"] = variant_order
+            pending_meta["baseline_variant"] = _resolved_baseline_variant(
+                variant_order,
+                meta=pending_meta,
+            )
+            pending_meta["partial_bundle"] = True
+            pending_meta.setdefault("bundle_status", "pending")
+            return _empty_experiment_review_data(paths.root, meta=pending_meta)
         raise FileNotFoundError(f"No completed trace rows found under {paths.traces_dir}")
 
     _assign_partial_rollout_indices(run_rows)
-    baseline_variant = variant_order[0] if len(variant_order) > 0 else ""
-    meta = {
-        "schema_version": EXPERIMENT_SCHEMA_VERSION,
-        "reviewer_version": REVIEWER_SCHEMA_VERSION,
-        "experiment_name": os.path.basename(paths.root),
-        "baseline_variant": baseline_variant,
-        "variant_order": variant_order,
-        "partial_bundle": True,
-        "bundle_status": "partial",
-    }
+    variant_order = _resolved_variant_order(variant_names, meta=meta)
+    baseline_variant = _resolved_baseline_variant(variant_order, meta=meta)
+    meta_payload = dict(meta or {})
+    meta_payload.update(
+        {
+            "schema_version": EXPERIMENT_SCHEMA_VERSION,
+            "reviewer_version": REVIEWER_SCHEMA_VERSION,
+            "experiment_name": str(meta_payload.get("experiment_name", os.path.basename(paths.root))),
+            "baseline_variant": baseline_variant,
+            "variant_order": variant_order,
+            "partial_bundle": True,
+            "bundle_status": "partial",
+        }
+    )
     variant_rows = _variant_summary_rows_from_runs(run_rows, variant_order=variant_order)
     data = _build_review_data(
         run_dir=paths.root,
-        meta=meta,
+        meta=meta_payload,
         variant_rows=variant_rows,
         run_rows=run_rows,
         paired_rows=[],
@@ -530,7 +610,7 @@ def _load_partial_experiment_review_data(run_dir: str) -> ExperimentReviewData:
         paired_rows = _reference_comparison_payload(data, baseline_variant)["paired_rows"]
     return _build_review_data(
         run_dir=paths.root,
-        meta=meta,
+        meta=meta_payload,
         variant_rows=variant_rows,
         run_rows=run_rows,
         paired_rows=paired_rows,
@@ -541,11 +621,18 @@ def _default_reference_variant(data: ExperimentReviewData, *, current_variant: s
     names = [name for name in data.variant_order if data.rows_by_variant.get(name)]
     if len(names) <= 0:
         return ""
+    baseline_variant = data.baseline_variant
+    if current_variant is None:
+        if baseline_variant in names:
+            return baseline_variant
+        return names[0]
     if current_variant is not None:
+        if baseline_variant in names and baseline_variant != str(current_variant):
+            return baseline_variant
         for name in names:
             if name != str(current_variant):
                 return name
-    return names[0]
+    return ""
 
 
 def _reference_comparison_payload(data: ExperimentReviewData, reference_variant: str) -> dict[str, Any]:
@@ -625,12 +712,16 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
 def load_experiment_review_data(run_dir: str) -> ExperimentReviewData:
     paths = bundle_paths(run_dir)
     if not os.path.isfile(paths.experiment_json):
-        return _load_partial_experiment_review_data(paths.root)
+        visible_entries = []
+        if os.path.isdir(paths.root):
+            visible_entries = [entry for entry in os.listdir(paths.root) if not entry.startswith(".")]
+        allow_empty = len(visible_entries) <= 0 or os.path.isdir(paths.traces_dir)
+        return _load_partial_experiment_review_data(paths.root, allow_empty=allow_empty)
     with open(paths.experiment_json, "r", encoding="utf-8") as f:
         meta = json.load(f)
     run_rows = _read_csv_rows(paths.runs_csv)
     if len(run_rows) <= 0:
-        return _load_partial_experiment_review_data(paths.root)
+        return _load_partial_experiment_review_data(paths.root, meta=meta, allow_empty=True)
     variant_rows = _read_csv_rows(paths.variants_csv)
     paired_rows = _read_csv_rows(paths.paired_vs_baseline_csv)
     return _build_review_data(
@@ -2122,6 +2213,17 @@ def _media_backend_label(trace_meta: dict[str, Any] | None) -> str:
     return "planner backend"
 
 
+def _media_display_name(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
+    backend_label = _media_backend_label(trace_meta)
+    names = {
+        "closed_loop_replay": "Closed-Loop Replay (GT env)",
+        "planner_view_replay": f"Planner-View Replay ({backend_label})",
+        "predicted_backend_replay": f"Predicted-Backend Replay ({backend_label})",
+        "gt_replay": "Dataset Replay (GT env)",
+    }
+    return names.get(media_name, media_name.replace("_", " ").title())
+
+
 def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
     backend_label = _media_backend_label(trace_meta)
     descriptions = {
@@ -2152,7 +2254,7 @@ def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = N
 def _media_title_html(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
     description = html.escape(_media_description(media_name, trace_meta=trace_meta))
     return (
-        f"{html.escape(media_name)}"
+        f"{html.escape(_media_display_name(media_name, trace_meta=trace_meta))}"
         f" <span class='info-chip' tabindex='0' data-tooltip='{description}' aria-label='{description}'>i</span>"
     )
 
@@ -2213,6 +2315,11 @@ def _media_section_html(
 ) -> str:
     variant = str(row.get("variant_name", ""))
     rollout_id = str(row.get("rollout_id", ""))
+    backend_label = _media_backend_label(trace_meta)
+    render_backend_href = (
+        f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
+        + "".join(f"&media={quote(media_name)}" for media_name in PLANNER_BACKEND_MEDIA)
+    )
     render_all_href = (
         f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
         + "".join(f"&media={quote(media_name)}" for media_name in REVIEW_MEDIA)
@@ -2222,7 +2329,9 @@ def _media_section_html(
         f"<section class='card' id='mediaSection' data-variant='{html.escape(variant)}' "
         f"data-rollout-id='{html.escape(rollout_id)}' data-active-media='{'true' if active_media else 'false'}'>"
         "<h2>Media</h2>"
-        f"<p><a class='button primary' data-async-render='true' href='{render_all_href}'>Render all review media</a></p>"
+        f"<p class='muted'>Execution replays use the GT environment. Planner-view and predicted-backend replays use this run's planner backend (<code>{html.escape(backend_label)}</code>).</p>"
+        f"<p><a class='button primary' data-async-render='true' href='{render_backend_href}'>Render planner-backend media</a> "
+        f"<a class='button' data-async-render='true' href='{render_all_href}'>Render all media for this run</a></p>"
         "<div class='media-grid'>"
         f"{_media_panel_html(data, row, media_tasks=media_tasks, trace_meta=trace_meta)}"
         "</div>"
@@ -2254,11 +2363,60 @@ def _representative_run_rows(rows: Sequence[dict[str, Any]], *, success: bool, l
 
 
 def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None) -> str:
+    variant_count = len(data.variant_order) if len(data.variant_order) > 0 else len(data.variant_rows)
+    baseline_variant = data.baseline_variant
     kpi_items: list[tuple[str, str]] = [
         ("Experiment", data.experiment_name),
-        ("Variants", str(len(data.variant_rows))),
+        ("Variants", str(variant_count)),
         ("Runs", str(len(data.run_rows))),
     ]
+    completed_runs = int(data.meta.get("completed_runs", len(data.run_rows)))
+    total_runs = int(data.meta.get("total_runs", len(data.run_rows)))
+    if total_runs > 0:
+        kpi_items.append(("Progress", f"{completed_runs}/{total_runs}"))
+    if len(data.run_rows) <= 0:
+        waiting_message = "Waiting for the first completed rollout. This page refreshes automatically."
+        if len(data.variant_order) <= 0:
+            waiting_message = "Waiting for experiment bundle metadata or the first completed rollout. This page refreshes automatically."
+        configured_variants_html = ""
+        if len(data.variant_order) > 0:
+            configured_variants_html = (
+                "<section class='card'>"
+                "<h2>Configured Variants</h2>"
+                "<ul>"
+                + "".join(f"<li><code>{html.escape(variant_name)}</code></li>" for variant_name in data.variant_order)
+                + "</ul>"
+                "</section>"
+            )
+        downloads_html = _downloads_html(data)
+        downloads_section = (
+            f"<section class='card'><h2>Downloads</h2><ul>{downloads_html}</ul></section>"
+            if downloads_html
+            else ""
+        )
+        body = f"""
+  {_notice_html(notice)}
+  <section class='card'>
+    <div class='hero'>
+      <div>
+        <h1>{html.escape(data.experiment_name)}</h1>
+        <p class='muted'>Interactive review for experiment bundle <code>{html.escape(os.path.relpath(data.run_dir, os.getcwd()))}</code></p>
+        {f"<p class='muted'>Configured baseline/reference variant: <code>{html.escape(baseline_variant)}</code></p>" if baseline_variant else ""}
+      </div>
+      <div class='nav-links'>
+        <a class='button' href='/'>Overview</a>
+      </div>
+    </div>
+  </section>
+  <section class='kpi-grid'>{_kpi_cards(kpi_items)}</section>
+  <section class='card'>
+    <h2>Bundle Status</h2>
+    <p class='muted'>{html.escape(waiting_message)}</p>
+  </section>
+  {configured_variants_html}
+  {downloads_section}
+"""
+        return _base_page(f"{data.experiment_name} review", body, auto_refresh_seconds=3)
     if len(data.variant_rows) == 1:
         only_variant = data.variant_rows[0]
         kpi_items.extend(
@@ -2344,6 +2502,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
       <div>
         <h1>{html.escape(data.experiment_name)}</h1>
         <p class='muted'>Interactive review for experiment bundle <code>{html.escape(os.path.relpath(data.run_dir, os.getcwd()))}</code></p>
+        {f"<p class='muted'>Configured baseline/reference variant: <code>{html.escape(baseline_variant)}</code></p>" if baseline_variant else ""}
       </div>
       <div class='nav-links'>
         <a class='button' href='/'>Overview</a>
@@ -2484,6 +2643,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
       <div>
         <h1>{html.escape(data.experiment_name)}</h1>
         <p class='muted'>Interactive review for experiment bundle <code>{html.escape(os.path.relpath(data.run_dir, os.getcwd()))}</code></p>
+        {f"<p class='muted'>Configured baseline/reference variant: <code>{html.escape(baseline_variant)}</code></p>" if baseline_variant else ""}
       </div>
       <div class='nav-links'>
         <a class='button' href='/'>Overview</a>
@@ -2557,6 +2717,16 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
     if len(rows) <= 0:
         raise KeyError(f"Unknown variant: {variant_name}")
     variant_row = data.variant_by_name[variant_name]
+    baseline_variant = data.baseline_variant
+    baseline_note = ""
+    if baseline_variant:
+        if variant_name == baseline_variant:
+            baseline_note = "<p class='muted'>This is the configured baseline/reference variant for experiment-level comparisons.</p>"
+        else:
+            baseline_note = (
+                "<p class='muted'>Default reference comparisons use "
+                f"<code>{html.escape(baseline_variant)}</code>.</p>"
+            )
     success_fig = _figure_html(_variant_success_figure(rows, variant_name))
     final_metrics_fig = _figure_html(_variant_histogram_figure(rows, metric_specs=FINAL_METRIC_SPECS, title=f"{variant_name}: Final Metric Distributions"))
     compute_metrics_fig = _figure_html(_variant_histogram_figure(rows, metric_specs=COMPUTE_METRIC_SPECS, title=f"{variant_name}: Compute and Effort Distributions"))
@@ -2636,6 +2806,7 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
         <p><a href='/'>&larr; Back to experiment overview</a></p>
         <h1>{html.escape(variant_name)}</h1>
         <p class='muted'>Variant detail page with success analysis, distributions, stepwise traces, and reference comparisons.</p>
+        {baseline_note}
       </div>
       <div class='nav-links'>
         <a class='button' href='/'>Overview</a>
