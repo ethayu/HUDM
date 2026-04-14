@@ -85,6 +85,351 @@ def _wrap_pi(a: float) -> float:
     return (a + math.pi) % (2.0 * math.pi) - math.pi
 
 
+def _gt_tee_body_com_local(
+    stem_w: float,
+    stem_h: float,
+    bar_w: float,
+    bar_h: float,
+) -> np.ndarray:
+    del stem_w, bar_w
+    bar_cog_y = 0.5 * float(bar_h)
+    stem_cog_y = float(bar_h) + 0.5 * float(stem_h)
+    return np.asarray([0.0, 0.5 * (bar_cog_y + stem_cog_y), 0.0], dtype=np.float32)
+
+
+def _rect_moment_about_origin(
+    mass: float,
+    width: float,
+    height: float,
+    centroid_xy: Sequence[float],
+) -> float:
+    cx, cy = float(centroid_xy[0]), float(centroid_xy[1])
+    return float(mass) * (
+        ((float(width) * float(width)) + (float(height) * float(height))) / 12.0
+        + cx * cx
+        + cy * cy
+    )
+
+
+def _gt_tee_body_inertia(
+    stem_w: float,
+    stem_h: float,
+    bar_w: float,
+    bar_h: float,
+) -> float:
+    del stem_w, stem_h
+    # Match PushTEnv.add_tee() exactly, including its current duplicated
+    # inertia term for the second rectangle.
+    bar_centroid = np.asarray([0.0, 0.5 * float(bar_h)], dtype=np.float32)
+    bar_inertia = _rect_moment_about_origin(
+        mass=1.0,
+        width=float(bar_w),
+        height=float(bar_h),
+        centroid_xy=bar_centroid,
+    )
+    return float(bar_inertia + bar_inertia)
+
+
+def _closest_point_on_segment(
+    point_xy: Sequence[float],
+    seg_start_xy: Sequence[float],
+    seg_end_xy: Sequence[float],
+) -> tuple[np.ndarray, float]:
+    point = np.asarray(point_xy, dtype=np.float32).reshape(2)
+    start = np.asarray(seg_start_xy, dtype=np.float32).reshape(2)
+    end = np.asarray(seg_end_xy, dtype=np.float32).reshape(2)
+    seg = end - start
+    seg_len2 = float(np.dot(seg, seg))
+    if seg_len2 <= 1e-12:
+        return start.astype(np.float32), 0.0
+    t = float(np.clip(np.dot(point - start, seg) / seg_len2, 0.0, 1.0))
+    return (start + seg * t).astype(np.float32), t
+
+
+def _swept_particle_contact(
+    pusher_start: Sequence[float],
+    pusher_end: Sequence[float],
+    particle_xy: Sequence[float],
+    *,
+    pusher_r: float,
+    pr: float,
+) -> dict[str, object]:
+    particle = np.asarray(particle_xy, dtype=np.float32).reshape(2)
+    closest_xy, t = _closest_point_on_segment(particle, pusher_start, pusher_end)
+    delta = particle - closest_xy
+    dist = float(np.linalg.norm(delta))
+    min_dist = float(pusher_r) + float(pr)
+    hit = dist < min_dist
+    normal = np.zeros((2,), dtype=np.float32)
+    if hit:
+        if dist > 1e-8:
+            normal = (delta / dist).astype(np.float32)
+        else:
+            seg = np.asarray(pusher_end, dtype=np.float32).reshape(2) - np.asarray(pusher_start, dtype=np.float32).reshape(2)
+            seg_norm = float(np.linalg.norm(seg))
+            if seg_norm > 1e-8:
+                normal = np.asarray([-seg[1] / seg_norm, seg[0] / seg_norm], dtype=np.float32)
+            else:
+                normal = np.asarray([1.0, 0.0], dtype=np.float32)
+    return {
+        "hit": bool(hit),
+        "toi": float(t),
+        "closest_xy": closest_xy.astype(np.float32),
+        "penetration": max(0.0, min_dist - dist),
+        "min_dist": float(min_dist),
+        "normal_xy": normal.astype(np.float32),
+    }
+
+
+def _normalize_particle_radii(particle_xy: np.ndarray, pr: float | Sequence[float] | np.ndarray) -> np.ndarray:
+    pts = np.asarray(particle_xy, dtype=np.float32).reshape(-1, 2)
+    radii = np.asarray(pr, dtype=np.float32).reshape(-1)
+    if radii.size == 1:
+        return np.full((pts.shape[0],), float(radii[0]), dtype=np.float32)
+    if radii.shape[0] != pts.shape[0]:
+        raise ValueError(
+            f"particle radii shape mismatch: got {radii.shape[0]} radii for {pts.shape[0]} particles"
+        )
+    return radii.astype(np.float32)
+
+
+def _resolve_particle_union_endpoint(
+    pusher_start: Sequence[float],
+    pusher_end: Sequence[float],
+    particle_xy: np.ndarray,
+    *,
+    pusher_r: float,
+    pr: float | Sequence[float] | np.ndarray,
+    eps: float = 1e-5,
+    max_iters: int = 16,
+) -> np.ndarray:
+    start = np.asarray(pusher_start, dtype=np.float32).reshape(2)
+    end = np.asarray(pusher_end, dtype=np.float32).reshape(2)
+    pts = np.asarray(particle_xy, dtype=np.float32).reshape(-1, 2)
+    radii = _normalize_particle_radii(pts, pr)
+    seg = end - start
+    seg_len2 = float(np.dot(seg, seg))
+
+    best_t = 1.0
+    if pts.shape[0] > 0:
+        start_d = np.linalg.norm(start[None, :] - pts, axis=1)
+        if np.any(start_d < (float(pusher_r) + radii)):
+            best_t = 0.0
+    if seg_len2 > 1e-12:
+        for center, radius in zip(pts, radii):
+            min_dist = float(pusher_r) + float(radius)
+            rel = start - center
+            if float(np.dot(rel, rel)) <= (min_dist * min_dist):
+                continue
+            a = seg_len2
+            b = 2.0 * float(np.dot(rel, seg))
+            c = float(np.dot(rel, rel) - (min_dist * min_dist))
+            disc = b * b - 4.0 * a * c
+            if disc < 0.0:
+                continue
+            sqrt_disc = math.sqrt(max(disc, 0.0))
+            t0 = (-b - sqrt_disc) / (2.0 * a)
+            if 0.0 <= t0 <= best_t:
+                best_t = float(t0)
+
+    point = (start + seg * best_t).astype(np.float32)
+    fallback_dir = seg.astype(np.float32)
+    if float(np.linalg.norm(fallback_dir)) <= 1e-8:
+        fallback_dir = np.asarray([1.0, 0.0], dtype=np.float32)
+
+    for _ in range(max_iters):
+        max_pen = 0.0
+        best_push = None
+        for center, radius in zip(pts, radii):
+            min_dist = float(pusher_r) + float(radius)
+            delta = point - center
+            dist = float(np.linalg.norm(delta))
+            pen = min_dist - dist
+            if pen <= 0.0:
+                continue
+            if dist > 1e-8:
+                normal = (delta / dist).astype(np.float32)
+            else:
+                dir_norm = float(np.linalg.norm(fallback_dir))
+                if dir_norm > 1e-8:
+                    normal = (fallback_dir / dir_norm).astype(np.float32)
+                else:
+                    normal = np.asarray([1.0, 0.0], dtype=np.float32)
+            if pen > max_pen:
+                max_pen = float(pen)
+                best_push = normal * float(pen + eps)
+        if best_push is None:
+            break
+        point = (point + best_push).astype(np.float32)
+        fallback_dir = best_push.astype(np.float32)
+
+    return point.astype(np.float32)
+
+
+def _resolve_particle_contact(
+    pusher_start: Sequence[float],
+    pusher_end: Sequence[float],
+    pusher_r: float,
+    particle_xy: np.ndarray,
+    particle_r: float | Sequence[float] | np.ndarray,
+) -> dict[str, object]:
+    pts = np.asarray(particle_xy, dtype=np.float32).reshape(-1, 2)
+    radii = _normalize_particle_radii(pts, particle_r)
+
+    best_hit: Optional[dict[str, object]] = None
+    for center, radius in zip(pts, radii):
+        hit = _swept_particle_contact(
+            pusher_start,
+            pusher_end,
+            center,
+            pusher_r=float(pusher_r),
+            pr=float(radius),
+        )
+        if not bool(hit["hit"]):
+            continue
+        if best_hit is None or float(hit["toi"]) < float(best_hit["toi"]):
+            best_hit = hit
+
+    projected_xy = _resolve_particle_union_endpoint(
+        pusher_start,
+        pusher_end,
+        pts,
+        pusher_r=float(pusher_r),
+        pr=radii,
+    )
+
+    result: dict[str, object] = {
+        "hit": bool(best_hit is not None),
+        "collided": bool(best_hit is not None),
+        "toi": float(best_hit["toi"]) if best_hit is not None else 1.0,
+        "projected_xy": projected_xy.astype(np.float32),
+        "resolved_xy": projected_xy.astype(np.float32),
+        "pusher_end": projected_xy.astype(np.float32),
+    }
+    if best_hit is not None:
+        result["closest_xy"] = np.asarray(best_hit["closest_xy"], dtype=np.float32)
+        result["normal_xy"] = np.asarray(best_hit["normal_xy"], dtype=np.float32)
+        result["penetration"] = float(best_hit["penetration"])
+        result["min_dist"] = float(best_hit["min_dist"])
+    return result
+
+
+def _fit_contact_rigid_delta(
+    points_xy: np.ndarray,
+    delta_xy: np.ndarray,
+    weights: np.ndarray,
+    center_xy: Sequence[float],
+    inertia: float = 1.0,
+    ridge: float = 1e-8,
+) -> dict[str, float]:
+    del ridge
+    pts = np.asarray(points_xy, dtype=np.float32).reshape(-1, 2)
+    delta = np.asarray(delta_xy, dtype=np.float32).reshape(-1, 2)
+    w = np.asarray(weights, dtype=np.float32).reshape(-1)
+    center = np.asarray(center_xy, dtype=np.float32).reshape(2)
+    if pts.shape[0] != delta.shape[0] or pts.shape[0] != w.shape[0]:
+        raise ValueError("points_xy, delta_xy, and weights must have matching leading dimensions.")
+
+    mask = np.isfinite(w) & (w > 1e-8)
+    mask &= np.all(np.isfinite(pts), axis=1)
+    mask &= np.all(np.isfinite(delta), axis=1)
+    if not np.any(mask):
+        return {
+            "tx": 0.0,
+            "ty": 0.0,
+            "dtheta": 0.0,
+            "raw_dtheta": 0.0,
+            "sum_w": 0.0,
+            "num_contacts": 0.0,
+            "max_disp": 0.0,
+            "r_max": 0.0,
+            "contact_x": 0.0,
+            "contact_y": 0.0,
+            "delta_x": 0.0,
+            "delta_y": 0.0,
+            "lever_x": 0.0,
+            "lever_y": 0.0,
+            "inertia": float(inertia),
+        }
+
+    pts = pts[mask]
+    delta = delta[mask]
+    w = w[mask]
+
+    r = pts - center[None, :]
+    w64 = w.astype(np.float64)
+
+    sum_w = float(np.sum(w64))
+    if sum_w <= 1e-8:
+        return {
+            "tx": 0.0,
+            "ty": 0.0,
+            "dtheta": 0.0,
+            "raw_dtheta": 0.0,
+            "sum_w": 0.0,
+            "num_contacts": 0.0,
+            "max_disp": 0.0,
+            "r_max": 0.0,
+            "contact_x": 0.0,
+            "contact_y": 0.0,
+            "delta_x": 0.0,
+            "delta_y": 0.0,
+            "lever_x": 0.0,
+            "lever_y": 0.0,
+            "inertia": float(inertia),
+        }
+
+    max_disp = float(np.linalg.norm(delta, axis=1).max(initial=0.0))
+    r_max = float(np.linalg.norm(r, axis=1).max(initial=0.0))
+
+    contact_xy = np.sum(pts.astype(np.float64) * w64[:, None], axis=0) / max(sum_w, 1e-8)
+    delta_mean = np.sum(delta.astype(np.float64) * w64[:, None], axis=0) / max(sum_w, 1e-8)
+    lever = contact_xy - center.astype(np.float64)
+    tx = float(delta_mean[0])
+    ty = float(delta_mean[1])
+    inertia = float(inertia)
+    if np.isfinite(inertia) and inertia > 1e-8:
+        raw_dtheta = float((lever[0] * delta_mean[1] - lever[1] * delta_mean[0]) / inertia)
+    else:
+        raw_dtheta = 0.0
+    dtheta = raw_dtheta
+
+    tmag = float(np.hypot(tx, ty))
+    if max_disp > 0.0 and np.isfinite(tmag) and tmag > max_disp:
+        scale = max_disp / max(tmag, 1e-8)
+        tx *= scale
+        ty *= scale
+    elif not np.isfinite(tmag):
+        tx = 0.0
+        ty = 0.0
+
+    if not np.isfinite(dtheta):
+        dtheta = 0.0
+    if max_disp > 0.0:
+        theta_cap = max_disp / max(r_max, 1e-6)
+        dtheta = float(np.clip(dtheta, -theta_cap, theta_cap))
+    else:
+        dtheta = 0.0
+
+    return {
+        "tx": float(tx),
+        "ty": float(ty),
+        "dtheta": float(dtheta),
+        "raw_dtheta": float(raw_dtheta),
+        "sum_w": float(sum_w),
+        "num_contacts": float(pts.shape[0]),
+        "max_disp": float(max_disp),
+        "r_max": float(r_max),
+        "contact_x": float(contact_xy[0]),
+        "contact_y": float(contact_xy[1]),
+        "delta_x": float(delta_mean[0]),
+        "delta_y": float(delta_mean[1]),
+        "lever_x": float(lever[0]),
+        "lever_y": float(lever[1]),
+        "inertia": float(inertia),
+    }
+
+
 @dataclass(frozen=True)
 class PushTParticleLevel:
     rest_offsets: np.ndarray
@@ -420,6 +765,7 @@ class PushTWarpParams:
     min_particles: int = 1
     force_single_particle: bool = False
     rest_offsets: Optional[np.ndarray] = None
+    pose_offset_local: Optional[np.ndarray] = None
 
     particle_radius: Optional[float] = None  # None -> auto-scale with N
     radius_scale: float = 1.0
@@ -494,27 +840,44 @@ if wp is not None:
 
 
     @wp.kernel
-    def _pusher_contact(
+    def _pusher_swept_contact(
         x_prev: wp.array(dtype=wp.vec3),
         x_pred: wp.array(dtype=wp.vec3),
         inv_m: wp.array(dtype=float),
-        pusher_pos: wp.vec3,
+        pusher_start: wp.vec3,
+        pusher_end: wp.vec3,
         pusher_r: float,
         pr: float,
         mu: float,
         contact_alpha: float,
+        contact_delta: wp.array(dtype=wp.vec3),
+        contact_weight: wp.array(dtype=float),
     ):
         i = wp.tid()
+        contact_delta[i] = wp.vec3(0.0, 0.0, 0.0)
+        contact_weight[i] = 0.0
         if inv_m[i] == 0.0:
             return
 
         xi = x_pred[i]
-        d = xi - pusher_pos
+        seg = pusher_end - pusher_start
+        seg_len2 = wp.dot(seg, seg)
+        closest = pusher_start
+        if seg_len2 > 1e-8:
+            t = wp.clamp(wp.dot(xi - pusher_start, seg) / seg_len2, 0.0, 1.0)
+            closest = pusher_start + seg * t
+
+        d = xi - closest
         dist = wp.length(d)
         min_dist = pusher_r + pr
 
-        if dist < min_dist and dist > 1e-8:
-            n = d / dist
+        if dist < min_dist:
+            n = wp.vec3(1.0, 0.0, 0.0)
+            if dist > 1e-8:
+                n = d / dist
+            elif seg_len2 > 1e-8:
+                seg_len = wp.sqrt(seg_len2)
+                n = wp.vec3(-seg[1] / seg_len, seg[0] / seg_len, 0.0)
             raw_pen = min_dist - dist
             pen = raw_pen * contact_alpha
 
@@ -529,7 +892,30 @@ if wp is not None:
                 tang = tang * (max_tang / tang_len)
                 xi = x_prev[i] + (n * wp.dot(dp, n) + tang)
 
-            x_pred[i] = wp.vec3(xi[0], xi[1], 0.0)
+            contact_delta[i] = wp.vec3(xi[0] - x_pred[i][0], xi[1] - x_pred[i][1], 0.0)
+            contact_weight[i] = raw_pen
+
+
+    @wp.kernel
+    def _apply_rigid_transform(
+        x_pred: wp.array(dtype=wp.vec3),
+        inv_m: wp.array(dtype=float),
+        center: wp.vec3,
+        tx: float,
+        ty: float,
+        dtheta: float,
+    ):
+        i = wp.tid()
+        if inv_m[i] == 0.0:
+            return
+
+        xi = x_pred[i]
+        rel = xi - center
+        ct = wp.cos(dtheta)
+        st = wp.sin(dtheta)
+        rx = ct * rel[0] - st * rel[1]
+        ry = st * rel[0] + ct * rel[1]
+        x_pred[i] = wp.vec3(center[0] + tx + rx, center[1] + ty + ry, 0.0)
 
 
     @wp.kernel
@@ -680,6 +1066,27 @@ class PushTWarpEnv:
         self.stem_h = float(p.stem_h)
         self.bar_w = float(p.bar_w)
         self.bar_h = float(p.bar_h)
+        if p.pose_offset_local is None:
+            self.pose_offset_local = np.zeros((3,), dtype=np.float32)
+        else:
+            self.pose_offset_local = np.asarray(p.pose_offset_local, dtype=np.float32).reshape(3).copy()
+        self.gt_body_com_local = _gt_tee_body_com_local(
+            stem_w=self.stem_w,
+            stem_h=self.stem_h,
+            bar_w=self.bar_w,
+            bar_h=self.bar_h,
+        )
+        self.body_com_from_cloud_local = (
+            self.gt_body_com_local - self.pose_offset_local
+        ).astype(np.float32)
+        self.gt_body_inertia = float(
+            _gt_tee_body_inertia(
+                stem_w=self.stem_w,
+                stem_h=self.stem_h,
+                bar_w=self.bar_w,
+                bar_h=self.bar_h,
+            )
+        )
 
         self.pusher_r = float(p.pusher_radius)
         self.sim_hz = int(p.sim_hz)
@@ -746,6 +1153,8 @@ class PushTWarpEnv:
         self.x = wp.array(np.zeros((self.N, 3), dtype=np.float32), dtype=wp.vec3, device=self.device)
         self.v = wp.array(np.zeros((self.N, 3), dtype=np.float32), dtype=wp.vec3, device=self.device)
         self.x_pred = wp.array(np.zeros((self.N, 3), dtype=np.float32), dtype=wp.vec3, device=self.device)
+        self.contact_delta = wp.array(np.zeros((self.N, 3), dtype=np.float32), dtype=wp.vec3, device=self.device)
+        self.contact_weight = wp.array(np.zeros((self.N,), dtype=np.float32), dtype=float, device=self.device)
 
         inv_m = np.full((self.N,), 1.0, dtype=np.float32)
         self.inv_m = wp.array(inv_m, dtype=float, device=self.device)
@@ -908,9 +1317,16 @@ class PushTWarpEnv:
 
         target = self.pusher_pos[:2] + action
         pusher_path, final_velocity = self._build_pusher_path(target)
-        self._simulate_frame(pusher_path=pusher_path)
-        self.pusher_pos = pusher_path[-1].copy()
-        self.pusher_velocity = final_velocity.copy()
+        resolved_path = self._simulate_frame(pusher_path=pusher_path)
+        self.pusher_pos = resolved_path[-1].copy()
+        if resolved_path.shape[0] >= 2:
+            realized_velocity = (resolved_path[-1, :2] - resolved_path[-2, :2]) / max(self.sim_dt, 1e-8)
+            if np.all(np.isfinite(realized_velocity)):
+                self.pusher_velocity = realized_velocity.astype(np.float32)
+            else:
+                self.pusher_velocity = final_velocity.copy()
+        else:
+            self.pusher_velocity = final_velocity.copy()
 
         pose = self.get_object_pose()
         self._last_pose = pose
@@ -929,10 +1345,92 @@ class PushTWarpEnv:
         }
         return obs, float(reward), bool(done), info
 
+    def _resolve_endpoint_against_particles(
+        self,
+        prev_world: Sequence[float],
+        target_world: Sequence[float],
+        particle_xy: np.ndarray,
+    ) -> np.ndarray:
+        return _resolve_particle_union_endpoint(
+            prev_world,
+            target_world,
+            particle_xy,
+            pusher_r=float(self.pusher_r),
+            pr=float(self.pr),
+        )
+
+    def _rotate_local_xy(self, local_xy: Sequence[float], theta: float) -> np.ndarray:
+        local = np.asarray(local_xy, dtype=np.float32).reshape(2)
+        c = math.cos(float(theta))
+        s = math.sin(float(theta))
+        return np.asarray(
+            [
+                c * float(local[0]) - s * float(local[1]),
+                s * float(local[0]) + c * float(local[1]),
+            ],
+            dtype=np.float32,
+        )
+
+    def _body_com_from_cloud_local_xy(self) -> np.ndarray:
+        if hasattr(self, "body_com_from_cloud_local"):
+            return np.asarray(self.body_com_from_cloud_local[:2], dtype=np.float32).copy()
+        pose_offset = np.asarray(
+            getattr(self, "pose_offset_local", np.zeros((3,), dtype=np.float32)),
+            dtype=np.float32,
+        ).reshape(3)
+        gt_body_com = _gt_tee_body_com_local(
+            stem_w=float(getattr(self, "stem_w", GT_T_STEM_W)),
+            stem_h=float(getattr(self, "stem_h", GT_T_STEM_H)),
+            bar_w=float(getattr(self, "bar_w", GT_T_BAR_W)),
+            bar_h=float(getattr(self, "bar_h", GT_T_BAR_H)),
+        )
+        return (gt_body_com[:2] - pose_offset[:2]).astype(np.float32)
+
+    def _gt_body_inertia_value(self) -> float:
+        if hasattr(self, "gt_body_inertia"):
+            return float(self.gt_body_inertia)
+        return float(
+            _gt_tee_body_inertia(
+                stem_w=float(getattr(self, "stem_w", GT_T_STEM_W)),
+                stem_h=float(getattr(self, "stem_h", GT_T_STEM_H)),
+                bar_w=float(getattr(self, "bar_w", GT_T_BAR_W)),
+                bar_h=float(getattr(self, "bar_h", GT_T_BAR_H)),
+            )
+        )
+
+    def _body_com_world_from_cloud_pose(self, cloud_center: object, theta: float) -> np.ndarray:
+        cloud_xy = np.asarray([float(cloud_center[0]), float(cloud_center[1])], dtype=np.float32)
+        return (cloud_xy + self._rotate_local_xy(self._body_com_from_cloud_local_xy(), theta)).astype(np.float32)
+
+    def _cloud_center_world_from_body_com(self, body_com_world: Sequence[float], theta: float) -> np.ndarray:
+        body_com_xy = np.asarray(body_com_world, dtype=np.float32).reshape(2)
+        return (body_com_xy - self._rotate_local_xy(self._body_com_from_cloud_local_xy(), theta)).astype(np.float32)
+
+    def _solve_contact_rigid_delta(self, body_com_world: Sequence[float]) -> tuple[float, float, float]:
+        if not (
+            hasattr(getattr(self, "x_pred", None), "numpy")
+            and hasattr(getattr(self, "contact_delta", None), "numpy")
+            and hasattr(getattr(self, "contact_weight", None), "numpy")
+        ):
+            return 0.0, 0.0, 0.0
+
+        center_xy = np.asarray(body_com_world, dtype=np.float32).reshape(2)
+        points_xy = self.x_pred.numpy().astype(np.float32)[:, :2]
+        delta_xy = self.contact_delta.numpy().astype(np.float32)[:, :2]
+        weights = self.contact_weight.numpy().astype(np.float32).reshape(-1)
+        fit = _fit_contact_rigid_delta(
+            points_xy=points_xy,
+            delta_xy=delta_xy,
+            weights=weights,
+            center_xy=center_xy,
+            inertia=self._gt_body_inertia_value(),
+        )
+        return float(fit["tx"]), float(fit["ty"]), float(fit["dtheta"])
+
     def _simulate_frame(
         self,
         pusher_path: Optional[np.ndarray] = None,
-    ) -> None:
+    ) -> np.ndarray:
         if pusher_path is None:
             pusher_path = np.asarray([self.pusher_pos.copy(), self.pusher_pos.copy()], dtype=np.float32)
         else:
@@ -941,13 +1439,21 @@ class PushTWarpEnv:
             raise ValueError("pusher_path must contain at least two points.")
         num_segments = int(pusher_path.shape[0] - 1)
         dt = self.control_dt / float(num_segments)
+        resolved_path = pusher_path.copy()
+        if hasattr(self, "pusher_pos"):
+            resolved_path[0, :2] = np.asarray(self.pusher_pos[:2], dtype=np.float32)
 
         # Replay the PD controller path at its native controller cadence instead
         # of resampling it at an unrelated substep count. This keeps particle
         # contact timing aligned with GT PushT's 100 Hz integration.
         for seg_idx in range(num_segments):
-            pxy = pusher_path[seg_idx + 1, :2]
-            ppos = wp.vec3(float(pxy[0]), float(pxy[1]), 0.0)
+            prev_pxy = resolved_path[seg_idx, :2].astype(np.float32, copy=False)
+            commanded_pxy = pusher_path[seg_idx + 1, :2].astype(np.float32, copy=False)
+            resolved_pxy = commanded_pxy.copy()
+            pstart = wp.vec3(float(prev_pxy[0]), float(prev_pxy[1]), 0.0)
+            pend = wp.vec3(float(commanded_pxy[0]), float(commanded_pxy[1]), 0.0)
+            contact_delta = getattr(self, "contact_delta", None)
+            contact_weight = getattr(self, "contact_weight", None)
 
             wp.launch(
                 kernel=_predict_positions,
@@ -965,26 +1471,47 @@ class PushTWarpEnv:
                 )
 
                 wp.launch(
-                    kernel=_pusher_contact,
+                    kernel=_pusher_swept_contact,
                     dim=self.N,
                     inputs=[
                         self.x,
                         self.x_pred,
                         self.inv_m,
-                        ppos,
+                        pstart,
+                        pend,
                         self.pusher_r,
                         self.pr,
                         self.mu,
                         self.contact_alpha,
+                        contact_delta,
+                        contact_weight,
                     ],
                     device=self.device,
                 )
 
                 c, theta = self._compute_com_and_theta()
+                body_com_world = self._body_com_world_from_cloud_pose(c, theta)
+                tx, ty, dtheta = self._solve_contact_rigid_delta(body_com_world)
+                body_com_wp = wp.vec3(float(body_com_world[0]), float(body_com_world[1]), 0.0)
+
+                wp.launch(
+                    kernel=_apply_rigid_transform,
+                    dim=self.N,
+                    inputs=[self.x_pred, self.inv_m, body_com_wp, tx, ty, dtheta],
+                    device=self.device,
+                )
+
+                theta_target = float(_wrap_pi(float(theta) + float(dtheta)))
+                body_com_after = np.asarray(
+                    [float(body_com_world[0]) + tx, float(body_com_world[1]) + ty],
+                    dtype=np.float32,
+                )
+                c_target_xy = self._cloud_center_world_from_body_com(body_com_after, theta_target)
+                c_target = wp.vec3(float(c_target_xy[0]), float(c_target_xy[1]), 0.0)
                 wp.launch(
                     kernel=_shape_match_project,
                     dim=self.N,
-                    inputs=[self.x_pred, self.r0, self.inv_m, c, theta, self.alpha_rigid],
+                    inputs=[self.x_pred, self.r0, self.inv_m, c_target, theta_target, self.alpha_rigid],
                     device=self.device,
                 )
 
@@ -1007,6 +1534,18 @@ class PushTWarpEnv:
                 ],
                 device=self.device,
             )
+
+            if hasattr(getattr(self, "x", None), "numpy"):
+                particle_xy = self.get_particle_positions().astype(np.float32)
+                resolved_pxy = self._resolve_endpoint_against_particles(
+                    prev_world=prev_pxy,
+                    target_world=commanded_pxy,
+                    particle_xy=particle_xy,
+                ).astype(np.float32)
+
+            resolved_path[seg_idx + 1, :2] = resolved_pxy.astype(np.float32)
+
+        return resolved_path.astype(np.float32)
 
     def _compute_com_and_theta(self) -> tuple[object, float]:
         wp.launch(_zero_scalar, dim=1, inputs=[self.sum_m], device=self.device)

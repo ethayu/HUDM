@@ -8,6 +8,7 @@ from unittest import mock
 from types import SimpleNamespace
 
 import numpy as np
+import pymunk
 import torch
 from omegaconf import OmegaConf
 
@@ -30,6 +31,24 @@ ROOT = os.path.dirname(os.path.dirname(__file__))
 
 
 class FrameworkContractTests(unittest.TestCase):
+    @staticmethod
+    def _expected_gt_tee_center_of_gravity(scale: float) -> np.ndarray:
+        return np.asarray([0.0, 1.5 * float(scale)], dtype=np.float32)
+
+    @staticmethod
+    def _expected_gt_tee_moment(scale: float) -> float:
+        mass = 1
+        length = 4
+        vertices1 = [
+            (-length * scale / 2, scale),
+            (length * scale / 2, scale),
+            (length * scale / 2, 0),
+            (-length * scale / 2, 0),
+        ]
+        inertia1 = pymunk.moment_for_poly(mass, vertices=vertices1)
+        inertia2 = pymunk.moment_for_poly(mass, vertices=vertices1)
+        return float(inertia1 + inertia2)
+
     def test_world_checkpoint_roundtrip_uses_epoch_suffixes(self):
         model = HierWorldModel(
             K=[4],
@@ -68,6 +87,20 @@ class FrameworkContractTests(unittest.TestCase):
         metrics = pose_metrics(goal, cur)
         self.assertIn("success", metrics)
         self.assertAlmostEqual(metrics["pos_diff"], 6.403124, places=5)
+
+    def test_gt_add_tee_matches_current_com_and_inertia_convention(self):
+        env = PushTEnv.__new__(PushTEnv)
+        env.space = pymunk.Space()
+
+        scale = 30
+        body = env.add_tee((256, 300), 0, scale=scale)
+
+        np.testing.assert_allclose(
+            np.asarray(tuple(body.center_of_gravity), dtype=np.float32),
+            self._expected_gt_tee_center_of_gravity(scale),
+            atol=1e-6,
+        )
+        self.assertAlmostEqual(float(body.moment), self._expected_gt_tee_moment(scale), places=6)
 
     def test_runtime_files_do_not_contain_live_pdb_breakpoints(self):
         for rel_path in ("plan.py", "planning/cem_core.py"):
@@ -364,6 +397,16 @@ class FrameworkContractTests(unittest.TestCase):
             np.asarray(gt_env.agent.velocity, dtype=np.float32),
             atol=1e-4,
         )
+
+    def test_particle_backend_contact_fit_normalization_preserves_global_scalar_knobs(self):
+        cfg = OmegaConf.create(_plan_defaults())
+        cfg.backend.kind = "particle_sim"
+        runtime_cfg = plan_spec_to_runtime_cfg(_prune_inactive_backend(cfg))
+
+        self.assertIn("contact_alpha", runtime_cfg.particle_env.fidelity_env)
+        self.assertIn("alpha_rigid", runtime_cfg.particle_env.fidelity_env)
+        self.assertAlmostEqual(float(runtime_cfg.particle_env.fidelity_env.contact_alpha), 0.35, places=6)
+        self.assertAlmostEqual(float(runtime_cfg.particle_env.fidelity_env.alpha_rigid), 1.0, places=6)
 
     def test_particle_backend_prepare_reuses_live_snapshot_when_state_matches(self):
         state = np.asarray([256.0, 128.0, 300.0, 320.0, 0.35, 12.0, -6.0], dtype=np.float32)

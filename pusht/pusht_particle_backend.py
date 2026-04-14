@@ -103,6 +103,7 @@ class PushTParticleBackend:
                 min_particles=int(warp_cfg.get("min_particles", 1)),
                 force_single_particle=bool(level.is_single_particle),
                 rest_offsets=np.asarray(level.rest_offsets, dtype=np.float32).copy(),
+                pose_offset_local=np.asarray(level.pose_offset_local, dtype=np.float32).copy(),
                 particle_radius=particle_radius,
                 radius_scale=float(warp_cfg.get("radius_scale", 1.0)),
                 radius_clip_spacing=bool(warp_cfg.get("radius_clip_spacing", False)),
@@ -465,19 +466,17 @@ class PushTParticleBackend:
         pr_px = self._world_len_to_img_px(float(sim.pr))
         pusher_r_px = self._world_len_to_img_px(float(sim.pusher_r))
 
-        # Goal overlay (light green) uses current fidelity particle layout.
-        r0 = sim.rest_offsets()
         goal_w = self._goal_pose_world(self._goal_state)
-        goal_pts = self._transform_points(r0, goal_w)
-        self._draw_particles(img, goal_pts, color=(180, 235, 180), radius_px=pr_px, thickness=-1)
+        goal_particles_w = self._transform_points(sim.rest_offsets(), goal_w)
+        self._draw_particles(img, goal_particles_w, color=(180, 235, 180), radius_px=pr_px, thickness=-1)
 
-        # Optional start overlay (outlined blue-ish markers).
+        # Optional start overlay.
         if include_start_pose:
             start_w = self._gt_pose_to_internal_pose(
                 np.array([*self._pix_to_world_xy(self._start_state[2:4]), float(self._start_state[4])], dtype=np.float32)
             )
-            start_pts = self._transform_points(r0, start_w)
-            self._draw_particles(img, start_pts, color=(220, 90, 40), radius_px=pr_px, thickness=1)
+            start_particles_w = self._transform_points(sim.rest_offsets(), start_w)
+            self._draw_particles(img, start_particles_w, color=(220, 90, 40), radius_px=pr_px, thickness=-1)
 
         obj_pts = sim.get_particle_positions().astype(np.float32)
         self._draw_particles(img, obj_pts, color=(112, 128, 144), radius_px=pr_px, thickness=-1)
