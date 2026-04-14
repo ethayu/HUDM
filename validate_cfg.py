@@ -86,6 +86,7 @@ def validate_plan_cfg(cfg) -> None:
     _reject_unknown_keys(
         cfg.gt_env.fidelity_env,
         {
+            "num_levels",
             "mode",
             "blur_sigma_max",
             "pool_scale_max",
@@ -105,14 +106,13 @@ def validate_plan_cfg(cfg) -> None:
     _reject_unknown_keys(
         cfg.particle_env.fidelity_env,
         {
-            "spacings",
+            "particle_counts",
             "device",
             "xmin",
             "xmax",
             "ymin",
             "ymax",
             "min_particles",
-            "coarsest_single_particle",
             "particle_radius",
             "radius_scale",
             "radius_clip_spacing",
@@ -121,9 +121,10 @@ def validate_plan_cfg(cfg) -> None:
             "bar_w",
             "bar_h",
             "pusher_radius",
-            "pusher_speed",
-            "pusher_interp_substeps",
-            "frame_dt",
+            "sim_hz",
+            "control_hz",
+            "pusher_k_p",
+            "pusher_k_v",
             "substeps",
             "iters",
             "mu",
@@ -186,14 +187,21 @@ def validate_plan_cfg(cfg) -> None:
             "plan.particle_env.objective_space must be 'image' or 'state', "
             f"got {cfg.particle_env.objective_space}"
         )
-    spacings = list(getattr(cfg.particle_env.fidelity_env, "spacings", []))
-    if len(spacings) <= 0:
-        raise ValueError("plan.particle_env.fidelity_env.spacings must contain at least one value.")
-    for i, s in enumerate(spacings):
-        if float(s) <= 0.0:
+    particle_counts = [int(c) for c in list(getattr(cfg.particle_env.fidelity_env, "particle_counts", []))]
+    if len(particle_counts) <= 0:
+        raise ValueError("plan.particle_env.fidelity_env.particle_counts must contain at least one value.")
+    prev_count = None
+    for i, count in enumerate(particle_counts):
+        if int(count) <= 0:
             raise ValueError(
-                f"plan.particle_env.fidelity_env.spacings[{i}] must be > 0, got {s}"
+                f"plan.particle_env.fidelity_env.particle_counts[{i}] must be >= 1, got {count}"
             )
+        if prev_count is not None and int(count) <= int(prev_count):
+            raise ValueError(
+                "plan.particle_env.fidelity_env.particle_counts must be strictly increasing, "
+                f"but index {i} has {count} after {prev_count}"
+            )
+        prev_count = int(count)
     min_particles = int(getattr(cfg.particle_env.fidelity_env, "min_particles", 1))
     if min_particles <= 0:
         raise ValueError(
@@ -212,17 +220,34 @@ def validate_plan_cfg(cfg) -> None:
             "plan.particle_env.fidelity_env.particle_radius must be > 0 or null, "
             f"got {particle_radius}"
         )
-    pusher_interp_substeps = getattr(cfg.particle_env.fidelity_env, "pusher_interp_substeps", True)
-    if not isinstance(pusher_interp_substeps, bool):
+    sim_hz = int(getattr(cfg.particle_env.fidelity_env, "sim_hz", 100))
+    if sim_hz <= 0:
         raise ValueError(
-            "plan.particle_env.fidelity_env.pusher_interp_substeps must be a bool, "
-            f"got {type(pusher_interp_substeps).__name__}"
+            "plan.particle_env.fidelity_env.sim_hz must be > 0, "
+            f"got {sim_hz}"
         )
-    coarsest_single_particle = getattr(cfg.particle_env.fidelity_env, "coarsest_single_particle", True)
-    if not isinstance(coarsest_single_particle, bool):
+    control_hz = int(getattr(cfg.particle_env.fidelity_env, "control_hz", 10))
+    if control_hz <= 0:
         raise ValueError(
-            "plan.particle_env.fidelity_env.coarsest_single_particle must be a bool, "
-            f"got {type(coarsest_single_particle).__name__}"
+            "plan.particle_env.fidelity_env.control_hz must be > 0, "
+            f"got {control_hz}"
+        )
+    if sim_hz % control_hz != 0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.sim_hz must be divisible by control_hz, "
+            f"got sim_hz={sim_hz}, control_hz={control_hz}"
+        )
+    pusher_k_p = float(getattr(cfg.particle_env.fidelity_env, "pusher_k_p", 100.0))
+    if pusher_k_p < 0.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.pusher_k_p must be >= 0, "
+            f"got {pusher_k_p}"
+        )
+    pusher_k_v = float(getattr(cfg.particle_env.fidelity_env, "pusher_k_v", 20.0))
+    if pusher_k_v < 0.0:
+        raise ValueError(
+            "plan.particle_env.fidelity_env.pusher_k_v must be >= 0, "
+            f"got {pusher_k_v}"
         )
     contact_alpha = float(getattr(cfg.particle_env.fidelity_env, "contact_alpha", 0.35))
     if contact_alpha <= 0.0 or contact_alpha > 1.0:
@@ -242,19 +267,15 @@ def validate_plan_cfg(cfg) -> None:
             "plan.particle_env.fidelity_env.rest_speed_eps must be >= 0, "
             f"got {rest_speed_eps}"
         )
-    if int(cfg.fidelity.num_levels) <= 0:
+    num_levels = getattr(cfg.fidelity, "num_levels", None)
+    if num_levels is not None and int(num_levels) <= 0:
         raise ValueError(f"plan.fidelity.num_levels must be > 0, got {cfg.fidelity.num_levels}")
-    if backend == "gt_env" and str(cfg.fidelity.rollout.mode).lower() == "uncertainty_downshift":
+    gt_num_levels = int(getattr(cfg.gt_env.fidelity_env, "num_levels", 4))
+    if gt_num_levels <= 0:
+        raise ValueError(f"plan.gt_env.fidelity_env.num_levels must be > 0, got {gt_num_levels}")
+    if backend != "wm" and str(cfg.fidelity.rollout.mode).lower() == "uncertainty_downshift":
         raise ValueError(
             "plan.fidelity.rollout.mode=uncertainty_downshift is only supported for backend='wm'."
-        )
-    if backend == "particle_sim" and str(cfg.fidelity.rollout.mode).lower() != "fixed":
-        raise ValueError("backend='particle_sim' currently requires plan.fidelity.rollout.mode='fixed'.")
-    if backend == "particle_sim" and int(cfg.fidelity.num_levels) != len(spacings):
-        raise ValueError(
-            "plan.fidelity.num_levels must equal "
-            "len(plan.particle_env.fidelity_env.spacings) for backend='particle_sim'. "
-            f"Got num_levels={cfg.fidelity.num_levels}, spacings={len(spacings)}."
         )
 
     init_src = str(cfg.init_goal.source).lower()

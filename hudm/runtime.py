@@ -298,6 +298,7 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             device=device,
         )
     elif backend == "gt_env":
+        cfg.fidelity.num_levels = int(getattr(cfg.gt_env.fidelity_env, "num_levels", 4))
         planner = GTEnvCEMPlanner(
             env=env,
             horizon=int(cfg.mpc.horizon),
@@ -312,11 +313,11 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             objective_cfg=OmegaConf.to_container(cfg.objective, resolve=True),
             fidelity_cfg=OmegaConf.to_container(cfg.fidelity, resolve=True),
             gt_env_cfg=OmegaConf.to_container(cfg.gt_env, resolve=True),
+            num_levels=int(cfg.fidelity.num_levels),
             device=device,
         )
     else:
-        spacings = list(cfg.particle_env.fidelity_env.spacings)
-        cfg.fidelity.num_levels = len(spacings)
+        particle_counts = [int(c) for c in list(cfg.particle_env.fidelity_env.particle_counts)]
         particle_seed = resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
         cfg.init_goal.dataset.seed = particle_seed
         particle_backend = PushTParticleBackend(
@@ -326,10 +327,11 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             relative=bool(getattr(env, "relative", True)),
             action_scale=float(getattr(env, "action_scale", 100.0)),
             device=str(cfg.particle_env.fidelity_env.device),
-            fidelity_spacings=[float(s) for s in spacings],
+            particle_counts=particle_counts,
             warp_cfg=OmegaConf.to_container(cfg.particle_env.fidelity_env, resolve=True),
             seed=particle_seed,
         )
+        cfg.fidelity.num_levels = int(particle_backend.num_levels)
         planner = ParticleCEMPlanner(
             particle_backend=particle_backend,
             horizon=int(cfg.mpc.horizon),
@@ -376,5 +378,5 @@ def print_plan_runtime_summary(runtime: dict, cfg: DictConfig) -> None:
     else:
         print(f"[levels] num_levels={int(cfg.fidelity.num_levels)} (particle_sim)")
         print(f"[particle] objective_space={str(cfg.particle_env.objective_space).lower()}")
-        print(f"[particle] spacings={list(cfg.particle_env.fidelity_env.spacings)}")
+        print(f"[particle] target_counts={list(cfg.particle_env.fidelity_env.particle_counts)}")
         print(f"[particle] progress={bool(cfg.particle_env.progress)}")

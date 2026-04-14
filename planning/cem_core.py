@@ -75,7 +75,7 @@ class SharedCEMCore:
         if self.init_std <= 0.0:
             raise ValueError(f"init_std must be > 0, got {self.init_std}")
         if self.num_levels <= 0:
-            raise ValueError(f"fidelity.num_levels must be > 0, got {self.num_levels}")
+            raise ValueError(f"num_levels must be > 0, got {self.num_levels}")
         if self.mpc_mode not in {"fixed", "linear"}:
             raise ValueError(
                 f"Unknown fidelity.mpc.mode '{self.mpc_mode}'. Use 'fixed' or 'linear'."

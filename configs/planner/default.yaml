@@ -1,8 +1,8 @@
 plan:
   budget:
-    max_env_steps: 50
+    max_env_steps: 30
   planner:
-    horizon: 100
+    horizon: 10
     replan_every: 10
     cem:
       pop_size: 100

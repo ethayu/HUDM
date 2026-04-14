@@ -2,7 +2,6 @@ plan:
   planner:
     fidelity:
       enabled: true
-      num_levels: 4
       mpc:
         mode: "fixed"
         level: "coarsest"

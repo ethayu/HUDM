@@ -47,6 +47,7 @@ class ParticleCEMPlanner:
         objective_cfg: Optional[Dict[str, Any]] = None,
         fidelity_cfg: Optional[Dict[str, Any]] = None,
         particle_env_cfg: Optional[Dict[str, Any]] = None,
+        num_levels: Optional[int] = None,
         warm_start: bool = True,
         device: Optional[torch.device] = None,
     ):
@@ -73,7 +74,12 @@ class ParticleCEMPlanner:
         self.state_l2_weight = float(self.objective_cfg.get("state_l2_weight", 0.0))
 
         fidelity_cfg = fidelity_cfg or {}
-        num_levels = int(fidelity_cfg.get("num_levels", 4))
+        if num_levels is None:
+            num_levels = getattr(self.backend, "num_levels", None)
+        if num_levels is None:
+            num_levels = getattr(self.backend, "_planning_fidelity_num_levels", None)
+        if num_levels is None:
+            raise ValueError("ParticleCEMPlanner requires the particle backend to define num_levels.")
         self.core = SharedCEMCore(
             horizon=self.horizon,
             action_dim=self.action_dim,
@@ -84,14 +90,10 @@ class ParticleCEMPlanner:
             action_low=self.action_low,
             action_high=self.action_high,
             fidelity_cfg=fidelity_cfg,
-            num_levels=num_levels,
-            rollout_modes={"fixed"},
+            num_levels=int(num_levels),
+            rollout_modes={"fixed", "linear"},
             device=self.device,
         )
-        if self.core.rollout_mode != "fixed":
-            raise ValueError(
-                "particle_sim backend currently supports only fidelity.rollout.mode='fixed'."
-            )
 
         self.particle_env_cfg = particle_env_cfg or {}
         self.rollout_samples = int(self.particle_env_cfg.get("rollout_samples", 1))

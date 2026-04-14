@@ -22,6 +22,7 @@ import numpy as np
 
 from hudm.experiment_bundle import (
     EXPERIMENT_JSON,
+    EXPERIMENT_SCHEMA_VERSION,
     PAIRED_VS_BASELINE_CSV,
     REVIEWER_SCHEMA_VERSION,
     RUNS_CSV,
@@ -211,6 +212,331 @@ def _sort_runs(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
+def _safe_name(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(value))
+
+
+def _trace_final_value(values: Sequence[float] | np.ndarray, fallback: Any) -> float:
+    if len(values) > 0:
+        return float(np.asarray(values, dtype=np.float32)[-1])
+    return float(fallback) if fallback is not None else float("nan")
+
+
+def _trace_best_value(values: Sequence[float] | np.ndarray, fallback: Any) -> float:
+    if len(values) > 0:
+        return float(np.min(np.asarray(values, dtype=np.float32)))
+    return float(fallback) if fallback is not None else float("nan")
+
+
+def _coverage_final(values: Sequence[float] | np.ndarray, fallback: Any) -> float:
+    if len(values) > 0:
+        arr = np.asarray(values, dtype=np.float32)
+        finite = arr[np.isfinite(arr)]
+        if finite.size > 0:
+            return float(finite[-1])
+    return float(fallback) if fallback is not None else float("nan")
+
+
+def _auc(values: Sequence[float] | np.ndarray) -> float:
+    if len(values) <= 0:
+        return float("nan")
+    return float(np.sum(np.asarray(values, dtype=np.float32)))
+
+
+def _summary_stat(values: Sequence[Any], *, kind: str) -> float:
+    arr = np.asarray(values, dtype=np.float32)
+    finite = arr[np.isfinite(arr)]
+    if finite.size <= 0:
+        return float("nan")
+    if kind == "mean":
+        return float(np.mean(finite))
+    if kind == "median":
+        return float(np.median(finite))
+    raise ValueError(f"Unknown summary stat kind: {kind}")
+
+
+def _summary_metric_values(rows: Sequence[dict[str, Any]], key: str) -> list[float]:
+    return [_safe_float(row.get(key)) for row in rows]
+
+
+def _variant_summary_rows_from_runs(
+    rows: Sequence[dict[str, Any]],
+    *,
+    variant_order: Sequence[str],
+) -> list[dict[str, Any]]:
+    by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        by_variant[str(row.get("variant_name", ""))].append(row)
+    ordered_variant_names = [name for name in variant_order if name in by_variant]
+    ordered_variant_names.extend(sorted(name for name in by_variant if name not in ordered_variant_names))
+
+    summary_rows: list[dict[str, Any]] = []
+    for variant_name in ordered_variant_names:
+        variant_rows = by_variant[variant_name]
+        success_vals = [int(bool(row.get("success", 0))) for row in variant_rows]
+        success_and_done = [int(bool(row.get("success_and_done", 0))) for row in variant_rows]
+        executed_steps = _summary_metric_values(variant_rows, "executed_steps")
+        plans = _summary_metric_values(variant_rows, "plans")
+        final_pos = _summary_metric_values(variant_rows, "final_pos_diff")
+        final_angle = _summary_metric_values(variant_rows, "final_angle_diff")
+        final_eef = _summary_metric_values(variant_rows, "final_eef_diff")
+        best_pos = _summary_metric_values(variant_rows, "best_pos_diff")
+        best_angle = _summary_metric_values(variant_rows, "best_angle_diff")
+        best_eef = _summary_metric_values(variant_rows, "best_eef_diff")
+        final_cov = _summary_metric_values(variant_rows, "final_coverage")
+        auc_pos = _summary_metric_values(variant_rows, "auc_pos_diff")
+        auc_angle = _summary_metric_values(variant_rows, "auc_angle_diff")
+        auc_eef = _summary_metric_values(variant_rows, "auc_eef_diff")
+        bits = _summary_metric_values(variant_rows, "bits_used_total")
+        bits_per_step = _summary_metric_values(variant_rows, "bits_used_per_step")
+        flops = _summary_metric_values(variant_rows, "flops_used_total")
+        flops_per_step = _summary_metric_values(variant_rows, "flops_used_per_step")
+        plan_time = _summary_metric_values(variant_rows, "plan_time_total_sec")
+        plan_time_per_replan = _summary_metric_values(variant_rows, "plan_time_per_replan_sec")
+        term_reasons = [str(row.get("termination_reason", "unknown")) for row in variant_rows]
+        reason_counts = Counter(term_reasons)
+
+        summary_row = {
+            "variant_name": variant_name,
+            "n_rollouts": int(len(variant_rows)),
+            "success_rate": _summary_stat(success_vals, kind="mean"),
+            "success_and_done_rate": _summary_stat(success_and_done, kind="mean"),
+            "mean_executed_steps": _summary_stat(executed_steps, kind="mean"),
+            "median_executed_steps": _summary_stat(executed_steps, kind="median"),
+            "mean_plans": _summary_stat(plans, kind="mean"),
+            "mean_final_pos_diff": _summary_stat(final_pos, kind="mean"),
+            "median_final_pos_diff": _summary_stat(final_pos, kind="median"),
+            "mean_final_angle_diff": _summary_stat(final_angle, kind="mean"),
+            "median_final_angle_diff": _summary_stat(final_angle, kind="median"),
+            "mean_final_eef_diff": _summary_stat(final_eef, kind="mean"),
+            "median_final_eef_diff": _summary_stat(final_eef, kind="median"),
+            "mean_best_pos_diff": _summary_stat(best_pos, kind="mean"),
+            "mean_best_angle_diff": _summary_stat(best_angle, kind="mean"),
+            "mean_best_eef_diff": _summary_stat(best_eef, kind="mean"),
+            "mean_final_coverage": _summary_stat(final_cov, kind="mean"),
+            "median_final_coverage": _summary_stat(final_cov, kind="median"),
+            "mean_auc_pos_diff": _summary_stat(auc_pos, kind="mean"),
+            "mean_auc_angle_diff": _summary_stat(auc_angle, kind="mean"),
+            "mean_auc_eef_diff": _summary_stat(auc_eef, kind="mean"),
+            "mean_bits_used_total": _summary_stat(bits, kind="mean"),
+            "mean_bits_used_per_step": _summary_stat(bits_per_step, kind="mean"),
+            "mean_flops_used_total": _summary_stat(flops, kind="mean"),
+            "mean_flops_used_per_step": _summary_stat(flops_per_step, kind="mean"),
+            "mean_plan_time_total_sec": _summary_stat(plan_time, kind="mean"),
+            "median_plan_time_total_sec": _summary_stat(plan_time, kind="median"),
+            "mean_plan_time_per_replan_sec": _summary_stat(plan_time_per_replan, kind="mean"),
+        }
+        for reason, count in sorted(reason_counts.items()):
+            summary_row[f"termination_reason__{_safe_name(reason)}"] = int(count)
+        summary_rows.append(summary_row)
+    return summary_rows
+
+
+def _assign_partial_rollout_indices(rows: Sequence[dict[str, Any]]) -> None:
+    rollout_keys: dict[str, tuple[int, int, int, str]] = {}
+    for row in rows:
+        rollout_id = str(row.get("rollout_id", ""))
+        key = (
+            int(row.get("episode_index", 10**9)),
+            int(row.get("start_index", 10**9)),
+            int(row.get("goal_index", 10**9)),
+            rollout_id,
+        )
+        prev = rollout_keys.get(rollout_id)
+        if prev is None or key < prev:
+            rollout_keys[rollout_id] = key
+    rollout_index_by_id = {
+        rollout_id: idx
+        for idx, (rollout_id, _key) in enumerate(sorted(rollout_keys.items(), key=lambda item: item[1]))
+    }
+    for row in rows:
+        row["rollout_index"] = int(rollout_index_by_id.get(str(row.get("rollout_id", "")), -1))
+
+
+def _load_partial_run_row(raw_trace_dir: str, *, variant_name: str) -> dict[str, Any] | None:
+    trace_json_path = os.path.join(raw_trace_dir, "trace.json")
+    trace_npz_path = os.path.join(raw_trace_dir, "trace.npz")
+    metadata_path = os.path.join(raw_trace_dir, "metadata.json")
+    if not (
+        os.path.isfile(trace_json_path)
+        and os.path.isfile(trace_npz_path)
+        and os.path.isfile(metadata_path)
+    ):
+        return None
+    try:
+        with open(trace_json_path, "r", encoding="utf-8") as f:
+            trace_meta = json.load(f)
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+        trace_arrays = _load_trace_npz(trace_npz_path)
+    except Exception:
+        return None
+
+    sample = trace_meta.get("sample") or metadata.get("sample") or {}
+    run_stats = trace_meta.get("run_stats") or {}
+    pos_diffs = np.asarray(trace_arrays.get("pos_diffs", []), dtype=np.float32)
+    angle_diffs = np.asarray(trace_arrays.get("angle_diffs", []), dtype=np.float32)
+    eef_diffs = np.asarray(trace_arrays.get("eef_diffs", []), dtype=np.float32)
+    coverages = np.asarray(trace_arrays.get("coverages", []), dtype=np.float32)
+    executed_actions = np.asarray(trace_arrays.get("executed_actions", []), dtype=np.float32)
+    executed_steps = int(executed_actions.shape[0]) if executed_actions.ndim >= 1 else 0
+    plans = int(
+        run_stats.get(
+            "plans",
+            metadata.get("plans", 0),
+        )
+    )
+    bits_total = int(run_stats.get("bits_used_total", metadata.get("bits_used_total", 0)))
+    flops_total = int(run_stats.get("flops_used_total", metadata.get("flops_used_total", 0)))
+    plan_time_total = float(run_stats.get("plan_time_total_sec", metadata.get("plan_time_total_sec", 0.0)))
+    shared_plan_time_total = float(
+        metadata.get(
+            "shared_plan_time_total_sec",
+            run_stats.get("shared_plan_time_total_sec", plan_time_total),
+        )
+    )
+    rollout_id = str(sample.get("rollout_id", os.path.basename(raw_trace_dir)))
+
+    return {
+        "variant_name": str(variant_name),
+        "rollout_id": rollout_id,
+        "rollout_index": int(sample.get("rollout_index", -1)),
+        "episode_index": int(sample.get("episode_index", -1)),
+        "start_index": int(sample.get("start_index", -1)),
+        "goal_index": int(sample.get("goal_index", -1)),
+        "success": int(bool(metadata.get("success", trace_meta.get("success", False)))),
+        "termination_reason": str(run_stats.get("termination_reason", metadata.get("termination_reason", "unknown"))),
+        "termination_step": int(run_stats.get("termination_step", metadata.get("termination_step", -1))),
+        "executed_steps": executed_steps,
+        "plans": plans,
+        "success_and_done": int(
+            bool(
+                run_stats.get("termination_metric_success", metadata.get("termination_metric_success", False))
+                and run_stats.get("termination_done", metadata.get("termination_done", False))
+            )
+        ),
+        "final_pos_diff": _trace_final_value(pos_diffs, run_stats.get("termination_pos_diff", metadata.get("termination_pos_diff"))),
+        "final_angle_diff": _trace_final_value(angle_diffs, run_stats.get("termination_angle_diff", metadata.get("termination_angle_diff"))),
+        "final_eef_diff": _trace_final_value(eef_diffs, run_stats.get("termination_eef_diff", metadata.get("termination_eef_diff"))),
+        "best_pos_diff": _trace_best_value(pos_diffs, run_stats.get("termination_pos_diff", metadata.get("termination_pos_diff"))),
+        "best_angle_diff": _trace_best_value(angle_diffs, run_stats.get("termination_angle_diff", metadata.get("termination_angle_diff"))),
+        "best_eef_diff": _trace_best_value(eef_diffs, run_stats.get("termination_eef_diff", metadata.get("termination_eef_diff"))),
+        "final_coverage": _coverage_final(coverages, run_stats.get("termination_coverage", metadata.get("termination_coverage"))),
+        "auc_pos_diff": _auc(pos_diffs),
+        "auc_angle_diff": _auc(angle_diffs),
+        "auc_eef_diff": _auc(eef_diffs),
+        "bits_used_total": bits_total,
+        "bits_used_per_step": float(bits_total / max(1, executed_steps)),
+        "flops_used_total": flops_total,
+        "flops_used_per_step": float(flops_total / max(1, executed_steps)),
+        "plan_time_total_sec": plan_time_total,
+        "shared_plan_time_total_sec": shared_plan_time_total,
+        "plan_time_per_replan_sec": float(plan_time_total / max(1, plans)),
+        "run_dir": raw_trace_dir,
+        "trace_json": trace_json_path,
+        "trace_npz": trace_npz_path,
+        "run_log": os.path.join(raw_trace_dir, "run.log"),
+    }
+
+
+def _build_review_data(
+    *,
+    run_dir: str,
+    meta: dict[str, Any],
+    variant_rows: Sequence[dict[str, Any]],
+    run_rows: Sequence[dict[str, Any]],
+    paired_rows: Sequence[dict[str, Any]],
+) -> ExperimentReviewData:
+    run_rows_sorted = _sort_runs(run_rows)
+    variant_order = [str(name) for name in meta.get("variant_order", [])]
+    variant_rank = {name: idx for idx, name in enumerate(variant_order)}
+    variant_rows_sorted = sorted(
+        list(variant_rows),
+        key=lambda row: (
+            variant_rank.get(str(row.get("variant_name", "")), 10**6),
+            str(row.get("variant_name", "")),
+        ),
+    )
+
+    rows_by_key = {
+        (str(row.get("variant_name", "")), str(row.get("rollout_id", ""))): row
+        for row in run_rows_sorted
+    }
+    rows_by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in run_rows_sorted:
+        rows_by_variant[str(row.get("variant_name", ""))].append(row)
+    variant_by_name = {str(row.get("variant_name", "")): row for row in variant_rows_sorted}
+
+    return ExperimentReviewData(
+        run_dir=os.path.abspath(run_dir),
+        meta=dict(meta),
+        variant_rows=variant_rows_sorted,
+        run_rows=run_rows_sorted,
+        paired_rows=list(paired_rows),
+        rows_by_key=rows_by_key,
+        rows_by_variant=dict(rows_by_variant),
+        variant_by_name=variant_by_name,
+    )
+
+
+def _load_partial_experiment_review_data(run_dir: str) -> ExperimentReviewData:
+    paths = bundle_paths(run_dir)
+    if not os.path.isdir(paths.traces_dir):
+        raise FileNotFoundError(f"Experiment bundle metadata not found: {paths.experiment_json}")
+
+    variant_names = sorted(
+        entry
+        for entry in os.listdir(paths.traces_dir)
+        if os.path.isdir(os.path.join(paths.traces_dir, entry))
+    )
+    run_rows: list[dict[str, Any]] = []
+    variant_order: list[str] = []
+    for variant_name in variant_names:
+        variant_trace_dir = os.path.join(paths.traces_dir, variant_name)
+        variant_rows_before = len(run_rows)
+        for rollout_id in sorted(os.listdir(variant_trace_dir)):
+            raw_trace_dir = os.path.join(variant_trace_dir, rollout_id)
+            if not os.path.isdir(raw_trace_dir):
+                continue
+            row = _load_partial_run_row(raw_trace_dir, variant_name=variant_name)
+            if row is not None:
+                run_rows.append(row)
+        if len(run_rows) > variant_rows_before:
+            variant_order.append(str(variant_name))
+    if len(run_rows) <= 0:
+        raise FileNotFoundError(f"No completed trace rows found under {paths.traces_dir}")
+
+    _assign_partial_rollout_indices(run_rows)
+    baseline_variant = variant_order[0] if len(variant_order) > 0 else ""
+    meta = {
+        "schema_version": EXPERIMENT_SCHEMA_VERSION,
+        "reviewer_version": REVIEWER_SCHEMA_VERSION,
+        "experiment_name": os.path.basename(paths.root),
+        "baseline_variant": baseline_variant,
+        "variant_order": variant_order,
+        "partial_bundle": True,
+        "bundle_status": "partial",
+    }
+    variant_rows = _variant_summary_rows_from_runs(run_rows, variant_order=variant_order)
+    data = _build_review_data(
+        run_dir=paths.root,
+        meta=meta,
+        variant_rows=variant_rows,
+        run_rows=run_rows,
+        paired_rows=[],
+    )
+    paired_rows = []
+    if baseline_variant:
+        paired_rows = _reference_comparison_payload(data, baseline_variant)["paired_rows"]
+    return _build_review_data(
+        run_dir=paths.root,
+        meta=meta,
+        variant_rows=variant_rows,
+        run_rows=run_rows,
+        paired_rows=paired_rows,
+    )
+
+
 def _default_reference_variant(data: ExperimentReviewData, *, current_variant: str | None = None) -> str:
     names = [name for name in data.variant_order if data.rows_by_variant.get(name)]
     if len(names) <= 0:
@@ -299,43 +625,20 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
 def load_experiment_review_data(run_dir: str) -> ExperimentReviewData:
     paths = bundle_paths(run_dir)
     if not os.path.isfile(paths.experiment_json):
-        raise FileNotFoundError(f"Experiment bundle metadata not found: {paths.experiment_json}")
+        return _load_partial_experiment_review_data(paths.root)
     with open(paths.experiment_json, "r", encoding="utf-8") as f:
         meta = json.load(f)
-    run_rows = _sort_runs(_read_csv_rows(paths.runs_csv))
+    run_rows = _read_csv_rows(paths.runs_csv)
     if len(run_rows) <= 0:
-        raise FileNotFoundError(f"No run rows found under {paths.root}")
+        return _load_partial_experiment_review_data(paths.root)
     variant_rows = _read_csv_rows(paths.variants_csv)
     paired_rows = _read_csv_rows(paths.paired_vs_baseline_csv)
-
-    variant_order = [str(name) for name in meta.get("variant_order", [])]
-    variant_rank = {name: idx for idx, name in enumerate(variant_order)}
-    variant_rows = sorted(
-        variant_rows,
-        key=lambda row: (
-            variant_rank.get(str(row.get("variant_name", "")), 10**6),
-            str(row.get("variant_name", "")),
-        ),
-    )
-
-    rows_by_key = {
-        (str(row.get("variant_name", "")), str(row.get("rollout_id", ""))): row
-        for row in run_rows
-    }
-    rows_by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in run_rows:
-        rows_by_variant[str(row.get("variant_name", ""))].append(row)
-    variant_by_name = {str(row.get("variant_name", "")): row for row in variant_rows}
-
-    return ExperimentReviewData(
+    return _build_review_data(
         run_dir=paths.root,
         meta=meta,
         variant_rows=variant_rows,
         run_rows=run_rows,
         paired_rows=paired_rows,
-        rows_by_key=rows_by_key,
-        rows_by_variant=dict(rows_by_variant),
-        variant_by_name=variant_by_name,
     )
 
 
@@ -2491,15 +2794,22 @@ def build_run_media_section(
 
 class ExperimentReviewApp:
     def __init__(self, run_dir: str):
-        self.data = load_experiment_review_data(run_dir)
+        self.run_dir = os.path.abspath(run_dir)
+        self._data_lock = threading.Lock()
+        self.data = load_experiment_review_data(self.run_dir)
         self._media_tasks: dict[tuple[str, str, str], MediaRenderTask] = {}
         self._media_tasks_lock = threading.Lock()
 
+    def _refresh_data(self) -> ExperimentReviewData:
+        with self._data_lock:
+            self.data = load_experiment_review_data(self.run_dir)
+            return self.data
+
     def summary_page(self, *, notice: str | None = None) -> str:
-        return build_summary_page(self.data, notice=notice)
+        return build_summary_page(self._refresh_data(), notice=notice)
 
     def variant_page(self, *, variant_name: str, notice: str | None = None) -> str:
-        return build_variant_page(self.data, variant_name, notice=notice)
+        return build_variant_page(self._refresh_data(), variant_name, notice=notice)
 
     def run_page(
         self,
@@ -2509,9 +2819,10 @@ class ExperimentReviewApp:
         notice: str | None = None,
         errors: list[str] | None = None,
     ) -> str:
-        row = resolve_row(self.data, variant_name, rollout_id)
+        data = self._refresh_data()
+        row = resolve_row(data, variant_name, rollout_id)
         return build_run_page(
-            self.data,
+            data,
             row,
             notice=notice,
             errors=errors,
@@ -2539,7 +2850,7 @@ class ExperimentReviewApp:
     def queue_media_render(self, *, variant_name: str, rollout_id: str, media: Sequence[str]) -> tuple[int, int]:
         queued = 0
         skipped = 0
-        media_dir = review_media_dir(self.data.run_dir, str(variant_name), str(rollout_id))
+        media_dir = review_media_dir(self.run_dir, str(variant_name), str(rollout_id))
         for media_name in media:
             if _media_path_for_name(media_dir, str(media_name)) is not None:
                 skipped += 1
@@ -2577,14 +2888,14 @@ class ExperimentReviewApp:
             task.status = "running"
             task.updated_at = time.time()
         backend = _trace_backend_for_run(
-            self.data.run_dir,
+            self.run_dir,
             variant_name=variant_name,
             rollout_id=rollout_id,
         )
         render_context = _PARTICLE_MEDIA_RENDER_LOCK if backend == "particle_sim" else contextlib.nullcontext()
         with render_context:
             outputs, errors = render_media_for_run(
-                self.data.run_dir,
+                self.run_dir,
                 variant_name=variant_name,
                 rollout_id=rollout_id,
                 media=[media_name],
@@ -2641,10 +2952,11 @@ def make_review_handler(app: ExperimentReviewApp):
                     params = parse_qs(parsed.query)
                     variant = params.get("variant", [""])[0]
                     rollout_id = params.get("rollout_id", [""])[0]
-                    row = resolve_row(self.review_app.data, variant, rollout_id)
+                    data = self.review_app._refresh_data()
+                    row = resolve_row(data, variant, rollout_id)
                     media_tasks = self.review_app.media_tasks_for_run(variant, rollout_id)
                     media_html, active_media = build_run_media_section(
-                        self.review_app.data,
+                        data,
                         row,
                         media_tasks=media_tasks,
                     )
@@ -2667,10 +2979,11 @@ def make_review_handler(app: ExperimentReviewApp):
                     if queued > 0:
                         notice = f"Queued {queued} media artifact(s)."
                     if response_format == "json":
-                        row = resolve_row(self.review_app.data, variant, rollout_id)
+                        data = self.review_app._refresh_data()
+                        row = resolve_row(data, variant, rollout_id)
                         media_tasks = self.review_app.media_tasks_for_run(variant, rollout_id)
                         media_html, active_media = build_run_media_section(
-                            self.review_app.data,
+                            data,
                             row,
                             media_tasks=media_tasks,
                         )
@@ -2718,7 +3031,7 @@ def make_review_handler(app: ExperimentReviewApp):
             self.wfile.write(data)
 
         def _serve_file(self, rel_path: str) -> None:
-            path = _safe_join(self.review_app.data.run_dir, rel_path)
+            path = _safe_join(self.review_app.run_dir, rel_path)
             if not os.path.isfile(path):
                 self.send_error(HTTPStatus.NOT_FOUND, "File not found")
                 return

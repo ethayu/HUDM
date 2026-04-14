@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional, Sequence, Tuple
 
 import numpy as np
@@ -13,6 +13,18 @@ except Exception as exc:  # pragma: no cover - optional dependency path
     _WARP_IMPORT_ERROR = exc
 else:
     _WARP_IMPORT_ERROR = None
+
+
+PUSHT_RENDER_PIXELS = 512.0
+PUSHT_WORLD_SIZE = 0.5
+PUSHT_WORLD_PER_PIXEL = PUSHT_WORLD_SIZE / PUSHT_RENDER_PIXELS
+
+GT_T_SCALE_PX = 40.0
+GT_T_STEM_W = GT_T_SCALE_PX * PUSHT_WORLD_PER_PIXEL
+GT_T_STEM_H = 3.0 * GT_T_SCALE_PX * PUSHT_WORLD_PER_PIXEL
+GT_T_BAR_W = 4.0 * GT_T_SCALE_PX * PUSHT_WORLD_PER_PIXEL
+GT_T_BAR_H = GT_T_SCALE_PX * PUSHT_WORLD_PER_PIXEL
+GT_PUSHER_RADIUS = 15.0 * PUSHT_WORLD_PER_PIXEL
 
 
 # -----------------------------
@@ -28,31 +40,39 @@ def _points_in_t_grid(
     min_particles: int = 1,
 ) -> np.ndarray:
     """
-    Build a T centered at (0,0) in object coordinates as union of rectangles.
+    Build a PushT T in the same local-coordinate convention as the GT env.
+
+    The GT tee is defined as:
+    - a horizontal bar spanning x in [-bar_w/2, bar_w/2], y in [0, bar_h]
+    - a vertical stem spanning x in [-stem_w/2, stem_w/2], y in [bar_h, bar_h + stem_h]
+
+    Sampling intentionally uses one uniform occupancy grid over the whole tee.
+    That means coarse spacings can under-resolve thin features, but at a truly
+    fine canonical spacing the resulting cloud converges to the intended GT
+    geometry without shape-specific sampling hacks.
+
+    Important: PushT state/rendering uses the body's local origin directly.
+    Although the Pymunk body stores a non-zero center of gravity, that does not
+    shift the local vertex coordinates used by render/eval/state. So the local
+    origin here must stay at the bar/stem junction frame, not at any centroid.
 
     If the grid sampling yields fewer than `min_particles`, collapse to one point.
     """
     xs = np.arange(-bar_w * 0.5, bar_w * 0.5 + 1e-9, spacing, dtype=np.float32)
-    ys = np.arange(-(stem_h + bar_h) * 0.5, (stem_h + bar_h) * 0.5 + 1e-9, spacing, dtype=np.float32)
+    ys = np.arange(0.0, bar_h + stem_h + 1e-9, spacing, dtype=np.float32)
 
     pts = []
     for y in ys:
         for x in xs:
-            in_stem = (abs(x) <= stem_w * 0.5) and (y <= bar_h * 0.5) and (y >= -stem_h + bar_h * 0.5)
-            in_bar = (abs(x) <= bar_w * 0.5) and (abs(y - bar_h * 0.5) <= bar_h * 0.5)
+            in_stem = (abs(float(x)) <= stem_w * 0.5) and (y >= bar_h) and (y <= bar_h + stem_h)
+            in_bar = (abs(float(x)) <= bar_w * 0.5) and (y >= 0.0) and (y <= bar_h)
             if in_stem or in_bar:
-                pts.append((x, y, 0.0))
+                pts.append((float(x), float(y), 0.0))
 
     if len(pts) < max(1, int(min_particles)):
         pts = [(0.0, 0.0, 0.0)]
 
-    arr = np.array(pts, dtype=np.float32)
-    # Match PushT canonical orientation at theta=0 (top-left image coordinates).
-    arr[:, 1] *= -1.0
-    com = arr[:, :2].mean(axis=0)
-    arr[:, 0] -= com[0]
-    arr[:, 1] -= com[1]
-    return arr
+    return np.array(pts, dtype=np.float32)
 
 
 def _rot2(theta: float) -> np.ndarray:
@@ -66,6 +86,326 @@ def _wrap_pi(a: float) -> float:
 
 
 @dataclass(frozen=True)
+class PushTParticleLevel:
+    rest_offsets: np.ndarray
+    spacing: float
+    achieved_cover_radius: float
+    target_particle_count: int
+    pose_offset_local: np.ndarray = field(default_factory=lambda: np.zeros((3,), dtype=np.float32))
+    is_canonical: bool = False
+    is_single_particle: bool = False
+
+
+def _greedy_farthest_point_order(points_xy: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    pts = np.asarray(points_xy, dtype=np.float32).reshape(-1, 2)
+    n = int(pts.shape[0])
+    if n <= 0:
+        raise ValueError("points_xy must contain at least one point.")
+    if n == 1:
+        return np.asarray([0], dtype=np.int64), np.asarray([0.0], dtype=np.float32)
+
+    order = np.empty((n,), dtype=np.int64)
+    coverage = np.empty((n,), dtype=np.float32)
+
+    center = pts.mean(axis=0, keepdims=True)
+    d2_center = np.sum((pts - center) ** 2, axis=1)
+    first = int(np.argmin(d2_center))
+    order[0] = first
+
+    min_d2 = np.sum((pts - pts[first:first + 1]) ** 2, axis=1)
+    min_d2[first] = 0.0
+    coverage[0] = float(np.sqrt(np.max(min_d2)))
+
+    selected = np.zeros((n,), dtype=bool)
+    selected[first] = True
+    for i in range(1, n):
+        next_idx = int(np.argmax(min_d2))
+        order[i] = next_idx
+        selected[next_idx] = True
+        d2_next = np.sum((pts - pts[next_idx:next_idx + 1]) ** 2, axis=1)
+        min_d2 = np.minimum(min_d2, d2_next)
+        min_d2[selected] = 0.0
+        coverage[i] = float(np.sqrt(np.max(min_d2)))
+
+    return order, coverage.astype(np.float32)
+
+
+def _cluster_points_by_prefix(points_xy: np.ndarray, center_order: np.ndarray, prefix_size: int) -> np.ndarray:
+    pts = np.asarray(points_xy, dtype=np.float32).reshape(-1, 2)
+    n = int(pts.shape[0])
+    k = int(prefix_size)
+    if n <= 0:
+        raise ValueError("points_xy must contain at least one point.")
+    if k <= 0 or k > n:
+        raise ValueError(f"prefix_size must be in [1, {n}], got {prefix_size}")
+
+    if k == 1:
+        return np.zeros((1, 3), dtype=np.float32)
+
+    selected = np.asarray(center_order[:k], dtype=np.int64).reshape(-1)
+    centers = pts[selected]
+    d2 = np.sum((pts[:, None, :] - centers[None, :, :]) ** 2, axis=2)
+    assign = np.argmin(d2, axis=1)
+
+    coarse = np.zeros((k, 3), dtype=np.float32)
+    for j in range(k):
+        members = pts[assign == j]
+        if members.shape[0] <= 0:
+            coarse[j, :2] = centers[j]
+        else:
+            coarse[j, :2] = members.mean(axis=0)
+
+    return coarse.astype(np.float32)
+
+
+def _effective_spacing_from_count(area_t: float, count: int) -> float:
+    return float(math.sqrt(max(float(area_t), 1e-12) / max(int(count), 1)))
+
+
+def _choose_canonical_spacing_for_target_count(
+    *,
+    target_particle_count: int,
+    stem_w: float,
+    stem_h: float,
+    bar_w: float,
+    bar_h: float,
+    min_particles: int,
+) -> tuple[float, np.ndarray]:
+    target = max(int(min_particles), int(target_particle_count))
+    area_t = float(stem_w) * float(stem_h) + float(bar_w) * float(bar_h)
+    nominal = max(1e-5, math.sqrt(max(area_t, 1e-12) / max(target, 1)))
+    cache: dict[float, np.ndarray] = {}
+
+    def points_for_spacing(spacing: float) -> np.ndarray:
+        sp = max(1e-6, float(spacing))
+        key = float(f"{sp:.12f}")
+        cached = cache.get(key, None)
+        if cached is None:
+            cached = _points_in_t_grid(
+                stem_w=float(stem_w),
+                stem_h=float(stem_h),
+                bar_w=float(bar_w),
+                bar_h=float(bar_h),
+                spacing=sp,
+                min_particles=int(min_particles),
+            ).astype(np.float32)
+            cache[key] = cached
+        return cached
+
+    lo = nominal * 0.125
+    hi = nominal * 8.0
+    while points_for_spacing(lo).shape[0] < target and lo > 1e-6:
+        lo *= 0.5
+    while points_for_spacing(hi).shape[0] > target:
+        hi *= 2.0
+
+    best_spacing = nominal
+    best_points = points_for_spacing(best_spacing)
+
+    def score(spacing: float, count: int) -> tuple[float, int, float]:
+        return (
+            abs(int(count) - target),
+            0 if int(count) >= target else 1,
+            float(spacing),
+        )
+
+    best_score = score(best_spacing, best_points.shape[0])
+    for spacing in (lo, hi):
+        pts = points_for_spacing(spacing)
+        s = score(spacing, pts.shape[0])
+        if s < best_score:
+            best_spacing = float(spacing)
+            best_points = pts
+            best_score = s
+
+    for _ in range(36):
+        mid = math.sqrt(lo * hi)
+        pts = points_for_spacing(mid)
+        mid_count = int(pts.shape[0])
+        s = score(mid, mid_count)
+        if s < best_score:
+            best_spacing = float(mid)
+            best_points = pts
+            best_score = s
+        if mid_count >= target:
+            lo = mid
+        else:
+            hi = mid
+
+    return float(best_spacing), best_points.astype(np.float32)
+
+
+def _tee_structure_metrics(
+    points_xy: np.ndarray,
+    *,
+    canonical_bbox: np.ndarray,
+    stem_w: float,
+    stem_h: float,
+    bar_w: float,
+    bar_h: float,
+) -> tuple[int, float]:
+    pts = np.asarray(points_xy, dtype=np.float32).reshape(-1, 2)
+    if pts.shape[0] <= 0:
+        return 4, float("inf")
+    if pts.shape[0] <= 4:
+        return 0, 0.0
+
+    # The hierarchy builder evaluates both GT-local clouds and centered
+    # rest-offset clouds. Normalize away translation before checking whether
+    # the coarse points still span the expected T structure.
+    pts = pts.copy()
+    pts[:, 0] -= 0.5 * float(pts[:, 0].min() + pts[:, 0].max())
+    pts[:, 1] -= float(pts[:, 1].min())
+
+    bar_center_y = 0.5 * float(bar_h)
+    junction_y = float(bar_h)
+    top_stem_y = float(bar_h) + 0.55 * float(stem_h)
+    stem_x_tol = max(float(stem_w), 0.15 * float(bar_w))
+    bar_y_tol = max(0.9 * float(bar_h), 0.15 * float(stem_h))
+
+    left_arm = np.any((pts[:, 0] <= -0.25 * float(bar_w)) & (np.abs(pts[:, 1] - bar_center_y) <= bar_y_tol))
+    right_arm = np.any((pts[:, 0] >= 0.25 * float(bar_w)) & (np.abs(pts[:, 1] - bar_center_y) <= bar_y_tol))
+    stem_top = np.any((np.abs(pts[:, 0]) <= stem_x_tol) & (pts[:, 1] >= top_stem_y))
+    junction = np.any((np.abs(pts[:, 0]) <= stem_x_tol) & (np.abs(pts[:, 1] - junction_y) <= bar_y_tol))
+
+    bbox = np.ptp(pts, axis=0)
+    canonical_bbox = np.asarray(canonical_bbox, dtype=np.float32).reshape(2)
+    bbox_penalty = float(
+        abs(float(bbox[0]) / max(float(canonical_bbox[0]), 1e-6) - 1.0)
+        + abs(float(bbox[1]) / max(float(canonical_bbox[1]), 1e-6) - 1.0)
+    )
+    missing = int(not left_arm) + int(not right_arm) + int(not stem_top) + int(not junction)
+    return missing, bbox_penalty
+
+
+def _select_soft_particle_count(
+    *,
+    target_particle_count: int,
+    total_particles: int,
+    center_order: np.ndarray,
+    coverage: np.ndarray,
+    canonical_gt_xy: np.ndarray,
+    stem_w: float,
+    stem_h: float,
+    bar_w: float,
+    bar_h: float,
+) -> int:
+    target = max(1, min(int(target_particle_count), int(total_particles)))
+    if target <= 4 or target >= int(total_particles):
+        return target
+
+    low_slack = max(2, int(math.ceil(0.20 * target)))
+    high_slack = max(4, int(math.ceil(0.35 * target)))
+    lo = max(5, target - low_slack)
+    hi = min(int(total_particles) - 1, target + high_slack)
+    canonical_bbox = np.ptp(np.asarray(canonical_gt_xy, dtype=np.float32), axis=0)
+
+    best_k = target
+    best_score: Optional[tuple[int, int, float, float]] = None
+    for k in range(lo, hi + 1):
+        coarse_gt = _cluster_points_by_prefix(canonical_gt_xy, center_order, k)
+        missing, bbox_penalty = _tee_structure_metrics(
+            coarse_gt[:, :2],
+            canonical_bbox=canonical_bbox,
+            stem_w=stem_w,
+            stem_h=stem_h,
+            bar_w=bar_w,
+            bar_h=bar_h,
+        )
+        score = (
+            int(missing),
+            abs(int(k) - target),
+            float(bbox_penalty),
+            float(coverage[k - 1]),
+        )
+        if best_score is None or score < best_score:
+            best_k = int(k)
+            best_score = score
+
+    return int(best_k)
+
+
+def build_t_particle_hierarchy(
+    *,
+    particle_counts: Sequence[int],
+    stem_w: float,
+    stem_h: float,
+    bar_w: float,
+    bar_h: float,
+    min_particles: int = 1,
+) -> list[PushTParticleLevel]:
+    counts = [int(c) for c in list(particle_counts)]
+    if len(counts) <= 0:
+        raise ValueError("particle_counts must contain at least one value.")
+    if any(c <= 0 for c in counts):
+        raise ValueError("All particle_counts values must be >= 1.")
+    if any(b <= a for a, b in zip(counts[:-1], counts[1:])):
+        raise ValueError("particle_counts must be strictly increasing.")
+
+    finest_target = int(counts[-1])
+    canonical_spacing, canonical_gt = _choose_canonical_spacing_for_target_count(
+        target_particle_count=finest_target,
+        stem_w=float(stem_w),
+        stem_h=float(stem_h),
+        bar_w=float(bar_w),
+        bar_h=float(bar_h),
+        min_particles=int(min_particles),
+    )
+    area_t = float(stem_w) * float(stem_h) + float(bar_w) * float(bar_h)
+    canonical_pose_offset = canonical_gt.mean(axis=0, keepdims=True).astype(np.float32)
+    canonical = canonical_gt.copy()
+    canonical[:, :2] -= canonical_pose_offset[0, :2]
+
+    levels_fine_to_coarse: list[PushTParticleLevel] = [
+        PushTParticleLevel(
+            rest_offsets=canonical.copy(),
+            pose_offset_local=canonical_pose_offset.reshape(3).copy(),
+            spacing=float(canonical_spacing),
+            achieved_cover_radius=0.0,
+            target_particle_count=int(finest_target),
+            is_canonical=True,
+            is_single_particle=bool(canonical.shape[0] == 1),
+        )
+    ]
+    if canonical.shape[0] <= 1:
+        return levels_fine_to_coarse[::-1]
+
+    center_order, coverage = _greedy_farthest_point_order(canonical_gt[:, :2])
+    prev_k = int(canonical.shape[0])
+    for target_count in reversed(counts[:-1]):
+        k = _select_soft_particle_count(
+            target_particle_count=int(target_count),
+            total_particles=int(canonical.shape[0]),
+            center_order=center_order,
+            coverage=coverage,
+            canonical_gt_xy=canonical_gt[:, :2],
+            stem_w=float(stem_w),
+            stem_h=float(stem_h),
+            bar_w=float(bar_w),
+            bar_h=float(bar_h),
+        )
+        if k >= int(canonical.shape[0]) or k == prev_k:
+            continue
+        coarse_gt = _cluster_points_by_prefix(canonical_gt[:, :2], center_order, k)
+        coarse_pose_offset = coarse_gt.mean(axis=0, keepdims=True).astype(np.float32)
+        rest_offsets = coarse_gt.copy()
+        rest_offsets[:, :2] -= coarse_pose_offset[0, :2]
+        levels_fine_to_coarse.append(
+            PushTParticleLevel(
+                rest_offsets=rest_offsets,
+                pose_offset_local=coarse_pose_offset.reshape(3).copy(),
+                spacing=_effective_spacing_from_count(area_t, k),
+                achieved_cover_radius=float(coverage[k - 1]),
+                target_particle_count=int(target_count),
+                is_single_particle=bool(k == 1),
+            )
+        )
+        prev_k = k
+
+    return levels_fine_to_coarse[::-1]
+
+
+@dataclass(frozen=True)
 class PushTWarpParams:
     xmin: float = -0.25
     xmax: float = 0.25
@@ -73,22 +413,24 @@ class PushTWarpParams:
     ymax: float = 0.25
 
     spacing: float = 0.012
-    stem_w: float = 0.05
-    stem_h: float = 0.10
-    bar_w: float = 0.12
-    bar_h: float = 0.04
+    stem_w: float = GT_T_STEM_W
+    stem_h: float = GT_T_STEM_H
+    bar_w: float = GT_T_BAR_W
+    bar_h: float = GT_T_BAR_H
     min_particles: int = 1
     force_single_particle: bool = False
+    rest_offsets: Optional[np.ndarray] = None
 
     particle_radius: Optional[float] = None  # None -> auto-scale with N
     radius_scale: float = 1.0
     radius_clip_spacing: bool = False
 
-    pusher_radius: float = 0.015
-    pusher_speed: float = 0.6
-    pusher_interp_substeps: bool = True
+    pusher_radius: float = GT_PUSHER_RADIUS
+    sim_hz: int = 100
+    control_hz: int = 10
+    pusher_k_p: float = 100.0
+    pusher_k_v: float = 20.0
 
-    frame_dt: float = 1.0 / 60.0
     substeps: int = 16
     iters: int = 8
     mu: float = 0.6
@@ -340,10 +682,22 @@ class PushTWarpEnv:
         self.bar_h = float(p.bar_h)
 
         self.pusher_r = float(p.pusher_radius)
-        self.pusher_speed = float(p.pusher_speed)
-        self.pusher_interp_substeps = bool(p.pusher_interp_substeps)
+        self.sim_hz = int(p.sim_hz)
+        self.control_hz = int(p.control_hz)
+        if self.sim_hz <= 0:
+            raise ValueError(f"sim_hz must be > 0, got {self.sim_hz}")
+        if self.control_hz <= 0:
+            raise ValueError(f"control_hz must be > 0, got {self.control_hz}")
+        if self.sim_hz % self.control_hz != 0:
+            raise ValueError(
+                f"sim_hz must be divisible by control_hz, got sim_hz={self.sim_hz}, control_hz={self.control_hz}"
+            )
+        self.pusher_k_p = float(p.pusher_k_p)
+        self.pusher_k_v = float(p.pusher_k_v)
+        self.control_dt = 1.0 / float(self.control_hz)
+        self.sim_dt = 1.0 / float(self.sim_hz)
+        self.controller_steps = self.sim_hz // self.control_hz
 
-        self.frame_dt = float(p.frame_dt)
         self.substeps = int(p.substeps)
         self.iters = int(p.iters)
         self.mu = float(p.mu)
@@ -357,7 +711,12 @@ class PushTWarpEnv:
         self.rng = np.random.default_rng(seed)
 
         self.force_single_particle = bool(p.force_single_particle)
-        if self.force_single_particle:
+        if p.rest_offsets is not None:
+            x0 = np.asarray(p.rest_offsets, dtype=np.float32).reshape(-1, 3).copy()
+            if x0.shape[0] <= 0:
+                raise ValueError("rest_offsets must contain at least one particle.")
+            x0[:, :2] -= x0[:, :2].mean(axis=0, keepdims=True)
+        elif self.force_single_particle:
             x0 = np.array([[0.0, 0.0, 0.0]], dtype=np.float32)
         else:
             x0 = _points_in_t_grid(
@@ -399,10 +758,11 @@ class PushTWarpEnv:
         self.sum_b = wp.array(np.zeros((1,), dtype=np.float32), dtype=float, device=self.device)
 
         self.pusher_pos = np.array([0.0, -0.12, 0.0], dtype=np.float32)
+        self.pusher_velocity = np.zeros((2,), dtype=np.float32)
         self.goal_pose = np.array([0.10, 0.10, 0.0], dtype=np.float32)
 
+        self._theta_state = 0.0
         self._last_pose = np.array([0.0, 0.0, 0.0], dtype=np.float32)
-        self._last_pusher_pos = self.pusher_pos.copy()
 
         self.reset()
 
@@ -440,7 +800,8 @@ class PushTWarpEnv:
         self.x_pred.assign(x_init)
 
         self.pusher_pos = np.array([pusher_xy[0], pusher_xy[1], 0.0], dtype=np.float32)
-        self._last_pusher_pos = self.pusher_pos.copy()
+        self.pusher_velocity = np.zeros((2,), dtype=np.float32)
+        self._theta_state = float(_wrap_pi(float(obj_theta)))
 
         self._last_pose = self.get_object_pose()
         return self._make_obs()
@@ -457,6 +818,7 @@ class PushTWarpEnv:
         goal_pose: Optional[Sequence[float]] = None,
         obj_pose: Optional[Sequence[float]] = None,
         obj_twist: Optional[Sequence[float]] = None,
+        pusher_velocity: Optional[Sequence[float]] = None,
     ) -> dict:
         """
         Compatibility shim supporting both:
@@ -482,6 +844,13 @@ class PushTWarpEnv:
             pusher_xy=tuple(np.asarray(pusher_xy, dtype=np.float32).reshape(2).tolist()),
             goal_pose=gx,
         )
+        if pusher_velocity is not None:
+            pv = np.asarray(pusher_velocity, dtype=np.float32).reshape(-1)
+            if pv.shape[0] < 2:
+                raise ValueError(
+                    f"pusher_velocity must have at least 2 dims, got {tuple(pv.shape)}"
+                )
+            self.pusher_velocity = pv[:2].astype(np.float32).copy()
 
         # Optional twist initialization after positional reset.
         if obj_twist is not None:
@@ -499,6 +868,26 @@ class PushTWarpEnv:
 
         self._last_pose = self.get_object_pose()
         return self._make_obs()
+
+    def capture_state(self) -> dict[str, np.ndarray]:
+        return {
+            "pusher_xy": np.asarray(self.pusher_pos[:2], dtype=np.float32).copy(),
+            "pusher_velocity": self.get_pusher_velocity().astype(np.float32),
+            "obj_pose": self.get_object_pose().astype(np.float32),
+            "obj_twist": self.get_object_twist().astype(np.float32),
+            "goal_pose": np.asarray(self.goal_pose, dtype=np.float32).copy(),
+        }
+
+    def restore_state(self, state: dict[str, Sequence[float]]) -> dict:
+        if not isinstance(state, dict):
+            raise ValueError(f"restore_state expects a dict snapshot, got {type(state).__name__}")
+        return self.set_state(
+            pusher_xy=state.get("pusher_xy", None),
+            pusher_velocity=state.get("pusher_velocity", None),
+            obj_pose=state.get("obj_pose", None),
+            obj_twist=state.get("obj_twist", None),
+            goal_pose=state.get("goal_pose", None),
+        )
 
     def _make_obs(self) -> dict:
         pose = self._last_pose.copy()
@@ -518,17 +907,10 @@ class PushTWarpEnv:
         action = np.asarray(action, dtype=np.float32).reshape(2)
 
         target = self.pusher_pos[:2] + action
-        delta = target - self.pusher_pos[:2]
-        dist = float(np.linalg.norm(delta))
-        max_dist = self.pusher_speed * self.frame_dt
-        if dist > max_dist and dist > 1e-8:
-            delta *= (max_dist / dist)
-
-        pusher_start = self.pusher_pos.copy()
-        self._last_pusher_pos = pusher_start.copy()
-        self.pusher_pos[:2] += delta
-
-        self._simulate_frame(pusher_start=pusher_start, pusher_end=self.pusher_pos.copy())
+        pusher_path, final_velocity = self._build_pusher_path(target)
+        self._simulate_frame(pusher_path=pusher_path)
+        self.pusher_pos = pusher_path[-1].copy()
+        self.pusher_velocity = final_velocity.copy()
 
         pose = self.get_object_pose()
         self._last_pose = pose
@@ -549,25 +931,22 @@ class PushTWarpEnv:
 
     def _simulate_frame(
         self,
-        pusher_start: Optional[np.ndarray] = None,
-        pusher_end: Optional[np.ndarray] = None,
+        pusher_path: Optional[np.ndarray] = None,
     ) -> None:
-        n_sub = max(1, self.substeps)
-        dt = self.frame_dt / n_sub
+        if pusher_path is None:
+            pusher_path = np.asarray([self.pusher_pos.copy(), self.pusher_pos.copy()], dtype=np.float32)
+        else:
+            pusher_path = np.asarray(pusher_path, dtype=np.float32).reshape(-1, 3)
+        if pusher_path.shape[0] < 2:
+            raise ValueError("pusher_path must contain at least two points.")
+        num_segments = int(pusher_path.shape[0] - 1)
+        dt = self.control_dt / float(num_segments)
 
-        if pusher_start is None:
-            pusher_start = self.pusher_pos.copy()
-        if pusher_end is None:
-            pusher_end = self.pusher_pos.copy()
-        pusher_start = np.asarray(pusher_start, dtype=np.float32).reshape(3)
-        pusher_end = np.asarray(pusher_end, dtype=np.float32).reshape(3)
-
-        for si in range(n_sub):
-            if self.pusher_interp_substeps and n_sub > 1:
-                a = float(si + 1) / float(n_sub)
-                pxy = (1.0 - a) * pusher_start[:2] + a * pusher_end[:2]
-            else:
-                pxy = pusher_end[:2]
+        # Replay the PD controller path at its native controller cadence instead
+        # of resampling it at an unrelated substep count. This keeps particle
+        # contact timing aligned with GT PushT's 100 Hz integration.
+        for seg_idx in range(num_segments):
+            pxy = pusher_path[seg_idx + 1, :2]
             ppos = wp.vec3(float(pxy[0]), float(pxy[1]), 0.0)
 
             wp.launch(
@@ -661,8 +1040,12 @@ class PushTWarpEnv:
 
         a = float(self.sum_a.numpy()[0])
         b = float(self.sum_b.numpy()[0])
-        theta = math.atan2(a, b) if (abs(a) + abs(b)) > 1e-12 else 0.0
-        return c, float(theta)
+        if self.N <= 1 or (abs(a) + abs(b)) <= 1e-12:
+            theta = float(self._theta_state)
+        else:
+            theta = float(_wrap_pi(math.atan2(a, b)))
+            self._theta_state = theta
+        return c, theta
 
     def get_object_pose(self) -> np.ndarray:
         c, theta = self._compute_com_and_theta()
@@ -689,19 +1072,53 @@ class PushTWarpEnv:
         return self.v.numpy().astype(np.float32)[:, :2].copy()
 
     def get_pusher_velocity(self) -> np.ndarray:
-        dt = max(1e-8, float(self.frame_dt))
-        return ((self.pusher_pos - self._last_pusher_pos)[:2] / dt).astype(np.float32)
+        return self.pusher_velocity.astype(np.float32).copy()
 
     def get_object_velocity(self) -> np.ndarray:
         # Backward-compatible alias used by existing adapters.
         return self.get_object_twist()[:2].copy()
 
+    def _build_pusher_path(self, target_xy: Sequence[float]) -> tuple[np.ndarray, np.ndarray]:
+        target = np.asarray(target_xy, dtype=np.float64).reshape(2)
+        pos = np.asarray(self.pusher_pos[:2], dtype=np.float64).copy()
+        vel = np.asarray(self.pusher_velocity, dtype=np.float64).copy()
+
+        path = np.zeros((self.controller_steps + 1, 3), dtype=np.float32)
+        path[0, :2] = pos.astype(np.float32)
+
+        for step_idx in range(self.controller_steps):
+            acc = self.pusher_k_p * (target - pos) - self.pusher_k_v * vel
+            vel = vel + acc * self.sim_dt
+            pos = pos + vel * self.sim_dt
+            path[step_idx + 1, :2] = pos.astype(np.float32)
+
+        return path, vel.astype(np.float32)
+
 
 if __name__ == "__main__":
     if wp is None:
         raise SystemExit("warp-lang is not installed.")
-    for sp in [0.006, 0.010, 0.016, 0.030, 0.080]:
-        env = PushTWarpEnv(device="cuda:0", spacing=sp, particle_radius=None, min_particles=1)
-        obs = env.reset()
-        meta = obs["meta"]
-        print(f"spacing={sp:.3f}  N={meta['num_particles']:4d}  pr={meta['particle_radius']:.4f}")
+    levels = build_t_particle_hierarchy(
+        particle_counts=[1, 4, 16, 64, 128, 256],
+        stem_w=GT_T_STEM_W,
+        stem_h=GT_T_STEM_H,
+        bar_w=GT_T_BAR_W,
+        bar_h=GT_T_BAR_H,
+        min_particles=1,
+    )
+    for li, level in enumerate(levels):
+        env = PushTWarpEnv(
+            device="cuda:0",
+            params=PushTWarpParams(
+                spacing=level.spacing,
+                rest_offsets=level.rest_offsets,
+                force_single_particle=bool(level.is_single_particle),
+                particle_radius=None,
+                min_particles=1,
+            ),
+        )
+        meta = env.reset()["meta"]
+        print(
+            f"level={li} spacing={level.spacing:.4f} "
+            f"N={meta['num_particles']:4d} pr={meta['particle_radius']:.4f}"
+        )
