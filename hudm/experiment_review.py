@@ -34,6 +34,7 @@ from hudm.experiment_bundle import (
     review_media_dir,
     trace_dir,
 )
+import hudm.reference_eval as reference_eval
 from hudm.runtime import format_bits_human, format_flops_human
 from planning.cem_core import SharedCEMCore
 from scripts import planning_media
@@ -55,6 +56,11 @@ REVIEW_MEDIA = (
     "planner_view_replay",
     "predicted_backend_replay",
     "gt_replay",
+)
+
+REFERENCE_MEDIA = (
+    "reference_goal_state",
+    "reference_env_replay",
 )
 
 PLANNER_BACKEND_MEDIA = (
@@ -583,9 +589,11 @@ def _load_partial_experiment_review_data(
         raise FileNotFoundError(f"No completed trace rows found under {paths.traces_dir}")
 
     _assign_partial_rollout_indices(run_rows)
+    overlay_meta = dict(meta or {})
+    overlay_meta, run_rows = _overlay_reference_metrics(paths.root, meta=overlay_meta, run_rows=run_rows)
     variant_order = _resolved_variant_order(variant_names, meta=meta)
-    baseline_variant = _resolved_baseline_variant(variant_order, meta=meta)
-    meta_payload = dict(meta or {})
+    baseline_variant = _resolved_baseline_variant(variant_order, meta=overlay_meta)
+    meta_payload = dict(overlay_meta)
     meta_payload.update(
         {
             "schema_version": EXPERIMENT_SCHEMA_VERSION,
@@ -709,6 +717,102 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
     }
 
 
+def _overlay_reference_metrics(
+    run_dir: str,
+    *,
+    meta: dict[str, Any],
+    run_rows: Sequence[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    context = reference_eval.resolve_reference_context(meta)
+    if context is None:
+        return dict(meta), list(run_rows)
+
+    meta_payload = dict(meta)
+    meta_payload["reference_backend"] = context.backend
+    meta_payload["reference_backend_label"] = context.backend_label
+    meta_payload["reference_metrics_supported"] = bool(context.metrics_supported)
+    meta_payload["gt_media_allowed"] = bool(context.gt_media_allowed)
+
+    if not context.metrics_supported:
+        return meta_payload, list(run_rows)
+
+    updated_rows: list[dict[str, Any]] = []
+    missing_rows: list[dict[str, Any]] = []
+    for row in run_rows:
+        variant_name = str(row.get("variant_name", ""))
+        rollout_id = str(row.get("rollout_id", ""))
+        trace_json_path = os.path.join(trace_dir(run_dir, variant_name, rollout_id), "trace.json")
+        trace_npz_path = os.path.join(trace_dir(run_dir, variant_name, rollout_id), "trace.npz")
+        cached = reference_eval.load_cached_reference_eval(
+            run_dir,
+            context=context,
+            variant_name=variant_name,
+            rollout_id=rollout_id,
+            source_paths=[trace_json_path, trace_npz_path, os.path.join(run_dir, EXPERIMENT_JSON)],
+        )
+        if cached is None:
+            missing_rows.append(dict(row))
+            continue
+        merged = dict(row)
+        for key, value in cached.summary.items():
+            if key in {
+                "success",
+                "success_and_done",
+                "final_pos_diff",
+                "final_angle_diff",
+                "final_eef_diff",
+                "best_pos_diff",
+                "best_angle_diff",
+                "best_eef_diff",
+                "final_coverage",
+                "auc_pos_diff",
+                "auc_angle_diff",
+                "auc_eef_diff",
+            }:
+                merged[key] = value
+        updated_rows.append(merged)
+
+    if len(missing_rows) > 0:
+        if not context.runtime_ready:
+            updated_rows.extend(dict(row) for row in missing_rows)
+            return meta_payload, _sort_runs(updated_rows)
+        evaluator = reference_eval.ReferenceEvaluator(context)
+        for row in missing_rows:
+            variant_name = str(row.get("variant_name", ""))
+            rollout_id = str(row.get("rollout_id", ""))
+            result = reference_eval.ensure_reference_eval(
+                run_dir,
+                meta_path=os.path.join(run_dir, EXPERIMENT_JSON),
+                context=context,
+                variant_name=variant_name,
+                rollout_id=rollout_id,
+                evaluator=evaluator,
+            )
+            if result is None:
+                updated_rows.append(dict(row))
+                continue
+            merged = dict(row)
+            for key, value in result.summary.items():
+                if key in {
+                    "success",
+                    "success_and_done",
+                    "final_pos_diff",
+                    "final_angle_diff",
+                    "final_eef_diff",
+                    "best_pos_diff",
+                    "best_angle_diff",
+                    "best_eef_diff",
+                    "final_coverage",
+                    "auc_pos_diff",
+                    "auc_angle_diff",
+                    "auc_eef_diff",
+                }:
+                    merged[key] = value
+            updated_rows.append(merged)
+
+    return meta_payload, _sort_runs(updated_rows)
+
+
 def load_experiment_review_data(run_dir: str) -> ExperimentReviewData:
     paths = bundle_paths(run_dir)
     if not os.path.isfile(paths.experiment_json):
@@ -722,8 +826,19 @@ def load_experiment_review_data(run_dir: str) -> ExperimentReviewData:
     run_rows = _read_csv_rows(paths.runs_csv)
     if len(run_rows) <= 0:
         return _load_partial_experiment_review_data(paths.root, meta=meta, allow_empty=True)
-    variant_rows = _read_csv_rows(paths.variants_csv)
-    paired_rows = _read_csv_rows(paths.paired_vs_baseline_csv)
+    meta, run_rows = _overlay_reference_metrics(paths.root, meta=meta, run_rows=run_rows)
+    variant_rows = _variant_summary_rows_from_runs(run_rows, variant_order=_resolved_variant_order([str(row.get("variant_name", "")) for row in run_rows], meta=meta))
+    paired_rows = []
+    baseline_variant = _resolved_baseline_variant([str(row.get("variant_name", "")) for row in variant_rows], meta=meta)
+    data = _build_review_data(
+        run_dir=paths.root,
+        meta=meta,
+        variant_rows=variant_rows,
+        run_rows=run_rows,
+        paired_rows=[],
+    )
+    if baseline_variant:
+        paired_rows = _reference_comparison_payload(data, baseline_variant)["paired_rows"]
     return _build_review_data(
         run_dir=paths.root,
         meta=meta,
@@ -752,6 +867,52 @@ def _read_log_tail(path: str, *, max_lines: int = 120) -> str | None:
 def _load_trace_npz(path: str) -> dict[str, np.ndarray]:
     with np.load(path, allow_pickle=False) as data:
         return {key: data[key] for key in data.files}
+
+
+def _reference_trace_arrays_for_row(
+    data: ExperimentReviewData,
+    row: dict[str, Any],
+) -> dict[str, np.ndarray] | None:
+    context = reference_eval.resolve_reference_context(data.meta)
+    if context is None or not context.metrics_supported:
+        return None
+    variant_name = str(row.get("variant_name", ""))
+    rollout_id = str(row.get("rollout_id", ""))
+    arrays = reference_eval.load_cached_reference_arrays(
+        data.run_dir,
+        context=context,
+        variant_name=variant_name,
+        rollout_id=rollout_id,
+    )
+    if arrays is not None:
+        return arrays
+    if not context.runtime_ready:
+        return None
+    result = reference_eval.ensure_reference_eval(
+        data.run_dir,
+        meta_path=os.path.join(data.run_dir, EXPERIMENT_JSON),
+        context=context,
+        variant_name=variant_name,
+        rollout_id=rollout_id,
+    )
+    return None if result is None else result.arrays
+
+
+def _reference_metrics_note(data: ExperimentReviewData) -> str:
+    context = reference_eval.resolve_reference_context(data.meta)
+    if context is None:
+        return ""
+    if context.metrics_supported:
+        return (
+            f"Success and final-state metrics are evaluated by replaying each variant's executed actions in the "
+            f"configured baseline/reference backend <code>{html.escape(context.backend_label)}</code>. "
+            "Execution termination and compute metrics remain tied to the original run."
+        )
+    return (
+        f"Configured baseline/reference backend is <code>{html.escape(context.backend_label)}</code>. "
+        "Review currently uses it for reference media, but pose/coverage metric replay is only available for "
+        "<code>gt_env</code> and <code>particle_sim</code> baselines."
+    )
 
 
 def _trace_paths_for_variant(data: ExperimentReviewData, variant_name: str) -> list[str]:
@@ -2140,7 +2301,10 @@ def _replan_display_level(trace_meta: dict[str, Any], replan: dict[str, Any]) ->
 
 
 def _media_path_for_name(media_dir: str, media_name: str) -> str | None:
-    for filename in planning_media.MEDIA_ALIASES.get(media_name, []):
+    aliases = []
+    aliases.extend(reference_eval.REFERENCE_MEDIA_ALIASES.get(media_name, []))
+    aliases.extend(planning_media.MEDIA_ALIASES.get(media_name, []))
+    for filename in aliases:
         path = os.path.join(media_dir, filename)
         if os.path.isfile(path):
             return path
@@ -2169,20 +2333,64 @@ def render_media_for_run(
     errors: list[str] = []
     media_dir = review_media_dir(experiment_root, variant_name, rollout_id)
     ensure_dir(media_dir)
+    meta_path = os.path.join(experiment_root, EXPERIMENT_JSON)
+    meta = None
+    if os.path.isfile(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+    context = reference_eval.resolve_reference_context(meta)
     for media_name in media:
         try:
-            outputs.extend(
-                planning_media.render_media(
-                    experiment_root,
-                    schedule=variant_name,
-                    rollout_id=rollout_id,
-                    media=[media_name],
-                    output_dir=media_dir,
+            if media_name in reference_eval.REFERENCE_MEDIA_ALIASES:
+                if context is None:
+                    raise ValueError("Reference baseline media requires experiment baseline metadata.")
+                outputs.append(
+                    reference_eval.render_reference_media(
+                        experiment_root,
+                        meta_path=meta_path if meta is not None else None,
+                        context=context,
+                        variant_name=variant_name,
+                        rollout_id=rollout_id,
+                        media_name=media_name,
+                        output_dir=media_dir,
+                    )
                 )
-            )
+            else:
+                outputs.extend(
+                    planning_media.render_media(
+                        experiment_root,
+                        schedule=variant_name,
+                        rollout_id=rollout_id,
+                        media=[media_name],
+                        output_dir=media_dir,
+                    )
+                )
         except Exception as exc:
             errors.append(f"{media_name}: {type(exc).__name__}: {exc}")
     return outputs, errors
+
+
+def _active_review_media(
+    data: ExperimentReviewData,
+    *,
+    trace_meta: dict[str, Any] | None = None,
+) -> tuple[str, ...]:
+    del trace_meta
+    media_names: list[str] = []
+    context = reference_eval.resolve_reference_context(data.meta)
+    if context is not None:
+        media_names.extend(REFERENCE_MEDIA)
+    media_names.extend(PLANNER_BACKEND_MEDIA)
+    if context is None or context.gt_media_allowed:
+        media_names.extend(("closed_loop_replay", "gt_replay"))
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for media_name in media_names:
+        if media_name in seen:
+            continue
+        seen.add(media_name)
+        ordered.append(media_name)
+    return tuple(ordered)
 
 
 def _status_badge_html(status: str) -> str:
@@ -2214,9 +2422,16 @@ def _media_backend_label(trace_meta: dict[str, Any] | None) -> str:
 
 
 def _media_display_name(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
+    context = reference_eval.resolve_reference_context(trace_meta.get("experiment_meta", {}) if isinstance(trace_meta, dict) else None)
     backend_label = _media_backend_label(trace_meta)
     names = {
-        "closed_loop_replay": "Closed-Loop Replay (GT env)",
+        "reference_goal_state": (
+            f"Reference Goal State ({context.backend_label})" if context is not None else "Reference Goal State"
+        ),
+        "reference_env_replay": (
+            f"Reference-Env Replay ({context.backend_label})" if context is not None else "Reference-Env Replay"
+        ),
+        "closed_loop_replay": "Execution Replay (GT env)",
         "planner_view_replay": f"Planner-View Replay ({backend_label})",
         "predicted_backend_replay": f"Predicted-Backend Replay ({backend_label})",
         "gt_replay": "Dataset Replay (GT env)",
@@ -2225,8 +2440,17 @@ def _media_display_name(media_name: str, *, trace_meta: dict[str, Any] | None = 
 
 
 def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
+    context = reference_eval.resolve_reference_context(trace_meta.get("experiment_meta", {}) if isinstance(trace_meta, dict) else None)
     backend_label = _media_backend_label(trace_meta)
     descriptions = {
+        "reference_goal_state": (
+            "Goal-state preview rendered in the configured baseline/reference backend."
+        ),
+        "reference_env_replay": (
+            "Executed actions from the current variant are rolled out in the configured "
+            f"baseline/reference backend ({context.backend_label if context is not None else 'baseline backend'}). "
+            "Success and final-state metrics are derived from this replay."
+        ),
         "closed_loop_replay": (
             "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. "
             "States are rendered in the GT environment. "
@@ -2276,7 +2500,7 @@ def _media_panel_html(
     pieces: list[str] = []
     variant = str(row.get("variant_name", ""))
     rollout_id = str(row.get("rollout_id", ""))
-    for media_name in REVIEW_MEDIA:
+    for media_name in _active_review_media(data, trace_meta=trace_meta):
         task = media_tasks.get(media_name) if media_tasks is not None else None
         media_path = _media_path_for_name(media_dir, media_name)
         if media_path is None:
@@ -2297,10 +2521,14 @@ def _media_panel_html(
             )
             continue
         rel_path = os.path.relpath(media_path, data.run_dir)
+        ext = os.path.splitext(media_path)[1].lower()
+        media_body = f"<video controls preload='metadata' src='/files/{quote(rel_path)}'></video>"
+        if ext in {".png", ".jpg", ".jpeg", ".webp"}:
+            media_body = f"<img alt='{html.escape(_media_display_name(media_name, trace_meta=trace_meta))}' src='/files/{quote(rel_path)}' />"
         pieces.append(
             "<section class='card media-card'>"
             f"{_media_card_title_html(media_name, 'succeeded', trace_meta=trace_meta)}"
-            f"<video controls preload='metadata' src='/files/{quote(rel_path)}'></video>"
+            f"{media_body}"
             "</section>"
         )
     return "".join(pieces)
@@ -2316,22 +2544,42 @@ def _media_section_html(
     variant = str(row.get("variant_name", ""))
     rollout_id = str(row.get("rollout_id", ""))
     backend_label = _media_backend_label(trace_meta)
+    reference_context = reference_eval.resolve_reference_context(data.meta)
+    active_media_names = _active_review_media(data, trace_meta=trace_meta)
+    render_reference_href = (
+        f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
+        + "".join(f"&media={quote(media_name)}" for media_name in REFERENCE_MEDIA)
+    )
     render_backend_href = (
         f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
         + "".join(f"&media={quote(media_name)}" for media_name in PLANNER_BACKEND_MEDIA)
     )
     render_all_href = (
         f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
-        + "".join(f"&media={quote(media_name)}" for media_name in REVIEW_MEDIA)
+        + "".join(f"&media={quote(media_name)}" for media_name in active_media_names)
     )
     active_media = any(task.status in {"pending", "running"} for task in (media_tasks or {}).values())
+    media_note = (
+        f"Reference goal/replay use the configured baseline/reference backend "
+        f"(<code>{html.escape(reference_context.backend_label)}</code>). "
+        f"Planner-view and predicted-backend replays use this run's planner backend "
+        f"(<code>{html.escape(backend_label)}</code>)."
+        if reference_context is not None
+        else f"Planner-view and predicted-backend replays use this run's planner backend (<code>{html.escape(backend_label)}</code>)."
+    )
+    if reference_context is not None and reference_context.gt_media_allowed:
+        media_note += " GT media remain available because GT is the baseline or an evaluated backend."
+    controls = ""
+    if reference_context is not None:
+        controls += f"<a class='button primary' data-async-render='true' href='{render_reference_href}'>Render reference media</a> "
+    controls += f"<a class='button' data-async-render='true' href='{render_backend_href}'>Render planner-backend media</a> "
+    controls += f"<a class='button' data-async-render='true' href='{render_all_href}'>Render all media for this run</a>"
     return (
         f"<section class='card' id='mediaSection' data-variant='{html.escape(variant)}' "
         f"data-rollout-id='{html.escape(rollout_id)}' data-active-media='{'true' if active_media else 'false'}'>"
         "<h2>Media</h2>"
-        f"<p class='muted'>Execution replays use the GT environment. Planner-view and predicted-backend replays use this run's planner backend (<code>{html.escape(backend_label)}</code>).</p>"
-        f"<p><a class='button primary' data-async-render='true' href='{render_backend_href}'>Render planner-backend media</a> "
-        f"<a class='button' data-async-render='true' href='{render_all_href}'>Render all media for this run</a></p>"
+        f"<p class='muted'>{media_note}</p>"
+        f"<p>{controls}</p>"
         "<div class='media-grid'>"
         f"{_media_panel_html(data, row, media_tasks=media_tasks, trace_meta=trace_meta)}"
         "</div>"
@@ -2365,6 +2613,7 @@ def _representative_run_rows(rows: Sequence[dict[str, Any]], *, success: bool, l
 def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None) -> str:
     variant_count = len(data.variant_order) if len(data.variant_order) > 0 else len(data.variant_rows)
     baseline_variant = data.baseline_variant
+    reference_note = _reference_metrics_note(data)
     kpi_items: list[tuple[str, str]] = [
         ("Experiment", data.experiment_name),
         ("Variants", str(variant_count)),
@@ -2409,6 +2658,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
     </div>
   </section>
   <section class='kpi-grid'>{_kpi_cards(kpi_items)}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <section class='card'>
     <h2>Bundle Status</h2>
     <p class='muted'>{html.escape(waiting_message)}</p>
@@ -2511,6 +2761,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <div class='plot-grid'>
     <section class='card'>{success_analysis_fig}</section>
     <section class='card'>{stepwise_fig}</section>
@@ -2651,6 +2902,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   {_table_section(
         "Variant Summary",
         table_id="variantSummaryTable",
@@ -2718,6 +2970,7 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
         raise KeyError(f"Unknown variant: {variant_name}")
     variant_row = data.variant_by_name[variant_name]
     baseline_variant = data.baseline_variant
+    reference_note = _reference_metrics_note(data)
     baseline_note = ""
     if baseline_variant:
         if variant_name == baseline_variant:
@@ -2814,6 +3067,7 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <div class='plot-grid'>
     <section class='card'>{success_fig}</section>
     <section class='card'>{relationship_fig}</section>
@@ -2863,20 +3117,37 @@ def build_run_page(
 
     with open(trace_json_path, "r", encoding="utf-8") as f:
         trace_meta = json.load(f)
+    trace_meta = dict(trace_meta)
+    trace_meta["experiment_meta"] = data.meta
     trace_arrays = _load_trace_npz(trace_npz_path)
-    trace_fig = _figure_html(_single_run_trace_figure(trace_arrays, variant, rollout_id, trace_meta=trace_meta))
+    reference_trace_arrays = _reference_trace_arrays_for_row(data, row)
+    trace_arrays_for_display = reference_trace_arrays if reference_trace_arrays is not None else trace_arrays
+    trace_fig = _figure_html(_single_run_trace_figure(trace_arrays_for_display, variant, rollout_id, trace_meta=trace_meta))
     log_tail = _read_log_tail(run_log_path)
     error_html = _notice_html(" | ".join(errors), kind="error") if errors else ""
     active_media_tasks = [task for task in (media_tasks or {}).values() if task.status in {"pending", "running"}]
+    reference_note = _reference_metrics_note(data)
+    reference_context = reference_eval.resolve_reference_context(data.meta)
+    success_label = "Success"
+    final_pos_label = "Final Pos"
+    final_angle_label = "Final Angle"
+    final_coverage_label = "Final Coverage"
+    termination_label = "Termination"
+    if reference_context is not None and reference_context.metrics_supported:
+        success_label = "Reference Success"
+        final_pos_label = "Reference Final Pos"
+        final_angle_label = "Reference Final Angle"
+        final_coverage_label = "Reference Final Coverage"
+        termination_label = "Execution Termination"
 
     kpi_html = _kpi_cards(
         [
-            ("Success", str(int(row.get("success", 0)))),
-            ("Termination", str(row.get("termination_reason", ""))),
+            (success_label, str(int(row.get("success", 0)))),
+            (termination_label, str(row.get("termination_reason", ""))),
             ("Executed Steps", _format_number(row.get("executed_steps"), digits=0)),
-            ("Final Pos", _format_number(row.get("final_pos_diff"))),
-            ("Final Angle", _format_number(row.get("final_angle_diff"))),
-            ("Final Coverage", _format_number(row.get("final_coverage"))),
+            (final_pos_label, _format_number(row.get("final_pos_diff"))),
+            (final_angle_label, _format_number(row.get("final_angle_diff"))),
+            (final_coverage_label, _format_number(row.get("final_coverage"))),
             ("Bits", _format_bits_value(row.get("bits_used_total"))),
             ("Plan Time", _format_number(row.get("plan_time_total_sec"))),
         ]
@@ -2926,6 +3197,7 @@ def build_run_page(
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <section class='card'>
     <h2>Single-Run Trace Curves</h2>
     {trace_fig}
@@ -2959,6 +3231,8 @@ def build_run_media_section(
         raise FileNotFoundError(f"Trace JSON missing for {variant}/{rollout_id}")
     with open(trace_json_path, "r", encoding="utf-8") as f:
         trace_meta = json.load(f)
+    trace_meta = dict(trace_meta)
+    trace_meta["experiment_meta"] = data.meta
     active_media = any(task.status in {"pending", "running"} for task in (media_tasks or {}).values())
     return _media_section_html(data, row, media_tasks=media_tasks, trace_meta=trace_meta), active_media
 

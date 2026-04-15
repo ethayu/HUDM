@@ -9,6 +9,9 @@ import time
 import unittest
 from unittest import mock
 
+import numpy as np
+
+from hudm.config import _plan_defaults
 from hudm.experiment_bundle import EXPERIMENT_JSON, PAIRED_VS_BASELINE_CSV, RUNS_CSV, SELECTED_ROLLOUTS_JSON, VARIANTS_CSV
 from hudm.experiment_review import (
     _compute_vs_outcome_figure,
@@ -763,19 +766,140 @@ class ExperimentReviewTests(unittest.TestCase):
                     f,
                 )
 
-            data = load_experiment_review_data(run_dir)
+            cached_reference = mock.Mock(
+                summary={
+                    "success": 1,
+                    "success_and_done": 1,
+                    "final_pos_diff": 1.0,
+                    "final_angle_diff": 0.1,
+                    "final_eef_diff": 0.2,
+                    "best_pos_diff": 1.0,
+                    "best_angle_diff": 0.1,
+                    "best_eef_diff": 0.2,
+                    "final_coverage": 0.95,
+                    "auc_pos_diff": 1.0,
+                    "auc_angle_diff": 0.1,
+                    "auc_eef_diff": 0.2,
+                }
+            )
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=cached_reference):
+                data = load_experiment_review_data(run_dir)
             row = resolve_row(data, "variant_a", "rollout_0")
             media_html, _ = build_run_media_section(data, row)
 
-            self.assertIn("Closed-Loop Replay (GT env)", media_html)
+            self.assertIn("Execution Replay (GT env)", media_html)
             self.assertIn("Planner-View Replay (wm (world_model_demo))", media_html)
             self.assertIn("Predicted-Backend Replay (wm (world_model_demo))", media_html)
             self.assertIn("Dataset Replay (GT env)", media_html)
             self.assertIn(
-                "Execution replays use the GT environment. Planner-view and predicted-backend replays use this run's planner backend",
+                "Planner-view and predicted-backend replays use this run's planner backend",
                 media_html,
             )
             self.assertIn("Render planner-backend media", media_html)
+
+    def test_media_section_uses_reference_media_and_hides_gt_when_baseline_is_non_gt(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, trace_dir = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [
+                            {
+                                "name": "variant_a",
+                                "plan": {"backend": "particle_sim", "particle_env": {"fidelity_env": {"particle_counts": [1, 4]}}},
+                            }
+                        ],
+                    },
+                    f,
+                )
+            with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backend": "particle_sim",
+                        "plan_config": {"backend": "particle_sim"},
+                        "replans": [],
+                    },
+                    f,
+                )
+
+            cached_reference = mock.Mock(
+                summary={
+                    "success": 1,
+                    "success_and_done": 1,
+                    "final_pos_diff": 1.0,
+                    "final_angle_diff": 0.1,
+                    "final_eef_diff": 0.2,
+                    "best_pos_diff": 1.0,
+                    "best_angle_diff": 0.1,
+                    "best_eef_diff": 0.2,
+                    "final_coverage": 0.95,
+                    "auc_pos_diff": 1.0,
+                    "auc_angle_diff": 0.1,
+                    "auc_eef_diff": 0.2,
+                }
+            )
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=cached_reference):
+                data = load_experiment_review_data(run_dir)
+            row = resolve_row(data, "variant_a", "rollout_0")
+            media_html, _ = build_run_media_section(data, row)
+
+            self.assertIn("Reference Goal State (particle_sim)", media_html)
+            self.assertIn("Reference-Env Replay (particle_sim)", media_html)
+            self.assertIn("Render reference media", media_html)
+            self.assertNotIn("Execution Replay (GT env)", media_html)
+            self.assertNotIn("Dataset Replay (GT env)", media_html)
+
+    def test_load_experiment_review_data_normalizes_compact_reference_plan(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, trace_dir = self._make_experiment_dir(tmpdir)
+            compact_plan = _plan_defaults()
+            compact_plan["backend"]["kind"] = "particle_sim"
+            compact_plan["artifacts"]["render"] = False
+            compact_plan["artifacts"]["save"] = False
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [
+                            {
+                                "name": "variant_a",
+                                "plan": compact_plan,
+                            }
+                        ],
+                    },
+                    f,
+                )
+            with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backend": "particle_sim",
+                        "plan_config": {"backend": "particle_sim"},
+                        "replans": [],
+                    },
+                    f,
+                )
+
+            class _DummyEvaluator:
+                def __init__(self, context):
+                    self.context = context
+                    assert context.plan_cfg["env_id"] == "pusht"
+
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=None):
+                with mock.patch("hudm.experiment_review.reference_eval.ReferenceEvaluator", _DummyEvaluator):
+                    with mock.patch("hudm.experiment_review.reference_eval.ensure_reference_eval", return_value=None):
+                        data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.meta.get("reference_backend"), "particle_sim")
+            self.assertTrue(bool(data.meta.get("reference_metrics_supported")))
 
     def test_render_media_for_run_writes_into_review_cache_and_run_page_links_it(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -819,6 +943,114 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn(
                 "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. States are rendered in the GT environment. Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early.",
                 detail_html,
+            )
+
+    def test_render_media_for_run_routes_reference_media_through_reference_renderer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [{"name": "variant_a", "plan": {"backend": "particle_sim"}}],
+                    },
+                    f,
+                )
+
+            def fake_reference_render(
+                experiment_root,
+                *,
+                meta_path,
+                context,
+                variant_name,
+                rollout_id,
+                media_name,
+                output_dir,
+            ):
+                self.assertEqual(os.path.abspath(experiment_root), os.path.abspath(run_dir))
+                self.assertEqual(os.path.abspath(meta_path), os.path.abspath(os.path.join(run_dir, EXPERIMENT_JSON)))
+                self.assertEqual(context.backend, "particle_sim")
+                self.assertEqual(variant_name, "variant_a")
+                self.assertEqual(rollout_id, "rollout_0")
+                self.assertEqual(media_name, "reference_env_replay")
+                os.makedirs(output_dir, exist_ok=True)
+                out_path = os.path.join(output_dir, "reference_env_replay.mp4")
+                with open(out_path, "wb") as f:
+                    f.write(b"fake_video")
+                return out_path
+
+            with mock.patch("hudm.experiment_review.reference_eval.render_reference_media", side_effect=fake_reference_render):
+                outputs, errors = render_media_for_run(
+                    run_dir,
+                    variant_name="variant_a",
+                    rollout_id="rollout_0",
+                    media=["reference_env_replay"],
+                )
+            self.assertEqual(len(outputs), 1)
+            self.assertEqual(errors, [])
+            self.assertTrue(outputs[0].endswith("reference_env_replay.mp4"))
+
+    def test_reference_metric_overlay_updates_run_page_labels(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [{"name": "variant_a", "plan": {"backend": "particle_sim"}}],
+                    },
+                    f,
+                )
+
+            cached_reference = mock.Mock(
+                summary={
+                    "success": 1,
+                    "success_and_done": 1,
+                    "final_pos_diff": 0.5,
+                    "final_angle_diff": 0.05,
+                    "final_eef_diff": 0.15,
+                    "best_pos_diff": 0.5,
+                    "best_angle_diff": 0.05,
+                    "best_eef_diff": 0.15,
+                    "final_coverage": 0.98,
+                    "auc_pos_diff": 0.5,
+                    "auc_angle_diff": 0.05,
+                    "auc_eef_diff": 0.15,
+                }
+            )
+            cached_arrays = {
+                "pos_diffs": np.asarray([0.8, 0.5], dtype=np.float32),
+                "angle_diffs": np.asarray([0.1, 0.05], dtype=np.float32),
+                "eef_diffs": np.asarray([0.2, 0.15], dtype=np.float32),
+                "coverages": np.asarray([0.9, 0.98], dtype=np.float32),
+                "state_dists": np.asarray([1.0, 0.8], dtype=np.float32),
+                "metric_success_flags": np.asarray([False, True], dtype=np.bool_),
+                "done_flags": np.asarray([False, True], dtype=np.bool_),
+                "trajectory": np.asarray([[256.0, 256.0, 0, 0, 0], [300.0, 256.0, 0, 0, 0]], dtype=np.float32),
+                "executed_actions": np.asarray([[0.5, 0.0]], dtype=np.float32),
+            }
+
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=cached_reference):
+                with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_arrays", return_value=cached_arrays):
+                    data = load_experiment_review_data(run_dir)
+                    row = resolve_row(data, "variant_a", "rollout_0")
+                    html = build_run_page(data, row)
+
+            self.assertIn("Reference Success", html)
+            self.assertIn("Reference Final Pos", html)
+            self.assertIn("Reference Final Coverage", html)
+            self.assertIn("Execution Termination", html)
+            self.assertIn(
+                "Success and final-state metrics are evaluated by replaying each variant's executed actions in the configured baseline/reference backend <code>particle_sim</code>",
+                html,
             )
 
     def test_variant_histogram_legend_groups_cover_every_subplot(self):
