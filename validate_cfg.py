@@ -48,7 +48,16 @@ def validate_plan_cfg(cfg) -> None:
     _reject_unknown_keys(cfg.mpc, {"steps", "horizon", "replan_every"}, "plan.mpc")
     _reject_unknown_keys(
         cfg.cem,
-        {"pop_size", "elite_frac", "n_iter", "init_std", "warm_start", "action_low", "action_high"},
+        {
+            "pop_size",
+            "elite_frac",
+            "n_iter",
+            "init_std",
+            "inject_dataset_gt_actions",
+            "warm_start",
+            "action_low",
+            "action_high",
+        },
         "plan.cem",
     )
     _reject_unknown_keys(
@@ -169,6 +178,12 @@ def validate_plan_cfg(cfg) -> None:
         raise ValueError(f"plan.env.render_size must be > 0, got {cfg.env.render_size}")
     if not isinstance(cfg.cem.warm_start, bool):
         raise ValueError(f"plan.cem.warm_start must be a bool, got {type(cfg.cem.warm_start).__name__}")
+    _inject_gt = getattr(cfg.cem, "inject_dataset_gt_actions", False)
+    if not isinstance(_inject_gt, bool):
+        raise ValueError(
+            "plan.cem.inject_dataset_gt_actions must be a bool, "
+            f"got {type(_inject_gt).__name__}"
+        )
     if int(cfg.gt_env.rollout_samples) <= 0:
         raise ValueError(f"plan.gt_env.rollout_samples must be > 0, got {cfg.gt_env.rollout_samples}")
     objective_space = str(getattr(cfg.gt_env, "objective_space", "image")).lower()

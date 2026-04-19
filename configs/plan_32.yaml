@@ -1,0 +1,10 @@
+imports:
+  - task/pusht_dataset.yaml
+  - planner/default.yaml
+  - backend/wm_32.yaml
+  - fidelity/single.yaml
+
+plan:
+  artifacts:
+    render: true
+    save: true

@@ -64,6 +64,7 @@ def run_plan_session(
         init_state=init_state,
         goal_state=goal_state,
         device=runtime["device"],
+        init_goal_meta=sample_meta,
     )
     return {
         "cfg": cfg,

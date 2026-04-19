@@ -10,9 +10,9 @@ plan:
     init_goal:
       source: "dataset"
       dataset:
-        zarr_path: "synthetic/pusht_synth_large.zarr"
-        split: "valid"
+        zarr_path: "synthetic/pusht_synth_planning_translation_100_len30.zarr"
+        split: "train"
         split_ratio: null
-        trajectory_len: 50
-        seed: 20
+        trajectory_len: 30
+        seed: 45 #12 #45 #12 #10
         reconstruct_goal_state: 3

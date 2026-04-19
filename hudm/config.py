@@ -74,6 +74,7 @@ def _plan_defaults() -> dict[str, Any]:
                 "elite_frac": 0.1,
                 "n_iter": 5,
                 "init_std": 1.0,
+                "inject_dataset_gt_actions": False,
                 "warm_start": True,
                 "action_low": None,
                 "action_high": None,
@@ -265,7 +266,16 @@ def validate_plan_spec_cfg(cfg: DictConfig) -> None:
     _reject_unknown_keys(cfg.planner, {"horizon", "replan_every", "cem", "fidelity"}, "plan.planner")
     _reject_unknown_keys(
         cfg.planner.cem,
-        {"pop_size", "elite_frac", "n_iter", "init_std", "warm_start", "action_low", "action_high"},
+        {
+            "pop_size",
+            "elite_frac",
+            "n_iter",
+            "init_std",
+            "inject_dataset_gt_actions",
+            "warm_start",
+            "action_low",
+            "action_high",
+        },
         "plan.planner.cem",
     )
     _reject_unknown_keys(cfg.planner.fidelity, {"enabled", "num_levels", "mpc", "cem", "rollout"}, "plan.planner.fidelity")

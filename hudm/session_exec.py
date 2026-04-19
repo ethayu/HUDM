@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import torch
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 
 from hudm.artifacts import (
     action_overlay_spec_from_env,
@@ -41,6 +41,29 @@ def _wm_termination_latent_loss(
     return float(torch.sqrt(diff.pow(2).mean() + 1e-8).item())
 
 
+def _gt_action_trajectory_for_cem(
+    init_goal_meta: Optional[dict],
+    horizon: int,
+    action_dim: int,
+) -> Optional[np.ndarray]:
+    if not init_goal_meta:
+        return None
+    # `actions` is set by PushTWrapper.sample_dataset_init_goal_states (env-space segment).
+    raw = init_goal_meta.get("actions", None)
+    if raw is None:
+        raw = init_goal_meta.get("gt_action_trajectory", None)
+    if raw is None:
+        return None
+    arr = np.asarray(raw, dtype=np.float32)
+    if arr.ndim != 2 or int(arr.shape[1]) != int(action_dim):
+        return None
+    out = np.zeros((int(horizon), int(action_dim)), dtype=np.float32)
+    n = min(int(horizon), int(arr.shape[0]))
+    if n > 0:
+        out[:n] = arr[:n]
+    return out
+
+
 def run_closed_loop(
     env: PushTWrapper,
     wm: object | None,
@@ -50,6 +73,7 @@ def run_closed_loop(
     init_state: np.ndarray,
     goal_state: np.ndarray,
     device: torch.device,
+    init_goal_meta: Optional[dict] = None,
 ) -> tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray], dict, dict]:
     set_start_pose(env, init_state)
     particle_backend = None
@@ -64,6 +88,7 @@ def run_closed_loop(
         goal_obs, _ = env.prepare(seed=0, init_state=goal_state)
         set_goal_pose(env, goal_state)
         goal_obs["visual"] = env.render("rgb_array", include_start_pose=False)
+        #save the goal_obs["visual"] to a file
         z_goal = encode_visual(wm, goal_obs["visual"], device)
     obs, cur_state = env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
     set_execution_fidelity_finest(env)
@@ -132,6 +157,12 @@ def run_closed_loop(
     horizon = int(cfg.mpc.horizon)
     replan_every = int(cfg.mpc.replan_every)
     n_replans = max(1, int(np.ceil(steps / replan_every)))
+    inject_gt_actions = bool(OmegaConf.select(cfg, "cem.inject_dataset_gt_actions", default=False))
+    gt_action_for_cem = (
+        _gt_action_trajectory_for_cem(init_goal_meta, horizon, int(env.action_dim))
+        if inject_gt_actions
+        else None
+    )
 
     render_enabled = bool(cfg.render)
     t = 0
@@ -222,13 +253,15 @@ def run_closed_loop(
         plan_start_state = np.asarray(cur_state, dtype=np.float32).copy()
         if backend == "wm":
             z_cur_for_plan = encode_visual(wm, obs["visual"], device)
-            action_seq, info = planner.plan(
-                z_cur_for_plan,
-                z_goal,
-                mpc_progress=mpc_progress,
-                warm_start_steps=int(prev_exec_steps),
-                seed=plan_seed,
-            )
+            plan_kw: dict[str, Any] = {
+                "mpc_progress": mpc_progress,
+                "warm_start_steps": int(prev_exec_steps),
+                "seed": plan_seed,
+            }
+            # Episode GT actions match the sampled start state; only meaningful at the first replan.
+            if inject_gt_actions and gt_action_for_cem is not None and replan_idx == 0:
+                plan_kw["gt_action_trajectory"] = gt_action_for_cem
+            action_seq, info = planner.plan(z_cur_for_plan, z_goal, **plan_kw)
         elif backend == "gt_env":
             action_seq, info = planner.plan(
                 init_state=cur_state,

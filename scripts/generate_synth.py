@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#python scripts/generate_synth.py synthetic/pusht_synth_planning.zarr --train_eps 100 --val_eps 1 --
+#len_min 50 --len_max 160 --with_velocity --policy contact_aware --mode-profile planning --quality-profile strict --img-size 96 --workers 50 --contact-aware-ou-sigma 3.0
 """
 Generate synthetic PushT rollouts by stepping the ground-truth environment and
 save them in Zarr format for world-model training.
@@ -28,6 +30,8 @@ Notes:
   - Train/val split is handled via split_ratio when loading the dataset
 """
 
+#Apr 13 python scripts/generate_synth.py synthetic/pusht_synth_training_translation.zarr --train_eps 10 --val_eps 1 --len_min 50 --len_max 150 --with_velocity --policy contact_aware --mode-profile train --quality-profile strict --img-size 96 --workers 50 --contact-aware-ou-sigma 3.0 --max-env-input-norm 0.3
+#Apt 14 python scripts/generate_synth.py synthetic/pusht_synth_planning_translation_100.zarr --train_eps 100 --val_eps 100 --len_min 5 --len_max 150 --with_velocity --policy contact_aware --mode-profile planning --quality-profile strict --img-size 96 --workers 50 --contact-aware-ou-sigma 3.0 --max-env-input-norm 0.3
 from __future__ import annotations
 
 import argparse

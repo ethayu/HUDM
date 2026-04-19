@@ -59,6 +59,7 @@ def gym_make_versioned(env_id: str, env_cfg: DictConfig):
 
 
 def image_to_model_tensor(img: np.ndarray, device: torch.device) -> torch.Tensor:
+    #save the img to a file
     x = torch.as_tensor(img, dtype=torch.float32, device=device)
     if x.ndim == 3:
         x = x.unsqueeze(0)
@@ -67,6 +68,7 @@ def image_to_model_tensor(img: np.ndarray, device: torch.device) -> torch.Tensor
     if float(x.max()) > 1.5:
         x = x / 255.0
     x = x * 2.0 - 1.0
+
     return x
 
 
