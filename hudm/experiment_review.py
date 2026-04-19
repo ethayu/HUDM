@@ -22,6 +22,7 @@ import numpy as np
 
 from hudm.experiment_bundle import (
     EXPERIMENT_JSON,
+    EXPERIMENT_SCHEMA_VERSION,
     PAIRED_VS_BASELINE_CSV,
     REVIEWER_SCHEMA_VERSION,
     RUNS_CSV,
@@ -33,6 +34,7 @@ from hudm.experiment_bundle import (
     review_media_dir,
     trace_dir,
 )
+import hudm.reference_eval as reference_eval
 from hudm.runtime import format_bits_human, format_flops_human
 from planning.cem_core import SharedCEMCore
 from scripts import planning_media
@@ -54,6 +56,16 @@ REVIEW_MEDIA = (
     "planner_view_replay",
     "predicted_backend_replay",
     "gt_replay",
+)
+
+REFERENCE_MEDIA = (
+    "reference_goal_state",
+    "reference_env_replay",
+)
+
+PLANNER_BACKEND_MEDIA = (
+    "planner_view_replay",
+    "predicted_backend_replay",
 )
 
 CANONICAL_DOWNLOADS = (
@@ -211,15 +223,424 @@ def _sort_runs(rows: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
+def _safe_name(value: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in {"-", "_"} else "_" for ch in str(value))
+
+
+def _trace_final_value(values: Sequence[float] | np.ndarray, fallback: Any) -> float:
+    if len(values) > 0:
+        return float(np.asarray(values, dtype=np.float32)[-1])
+    return float(fallback) if fallback is not None else float("nan")
+
+
+def _trace_best_value(values: Sequence[float] | np.ndarray, fallback: Any) -> float:
+    if len(values) > 0:
+        return float(np.min(np.asarray(values, dtype=np.float32)))
+    return float(fallback) if fallback is not None else float("nan")
+
+
+def _coverage_final(values: Sequence[float] | np.ndarray, fallback: Any) -> float:
+    if len(values) > 0:
+        arr = np.asarray(values, dtype=np.float32)
+        finite = arr[np.isfinite(arr)]
+        if finite.size > 0:
+            return float(finite[-1])
+    return float(fallback) if fallback is not None else float("nan")
+
+
+def _auc(values: Sequence[float] | np.ndarray) -> float:
+    if len(values) <= 0:
+        return float("nan")
+    return float(np.sum(np.asarray(values, dtype=np.float32)))
+
+
+def _summary_stat(values: Sequence[Any], *, kind: str) -> float:
+    arr = np.asarray(values, dtype=np.float32)
+    finite = arr[np.isfinite(arr)]
+    if finite.size <= 0:
+        return float("nan")
+    if kind == "mean":
+        return float(np.mean(finite))
+    if kind == "median":
+        return float(np.median(finite))
+    raise ValueError(f"Unknown summary stat kind: {kind}")
+
+
+def _summary_metric_values(rows: Sequence[dict[str, Any]], key: str) -> list[float]:
+    return [_safe_float(row.get(key)) for row in rows]
+
+
+def _variant_summary_rows_from_runs(
+    rows: Sequence[dict[str, Any]],
+    *,
+    variant_order: Sequence[str],
+) -> list[dict[str, Any]]:
+    by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in rows:
+        by_variant[str(row.get("variant_name", ""))].append(row)
+    ordered_variant_names = [name for name in variant_order if name in by_variant]
+    ordered_variant_names.extend(sorted(name for name in by_variant if name not in ordered_variant_names))
+
+    summary_rows: list[dict[str, Any]] = []
+    for variant_name in ordered_variant_names:
+        variant_rows = by_variant[variant_name]
+        success_vals = [int(bool(row.get("success", 0))) for row in variant_rows]
+        success_and_done = [int(bool(row.get("success_and_done", 0))) for row in variant_rows]
+        executed_steps = _summary_metric_values(variant_rows, "executed_steps")
+        plans = _summary_metric_values(variant_rows, "plans")
+        final_pos = _summary_metric_values(variant_rows, "final_pos_diff")
+        final_angle = _summary_metric_values(variant_rows, "final_angle_diff")
+        final_eef = _summary_metric_values(variant_rows, "final_eef_diff")
+        best_pos = _summary_metric_values(variant_rows, "best_pos_diff")
+        best_angle = _summary_metric_values(variant_rows, "best_angle_diff")
+        best_eef = _summary_metric_values(variant_rows, "best_eef_diff")
+        final_cov = _summary_metric_values(variant_rows, "final_coverage")
+        auc_pos = _summary_metric_values(variant_rows, "auc_pos_diff")
+        auc_angle = _summary_metric_values(variant_rows, "auc_angle_diff")
+        auc_eef = _summary_metric_values(variant_rows, "auc_eef_diff")
+        bits = _summary_metric_values(variant_rows, "bits_used_total")
+        bits_per_step = _summary_metric_values(variant_rows, "bits_used_per_step")
+        flops = _summary_metric_values(variant_rows, "flops_used_total")
+        flops_per_step = _summary_metric_values(variant_rows, "flops_used_per_step")
+        plan_time = _summary_metric_values(variant_rows, "plan_time_total_sec")
+        plan_time_per_replan = _summary_metric_values(variant_rows, "plan_time_per_replan_sec")
+        term_reasons = [str(row.get("termination_reason", "unknown")) for row in variant_rows]
+        reason_counts = Counter(term_reasons)
+
+        summary_row = {
+            "variant_name": variant_name,
+            "n_rollouts": int(len(variant_rows)),
+            "success_rate": _summary_stat(success_vals, kind="mean"),
+            "success_and_done_rate": _summary_stat(success_and_done, kind="mean"),
+            "mean_executed_steps": _summary_stat(executed_steps, kind="mean"),
+            "median_executed_steps": _summary_stat(executed_steps, kind="median"),
+            "mean_plans": _summary_stat(plans, kind="mean"),
+            "mean_final_pos_diff": _summary_stat(final_pos, kind="mean"),
+            "median_final_pos_diff": _summary_stat(final_pos, kind="median"),
+            "mean_final_angle_diff": _summary_stat(final_angle, kind="mean"),
+            "median_final_angle_diff": _summary_stat(final_angle, kind="median"),
+            "mean_final_eef_diff": _summary_stat(final_eef, kind="mean"),
+            "median_final_eef_diff": _summary_stat(final_eef, kind="median"),
+            "mean_best_pos_diff": _summary_stat(best_pos, kind="mean"),
+            "mean_best_angle_diff": _summary_stat(best_angle, kind="mean"),
+            "mean_best_eef_diff": _summary_stat(best_eef, kind="mean"),
+            "mean_final_coverage": _summary_stat(final_cov, kind="mean"),
+            "median_final_coverage": _summary_stat(final_cov, kind="median"),
+            "mean_auc_pos_diff": _summary_stat(auc_pos, kind="mean"),
+            "mean_auc_angle_diff": _summary_stat(auc_angle, kind="mean"),
+            "mean_auc_eef_diff": _summary_stat(auc_eef, kind="mean"),
+            "mean_bits_used_total": _summary_stat(bits, kind="mean"),
+            "mean_bits_used_per_step": _summary_stat(bits_per_step, kind="mean"),
+            "mean_flops_used_total": _summary_stat(flops, kind="mean"),
+            "mean_flops_used_per_step": _summary_stat(flops_per_step, kind="mean"),
+            "mean_plan_time_total_sec": _summary_stat(plan_time, kind="mean"),
+            "median_plan_time_total_sec": _summary_stat(plan_time, kind="median"),
+            "mean_plan_time_per_replan_sec": _summary_stat(plan_time_per_replan, kind="mean"),
+        }
+        for reason, count in sorted(reason_counts.items()):
+            summary_row[f"termination_reason__{_safe_name(reason)}"] = int(count)
+        summary_rows.append(summary_row)
+    return summary_rows
+
+
+def _assign_partial_rollout_indices(rows: Sequence[dict[str, Any]]) -> None:
+    rollout_keys: dict[str, tuple[int, int, int, str]] = {}
+    for row in rows:
+        rollout_id = str(row.get("rollout_id", ""))
+        key = (
+            int(row.get("episode_index", 10**9)),
+            int(row.get("start_index", 10**9)),
+            int(row.get("goal_index", 10**9)),
+            rollout_id,
+        )
+        prev = rollout_keys.get(rollout_id)
+        if prev is None or key < prev:
+            rollout_keys[rollout_id] = key
+    rollout_index_by_id = {
+        rollout_id: idx
+        for idx, (rollout_id, _key) in enumerate(sorted(rollout_keys.items(), key=lambda item: item[1]))
+    }
+    for row in rows:
+        row["rollout_index"] = int(rollout_index_by_id.get(str(row.get("rollout_id", "")), -1))
+
+
+def _load_partial_run_row(raw_trace_dir: str, *, variant_name: str) -> dict[str, Any] | None:
+    trace_json_path = os.path.join(raw_trace_dir, "trace.json")
+    trace_npz_path = os.path.join(raw_trace_dir, "trace.npz")
+    metadata_path = os.path.join(raw_trace_dir, "metadata.json")
+    if not (
+        os.path.isfile(trace_json_path)
+        and os.path.isfile(trace_npz_path)
+        and os.path.isfile(metadata_path)
+    ):
+        return None
+    try:
+        with open(trace_json_path, "r", encoding="utf-8") as f:
+            trace_meta = json.load(f)
+        with open(metadata_path, "r", encoding="utf-8") as f:
+            metadata = json.load(f)
+        trace_arrays = _load_trace_npz(trace_npz_path)
+    except Exception:
+        return None
+
+    sample = trace_meta.get("sample") or metadata.get("sample") or {}
+    run_stats = trace_meta.get("run_stats") or {}
+    pos_diffs = np.asarray(trace_arrays.get("pos_diffs", []), dtype=np.float32)
+    angle_diffs = np.asarray(trace_arrays.get("angle_diffs", []), dtype=np.float32)
+    eef_diffs = np.asarray(trace_arrays.get("eef_diffs", []), dtype=np.float32)
+    coverages = np.asarray(trace_arrays.get("coverages", []), dtype=np.float32)
+    executed_actions = np.asarray(trace_arrays.get("executed_actions", []), dtype=np.float32)
+    executed_steps = int(executed_actions.shape[0]) if executed_actions.ndim >= 1 else 0
+    plans = int(
+        run_stats.get(
+            "plans",
+            metadata.get("plans", 0),
+        )
+    )
+    bits_total = int(run_stats.get("bits_used_total", metadata.get("bits_used_total", 0)))
+    flops_total = int(run_stats.get("flops_used_total", metadata.get("flops_used_total", 0)))
+    plan_time_total = float(run_stats.get("plan_time_total_sec", metadata.get("plan_time_total_sec", 0.0)))
+    shared_plan_time_total = float(
+        metadata.get(
+            "shared_plan_time_total_sec",
+            run_stats.get("shared_plan_time_total_sec", plan_time_total),
+        )
+    )
+    rollout_id = str(sample.get("rollout_id", os.path.basename(raw_trace_dir)))
+
+    return {
+        "variant_name": str(variant_name),
+        "rollout_id": rollout_id,
+        "rollout_index": int(sample.get("rollout_index", -1)),
+        "episode_index": int(sample.get("episode_index", -1)),
+        "start_index": int(sample.get("start_index", -1)),
+        "goal_index": int(sample.get("goal_index", -1)),
+        "success": int(bool(metadata.get("success", trace_meta.get("success", False)))),
+        "termination_reason": str(run_stats.get("termination_reason", metadata.get("termination_reason", "unknown"))),
+        "termination_step": int(run_stats.get("termination_step", metadata.get("termination_step", -1))),
+        "executed_steps": executed_steps,
+        "plans": plans,
+        "success_and_done": int(
+            bool(
+                run_stats.get("termination_metric_success", metadata.get("termination_metric_success", False))
+                and run_stats.get("termination_done", metadata.get("termination_done", False))
+            )
+        ),
+        "final_pos_diff": _trace_final_value(pos_diffs, run_stats.get("termination_pos_diff", metadata.get("termination_pos_diff"))),
+        "final_angle_diff": _trace_final_value(angle_diffs, run_stats.get("termination_angle_diff", metadata.get("termination_angle_diff"))),
+        "final_eef_diff": _trace_final_value(eef_diffs, run_stats.get("termination_eef_diff", metadata.get("termination_eef_diff"))),
+        "best_pos_diff": _trace_best_value(pos_diffs, run_stats.get("termination_pos_diff", metadata.get("termination_pos_diff"))),
+        "best_angle_diff": _trace_best_value(angle_diffs, run_stats.get("termination_angle_diff", metadata.get("termination_angle_diff"))),
+        "best_eef_diff": _trace_best_value(eef_diffs, run_stats.get("termination_eef_diff", metadata.get("termination_eef_diff"))),
+        "final_coverage": _coverage_final(coverages, run_stats.get("termination_coverage", metadata.get("termination_coverage"))),
+        "auc_pos_diff": _auc(pos_diffs),
+        "auc_angle_diff": _auc(angle_diffs),
+        "auc_eef_diff": _auc(eef_diffs),
+        "bits_used_total": bits_total,
+        "bits_used_per_step": float(bits_total / max(1, executed_steps)),
+        "flops_used_total": flops_total,
+        "flops_used_per_step": float(flops_total / max(1, executed_steps)),
+        "plan_time_total_sec": plan_time_total,
+        "shared_plan_time_total_sec": shared_plan_time_total,
+        "plan_time_per_replan_sec": float(plan_time_total / max(1, plans)),
+        "run_dir": raw_trace_dir,
+        "trace_json": trace_json_path,
+        "trace_npz": trace_npz_path,
+        "run_log": os.path.join(raw_trace_dir, "run.log"),
+    }
+
+
+def _build_review_data(
+    *,
+    run_dir: str,
+    meta: dict[str, Any],
+    variant_rows: Sequence[dict[str, Any]],
+    run_rows: Sequence[dict[str, Any]],
+    paired_rows: Sequence[dict[str, Any]],
+) -> ExperimentReviewData:
+    run_rows_sorted = _sort_runs(run_rows)
+    variant_order = [str(name) for name in meta.get("variant_order", [])]
+    variant_rank = {name: idx for idx, name in enumerate(variant_order)}
+    variant_rows_sorted = sorted(
+        list(variant_rows),
+        key=lambda row: (
+            variant_rank.get(str(row.get("variant_name", "")), 10**6),
+            str(row.get("variant_name", "")),
+        ),
+    )
+
+    rows_by_key = {
+        (str(row.get("variant_name", "")), str(row.get("rollout_id", ""))): row
+        for row in run_rows_sorted
+    }
+    rows_by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for row in run_rows_sorted:
+        rows_by_variant[str(row.get("variant_name", ""))].append(row)
+    variant_by_name = {str(row.get("variant_name", "")): row for row in variant_rows_sorted}
+
+    return ExperimentReviewData(
+        run_dir=os.path.abspath(run_dir),
+        meta=dict(meta),
+        variant_rows=variant_rows_sorted,
+        run_rows=run_rows_sorted,
+        paired_rows=list(paired_rows),
+        rows_by_key=rows_by_key,
+        rows_by_variant=dict(rows_by_variant),
+        variant_by_name=variant_by_name,
+    )
+
+
+def _empty_experiment_review_data(
+    run_dir: str,
+    *,
+    meta: dict[str, Any] | None = None,
+) -> ExperimentReviewData:
+    payload = {
+        "schema_version": EXPERIMENT_SCHEMA_VERSION,
+        "reviewer_version": REVIEWER_SCHEMA_VERSION,
+        "experiment_name": os.path.basename(os.path.abspath(run_dir)),
+        "baseline_variant": "",
+        "variant_order": [],
+        "partial_bundle": True,
+        "bundle_status": "pending",
+    }
+    if meta is not None:
+        payload.update(dict(meta))
+    payload["experiment_name"] = str(payload.get("experiment_name", os.path.basename(os.path.abspath(run_dir))))
+    payload["baseline_variant"] = str(payload.get("baseline_variant", ""))
+    payload["variant_order"] = [str(name) for name in payload.get("variant_order", [])]
+    return _build_review_data(
+        run_dir=os.path.abspath(run_dir),
+        meta=payload,
+        variant_rows=[],
+        run_rows=[],
+        paired_rows=[],
+    )
+
+
+def _resolved_variant_order(
+    discovered_variant_names: Sequence[str],
+    *,
+    meta: dict[str, Any] | None = None,
+) -> list[str]:
+    discovered = [str(name) for name in discovered_variant_names]
+    configured = [str(name) for name in (meta or {}).get("variant_order", [])]
+    ordered = [name for name in configured if name in discovered]
+    ordered.extend(name for name in discovered if name not in ordered)
+    if len(ordered) > 0:
+        return ordered
+    return configured
+
+
+def _resolved_baseline_variant(
+    variant_order: Sequence[str],
+    *,
+    meta: dict[str, Any] | None = None,
+) -> str:
+    configured = str((meta or {}).get("baseline_variant", "")).strip()
+    if configured and configured in {str(name) for name in variant_order}:
+        return configured
+    return str(variant_order[0]) if len(variant_order) > 0 else ""
+
+
+def _load_partial_experiment_review_data(
+    run_dir: str,
+    *,
+    meta: dict[str, Any] | None = None,
+    allow_empty: bool = False,
+) -> ExperimentReviewData:
+    paths = bundle_paths(run_dir)
+    if not os.path.isdir(paths.traces_dir):
+        if allow_empty and os.path.isdir(paths.root):
+            return _empty_experiment_review_data(paths.root, meta=meta)
+        raise FileNotFoundError(f"Experiment bundle metadata not found: {paths.experiment_json}")
+
+    variant_names = sorted(
+        entry
+        for entry in os.listdir(paths.traces_dir)
+        if os.path.isdir(os.path.join(paths.traces_dir, entry))
+    )
+    run_rows: list[dict[str, Any]] = []
+    variant_order: list[str] = []
+    for variant_name in variant_names:
+        variant_trace_dir = os.path.join(paths.traces_dir, variant_name)
+        variant_rows_before = len(run_rows)
+        for rollout_id in sorted(os.listdir(variant_trace_dir)):
+            raw_trace_dir = os.path.join(variant_trace_dir, rollout_id)
+            if not os.path.isdir(raw_trace_dir):
+                continue
+            row = _load_partial_run_row(raw_trace_dir, variant_name=variant_name)
+            if row is not None:
+                run_rows.append(row)
+        if len(run_rows) > variant_rows_before:
+            variant_order.append(str(variant_name))
+    if len(run_rows) <= 0:
+        if allow_empty:
+            pending_meta = dict(meta or {})
+            variant_order = _resolved_variant_order(variant_names, meta=pending_meta)
+            pending_meta["variant_order"] = variant_order
+            pending_meta["baseline_variant"] = _resolved_baseline_variant(
+                variant_order,
+                meta=pending_meta,
+            )
+            pending_meta["partial_bundle"] = True
+            pending_meta.setdefault("bundle_status", "pending")
+            return _empty_experiment_review_data(paths.root, meta=pending_meta)
+        raise FileNotFoundError(f"No completed trace rows found under {paths.traces_dir}")
+
+    _assign_partial_rollout_indices(run_rows)
+    overlay_meta = dict(meta or {})
+    overlay_meta, run_rows = _overlay_reference_metrics(paths.root, meta=overlay_meta, run_rows=run_rows)
+    variant_order = _resolved_variant_order(variant_names, meta=meta)
+    baseline_variant = _resolved_baseline_variant(variant_order, meta=overlay_meta)
+    meta_payload = dict(overlay_meta)
+    meta_payload.update(
+        {
+            "schema_version": EXPERIMENT_SCHEMA_VERSION,
+            "reviewer_version": REVIEWER_SCHEMA_VERSION,
+            "experiment_name": str(meta_payload.get("experiment_name", os.path.basename(paths.root))),
+            "baseline_variant": baseline_variant,
+            "variant_order": variant_order,
+            "partial_bundle": True,
+            "bundle_status": "partial",
+        }
+    )
+    variant_rows = _variant_summary_rows_from_runs(run_rows, variant_order=variant_order)
+    data = _build_review_data(
+        run_dir=paths.root,
+        meta=meta_payload,
+        variant_rows=variant_rows,
+        run_rows=run_rows,
+        paired_rows=[],
+    )
+    paired_rows = []
+    if baseline_variant:
+        paired_rows = _reference_comparison_payload(data, baseline_variant)["paired_rows"]
+    return _build_review_data(
+        run_dir=paths.root,
+        meta=meta_payload,
+        variant_rows=variant_rows,
+        run_rows=run_rows,
+        paired_rows=paired_rows,
+    )
+
+
 def _default_reference_variant(data: ExperimentReviewData, *, current_variant: str | None = None) -> str:
     names = [name for name in data.variant_order if data.rows_by_variant.get(name)]
     if len(names) <= 0:
         return ""
+    baseline_variant = data.baseline_variant
+    if current_variant is None:
+        if baseline_variant in names:
+            return baseline_variant
+        return names[0]
     if current_variant is not None:
+        if baseline_variant in names and baseline_variant != str(current_variant):
+            return baseline_variant
         for name in names:
             if name != str(current_variant):
                 return name
-    return names[0]
+    return ""
 
 
 def _reference_comparison_payload(data: ExperimentReviewData, reference_variant: str) -> dict[str, Any]:
@@ -296,46 +717,134 @@ def _reference_comparison_payload(data: ExperimentReviewData, reference_variant:
     }
 
 
+def _overlay_reference_metrics(
+    run_dir: str,
+    *,
+    meta: dict[str, Any],
+    run_rows: Sequence[dict[str, Any]],
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    context = reference_eval.resolve_reference_context(meta)
+    if context is None:
+        return dict(meta), list(run_rows)
+
+    meta_payload = dict(meta)
+    meta_payload["reference_backend"] = context.backend
+    meta_payload["reference_backend_label"] = context.backend_label
+    meta_payload["reference_metrics_supported"] = bool(context.metrics_supported)
+    meta_payload["gt_media_allowed"] = bool(context.gt_media_allowed)
+
+    if not context.metrics_supported:
+        return meta_payload, list(run_rows)
+
+    updated_rows: list[dict[str, Any]] = []
+    missing_rows: list[dict[str, Any]] = []
+    for row in run_rows:
+        variant_name = str(row.get("variant_name", ""))
+        rollout_id = str(row.get("rollout_id", ""))
+        trace_json_path = os.path.join(trace_dir(run_dir, variant_name, rollout_id), "trace.json")
+        trace_npz_path = os.path.join(trace_dir(run_dir, variant_name, rollout_id), "trace.npz")
+        cached = reference_eval.load_cached_reference_eval(
+            run_dir,
+            context=context,
+            variant_name=variant_name,
+            rollout_id=rollout_id,
+            source_paths=[trace_json_path, trace_npz_path, os.path.join(run_dir, EXPERIMENT_JSON)],
+        )
+        if cached is None:
+            missing_rows.append(dict(row))
+            continue
+        merged = dict(row)
+        for key, value in cached.summary.items():
+            if key in {
+                "success",
+                "success_and_done",
+                "final_pos_diff",
+                "final_angle_diff",
+                "final_eef_diff",
+                "best_pos_diff",
+                "best_angle_diff",
+                "best_eef_diff",
+                "final_coverage",
+                "auc_pos_diff",
+                "auc_angle_diff",
+                "auc_eef_diff",
+            }:
+                merged[key] = value
+        updated_rows.append(merged)
+
+    if len(missing_rows) > 0:
+        if not context.runtime_ready:
+            updated_rows.extend(dict(row) for row in missing_rows)
+            return meta_payload, _sort_runs(updated_rows)
+        evaluator = reference_eval.ReferenceEvaluator(context)
+        for row in missing_rows:
+            variant_name = str(row.get("variant_name", ""))
+            rollout_id = str(row.get("rollout_id", ""))
+            result = reference_eval.ensure_reference_eval(
+                run_dir,
+                meta_path=os.path.join(run_dir, EXPERIMENT_JSON),
+                context=context,
+                variant_name=variant_name,
+                rollout_id=rollout_id,
+                evaluator=evaluator,
+            )
+            if result is None:
+                updated_rows.append(dict(row))
+                continue
+            merged = dict(row)
+            for key, value in result.summary.items():
+                if key in {
+                    "success",
+                    "success_and_done",
+                    "final_pos_diff",
+                    "final_angle_diff",
+                    "final_eef_diff",
+                    "best_pos_diff",
+                    "best_angle_diff",
+                    "best_eef_diff",
+                    "final_coverage",
+                    "auc_pos_diff",
+                    "auc_angle_diff",
+                    "auc_eef_diff",
+                }:
+                    merged[key] = value
+            updated_rows.append(merged)
+
+    return meta_payload, _sort_runs(updated_rows)
+
+
 def load_experiment_review_data(run_dir: str) -> ExperimentReviewData:
     paths = bundle_paths(run_dir)
     if not os.path.isfile(paths.experiment_json):
-        raise FileNotFoundError(f"Experiment bundle metadata not found: {paths.experiment_json}")
+        visible_entries = []
+        if os.path.isdir(paths.root):
+            visible_entries = [entry for entry in os.listdir(paths.root) if not entry.startswith(".")]
+        allow_empty = len(visible_entries) <= 0 or os.path.isdir(paths.traces_dir)
+        return _load_partial_experiment_review_data(paths.root, allow_empty=allow_empty)
     with open(paths.experiment_json, "r", encoding="utf-8") as f:
         meta = json.load(f)
-    run_rows = _sort_runs(_read_csv_rows(paths.runs_csv))
+    run_rows = _read_csv_rows(paths.runs_csv)
     if len(run_rows) <= 0:
-        raise FileNotFoundError(f"No run rows found under {paths.root}")
-    variant_rows = _read_csv_rows(paths.variants_csv)
-    paired_rows = _read_csv_rows(paths.paired_vs_baseline_csv)
-
-    variant_order = [str(name) for name in meta.get("variant_order", [])]
-    variant_rank = {name: idx for idx, name in enumerate(variant_order)}
-    variant_rows = sorted(
-        variant_rows,
-        key=lambda row: (
-            variant_rank.get(str(row.get("variant_name", "")), 10**6),
-            str(row.get("variant_name", "")),
-        ),
+        return _load_partial_experiment_review_data(paths.root, meta=meta, allow_empty=True)
+    meta, run_rows = _overlay_reference_metrics(paths.root, meta=meta, run_rows=run_rows)
+    variant_rows = _variant_summary_rows_from_runs(run_rows, variant_order=_resolved_variant_order([str(row.get("variant_name", "")) for row in run_rows], meta=meta))
+    paired_rows = []
+    baseline_variant = _resolved_baseline_variant([str(row.get("variant_name", "")) for row in variant_rows], meta=meta)
+    data = _build_review_data(
+        run_dir=paths.root,
+        meta=meta,
+        variant_rows=variant_rows,
+        run_rows=run_rows,
+        paired_rows=[],
     )
-
-    rows_by_key = {
-        (str(row.get("variant_name", "")), str(row.get("rollout_id", ""))): row
-        for row in run_rows
-    }
-    rows_by_variant: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in run_rows:
-        rows_by_variant[str(row.get("variant_name", ""))].append(row)
-    variant_by_name = {str(row.get("variant_name", "")): row for row in variant_rows}
-
-    return ExperimentReviewData(
+    if baseline_variant:
+        paired_rows = _reference_comparison_payload(data, baseline_variant)["paired_rows"]
+    return _build_review_data(
         run_dir=paths.root,
         meta=meta,
         variant_rows=variant_rows,
         run_rows=run_rows,
         paired_rows=paired_rows,
-        rows_by_key=rows_by_key,
-        rows_by_variant=dict(rows_by_variant),
-        variant_by_name=variant_by_name,
     )
 
 
@@ -358,6 +867,52 @@ def _read_log_tail(path: str, *, max_lines: int = 120) -> str | None:
 def _load_trace_npz(path: str) -> dict[str, np.ndarray]:
     with np.load(path, allow_pickle=False) as data:
         return {key: data[key] for key in data.files}
+
+
+def _reference_trace_arrays_for_row(
+    data: ExperimentReviewData,
+    row: dict[str, Any],
+) -> dict[str, np.ndarray] | None:
+    context = reference_eval.resolve_reference_context(data.meta)
+    if context is None or not context.metrics_supported:
+        return None
+    variant_name = str(row.get("variant_name", ""))
+    rollout_id = str(row.get("rollout_id", ""))
+    arrays = reference_eval.load_cached_reference_arrays(
+        data.run_dir,
+        context=context,
+        variant_name=variant_name,
+        rollout_id=rollout_id,
+    )
+    if arrays is not None:
+        return arrays
+    if not context.runtime_ready:
+        return None
+    result = reference_eval.ensure_reference_eval(
+        data.run_dir,
+        meta_path=os.path.join(data.run_dir, EXPERIMENT_JSON),
+        context=context,
+        variant_name=variant_name,
+        rollout_id=rollout_id,
+    )
+    return None if result is None else result.arrays
+
+
+def _reference_metrics_note(data: ExperimentReviewData) -> str:
+    context = reference_eval.resolve_reference_context(data.meta)
+    if context is None:
+        return ""
+    if context.metrics_supported:
+        return (
+            f"Success and final-state metrics are evaluated by replaying each variant's executed actions in the "
+            f"configured baseline/reference backend <code>{html.escape(context.backend_label)}</code>. "
+            "Execution termination and compute metrics remain tied to the original run."
+        )
+    return (
+        f"Configured baseline/reference backend is <code>{html.escape(context.backend_label)}</code>. "
+        "Review currently uses it for reference media, but pose/coverage metric replay is only available for "
+        "<code>gt_env</code> and <code>particle_sim</code> baselines."
+    )
 
 
 def _trace_paths_for_variant(data: ExperimentReviewData, variant_name: str) -> list[str]:
@@ -1746,7 +2301,10 @@ def _replan_display_level(trace_meta: dict[str, Any], replan: dict[str, Any]) ->
 
 
 def _media_path_for_name(media_dir: str, media_name: str) -> str | None:
-    for filename in planning_media.MEDIA_ALIASES.get(media_name, []):
+    aliases = []
+    aliases.extend(reference_eval.REFERENCE_MEDIA_ALIASES.get(media_name, []))
+    aliases.extend(planning_media.MEDIA_ALIASES.get(media_name, []))
+    for filename in aliases:
         path = os.path.join(media_dir, filename)
         if os.path.isfile(path):
             return path
@@ -1775,20 +2333,64 @@ def render_media_for_run(
     errors: list[str] = []
     media_dir = review_media_dir(experiment_root, variant_name, rollout_id)
     ensure_dir(media_dir)
+    meta_path = os.path.join(experiment_root, EXPERIMENT_JSON)
+    meta = None
+    if os.path.isfile(meta_path):
+        with open(meta_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+    context = reference_eval.resolve_reference_context(meta)
     for media_name in media:
         try:
-            outputs.extend(
-                planning_media.render_media(
-                    experiment_root,
-                    schedule=variant_name,
-                    rollout_id=rollout_id,
-                    media=[media_name],
-                    output_dir=media_dir,
+            if media_name in reference_eval.REFERENCE_MEDIA_ALIASES:
+                if context is None:
+                    raise ValueError("Reference baseline media requires experiment baseline metadata.")
+                outputs.append(
+                    reference_eval.render_reference_media(
+                        experiment_root,
+                        meta_path=meta_path if meta is not None else None,
+                        context=context,
+                        variant_name=variant_name,
+                        rollout_id=rollout_id,
+                        media_name=media_name,
+                        output_dir=media_dir,
+                    )
                 )
-            )
+            else:
+                outputs.extend(
+                    planning_media.render_media(
+                        experiment_root,
+                        schedule=variant_name,
+                        rollout_id=rollout_id,
+                        media=[media_name],
+                        output_dir=media_dir,
+                    )
+                )
         except Exception as exc:
             errors.append(f"{media_name}: {type(exc).__name__}: {exc}")
     return outputs, errors
+
+
+def _active_review_media(
+    data: ExperimentReviewData,
+    *,
+    trace_meta: dict[str, Any] | None = None,
+) -> tuple[str, ...]:
+    del trace_meta
+    media_names: list[str] = []
+    context = reference_eval.resolve_reference_context(data.meta)
+    if context is not None:
+        media_names.extend(REFERENCE_MEDIA)
+    media_names.extend(PLANNER_BACKEND_MEDIA)
+    if context is None or context.gt_media_allowed:
+        media_names.extend(("closed_loop_replay", "gt_replay"))
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for media_name in media_names:
+        if media_name in seen:
+            continue
+        seen.add(media_name)
+        ordered.append(media_name)
+    return tuple(ordered)
 
 
 def _status_badge_html(status: str) -> str:
@@ -1819,9 +2421,36 @@ def _media_backend_label(trace_meta: dict[str, Any] | None) -> str:
     return "planner backend"
 
 
+def _media_display_name(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
+    context = reference_eval.resolve_reference_context(trace_meta.get("experiment_meta", {}) if isinstance(trace_meta, dict) else None)
+    backend_label = _media_backend_label(trace_meta)
+    names = {
+        "reference_goal_state": (
+            f"Reference Goal State ({context.backend_label})" if context is not None else "Reference Goal State"
+        ),
+        "reference_env_replay": (
+            f"Reference-Env Replay ({context.backend_label})" if context is not None else "Reference-Env Replay"
+        ),
+        "closed_loop_replay": "Execution Replay (GT env)",
+        "planner_view_replay": f"Planner-View Replay ({backend_label})",
+        "predicted_backend_replay": f"Predicted-Backend Replay ({backend_label})",
+        "gt_replay": "Dataset Replay (GT env)",
+    }
+    return names.get(media_name, media_name.replace("_", " ").title())
+
+
 def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
+    context = reference_eval.resolve_reference_context(trace_meta.get("experiment_meta", {}) if isinstance(trace_meta, dict) else None)
     backend_label = _media_backend_label(trace_meta)
     descriptions = {
+        "reference_goal_state": (
+            "Goal-state preview rendered in the configured baseline/reference backend."
+        ),
+        "reference_env_replay": (
+            "Executed actions from the current variant are rolled out in the configured "
+            f"baseline/reference backend ({context.backend_label if context is not None else 'baseline backend'}). "
+            "Success and final-state metrics are derived from this replay."
+        ),
         "closed_loop_replay": (
             "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. "
             "States are rendered in the GT environment. "
@@ -1849,7 +2478,7 @@ def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = N
 def _media_title_html(media_name: str, *, trace_meta: dict[str, Any] | None = None) -> str:
     description = html.escape(_media_description(media_name, trace_meta=trace_meta))
     return (
-        f"{html.escape(media_name)}"
+        f"{html.escape(_media_display_name(media_name, trace_meta=trace_meta))}"
         f" <span class='info-chip' tabindex='0' data-tooltip='{description}' aria-label='{description}'>i</span>"
     )
 
@@ -1871,7 +2500,7 @@ def _media_panel_html(
     pieces: list[str] = []
     variant = str(row.get("variant_name", ""))
     rollout_id = str(row.get("rollout_id", ""))
-    for media_name in REVIEW_MEDIA:
+    for media_name in _active_review_media(data, trace_meta=trace_meta):
         task = media_tasks.get(media_name) if media_tasks is not None else None
         media_path = _media_path_for_name(media_dir, media_name)
         if media_path is None:
@@ -1892,10 +2521,14 @@ def _media_panel_html(
             )
             continue
         rel_path = os.path.relpath(media_path, data.run_dir)
+        ext = os.path.splitext(media_path)[1].lower()
+        media_body = f"<video controls preload='metadata' src='/files/{quote(rel_path)}'></video>"
+        if ext in {".png", ".jpg", ".jpeg", ".webp"}:
+            media_body = f"<img alt='{html.escape(_media_display_name(media_name, trace_meta=trace_meta))}' src='/files/{quote(rel_path)}' />"
         pieces.append(
             "<section class='card media-card'>"
             f"{_media_card_title_html(media_name, 'succeeded', trace_meta=trace_meta)}"
-            f"<video controls preload='metadata' src='/files/{quote(rel_path)}'></video>"
+            f"{media_body}"
             "</section>"
         )
     return "".join(pieces)
@@ -1910,16 +2543,43 @@ def _media_section_html(
 ) -> str:
     variant = str(row.get("variant_name", ""))
     rollout_id = str(row.get("rollout_id", ""))
+    backend_label = _media_backend_label(trace_meta)
+    reference_context = reference_eval.resolve_reference_context(data.meta)
+    active_media_names = _active_review_media(data, trace_meta=trace_meta)
+    render_reference_href = (
+        f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
+        + "".join(f"&media={quote(media_name)}" for media_name in REFERENCE_MEDIA)
+    )
+    render_backend_href = (
+        f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
+        + "".join(f"&media={quote(media_name)}" for media_name in PLANNER_BACKEND_MEDIA)
+    )
     render_all_href = (
         f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
-        + "".join(f"&media={quote(media_name)}" for media_name in REVIEW_MEDIA)
+        + "".join(f"&media={quote(media_name)}" for media_name in active_media_names)
     )
     active_media = any(task.status in {"pending", "running"} for task in (media_tasks or {}).values())
+    media_note = (
+        f"Reference goal/replay use the configured baseline/reference backend "
+        f"(<code>{html.escape(reference_context.backend_label)}</code>). "
+        f"Planner-view and predicted-backend replays use this run's planner backend "
+        f"(<code>{html.escape(backend_label)}</code>)."
+        if reference_context is not None
+        else f"Planner-view and predicted-backend replays use this run's planner backend (<code>{html.escape(backend_label)}</code>)."
+    )
+    if reference_context is not None and reference_context.gt_media_allowed:
+        media_note += " GT media remain available because GT is the baseline or an evaluated backend."
+    controls = ""
+    if reference_context is not None:
+        controls += f"<a class='button primary' data-async-render='true' href='{render_reference_href}'>Render reference media</a> "
+    controls += f"<a class='button' data-async-render='true' href='{render_backend_href}'>Render planner-backend media</a> "
+    controls += f"<a class='button' data-async-render='true' href='{render_all_href}'>Render all media for this run</a>"
     return (
         f"<section class='card' id='mediaSection' data-variant='{html.escape(variant)}' "
         f"data-rollout-id='{html.escape(rollout_id)}' data-active-media='{'true' if active_media else 'false'}'>"
         "<h2>Media</h2>"
-        f"<p><a class='button primary' data-async-render='true' href='{render_all_href}'>Render all review media</a></p>"
+        f"<p class='muted'>{media_note}</p>"
+        f"<p>{controls}</p>"
         "<div class='media-grid'>"
         f"{_media_panel_html(data, row, media_tasks=media_tasks, trace_meta=trace_meta)}"
         "</div>"
@@ -1951,11 +2611,62 @@ def _representative_run_rows(rows: Sequence[dict[str, Any]], *, success: bool, l
 
 
 def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None) -> str:
+    variant_count = len(data.variant_order) if len(data.variant_order) > 0 else len(data.variant_rows)
+    baseline_variant = data.baseline_variant
+    reference_note = _reference_metrics_note(data)
     kpi_items: list[tuple[str, str]] = [
         ("Experiment", data.experiment_name),
-        ("Variants", str(len(data.variant_rows))),
+        ("Variants", str(variant_count)),
         ("Runs", str(len(data.run_rows))),
     ]
+    completed_runs = int(data.meta.get("completed_runs", len(data.run_rows)))
+    total_runs = int(data.meta.get("total_runs", len(data.run_rows)))
+    if total_runs > 0:
+        kpi_items.append(("Progress", f"{completed_runs}/{total_runs}"))
+    if len(data.run_rows) <= 0:
+        waiting_message = "Waiting for the first completed rollout. This page refreshes automatically."
+        if len(data.variant_order) <= 0:
+            waiting_message = "Waiting for experiment bundle metadata or the first completed rollout. This page refreshes automatically."
+        configured_variants_html = ""
+        if len(data.variant_order) > 0:
+            configured_variants_html = (
+                "<section class='card'>"
+                "<h2>Configured Variants</h2>"
+                "<ul>"
+                + "".join(f"<li><code>{html.escape(variant_name)}</code></li>" for variant_name in data.variant_order)
+                + "</ul>"
+                "</section>"
+            )
+        downloads_html = _downloads_html(data)
+        downloads_section = (
+            f"<section class='card'><h2>Downloads</h2><ul>{downloads_html}</ul></section>"
+            if downloads_html
+            else ""
+        )
+        body = f"""
+  {_notice_html(notice)}
+  <section class='card'>
+    <div class='hero'>
+      <div>
+        <h1>{html.escape(data.experiment_name)}</h1>
+        <p class='muted'>Interactive review for experiment bundle <code>{html.escape(os.path.relpath(data.run_dir, os.getcwd()))}</code></p>
+        {f"<p class='muted'>Configured baseline/reference variant: <code>{html.escape(baseline_variant)}</code></p>" if baseline_variant else ""}
+      </div>
+      <div class='nav-links'>
+        <a class='button' href='/'>Overview</a>
+      </div>
+    </div>
+  </section>
+  <section class='kpi-grid'>{_kpi_cards(kpi_items)}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
+  <section class='card'>
+    <h2>Bundle Status</h2>
+    <p class='muted'>{html.escape(waiting_message)}</p>
+  </section>
+  {configured_variants_html}
+  {downloads_section}
+"""
+        return _base_page(f"{data.experiment_name} review", body, auto_refresh_seconds=3)
     if len(data.variant_rows) == 1:
         only_variant = data.variant_rows[0]
         kpi_items.extend(
@@ -2041,6 +2752,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
       <div>
         <h1>{html.escape(data.experiment_name)}</h1>
         <p class='muted'>Interactive review for experiment bundle <code>{html.escape(os.path.relpath(data.run_dir, os.getcwd()))}</code></p>
+        {f"<p class='muted'>Configured baseline/reference variant: <code>{html.escape(baseline_variant)}</code></p>" if baseline_variant else ""}
       </div>
       <div class='nav-links'>
         <a class='button' href='/'>Overview</a>
@@ -2049,6 +2761,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <div class='plot-grid'>
     <section class='card'>{success_analysis_fig}</section>
     <section class='card'>{stepwise_fig}</section>
@@ -2181,6 +2894,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
       <div>
         <h1>{html.escape(data.experiment_name)}</h1>
         <p class='muted'>Interactive review for experiment bundle <code>{html.escape(os.path.relpath(data.run_dir, os.getcwd()))}</code></p>
+        {f"<p class='muted'>Configured baseline/reference variant: <code>{html.escape(baseline_variant)}</code></p>" if baseline_variant else ""}
       </div>
       <div class='nav-links'>
         <a class='button' href='/'>Overview</a>
@@ -2188,6 +2902,7 @@ def build_summary_page(data: ExperimentReviewData, *, notice: str | None = None)
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   {_table_section(
         "Variant Summary",
         table_id="variantSummaryTable",
@@ -2254,6 +2969,17 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
     if len(rows) <= 0:
         raise KeyError(f"Unknown variant: {variant_name}")
     variant_row = data.variant_by_name[variant_name]
+    baseline_variant = data.baseline_variant
+    reference_note = _reference_metrics_note(data)
+    baseline_note = ""
+    if baseline_variant:
+        if variant_name == baseline_variant:
+            baseline_note = "<p class='muted'>This is the configured baseline/reference variant for experiment-level comparisons.</p>"
+        else:
+            baseline_note = (
+                "<p class='muted'>Default reference comparisons use "
+                f"<code>{html.escape(baseline_variant)}</code>.</p>"
+            )
     success_fig = _figure_html(_variant_success_figure(rows, variant_name))
     final_metrics_fig = _figure_html(_variant_histogram_figure(rows, metric_specs=FINAL_METRIC_SPECS, title=f"{variant_name}: Final Metric Distributions"))
     compute_metrics_fig = _figure_html(_variant_histogram_figure(rows, metric_specs=COMPUTE_METRIC_SPECS, title=f"{variant_name}: Compute and Effort Distributions"))
@@ -2333,6 +3059,7 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
         <p><a href='/'>&larr; Back to experiment overview</a></p>
         <h1>{html.escape(variant_name)}</h1>
         <p class='muted'>Variant detail page with success analysis, distributions, stepwise traces, and reference comparisons.</p>
+        {baseline_note}
       </div>
       <div class='nav-links'>
         <a class='button' href='/'>Overview</a>
@@ -2340,6 +3067,7 @@ def build_variant_page(data: ExperimentReviewData, variant_name: str, *, notice:
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <div class='plot-grid'>
     <section class='card'>{success_fig}</section>
     <section class='card'>{relationship_fig}</section>
@@ -2389,20 +3117,37 @@ def build_run_page(
 
     with open(trace_json_path, "r", encoding="utf-8") as f:
         trace_meta = json.load(f)
+    trace_meta = dict(trace_meta)
+    trace_meta["experiment_meta"] = data.meta
     trace_arrays = _load_trace_npz(trace_npz_path)
-    trace_fig = _figure_html(_single_run_trace_figure(trace_arrays, variant, rollout_id, trace_meta=trace_meta))
+    reference_trace_arrays = _reference_trace_arrays_for_row(data, row)
+    trace_arrays_for_display = reference_trace_arrays if reference_trace_arrays is not None else trace_arrays
+    trace_fig = _figure_html(_single_run_trace_figure(trace_arrays_for_display, variant, rollout_id, trace_meta=trace_meta))
     log_tail = _read_log_tail(run_log_path)
     error_html = _notice_html(" | ".join(errors), kind="error") if errors else ""
     active_media_tasks = [task for task in (media_tasks or {}).values() if task.status in {"pending", "running"}]
+    reference_note = _reference_metrics_note(data)
+    reference_context = reference_eval.resolve_reference_context(data.meta)
+    success_label = "Success"
+    final_pos_label = "Final Pos"
+    final_angle_label = "Final Angle"
+    final_coverage_label = "Final Coverage"
+    termination_label = "Termination"
+    if reference_context is not None and reference_context.metrics_supported:
+        success_label = "Reference Success"
+        final_pos_label = "Reference Final Pos"
+        final_angle_label = "Reference Final Angle"
+        final_coverage_label = "Reference Final Coverage"
+        termination_label = "Execution Termination"
 
     kpi_html = _kpi_cards(
         [
-            ("Success", str(int(row.get("success", 0)))),
-            ("Termination", str(row.get("termination_reason", ""))),
+            (success_label, str(int(row.get("success", 0)))),
+            (termination_label, str(row.get("termination_reason", ""))),
             ("Executed Steps", _format_number(row.get("executed_steps"), digits=0)),
-            ("Final Pos", _format_number(row.get("final_pos_diff"))),
-            ("Final Angle", _format_number(row.get("final_angle_diff"))),
-            ("Final Coverage", _format_number(row.get("final_coverage"))),
+            (final_pos_label, _format_number(row.get("final_pos_diff"))),
+            (final_angle_label, _format_number(row.get("final_angle_diff"))),
+            (final_coverage_label, _format_number(row.get("final_coverage"))),
             ("Bits", _format_bits_value(row.get("bits_used_total"))),
             ("Plan Time", _format_number(row.get("plan_time_total_sec"))),
         ]
@@ -2452,6 +3197,7 @@ def build_run_page(
     </div>
   </section>
   <section class='kpi-grid'>{kpi_html}</section>
+  {f"<section class='card'><p class='muted'>{reference_note}</p></section>" if reference_note else ""}
   <section class='card'>
     <h2>Single-Run Trace Curves</h2>
     {trace_fig}
@@ -2485,21 +3231,30 @@ def build_run_media_section(
         raise FileNotFoundError(f"Trace JSON missing for {variant}/{rollout_id}")
     with open(trace_json_path, "r", encoding="utf-8") as f:
         trace_meta = json.load(f)
+    trace_meta = dict(trace_meta)
+    trace_meta["experiment_meta"] = data.meta
     active_media = any(task.status in {"pending", "running"} for task in (media_tasks or {}).values())
     return _media_section_html(data, row, media_tasks=media_tasks, trace_meta=trace_meta), active_media
 
 
 class ExperimentReviewApp:
     def __init__(self, run_dir: str):
-        self.data = load_experiment_review_data(run_dir)
+        self.run_dir = os.path.abspath(run_dir)
+        self._data_lock = threading.Lock()
+        self.data = load_experiment_review_data(self.run_dir)
         self._media_tasks: dict[tuple[str, str, str], MediaRenderTask] = {}
         self._media_tasks_lock = threading.Lock()
 
+    def _refresh_data(self) -> ExperimentReviewData:
+        with self._data_lock:
+            self.data = load_experiment_review_data(self.run_dir)
+            return self.data
+
     def summary_page(self, *, notice: str | None = None) -> str:
-        return build_summary_page(self.data, notice=notice)
+        return build_summary_page(self._refresh_data(), notice=notice)
 
     def variant_page(self, *, variant_name: str, notice: str | None = None) -> str:
-        return build_variant_page(self.data, variant_name, notice=notice)
+        return build_variant_page(self._refresh_data(), variant_name, notice=notice)
 
     def run_page(
         self,
@@ -2509,9 +3264,10 @@ class ExperimentReviewApp:
         notice: str | None = None,
         errors: list[str] | None = None,
     ) -> str:
-        row = resolve_row(self.data, variant_name, rollout_id)
+        data = self._refresh_data()
+        row = resolve_row(data, variant_name, rollout_id)
         return build_run_page(
-            self.data,
+            data,
             row,
             notice=notice,
             errors=errors,
@@ -2539,7 +3295,7 @@ class ExperimentReviewApp:
     def queue_media_render(self, *, variant_name: str, rollout_id: str, media: Sequence[str]) -> tuple[int, int]:
         queued = 0
         skipped = 0
-        media_dir = review_media_dir(self.data.run_dir, str(variant_name), str(rollout_id))
+        media_dir = review_media_dir(self.run_dir, str(variant_name), str(rollout_id))
         for media_name in media:
             if _media_path_for_name(media_dir, str(media_name)) is not None:
                 skipped += 1
@@ -2577,14 +3333,14 @@ class ExperimentReviewApp:
             task.status = "running"
             task.updated_at = time.time()
         backend = _trace_backend_for_run(
-            self.data.run_dir,
+            self.run_dir,
             variant_name=variant_name,
             rollout_id=rollout_id,
         )
         render_context = _PARTICLE_MEDIA_RENDER_LOCK if backend == "particle_sim" else contextlib.nullcontext()
         with render_context:
             outputs, errors = render_media_for_run(
-                self.data.run_dir,
+                self.run_dir,
                 variant_name=variant_name,
                 rollout_id=rollout_id,
                 media=[media_name],
@@ -2641,10 +3397,11 @@ def make_review_handler(app: ExperimentReviewApp):
                     params = parse_qs(parsed.query)
                     variant = params.get("variant", [""])[0]
                     rollout_id = params.get("rollout_id", [""])[0]
-                    row = resolve_row(self.review_app.data, variant, rollout_id)
+                    data = self.review_app._refresh_data()
+                    row = resolve_row(data, variant, rollout_id)
                     media_tasks = self.review_app.media_tasks_for_run(variant, rollout_id)
                     media_html, active_media = build_run_media_section(
-                        self.review_app.data,
+                        data,
                         row,
                         media_tasks=media_tasks,
                     )
@@ -2667,10 +3424,11 @@ def make_review_handler(app: ExperimentReviewApp):
                     if queued > 0:
                         notice = f"Queued {queued} media artifact(s)."
                     if response_format == "json":
-                        row = resolve_row(self.review_app.data, variant, rollout_id)
+                        data = self.review_app._refresh_data()
+                        row = resolve_row(data, variant, rollout_id)
                         media_tasks = self.review_app.media_tasks_for_run(variant, rollout_id)
                         media_html, active_media = build_run_media_section(
-                            self.review_app.data,
+                            data,
                             row,
                             media_tasks=media_tasks,
                         )
@@ -2718,7 +3476,7 @@ def make_review_handler(app: ExperimentReviewApp):
             self.wfile.write(data)
 
         def _serve_file(self, rel_path: str) -> None:
-            path = _safe_join(self.review_app.data.run_dir, rel_path)
+            path = _safe_join(self.review_app.run_dir, rel_path)
             if not os.path.isfile(path):
                 self.send_error(HTTPStatus.NOT_FOUND, "File not found")
                 return

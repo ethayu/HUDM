@@ -170,7 +170,6 @@ Level fields accept either:
 | Field | Type | Valid values | Notes |
 |---|---|---|---|
 | `enabled` | bool | `true/false` | If false, always use finest level. |
-| `num_levels` | int | `>0` | Used by `gt_env` and `particle_sim` backends. (`wm` backend uses `len(model.K)`). |
 | `mpc.mode` | str | `fixed`\|`linear` | Replan-level schedule mode. |
 | `mpc.level` | int\|token | used in `fixed` mode | Requested fixed MPC level. |
 | `mpc.start_level` | int\|token | used in `linear` mode | Start level over MPC progress. |
@@ -209,8 +208,7 @@ Uncertainty score definition for candidate population:
 - `ensemble.enabled=true` with `world_model.run_dir` set.
 - `ensemble.enabled=false` with non-empty `ensemble.run_dirs`.
 - `backend=gt_env` with `fidelity.rollout.mode=uncertainty_downshift`.
-- `backend=particle_sim` with `fidelity.rollout.mode` other than `fixed`.
-- `backend=particle_sim` with `fidelity.num_levels != len(particle_env.fidelity_env.spacings)`.
+- `backend=particle_sim` with `fidelity.rollout.mode=uncertainty_downshift`.
 - `rollout.mode=uncertainty_downshift` with non-ensemble world model.
 - Unknown fidelity modes or out-of-range level indices.
 
@@ -224,6 +222,7 @@ Only used when `backend: gt_env`.
 | `objective_space` | str | `image`\|`state` | `image`: optimize against visual observations. `state`: optimize against low-dim PushT state terms (`eef/block/angle`). |
 | `progress` | bool | `true/false` | Show per-CEM-iteration rollout progress bar for `gt_env` planning. |
 | `progress_leave` | bool | `true/false` | Keep completed progress bars in terminal output. |
+| `fidelity_env.num_levels` | int | `>0` | Number of discrete planning fidelity levels owned by the `gt_env` backend. |
 | `fidelity_env.mode` | str | `blur_avgpool`\|`blur_quantize` | Env-side visual fidelity transform. |
 | `fidelity_env.blur_sigma_max` | float | `>=0` | Max blur at coarsest level. |
 | `fidelity_env.pool_scale_max` | int | `>=1` | Max pooling/downscale factor for `blur_avgpool`. |
@@ -243,11 +242,11 @@ Only used when `backend: particle_sim`.
 | `objective_space` | str | `image`\|`state` | `state`: optimize pose-based PushT metrics. `image`: optimize rendered visual distance. |
 | `progress` | bool | `true/false` | Show per-CEM-iteration rollout progress bar for particle planning. |
 | `progress_leave` | bool | `true/false` | Keep completed progress bars in terminal output. |
-| `fidelity_env.spacings` | list[float] | positive values | Coarsest->finest spacing per fidelity level (larger spacing => fewer particles). Length must equal `fidelity.num_levels`. |
+| `fidelity_env.spacings` | list[float] | positive values | Coarsest->finest spacing per fidelity level (larger spacing => fewer particles). The particle backend derives its level count from this list. |
 | `fidelity_env.device` | str | `auto`\|`cpu`\|`cuda`\|`cuda:N` | Warp device selection. |
 | `fidelity_env.{xmin,xmax,ymin,ymax}` | float | any real | World bounds for particle simulator. |
 | `fidelity_env.min_particles` | int | `>=1` | Minimum sampled particles; very coarse levels can collapse to `N=1`. |
-| `fidelity_env.coarsest_single_particle` | bool | `true/false` | If true, the coarsest level (`spacings[0]`) is forced to one particle (`N=1`). |
+| `fidelity_env.coarsest_single_particle` | bool | `true/false` | If true, the coarsest level (`spacings[0]`) is forced to one particle (`N=1`). Enabled by default. |
 | `fidelity_env.particle_radius` | float\|null | `>0` or `null` | `null` enables auto radius scaling from particle count (`N`); float forces fixed radius. |
 | `fidelity_env.radius_scale` | float | `>0` | Multiplier for auto-scaled radius when `particle_radius=null`. |
 | `fidelity_env.radius_clip_spacing` | bool | `true/false` | Clamp auto radius relative to spacing (`N>1`) for stability. |
@@ -256,10 +255,11 @@ Only used when `backend: particle_sim`.
 | `fidelity_env.bar_w` | float | `>0` | T bar width in world units. |
 | `fidelity_env.bar_h` | float | `>0` | T bar height in world units. |
 | `fidelity_env.pusher_radius` | float | `>0` | Kinematic pusher radius in world units. |
-| `fidelity_env.pusher_speed` | float | `>0` | Max pusher speed (world units/sec). |
-| `fidelity_env.pusher_interp_substeps` | bool | `true/false` | If true, pusher motion is interpolated across solver substeps to avoid impulsive contacts. |
-| `fidelity_env.frame_dt` | float | `>0` | Control-step dt for one backend step. |
-| `fidelity_env.substeps` | int | `>=1` | Substeps per control frame. |
+| `fidelity_env.sim_hz` | int | `>0` | GT-matched pusher microstep rate; must be divisible by `control_hz`. |
+| `fidelity_env.control_hz` | int | `>0` | Planner/control-step rate for one backend action. |
+| `fidelity_env.pusher_k_p` | float | `>=0` | GT-style proportional gain for the kinematic pusher PD controller. |
+| `fidelity_env.pusher_k_v` | float | `>=0` | GT-style damping gain for the kinematic pusher PD controller. |
+| `fidelity_env.substeps` | int | `>=1` | Solver substeps per control frame while sampling the PD pusher path continuously. |
 | `fidelity_env.iters` | int | `>=1` | Solver iterations per substep. |
 | `fidelity_env.mu` | float | `>=0` | Position-level friction factor for pusher contact. |
 | `fidelity_env.contact_alpha` | float | `(0,1]` | Contact projection gain; lower values reduce bounce from light touches. |

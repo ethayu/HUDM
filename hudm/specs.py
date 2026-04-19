@@ -77,6 +77,7 @@ class ExperimentSpec:
     name: str
     config_path: str | None
     shared_plan: PlanSpec
+    baseline: str | None
     variants: list[ExperimentVariant]
     rollouts: dict[str, Any]
     execution: dict[str, Any]

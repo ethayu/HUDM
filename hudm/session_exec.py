@@ -321,6 +321,7 @@ def run_closed_loop(
                 "base_k": None if getattr(info, "base_k", None) is None else int(getattr(info, "base_k")),
                 "base_spacing": None if getattr(info, "base_spacing", None) is None else float(getattr(info, "base_spacing")),
                 "base_num_particles": None if getattr(info, "base_num_particles", None) is None else int(getattr(info, "base_num_particles")),
+                "batch_impl": None if getattr(info, "batch_impl", None) is None else str(getattr(info, "batch_impl")),
                 "start_state": plan_start_state.tolist(),
             }
         )

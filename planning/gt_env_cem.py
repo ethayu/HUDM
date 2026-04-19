@@ -48,6 +48,7 @@ class GTEnvCEMPlanner:
         objective_cfg: Optional[Dict[str, Any]] = None,
         fidelity_cfg: Optional[Dict[str, Any]] = None,
         gt_env_cfg: Optional[Dict[str, Any]] = None,
+        num_levels: Optional[int] = None,
         warm_start: bool = True,
         device: Optional[torch.device] = None,
     ):
@@ -74,7 +75,12 @@ class GTEnvCEMPlanner:
         self.state_l2_weight = float(self.objective_cfg.get("state_l2_weight", 0.0))
 
         fidelity_cfg = fidelity_cfg or {}
-        num_levels = int(fidelity_cfg.get("num_levels", 4))
+        self.gt_env_cfg = gt_env_cfg or {}
+        if num_levels is None:
+            fidelity_env_cfg = SharedCEMCore.as_cfg_dict(
+                self.gt_env_cfg.get("fidelity_env", {}), "gt_env.fidelity_env"
+            )
+            num_levels = fidelity_env_cfg.get("num_levels", getattr(env, "_planning_fidelity_num_levels", 1))
         self.core = SharedCEMCore(
             horizon=self.horizon,
             action_dim=self.action_dim,
@@ -85,12 +91,11 @@ class GTEnvCEMPlanner:
             action_low=self.action_low,
             action_high=self.action_high,
             fidelity_cfg=fidelity_cfg,
-            num_levels=num_levels,
+            num_levels=int(num_levels),
             rollout_modes={"fixed", "linear"},
             device=self.device,
         )
 
-        self.gt_env_cfg = gt_env_cfg or {}
         self.rollout_samples = int(self.gt_env_cfg.get("rollout_samples", 1))
         self.objective_space = str(self.gt_env_cfg.get("objective_space", "image")).lower()
         self.progress = bool(self.gt_env_cfg.get("progress", True))

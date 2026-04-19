@@ -36,6 +36,7 @@
 
 plan:
   budget:
+
     max_env_steps: 100
   planner:
     horizon: 20

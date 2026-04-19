@@ -30,14 +30,15 @@ def run_plan_session(
     print_summary: bool = True,
 ) -> dict:
     runtime = build_plan_runtime(cfg)
+    runtime_cfg = runtime.get("cfg", cfg)
     env = runtime["env"]
     wm_cfg = runtime["wm_cfg"]
     if rollout_selection is None:
-        init_state, goal_state, sample_meta = sample_init_goal_states(env, cfg, wm_cfg=wm_cfg)
+        init_state, goal_state, sample_meta = sample_init_goal_states(env, runtime_cfg, wm_cfg=wm_cfg)
     else:
         init_state, goal_state, sample_meta = load_selected_rollout(
             env,
-            cfg,
+            runtime_cfg,
             wm_cfg=wm_cfg,
             selection=rollout_selection,
         )
@@ -51,7 +52,7 @@ def run_plan_session(
                 "Set them equal for length-matched visual comparison."
             )
     if bool(print_summary):
-        print_plan_runtime_summary(runtime, cfg)
+        print_plan_runtime_summary(runtime, runtime_cfg)
     planner = runtime["planner"]
     if hasattr(planner, "reset"):
         planner.reset()
@@ -60,14 +61,14 @@ def run_plan_session(
         wm=runtime["wm"],
         planner=runtime["planner"],
         backend=runtime["backend"],
-        cfg=cfg,
+        cfg=runtime_cfg,
         init_state=init_state,
         goal_state=goal_state,
         device=runtime["device"],
         init_goal_meta=sample_meta,
     )
     return {
-        "cfg": cfg,
+        "cfg": runtime_cfg,
         "runtime": runtime,
         "success": bool(success),
         "trajectory": traj,

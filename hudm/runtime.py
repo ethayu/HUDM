@@ -16,7 +16,11 @@ from models.world.ensemble import WorldModelEnsemble
 from models.world.model import HierWorldModel
 from planning.gt_env_cem import GTEnvCEMPlanner
 from planning.latent_cem import LatentCEMPlanner
-from planning.particle_cem import ParticleCEMPlanner
+from planning.particle_cem import (
+    BatchedParticleCEMPlanner,
+    BatchedParticlePlannerUnavailable,
+    ParticleCEMPlanner,
+)
 from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_wrapper import PushTWrapper
 
@@ -41,6 +45,14 @@ def resolve_dataset_seed(seed_cfg: Any) -> int:
         raise ValueError(
             f"plan.init_goal.dataset.seed must be an int or 'random', got {seed_cfg!r}."
         ) from exc
+
+
+def runtime_backend_kind(cfg: DictConfig) -> str:
+    return str(getattr(cfg, "backend", "")).lower()
+
+
+def _clone_runtime_cfg(cfg: DictConfig) -> DictConfig:
+    return OmegaConf.create(OmegaConf.to_container(cfg, resolve=False))
 
 
 def gym_make_versioned(env_id: str, env_cfg: DictConfig):
@@ -264,10 +276,11 @@ def register_plan_env(cfg: DictConfig) -> None:
 
 
 def build_plan_runtime(cfg: DictConfig) -> dict:
+    cfg = _clone_runtime_cfg(cfg)
     register_plan_env(cfg)
     env_wrapped = gym_make_versioned(str(cfg.env_id), cfg.env)
     env: PushTWrapper = unwrap_env(env_wrapped)
-    backend = str(cfg.backend).lower()
+    backend = runtime_backend_kind(cfg)
     device = resolve_device(str(cfg.world_model.device))
     wm = None
     wm_cfg = None
@@ -300,6 +313,7 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             device=device,
         )
     elif backend == "gt_env":
+        cfg.fidelity.num_levels = int(getattr(cfg.gt_env.fidelity_env, "num_levels", 4))
         planner = GTEnvCEMPlanner(
             env=env,
             horizon=int(cfg.mpc.horizon),
@@ -314,13 +328,14 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             objective_cfg=OmegaConf.to_container(cfg.objective, resolve=True),
             fidelity_cfg=OmegaConf.to_container(cfg.fidelity, resolve=True),
             gt_env_cfg=OmegaConf.to_container(cfg.gt_env, resolve=True),
+            num_levels=int(cfg.fidelity.num_levels),
             device=device,
         )
     else:
-        spacings = list(cfg.particle_env.fidelity_env.spacings)
-        cfg.fidelity.num_levels = len(spacings)
+        particle_counts = [int(c) for c in list(cfg.particle_env.fidelity_env.particle_counts)]
         particle_seed = resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
         cfg.init_goal.dataset.seed = particle_seed
+        batch_mode = str(getattr(cfg.particle_env, "batch_mode", "auto")).lower()
         particle_backend = PushTParticleBackend(
             with_velocity=bool(cfg.env.with_velocity),
             with_target=bool(cfg.env.with_target),
@@ -328,11 +343,12 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             relative=bool(getattr(env, "relative", True)),
             action_scale=float(getattr(env, "action_scale", 100.0)),
             device=str(cfg.particle_env.fidelity_env.device),
-            fidelity_spacings=[float(s) for s in spacings],
+            particle_counts=particle_counts,
             warp_cfg=OmegaConf.to_container(cfg.particle_env.fidelity_env, resolve=True),
             seed=particle_seed,
         )
-        planner = ParticleCEMPlanner(
+        cfg.fidelity.num_levels = int(particle_backend.num_levels)
+        planner_kwargs = dict(
             particle_backend=particle_backend,
             horizon=int(cfg.mpc.horizon),
             action_dim=int(env.action_dim),
@@ -348,7 +364,17 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
             particle_env_cfg=OmegaConf.to_container(cfg.particle_env, resolve=True),
             device=device,
         )
+        if batch_mode == "off":
+            planner = ParticleCEMPlanner(**planner_kwargs)
+        else:
+            try:
+                planner = BatchedParticleCEMPlanner(**planner_kwargs)
+            except BatchedParticlePlannerUnavailable:
+                if batch_mode == "force":
+                    raise
+                planner = ParticleCEMPlanner(**planner_kwargs)
     return {
+        "cfg": cfg,
         "env": env,
         "planner": planner,
         "wm": wm,
@@ -360,6 +386,7 @@ def build_plan_runtime(cfg: DictConfig) -> dict:
 
 
 def print_plan_runtime_summary(runtime: dict, cfg: DictConfig) -> None:
+    cfg = runtime.get("cfg", cfg)
     backend = str(runtime["backend"])
     wm = runtime.get("wm", None)
     print(f"[backend] {backend}")
@@ -378,5 +405,6 @@ def print_plan_runtime_summary(runtime: dict, cfg: DictConfig) -> None:
     else:
         print(f"[levels] num_levels={int(cfg.fidelity.num_levels)} (particle_sim)")
         print(f"[particle] objective_space={str(cfg.particle_env.objective_space).lower()}")
-        print(f"[particle] spacings={list(cfg.particle_env.fidelity_env.spacings)}")
+        print(f"[particle] batch_mode={str(getattr(cfg.particle_env, 'batch_mode', 'auto')).lower()}")
+        print(f"[particle] target_counts={list(cfg.particle_env.fidelity_env.particle_counts)}")
         print(f"[particle] progress={bool(cfg.particle_env.progress)}")

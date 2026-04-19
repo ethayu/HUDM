@@ -52,14 +52,12 @@ class BatchedLatentPlannerTests(unittest.TestCase):
         self.fidelity_cfgs = [
             {
                 "enabled": True,
-                "num_levels": 3,
                 "mpc": {"mode": "fixed", "level": "finest"},
                 "cem": {"mode": "fixed", "level": "base"},
                 "rollout": {"mode": "fixed", "level": "base", "uncertainty": {"criterion": "mean", "threshold": 0.1, "percentile": 0.8, "min_level": "coarsest", "max_downshifts_per_step": 1}},
             },
             {
                 "enabled": True,
-                "num_levels": 3,
                 "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
                 "cem": {"mode": "linear", "start_level": "base", "end_level": "finest"},
                 "rollout": {"mode": "linear", "start_level": "base", "end_level": "coarsest", "uncertainty": {"criterion": "mean", "threshold": 0.1, "percentile": 0.8, "min_level": "coarsest", "max_downshifts_per_step": 1}},
