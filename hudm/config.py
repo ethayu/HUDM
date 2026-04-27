@@ -4,7 +4,7 @@ import copy
 import os
 from typing import Any
 
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig, ListConfig, OmegaConf
 
 from hudm.specs import BenchmarkEntry, BenchmarkSpec, ExperimentSpec, ExperimentVariant, make_plan_spec
 from validate_cfg import validate_plan_cfg
@@ -74,13 +74,13 @@ def _plan_defaults() -> dict[str, Any]:
                 "elite_frac": 0.1,
                 "n_iter": 5,
                 "init_std": 1.0,
+                "inject_dataset_gt_actions": False,
                 "warm_start": True,
                 "action_low": None,
                 "action_high": None,
             },
             "fidelity": {
                 "enabled": True,
-                "num_levels": 4,
                 "mpc": {
                     "mode": "linear",
                     "level": "finest",
@@ -142,6 +142,7 @@ def _plan_defaults() -> dict[str, Any]:
                     "state_l2_weight": 0.0,
                 },
                 "fidelity_env": {
+                    "num_levels": 4,
                     "mode": "blur_avgpool",
                     "blur_sigma_max": 2.0,
                     "pool_scale_max": 4,
@@ -155,6 +156,7 @@ def _plan_defaults() -> dict[str, Any]:
             "particle_sim": {
                 "rollout_samples": 1,
                 "objective_space": "state",
+                "batch_mode": "auto",
                 "progress": True,
                 "progress_leave": False,
                 "objective": {
@@ -165,25 +167,25 @@ def _plan_defaults() -> dict[str, Any]:
                     "state_l2_weight": 0.0,
                 },
                 "fidelity_env": {
-                    "spacings": [0.020, 0.016, 0.013, 0.010],
+                    "particle_counts": [1, 4, 16, 64, 128, 256],
                     "device": "auto",
                     "xmin": -0.25,
                     "xmax": 0.25,
                     "ymin": -0.25,
                     "ymax": 0.25,
                     "min_particles": 1,
-                    "coarsest_single_particle": True,
                     "particle_radius": None,
                     "radius_scale": 1.0,
                     "radius_clip_spacing": False,
-                    "stem_w": 0.05,
-                    "stem_h": 0.10,
-                    "bar_w": 0.12,
-                    "bar_h": 0.04,
-                    "pusher_radius": 0.015,
-                    "pusher_speed": 0.6,
-                    "pusher_interp_substeps": True,
-                    "frame_dt": 1.0 / 60.0,
+                    "stem_w": 40.0 * (0.5 / 512.0),
+                    "stem_h": 120.0 * (0.5 / 512.0),
+                    "bar_w": 160.0 * (0.5 / 512.0),
+                    "bar_h": 40.0 * (0.5 / 512.0),
+                    "pusher_radius": 15.0 * (0.5 / 512.0),
+                    "sim_hz": 100,
+                    "control_hz": 10,
+                    "pusher_k_p": 100.0,
+                    "pusher_k_v": 20.0,
                     "substeps": 16,
                     "iters": 8,
                     "mu": 0.6,
@@ -218,6 +220,9 @@ def _experiment_defaults() -> dict[str, Any]:
         "execution": {
             "mode": "auto",
             "max_workers": 2,
+            "particle": {
+                "device_slots": None,
+            },
         },
         "terminal": {
             "mode": "compact",
@@ -265,7 +270,16 @@ def validate_plan_spec_cfg(cfg: DictConfig) -> None:
     _reject_unknown_keys(cfg.planner, {"horizon", "replan_every", "cem", "fidelity"}, "plan.planner")
     _reject_unknown_keys(
         cfg.planner.cem,
-        {"pop_size", "elite_frac", "n_iter", "init_std", "warm_start", "action_low", "action_high"},
+        {
+            "pop_size",
+            "elite_frac",
+            "n_iter",
+            "init_std",
+            "inject_dataset_gt_actions",
+            "warm_start",
+            "action_low",
+            "action_high",
+        },
         "plan.planner.cem",
     )
     _reject_unknown_keys(cfg.planner.fidelity, {"enabled", "num_levels", "mpc", "cem", "rollout"}, "plan.planner.fidelity")
@@ -320,6 +334,7 @@ def validate_plan_spec_cfg(cfg: DictConfig) -> None:
         _reject_unknown_keys(
             cfg.backend.gt_env.fidelity_env,
             {
+                "num_levels",
                 "mode",
                 "blur_sigma_max",
                 "pool_scale_max",
@@ -339,20 +354,19 @@ def validate_plan_spec_cfg(cfg: DictConfig) -> None:
     else:
         _reject_unknown_keys(
             cfg.backend.particle_sim,
-            {"rollout_samples", "objective_space", "progress", "progress_leave", "fidelity_env", "objective"},
+            {"rollout_samples", "objective_space", "batch_mode", "progress", "progress_leave", "fidelity_env", "objective"},
             "plan.backend.particle_sim",
         )
         _reject_unknown_keys(
             cfg.backend.particle_sim.fidelity_env,
             {
-                "spacings",
+                "particle_counts",
                 "device",
                 "xmin",
                 "xmax",
                 "ymin",
                 "ymax",
                 "min_particles",
-                "coarsest_single_particle",
                 "particle_radius",
                 "radius_scale",
                 "radius_clip_spacing",
@@ -361,9 +375,10 @@ def validate_plan_spec_cfg(cfg: DictConfig) -> None:
                 "bar_w",
                 "bar_h",
                 "pusher_radius",
-                "pusher_speed",
-                "pusher_interp_substeps",
-                "frame_dt",
+                "sim_hz",
+                "control_hz",
+                "pusher_k_p",
+                "pusher_k_v",
                 "substeps",
                 "iters",
                 "mu",
@@ -381,6 +396,12 @@ def validate_plan_spec_cfg(cfg: DictConfig) -> None:
             {"action_l2_weight", "eef_weight", "block_pos_weight", "block_angle_weight", "state_l2_weight"},
             "plan.backend.particle_sim.objective",
         )
+        particle_batch_mode = str(getattr(cfg.backend.particle_sim, "batch_mode", "auto")).lower()
+        if particle_batch_mode not in {"auto", "off", "force"}:
+            raise ValueError(
+                "plan.backend.particle_sim.batch_mode must be one of auto|off|force, "
+                f"got {cfg.backend.particle_sim.batch_mode!r}."
+            )
 
     if int(cfg.budget.max_env_steps) <= 0:
         raise ValueError("plan.budget.max_env_steps must be > 0")
@@ -481,7 +502,10 @@ def validate_experiment_cfg(cfg: DictConfig) -> None:
         {"seed", "num_rollouts", "sample_without_replacement"},
         "experiment.rollouts",
     )
-    _reject_unknown_keys(cfg.execution, {"mode", "max_workers"}, "experiment.execution")
+    _reject_unknown_keys(cfg.execution, {"mode", "max_workers", "particle"}, "experiment.execution")
+    particle_execution = getattr(cfg.execution, "particle", None)
+    if particle_execution is not None:
+        _reject_unknown_keys(particle_execution, {"device_slots"}, "experiment.execution.particle")
     _reject_unknown_keys(cfg.terminal, {"mode"}, "experiment.terminal")
     _reject_unknown_keys(cfg.reporting, {"output_root"}, "experiment.reporting")
     if cfg.variants is None or len(cfg.variants) <= 0:
@@ -501,12 +525,28 @@ def validate_experiment_cfg(cfg: DictConfig) -> None:
                 )
     if len(set(names)) != len(names):
         raise ValueError("experiment.variants contains duplicate names.")
+    baseline = getattr(cfg, "baseline", None)
+    if baseline is not None and str(baseline).strip() and str(baseline) not in set(names):
+        raise ValueError(
+            f"experiment.baseline must match one of the variant names, got {baseline!r}. "
+            f"Available variants: {', '.join(names)}"
+        )
     if str(getattr(cfg.execution, "mode", "auto")).lower() not in {"auto", "serial", "process"}:
         raise ValueError("experiment.execution.mode must be one of auto|serial|process.")
     if str(getattr(cfg.terminal, "mode", "compact")).lower() not in {"quiet", "compact", "verbose"}:
         raise ValueError("experiment.terminal.mode must be one of quiet|compact|verbose.")
     if int(getattr(cfg.execution, "max_workers", 1)) <= 0:
         raise ValueError("experiment.execution.max_workers must be > 0.")
+    particle_device_slots = getattr(getattr(cfg.execution, "particle", None), "device_slots", None)
+    if particle_device_slots is not None:
+        if not isinstance(particle_device_slots, (list, tuple, ListConfig)):
+            raise ValueError("experiment.execution.particle.device_slots must be a list of device strings or null.")
+        for idx, slot in enumerate(particle_device_slots):
+            if not str(slot).strip():
+                raise ValueError(
+                    "experiment.execution.particle.device_slots entries must be non-empty device strings. "
+                    f"Invalid entry at index {idx}."
+                )
     if int(cfg.rollouts.num_rollouts) <= 0:
         raise ValueError("experiment.rollouts.num_rollouts must be > 0.")
     if int(cfg.rollouts.seed) < 0:
@@ -577,6 +617,7 @@ def resolve_experiment_spec(cfg_path: str) -> ExperimentSpec:
         name=str(cfg.name),
         config_path=os.path.abspath(cfg_path),
         shared_plan=shared_plan,
+        baseline=(str(cfg.baseline).strip() if getattr(cfg, "baseline", None) is not None and str(cfg.baseline).strip() else None),
         variants=variants,
         rollouts=dict(OmegaConf.to_container(cfg.rollouts, resolve=True)),
         execution=dict(OmegaConf.to_container(cfg.execution, resolve=True)),

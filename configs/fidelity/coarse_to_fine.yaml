@@ -2,7 +2,6 @@ plan:
   planner:
     fidelity:
       enabled: true
-      num_levels: 4
       mpc:
         mode: "linear"
         start_level: "coarsest"
@@ -12,7 +11,7 @@ plan:
         start_level: "base"
         end_level: "finest"
       rollout:
-        mode: "fixed"
+        mode: "linear"
         level: "base"
         uncertainty:
           criterion: "mean"

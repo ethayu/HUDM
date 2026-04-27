@@ -40,6 +40,7 @@ class SharedCEMCore:
         num_levels: int,
         rollout_modes: Sequence[str],
         device: Optional[torch.device] = None,
+        min_std: float = 0.01,
     ):
         self.horizon = int(horizon)
         self.action_dim = int(action_dim)
@@ -47,6 +48,7 @@ class SharedCEMCore:
         self.n_elite = max(1, int(round(self.pop_size * float(elite_frac))))
         self.n_iter = int(n_iter)
         self.init_std = float(init_std)
+        self.min_std = float(min_std)
         self.action_low = action_low
         self.action_high = action_high
         self.device = device or torch.device("cpu")
@@ -74,8 +76,10 @@ class SharedCEMCore:
             raise ValueError(f"n_iter must be > 0, got {self.n_iter}")
         if self.init_std <= 0.0:
             raise ValueError(f"init_std must be > 0, got {self.init_std}")
+        if self.min_std <= 0.0:
+            raise ValueError(f"min_std must be > 0, got {self.min_std}")
         if self.num_levels <= 0:
-            raise ValueError(f"fidelity.num_levels must be > 0, got {self.num_levels}")
+            raise ValueError(f"num_levels must be > 0, got {self.num_levels}")
         if self.mpc_mode not in {"fixed", "linear"}:
             raise ValueError(
                 f"Unknown fidelity.mpc.mode '{self.mpc_mode}'. Use 'fixed' or 'linear'."
@@ -101,16 +105,12 @@ class SharedCEMCore:
             raise ValueError(f"shift_steps must be >= 0, got {shift_steps}")
         if bool(warm_start) and self._has_distribution:
             s = int(shift_steps)
-            if s >= self.horizon:
-                self.mu.zero_()
-                self.std.fill_(self.init_std)
-            elif s > 0:
-                mu_prev = self.mu.clone()
-                std_prev = self.std.clone()
-                self.mu[:-s] = mu_prev[s:]
-                self.mu[-s:] = 0.0
-                self.std[:-s] = std_prev[s:]
-                self.std[-s:] = self.init_std
+            mu_prev = self.mu.clone()
+            std_prev = self.std.clone()
+            self.mu[:-s] = mu_prev[s:]
+            self.mu[-s:] = 0.0
+            self.std[:-s] = std_prev[s:]
+            self.std[-s:] = self.init_std
         else:
             self.mu.zero_()
             self.std.fill_(self.init_std)
@@ -132,10 +132,7 @@ class SharedCEMCore:
             device=self.device,
         )
         actions = self.mu.unsqueeze(0) + noise * self.std.unsqueeze(0)
-        if self.action_low is not None or self.action_high is not None:
-            low = -float("inf") if self.action_low is None else float(self.action_low)
-            high = float("inf") if self.action_high is None else float(self.action_high)
-            actions = actions.clamp(min=low, max=high)
+        actions = self._clamp_action_tensor(actions)
         return actions
 
     def update_distribution(self, actions: torch.Tensor, costs: torch.Tensor) -> None:
@@ -145,9 +142,15 @@ class SharedCEMCore:
             costs = costs.to(self.device)
         elite_idxs = costs.topk(self.n_elite, largest=False).indices
         elite = actions[elite_idxs]
-        self.mu = elite.mean(dim=0)
-        self.std = elite.std(dim=0) + 1e-6
+        #import pdb; pdb.set_trace()
+        new_mu = elite.mean(dim=0)
+        # unbiased=False avoids NaNs when n_elite==1 (Bessel ddof would divide by zero).
+        std = elite.std(dim=0, unbiased=False)
+        new_std = std.clamp(min=self.min_std)
         self._has_distribution = True
+        alpha = 0#0.6
+        self.mu = alpha * self.mu + (1 - alpha) * new_mu
+        self.std = alpha * self.std + (1 - alpha) * new_std
 
     @staticmethod
     def as_cfg_dict(raw: Any, field_name: str) -> Dict[str, Any]:
@@ -266,6 +269,13 @@ class SharedCEMCore:
 
         raise ValueError(f"Unknown rollout fidelity mode: {self.rollout_mode}")
 
+    def _clamp_action_tensor(self, actions: torch.Tensor) -> torch.Tensor:
+        if self.action_low is None and self.action_high is None:
+            return actions
+        low = -float("inf") if self.action_low is None else float(self.action_low)
+        high = float("inf") if self.action_high is None else float(self.action_high)
+        return actions.clamp(min=low, max=high)
+
     @torch.no_grad()
     def optimize(
         self,
@@ -274,11 +284,22 @@ class SharedCEMCore:
         warm_start: bool = False,
         shift_steps: int = 0,
         rng_seed: Optional[int] = None,
+        inject_actions: Optional[torch.Tensor] = None,
+        inject_count: int = 1,
     ) -> tuple[torch.Tensor, int, List[int], int]:
         self.initialize_distribution(warm_start=warm_start, shift_steps=int(shift_steps))
         generator = self.make_generator(rng_seed=rng_seed)
         total_bits = 0
         eff_rollout_levels: List[int] = []
+
+        inj: Optional[torch.Tensor] = None
+        n_inj = 0
+        if inject_actions is not None:
+            inj = inject_actions.to(device=self.device, dtype=torch.float32).reshape(
+                self.horizon, self.action_dim
+            )
+            inj = self._clamp_action_tensor(inj)
+            n_inj = min(max(0, int(inject_count)), self.pop_size)
 
         for it in range(self.n_iter):
             cem_progress = 1.0 if self.n_iter == 1 else it / (self.n_iter - 1)
@@ -286,12 +307,15 @@ class SharedCEMCore:
             rollout_levels = self.rollout_level_indices(base_level_idx)
 
             actions = self.sample_population(generator=generator)
+            if inj is not None and n_inj > 0:
+                actions[:n_inj] = inj.unsqueeze(0).expand(n_inj, -1, -1)
             costs, levels_used, bits_used = evaluate_population(
                 actions,
                 int(base_level_idx),
                 list(rollout_levels),
                 it,
             )
+            #print(f"costs: {costs}")
             if not torch.is_tensor(costs):
                 costs = torch.as_tensor(costs, dtype=torch.float32, device=self.device)
             else:

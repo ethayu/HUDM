@@ -1,5 +1,5 @@
 experiment:
-  name: "smoke_gt_env"
+  name: "wm_128_100_rollouts"
   shared_plan:
     imports:
       - task/pusht_dataset.yaml
@@ -10,20 +10,16 @@ experiment:
         save: false
   rollouts:
     seed: 0
-    num_rollouts: 20
+    num_rollouts: 100
     sample_without_replacement: true
   execution:
     mode: "auto"
     max_workers: 2
   reporting:
     output_root: "rollouts"
-  baseline: "finest_fixed"
+  baseline: "wm_128"
   variants:
-    - name: "finest_fixed"
+    - name: "wm_128"
       imports:
-        - backend/gt_env_image.yaml
-        - fidelity/finest.yaml
-    # - name: "coarse_fixed"
-    #   imports:
-    #     - backend/gt_env_state.yaml
-    #     - fidelity/coarsest.yaml
+        - backend/wm_128.yaml
+        - fidelity/single.yaml

@@ -7,7 +7,7 @@ data:
   action_dim: 2
   synthetic:
     enable: true
-    zarr_path: "/home/aurora/HUDM-mwm-ethan/synthetic/pusht_synth_test.zarr"  # Path to your synthetic zarr dataset
+    zarr_path: "/home/aurora/HUDM-mwm-ethan/synthetic/pusht_synth_planning_translation_100.zarr"  # Path to your synthetic zarr dataset
     frac: 1  # Fraction of synthetic data in the mix (0.5 = 50% synthetic, 50% real)
     total_train: null  # Total training samples (null = use len(real_train))
     seed: 0  # Random seed for sampling

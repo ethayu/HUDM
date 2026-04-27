@@ -12,7 +12,7 @@ import numpy as np
 import torch
 
 from hudm import experiment
-from hudm.specs import ExperimentSpec, ExperimentVariant
+from hudm.specs import ExperimentSpec, ExperimentVariant, make_plan_spec
 from omegaconf import OmegaConf
 from scripts.create_dummy_multivariant_bundle import FAKE_VARIANTS, build_dummy_bundle
 from hudm.experiment_bundle import (
@@ -28,6 +28,335 @@ from hudm.experiment_review import load_experiment_review_data
 
 
 class ExperimentReportingTests(unittest.TestCase):
+    def _make_plan_spec(self, name: str, backend_kind: str, *, backend_cfg: dict | None = None):
+        clean_cfg = OmegaConf.create(
+            {
+                "task": {
+                    "env_id": "pusht",
+                    "env": {},
+                    "init_goal": {},
+                },
+                "budget": {"max_env_steps": 1},
+                "planner": {
+                    "horizon": 1,
+                    "replan_every": 1,
+                    "cem": {"pop_size": 4, "elite_frac": 0.5},
+                },
+                "backend": {
+                    "kind": backend_kind,
+                    backend_kind: backend_cfg or {},
+                },
+                "artifacts": {"save": False},
+            }
+        )
+        runtime_cfg = OmegaConf.create({"save": False})
+        return make_plan_spec(name=name, config_path=None, clean_cfg=clean_cfg, runtime_cfg=runtime_cfg)
+
+    def _make_experiment_spec(self, tmpdir: str, variants: list[ExperimentVariant]) -> ExperimentSpec:
+        return ExperimentSpec(
+            name="scheduler_demo",
+            config_path=None,
+            shared_plan=self._make_plan_spec("shared", "wm", backend_cfg={"shared": True}),
+            baseline=variants[0].name if variants else None,
+            variants=variants,
+            rollouts={"seed": 0, "num_rollouts": 1, "sample_without_replacement": True},
+            execution={"mode": "process", "max_workers": 4},
+            terminal={"mode": "quiet"},
+            reporting={"output_root": tmpdir},
+        )
+
+    def _fake_row(self, variant_name: str, rollout_id: str = "r0", rollout_index: int = 0) -> dict:
+        return {
+            "variant_name": variant_name,
+            "rollout_id": rollout_id,
+            "rollout_index": rollout_index,
+            "success": 1,
+        }
+
+    def test_group_wm_variants_groups_backend_lanes_by_compatibility_signature(self):
+        shared_backend = {"world_model": {"device": "cpu"}}
+        wm_a = ExperimentVariant(name="wm_a", plan=self._make_plan_spec("wm_a", "wm", backend_cfg=shared_backend))
+        wm_b = ExperimentVariant(name="wm_b", plan=self._make_plan_spec("wm_b", "wm", backend_cfg=shared_backend))
+        gt = ExperimentVariant(name="gt_a", plan=self._make_plan_spec("gt_a", "gt_env", backend_cfg={"rollout_samples": 1}))
+
+        batched, singles = experiment._group_wm_variants([wm_a, wm_b, gt])
+
+        self.assertEqual([[variant.name for variant in group] for group in batched], [["wm_a", "wm_b"]])
+        self.assertEqual([variant.name for variant in singles], ["gt_a"])
+
+    def test_run_experiment_dispatches_backend_lanes_without_real_multiprocessing(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            shared_backend = {"world_model": {"device": "cpu"}}
+            wm_a = ExperimentVariant(name="wm_a", plan=self._make_plan_spec("wm_a", "wm", backend_cfg=shared_backend))
+            wm_b = ExperimentVariant(name="wm_b", plan=self._make_plan_spec("wm_b", "wm", backend_cfg=shared_backend))
+            gt = ExperimentVariant(name="gt_a", plan=self._make_plan_spec("gt_a", "gt_env", backend_cfg={"rollout_samples": 1}))
+            spec = self._make_experiment_spec(tmpdir, [wm_a, wm_b, gt])
+
+            submitted_tasks: list[dict] = []
+            captured_bundle: dict[str, object] = {}
+
+            class _FakeFuture:
+                def __init__(self, fn, task):
+                    self._fn = fn
+                    self._task = task
+
+                def result(self):
+                    return self._fn(self._task)
+
+            class _FakeExecutor:
+                def __init__(self, *args, **kwargs):
+                    del args, kwargs
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb):
+                    del exc_type, exc, tb
+                    return False
+
+                def submit(self, fn, task):
+                    submitted_tasks.append(task)
+                    return _FakeFuture(fn, task)
+
+            with mock.patch.object(experiment, "enumerate_rollout_candidates", return_value=[{"rollout_id": "r0"}]):
+                with mock.patch.object(
+                    experiment,
+                    "select_rollouts",
+                    return_value=[{"rollout_id": "r0", "rollout_index": 0}],
+                ):
+                    with mock.patch.object(
+                        experiment,
+                        "_run_wm_batched_variants",
+                        return_value=[self._fake_row("wm_a"), self._fake_row("wm_b")],
+                    ) as wm_lane:
+                        with mock.patch.object(
+                            experiment,
+                            "_run_variant_task",
+                            side_effect=lambda task: self._fake_row(str(task["variant_name"])),
+                        ) as single_lane:
+                            with mock.patch.object(
+                                experiment,
+                                "ProcessPoolExecutor",
+                                _FakeExecutor,
+                            ):
+                                with mock.patch.object(
+                                    experiment,
+                                    "as_completed",
+                                    side_effect=lambda futures: list(futures),
+                                ):
+                                    with mock.patch.object(
+                                        experiment,
+                                        "aggregate_summary",
+                                        return_value=([], []),
+                                    ):
+                                        with mock.patch.object(
+                                            experiment,
+                                            "write_experiment_bundle",
+                                            side_effect=lambda run_dir, **kwargs: captured_bundle.update(kwargs),
+                                        ):
+                                            run_dir = experiment.run_experiment(spec)
+
+            self.assertTrue(run_dir.startswith(tmpdir))
+            self.assertEqual(wm_lane.call_count, 1)
+            self.assertEqual([variant.name for variant in wm_lane.call_args.kwargs["variants"]], ["wm_a", "wm_b"])
+            self.assertEqual(single_lane.call_count, 1)
+            self.assertEqual(len(submitted_tasks), 1)
+            self.assertEqual(submitted_tasks[0]["variant_name"], "gt_a")
+            self.assertEqual(
+                {row["variant_name"] for row in captured_bundle["run_rows"]},
+                {"wm_a", "wm_b", "gt_a"},
+            )
+
+    def test_run_experiment_falls_back_to_serial_when_process_lane_executor_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            gt = ExperimentVariant(name="gt_a", plan=self._make_plan_spec("gt_a", "gt_env", backend_cfg={"rollout_samples": 1}))
+            spec = self._make_experiment_spec(tmpdir, [gt])
+
+            submitted_tasks: list[dict] = []
+            captured_bundle: dict[str, object] = {}
+
+            class _FailingFuture:
+                def result(self):
+                    raise RuntimeError("pickling failed")
+
+            class _FailingExecutor:
+                def __init__(self, *args, **kwargs):
+                    del args, kwargs
+
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, exc_type, exc, tb):
+                    del exc_type, exc, tb
+                    return False
+
+                def submit(self, fn, task):
+                    submitted_tasks.append(task)
+                    del fn
+                    return _FailingFuture()
+
+            with mock.patch.object(experiment, "enumerate_rollout_candidates", return_value=[{"rollout_id": "r0"}]):
+                with mock.patch.object(
+                    experiment,
+                    "select_rollouts",
+                    return_value=[{"rollout_id": "r0", "rollout_index": 0}],
+                ):
+                    with mock.patch.object(
+                        experiment,
+                        "_run_wm_batched_variants",
+                        return_value=[],
+                    ):
+                        with mock.patch.object(
+                            experiment,
+                            "_run_variant_task",
+                            side_effect=lambda task: self._fake_row(str(task["variant_name"])),
+                        ) as single_lane:
+                            with mock.patch.object(
+                                experiment,
+                                "ProcessPoolExecutor",
+                                _FailingExecutor,
+                            ):
+                                with mock.patch.object(
+                                    experiment,
+                                    "as_completed",
+                                    side_effect=lambda futures: list(futures),
+                                ):
+                                    with mock.patch.object(
+                                        experiment,
+                                        "aggregate_summary",
+                                        return_value=([], []),
+                                    ):
+                                        with mock.patch.object(
+                                            experiment,
+                                            "write_experiment_bundle",
+                                            side_effect=lambda run_dir, **kwargs: captured_bundle.update(kwargs),
+                                        ):
+                                            with mock.patch("builtins.print") as print_mock:
+                                                run_dir = experiment.run_experiment(spec)
+
+            self.assertTrue(run_dir.startswith(tmpdir))
+            self.assertEqual(len(submitted_tasks), 1)
+            self.assertEqual(submitted_tasks[0]["variant_name"], "gt_a")
+            self.assertEqual(single_lane.call_count, 1)
+            self.assertEqual(
+                [row["variant_name"] for row in captured_bundle["run_rows"]],
+                ["gt_a"],
+            )
+            self.assertTrue(
+                any(
+                    args
+                    and isinstance(args[0], str)
+                    and args[0].startswith("[experiment][warn] process parallelism unavailable (pickling failed); falling back to serial.")
+                    for args, _ in ((call.args, call.kwargs) for call in print_mock.call_args_list)
+                )
+            )
+
+    def test_run_task_lane_particle_device_slots_limit_workers_and_patch_task_devices(self):
+        tasks = [
+            {
+                "cfg": {"particle_env": {"fidelity_env": {"device": "auto"}}},
+                "variant_name": f"particle_{idx}",
+            }
+            for idx in range(3)
+        ]
+        submitted_devices: list[str] = []
+        worker_counts: list[int] = []
+
+        class _FakeFuture:
+            def __init__(self, fn, task):
+                self._fn = fn
+                self._task = task
+
+            def result(self):
+                return self._fn(self._task)
+
+        class _FakeExecutor:
+            def __init__(self, *args, **kwargs):
+                del args
+                worker_counts.append(int(kwargs["max_workers"]))
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                del exc_type, exc, tb
+                return False
+
+            def submit(self, fn, task):
+                submitted_devices.append(str(task["cfg"]["particle_env"]["fidelity_env"]["device"]))
+                return _FakeFuture(fn, task)
+
+        with mock.patch.object(experiment, "ProcessPoolExecutor", _FakeExecutor):
+            with mock.patch.object(experiment, "as_completed", side_effect=lambda futures: list(futures)):
+                with mock.patch.object(
+                    experiment,
+                    "_run_variant_task",
+                    side_effect=lambda task: self._fake_row(str(task["variant_name"])),
+                ):
+                    rows = experiment._run_task_lane(
+                        tasks,
+                        exec_mode="process",
+                        max_workers=6,
+                        lane_key="task_pool:particle_sim",
+                        backend_kind="particle_sim",
+                        device_slots=["cuda:0", "cuda:1"],
+                    )
+
+        self.assertEqual(worker_counts, [2])
+        self.assertEqual(submitted_devices, ["cuda:0", "cuda:1", "cuda:0"])
+        self.assertEqual([row["variant_name"] for row in rows], ["particle_0", "particle_1", "particle_2"])
+
+    def test_run_task_lane_particle_auto_device_uses_cpu_parallelism_when_cuda_is_unavailable(self):
+        tasks = [
+            {
+                "cfg": {"particle_env": {"fidelity_env": {"device": "auto"}}},
+                "variant_name": f"particle_{idx}",
+            }
+            for idx in range(2)
+        ]
+        worker_counts: list[int] = []
+
+        class _FakeFuture:
+            def __init__(self, fn, task):
+                self._fn = fn
+                self._task = task
+
+            def result(self):
+                return self._fn(self._task)
+
+        class _FakeExecutor:
+            def __init__(self, *args, **kwargs):
+                del args
+                worker_counts.append(int(kwargs["max_workers"]))
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                del exc_type, exc, tb
+                return False
+
+            def submit(self, fn, task):
+                return _FakeFuture(fn, task)
+
+        with mock.patch.object(experiment, "ProcessPoolExecutor", _FakeExecutor):
+            with mock.patch.object(experiment, "as_completed", side_effect=lambda futures: list(futures)):
+                with mock.patch.object(experiment.torch.cuda, "is_available", return_value=False):
+                    with mock.patch.object(
+                        experiment,
+                        "_run_variant_task",
+                        side_effect=lambda task: self._fake_row(str(task["variant_name"])),
+                    ):
+                        experiment._run_task_lane(
+                            tasks,
+                            exec_mode="process",
+                            max_workers=5,
+                            lane_key="task_pool:particle_sim",
+                            backend_kind="particle_sim",
+                        )
+
+        self.assertEqual(worker_counts, [2])
+
     def test_wm_batched_variants_allocate_shared_plan_time(self):
         class FakeEnv:
             action_dim = 2
@@ -150,17 +479,29 @@ class ExperimentReportingTests(unittest.TestCase):
                                                 "BatchedLatentCEMPlanner",
                                                 FakeBatchPlanner,
                                             ):
-                                                with mock.patch.object(experiment, "save_plan_result", side_effect=lambda *args, **kwargs: None):
+                                                with mock.patch.object(
+                                                    experiment,
+                                                    "save_plan_result",
+                                                    side_effect=lambda *args, **kwargs: None,
+                                                ):
                                                     with mock.patch.object(
                                                         experiment,
                                                         "result_row",
                                                         side_effect=lambda result, run_dir: {
                                                             "variant_name": result["variant_name"],
                                                             "plan_time_total_sec": result["run_stats"]["plan_time_total_sec"],
-                                                            "shared_plan_time_total_sec": result["run_stats"]["shared_plan_time_total_sec"],
-                                                            "replan_plan_time_sec": result["trace"]["replans"][0]["plan_time_sec"],
-                                                            "replan_shared_plan_time_sec": result["trace"]["replans"][0]["shared_plan_time_sec"],
-                                                            "plan_time_allocation": result["trace"]["replans"][0]["plan_time_allocation"],
+                                                            "shared_plan_time_total_sec": result["run_stats"][
+                                                                "shared_plan_time_total_sec"
+                                                            ],
+                                                            "replan_plan_time_sec": result["trace"]["replans"][0][
+                                                                "plan_time_sec"
+                                                            ],
+                                                            "replan_shared_plan_time_sec": result["trace"]["replans"][0][
+                                                                "shared_plan_time_sec"
+                                                            ],
+                                                            "plan_time_allocation": result["trace"]["replans"][0][
+                                                                "plan_time_allocation"
+                                                            ],
                                                         },
                                                     ):
                                                         rows = experiment._run_wm_batched_variants(
@@ -292,6 +633,7 @@ class ExperimentReportingTests(unittest.TestCase):
                 name="demo",
                 config_path=None,
                 shared_plan=shared_plan,
+                baseline="variant_a",
                 variants=[ExperimentVariant(name="variant_a", plan=variant_plan)],
                 rollouts={"seed": 0, "num_rollouts": 1, "sample_without_replacement": True},
                 execution={"mode": "serial", "max_workers": 1},
@@ -326,7 +668,28 @@ class ExperimentReportingTests(unittest.TestCase):
             }
             with mock.patch.object(experiment, "enumerate_rollout_candidates", return_value=[{"rollout_id": "r0"}]):
                 with mock.patch.object(experiment, "select_rollouts", return_value=[{"rollout_id": "r0", "rollout_index": 0}]):
-                    with mock.patch.object(experiment, "_group_wm_variants", return_value=([], spec.variants)):
+                    with mock.patch.object(
+                        experiment,
+                        "_build_execution_lanes",
+                        return_value=[
+                            {
+                                "lane_type": "task_pool",
+                                "backend_kind": "gt_env",
+                                "lane_key": "task_pool:gt_env",
+                                "tasks": [
+                                    {
+                                        "cfg": {"save": False},
+                                        "selection": {"rollout_id": "r0", "rollout_index": 0},
+                                        "variant_name": "variant_a",
+                                        "run_dir": os.path.join(tmpdir, "traces", "variant_a", "r0"),
+                                        "terminal_mode": "quiet",
+                                        "backend_kind": "gt_env",
+                                        "lane_key": "task_pool:gt_env",
+                                    }
+                                ],
+                            }
+                        ],
+                    ):
                         with mock.patch.object(experiment, "_run_variant_task", return_value=fake_row):
                             run_dir = experiment.run_experiment(spec)
 
@@ -336,6 +699,7 @@ class ExperimentReportingTests(unittest.TestCase):
             self.assertEqual(payload["execution"]["mode"], "serial")
             self.assertEqual(payload["terminal"]["mode"], "quiet")
             self.assertEqual(payload["reporting"]["output_root"], tmpdir)
+            self.assertEqual(payload["baseline_variant"], "variant_a")
 
     def test_run_variant_task_writes_run_log(self):
         fake_result = {

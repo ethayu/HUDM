@@ -1,5 +1,5 @@
 experiment:
-  name: "multi_backend_compare"
+  name: "wm_ours+baseline"
   shared_plan:
     imports:
       - task/pusht_dataset.yaml
@@ -10,24 +10,36 @@ experiment:
         save: false
   rollouts:
     seed: 0
-    num_rollouts: 4
+    num_rollouts: 20
     sample_without_replacement: true
   execution:
     mode: "auto"
     max_workers: 2
   reporting:
     output_root: "rollouts"
-  baseline: "gt_env_finest"
+  baseline: "wm_coarse_to_fine"
   variants:
-    - name: "gt_env_finest"
+    - name: "wm_coarse_to_fine"
       imports:
-        - backend/gt_env_image.yaml
-        - fidelity/finest.yaml
-    - name: "gt_env_coarse_to_fine"
-      imports:
-        - backend/gt_env_image.yaml
+        - backend/wm_coarse_to_fine.yaml
         - fidelity/coarse_to_fine.yaml
-    - name: "particle_finest"
+    - name: "wm_256"
       imports:
-        - backend/particle_state.yaml
-        - fidelity/finest.yaml
+        - backend/wm_256.yaml
+        - fidelity/single.yaml
+    - name: "wm_128"
+      imports:
+        - backend/wm_128.yaml
+        - fidelity/single.yaml
+    - name: "wm_64"
+      imports:
+        - backend/wm_64.yaml
+        - fidelity/single.yaml
+    - name: "wm_32"
+      imports:
+        - backend/wm_32.yaml
+        - fidelity/single.yaml
+    - name: "wm_16"
+      imports:
+        - backend/wm_16.yaml
+        - fidelity/single.yaml

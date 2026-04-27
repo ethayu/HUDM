@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
+import numpy as np
 import torch
 
 from planning.cem_core import SharedCEMCore
@@ -126,6 +127,24 @@ class LatentCEMPlanner:
         self._latest_rollout_latent_losses: List[float] = []
         self._iter_best_rollout_latent_losses: List[List[float]] = []
 
+    @staticmethod
+    def _prepare_inject_actions_tensor(
+        gt_action_trajectory: Union[np.ndarray, torch.Tensor, List[List[float]]],
+        horizon: int,
+        action_dim: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        arr = np.asarray(gt_action_trajectory, dtype=np.float32)
+        if arr.ndim != 2 or arr.shape[1] != int(action_dim):
+            raise ValueError(
+                f"gt_action_trajectory must have shape (T, {action_dim}), got {arr.shape}"
+            )
+        out = np.zeros((int(horizon), int(action_dim)), dtype=np.float32)
+        n = min(int(horizon), int(arr.shape[0]))
+        if n > 0:
+            out[:n] = arr[:n]
+        return torch.as_tensor(out, device=device, dtype=torch.float32)
+
     def _predict_next_stats(
         self,
         level: int,
@@ -215,12 +234,12 @@ class LatentCEMPlanner:
         k_terminal = self.K[base_level_idx]
         terminal = self.terminal_weight * self._latent_distance(z, z_goal_exp, k_terminal)
         cost = terminal + running
-
         if self.action_l2_weight > 0.0:
             action_penalty = actions.pow(2).mean(dim=(1, 2))
             cost = cost + self.action_l2_weight * action_penalty
         if step_latent is not None:
             best_idx = int(torch.argmin(cost).item())
+            print(f"best_idx: {best_idx}, cost: {cost[best_idx].item()}, cost_gt: {cost[0].item()}")
             self._latest_rollout_latent_losses = [
                 float(x) for x in step_latent[best_idx].detach().cpu().tolist()
             ]
@@ -307,6 +326,8 @@ class LatentCEMPlanner:
         mpc_progress: float = 0.0,
         warm_start_steps: int = 0,
         seed: Optional[int] = None,
+        gt_action_trajectory: Optional[Union[np.ndarray, torch.Tensor, List[List[float]]]] = None,
+        gt_inject_count: int = 1,
     ) -> tuple[torch.Tensor, LatentCEMInfo]:
         t0 = time.perf_counter()
         self._latest_rollout_latent_losses = []
@@ -335,12 +356,22 @@ class LatentCEMPlanner:
             return costs, levels_used, bits_used
 
         start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
+        inject_tensor: Optional[torch.Tensor] = None
+        if gt_action_trajectory is not None:
+            inject_tensor = self._prepare_inject_actions_tensor(
+                gt_action_trajectory,
+                self.horizon,
+                self.action_dim,
+                self.device,
+            )
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
             evaluate_population=_evaluate,
             warm_start=self.warm_start,
             shift_steps=int(warm_start_steps),
             rng_seed=None if seed is None else int(seed),
+            inject_actions=inject_tensor,
+            inject_count=int(gt_inject_count),
         )
 
         info = LatentCEMInfo(

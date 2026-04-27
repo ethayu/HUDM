@@ -17,6 +17,8 @@ from hudm.artifacts import infer_action_overlay_spec, overlay_action_targets_on_
 
 
 MEDIA_ALIASES = {
+    "reference_goal_state": ["reference_goal_state.png", "baseline_goal_state.png"],
+    "reference_env_replay": ["reference_env_replay.mp4", "baseline_env_replay.mp4"],
     "gt_replay": ["gt_replay.mp4", "gt.mp4"],
     "closed_loop_replay": ["closed_loop_replay.mp4", "planned.mp4"],
     "planner_view_replay": ["planner_view_replay.mp4", "planner_view.mp4"],

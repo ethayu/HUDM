@@ -9,9 +9,13 @@ import time
 import unittest
 from unittest import mock
 
+import numpy as np
+
+from hudm.config import _plan_defaults
 from hudm.experiment_bundle import EXPERIMENT_JSON, PAIRED_VS_BASELINE_CSV, RUNS_CSV, SELECTED_ROLLOUTS_JSON, VARIANTS_CSV
 from hudm.experiment_review import (
     _compute_vs_outcome_figure,
+    _default_reference_variant,
     _figure_html,
     _media_description,
     _paired_summary_figure,
@@ -144,6 +148,157 @@ class ExperimentReviewTests(unittest.TestCase):
         np.savez_compressed(os.path.join(trace_dir, "trace.npz"), **{k: np.asarray(v, dtype=np.float32) for k, v in npz_data.items()})
         return run_dir, trace_dir
 
+    def _write_partial_trace(
+        self,
+        run_dir: str,
+        *,
+        variant_name: str,
+        rollout_id: str,
+        success: bool,
+        final_pos_diff: float,
+        final_angle_diff: float,
+        final_eef_diff: float,
+        final_coverage: float,
+        bits_used_total: int,
+        flops_used_total: int,
+        plan_time_total_sec: float,
+        termination_reason: str,
+        episode_index: int,
+        start_index: int,
+        goal_index: int,
+    ) -> str:
+        import numpy as np
+
+        trace_dir = os.path.join(run_dir, "traces", variant_name, rollout_id)
+        os.makedirs(trace_dir, exist_ok=True)
+        trace_payload = {
+            "backend": "particle_sim",
+            "success": bool(success),
+            "schedule_name": variant_name,
+            "plan_config": {"backend": "particle_sim"},
+            "sample": {
+                "episode_index": episode_index,
+                "start_index": start_index,
+                "goal_index": goal_index,
+            },
+            "run_stats": {
+                "plans": 2,
+                "bits_used_total": int(bits_used_total),
+                "flops_used_total": int(flops_used_total),
+                "plan_time_total_sec": float(plan_time_total_sec),
+                "termination_reason": termination_reason,
+                "termination_step": 2,
+                "termination_metric_success": bool(success),
+                "termination_done": bool(success),
+                "termination_pos_diff": float(final_pos_diff),
+                "termination_angle_diff": float(final_angle_diff),
+                "termination_eef_diff": float(final_eef_diff),
+                "termination_coverage": float(final_coverage),
+            },
+            "replans": [
+                {
+                    "replan_idx": 0,
+                    "step_start": 0,
+                    "mpc_progress": 0.0,
+                    "base_level_idx": 0,
+                    "bits_used_estimate": bits_used_total,
+                    "plan_time_sec": float(plan_time_total_sec) / 2.0,
+                    "action_seq": [[0.0, 0.0]],
+                }
+            ],
+        }
+        metadata_payload = {
+            "created_at": "20260331_120000",
+            "backend": "particle_sim",
+            "source": "dataset",
+            "success": bool(success),
+            "planned_steps": 3,
+            "plans": 2,
+            "bits_used_total": int(bits_used_total),
+            "flops_used_total": int(flops_used_total),
+            "plan_time_total_sec": float(plan_time_total_sec),
+            "shared_plan_time_total_sec": float(plan_time_total_sec) * 0.75,
+            "termination_reason": termination_reason,
+            "termination_step": 2,
+            "termination_metric_success": bool(success),
+            "termination_done": bool(success),
+            "termination_pos_diff": float(final_pos_diff),
+            "termination_angle_diff": float(final_angle_diff),
+            "termination_eef_diff": float(final_eef_diff),
+            "termination_coverage": float(final_coverage),
+            "sample": {
+                "episode_index": episode_index,
+                "start_index": start_index,
+                "goal_index": goal_index,
+            },
+            "trace_json": "trace.json",
+            "trace_npz": "trace.npz",
+        }
+        npz_data = {
+            "pos_diffs": np.asarray([final_pos_diff + 0.5, final_pos_diff + 0.2, final_pos_diff], dtype=np.float32),
+            "angle_diffs": np.asarray([final_angle_diff + 0.05, final_angle_diff + 0.02, final_angle_diff], dtype=np.float32),
+            "eef_diffs": np.asarray([final_eef_diff + 0.1, final_eef_diff + 0.04, final_eef_diff], dtype=np.float32),
+            "coverages": np.asarray([max(0.0, final_coverage - 0.1), max(0.0, final_coverage - 0.03), final_coverage], dtype=np.float32),
+            "executed_actions": np.asarray([[0.0, 0.0], [0.1, 0.0], [0.2, 0.0]], dtype=np.float32),
+            "trajectory": np.asarray(
+                [
+                    [256.0, 256.0, 0.0, 0.0, 0.0],
+                    [266.0, 256.0, 0.0, 0.0, 0.0],
+                    [276.0, 256.0, 0.0, 0.0, 0.0],
+                    [286.0, 256.0, 0.0, 0.0, 0.0],
+                ],
+                dtype=np.float32,
+            ),
+        }
+        with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+            json.dump(trace_payload, f)
+        with open(os.path.join(trace_dir, "metadata.json"), "w", encoding="utf-8") as f:
+            json.dump(metadata_payload, f)
+        with open(os.path.join(trace_dir, "run.log"), "w", encoding="utf-8") as f:
+            f.write("partial run log\n")
+        np.savez_compressed(os.path.join(trace_dir, "trace.npz"), **npz_data)
+        return trace_dir
+
+    def _make_partial_experiment_dir(self, tmpdir: str, *, include_second_variant: bool = False) -> str:
+        run_dir = os.path.join(tmpdir, "experiment_partial")
+        self._write_partial_trace(
+            run_dir,
+            variant_name="variant_a",
+            rollout_id="rollout_0",
+            success=True,
+            final_pos_diff=1.0,
+            final_angle_diff=0.1,
+            final_eef_diff=0.2,
+            final_coverage=0.95,
+            bits_used_total=100,
+            flops_used_total=200,
+            plan_time_total_sec=0.5,
+            termination_reason="env_done",
+            episode_index=7,
+            start_index=11,
+            goal_index=19,
+        )
+        if include_second_variant:
+            self._write_partial_trace(
+                run_dir,
+                variant_name="variant_b",
+                rollout_id="rollout_0",
+                success=False,
+                final_pos_diff=3.5,
+                final_angle_diff=0.3,
+                final_eef_diff=0.4,
+                final_coverage=0.55,
+                bits_used_total=250,
+                flops_used_total=400,
+                plan_time_total_sec=1.25,
+                termination_reason="max_steps",
+                episode_index=7,
+                start_index=11,
+                goal_index=19,
+            )
+        os.makedirs(os.path.join(run_dir, "traces", "variant_a", "rollout_pending"), exist_ok=True)
+        return run_dir
+
     def test_build_summary_page_has_variant_links_and_downloads(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir, _ = self._make_experiment_dir(tmpdir)
@@ -163,6 +318,134 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertNotIn("Cross-Variant Compute Distributions", html)
             self.assertNotIn("Final Pos", html)
             self.assertNotIn("kpi-label'>Baseline", html)
+
+    def test_load_experiment_review_data_falls_back_to_completed_partial_traces(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = self._make_partial_experiment_dir(tmpdir, include_second_variant=True)
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "experiment_partial")
+            self.assertTrue(bool(data.meta.get("partial_bundle")))
+            self.assertEqual(data.variant_order, ["variant_a", "variant_b"])
+            self.assertEqual(len(data.run_rows), 2)
+            self.assertEqual(len(data.variant_rows), 2)
+            self.assertEqual(sorted(row["rollout_id"] for row in data.run_rows), ["rollout_0", "rollout_0"])
+            self.assertEqual(resolve_row(data, "variant_a", "rollout_0")["rollout_index"], 0)
+            self.assertAlmostEqual(data.variant_by_name["variant_a"]["mean_final_coverage"], 0.95)
+            self.assertAlmostEqual(data.variant_by_name["variant_b"]["mean_final_coverage"], 0.55)
+            self.assertEqual(len(data.paired_rows), 1)
+
+            html = build_summary_page(data)
+            self.assertIn("Reference Variant", html)
+            self.assertIn("/variant?name=variant_a", html)
+            self.assertIn("/variant?name=variant_b", html)
+            self.assertNotIn("rollout_pending", html)
+
+    def test_partial_review_preserves_configured_variant_order_and_baseline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = self._make_partial_experiment_dir(tmpdir, include_second_variant=True)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "partial_demo",
+                        "baseline_variant": "variant_b",
+                        "variant_order": ["variant_b", "variant_a"],
+                    },
+                    f,
+                )
+
+            runs_csv = os.path.join(run_dir, RUNS_CSV)
+            if os.path.exists(runs_csv):
+                os.remove(runs_csv)
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "partial_demo")
+            self.assertEqual(data.variant_order, ["variant_b", "variant_a"])
+            self.assertEqual(data.baseline_variant, "variant_b")
+
+            html = build_summary_page(data)
+            self.assertIn("Configured baseline/reference variant: <code>variant_b</code>", html)
+            self.assertIn("<option value='variant_b' selected>variant_b</option>", html)
+
+    def test_load_experiment_review_data_allows_pending_bundle_without_completed_runs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = os.path.join(tmpdir, "experiment_pending")
+            os.makedirs(run_dir, exist_ok=True)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "pending_demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a", "variant_b"],
+                        "completed_runs": 0,
+                        "total_runs": 8,
+                        "bundle_status": "pending",
+                        "partial_bundle": True,
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "pending_demo")
+            self.assertEqual(data.variant_order, ["variant_a", "variant_b"])
+            self.assertEqual(len(data.run_rows), 0)
+            self.assertTrue(bool(data.meta.get("partial_bundle")))
+
+            html = build_summary_page(data)
+            self.assertIn("Waiting for the first completed rollout", html)
+            self.assertIn("http-equiv='refresh'", html)
+            self.assertIn("variant_a", html)
+            self.assertIn("variant_b", html)
+            self.assertIn("0/8", html)
+            self.assertIn("Configured baseline/reference variant: <code>variant_a</code>", html)
+
+    def test_load_experiment_review_data_allows_empty_run_directory(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = os.path.join(tmpdir, "experiment_empty")
+            os.makedirs(run_dir, exist_ok=True)
+
+            data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.experiment_name, "experiment_empty")
+            self.assertEqual(len(data.run_rows), 0)
+            self.assertEqual(data.variant_order, [])
+
+            html = build_summary_page(data)
+            self.assertIn("Waiting for experiment bundle metadata or the first completed rollout", html)
+            self.assertIn("http-equiv='refresh'", html)
+
+    def test_experiment_review_app_refreshes_partial_trace_snapshot(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir = self._make_partial_experiment_dir(tmpdir, include_second_variant=False)
+            app = ExperimentReviewApp(run_dir)
+            self.assertEqual(len(app.data.run_rows), 1)
+
+            self._write_partial_trace(
+                run_dir,
+                variant_name="variant_a",
+                rollout_id="rollout_1",
+                success=True,
+                final_pos_diff=0.8,
+                final_angle_diff=0.08,
+                final_eef_diff=0.18,
+                final_coverage=0.97,
+                bits_used_total=90,
+                flops_used_total=180,
+                plan_time_total_sec=0.45,
+                termination_reason="env_done",
+                episode_index=8,
+                start_index=12,
+                goal_index=20,
+            )
+
+            html = app.summary_page()
+            self.assertEqual(len(app.data.run_rows), 2)
+            self.assertIn("rollout_1", html)
 
     def test_replan_rows_use_human_bits_and_saved_action_horizon(self):
         rows = _replan_rows(
@@ -345,6 +628,279 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertNotIn("data-barmode-target=", success_analysis_section)
             self.assertNotIn("kpi-label'>Baseline", html)
 
+    def test_default_reference_variant_prefers_configured_baseline(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            _write_csv(
+                os.path.join(run_dir, VARIANTS_CSV),
+                [
+                    {"variant_name": "variant_a", "n_rollouts": 1, "success_rate": 1.0},
+                    {"variant_name": "variant_b", "n_rollouts": 1, "success_rate": 0.0},
+                ],
+            )
+            _write_csv(
+                os.path.join(run_dir, RUNS_CSV),
+                [
+                    {"variant_name": "variant_a", "rollout_id": "rollout_0", "rollout_index": 0, "success": 1},
+                    {"variant_name": "variant_b", "rollout_id": "rollout_0", "rollout_index": 0, "success": 0},
+                ],
+            )
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_b",
+                        "variant_order": ["variant_a", "variant_b"],
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+            self.assertEqual(_default_reference_variant(data), "variant_b")
+            self.assertEqual(_default_reference_variant(data, current_variant="variant_a"), "variant_b")
+            self.assertEqual(_default_reference_variant(data, current_variant="variant_b"), "variant_a")
+
+    def test_summary_and_variant_pages_select_configured_baseline_by_default(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            _write_csv(
+                os.path.join(run_dir, VARIANTS_CSV),
+                [
+                    {
+                        "variant_name": "variant_a",
+                        "n_rollouts": 1,
+                        "success_rate": 1.0,
+                        "mean_final_coverage": 0.9,
+                        "mean_bits_used_total": 100.0,
+                        "mean_flops_used_total": 200.0,
+                        "mean_plan_time_total_sec": 0.5,
+                    },
+                    {
+                        "variant_name": "variant_b",
+                        "n_rollouts": 1,
+                        "success_rate": 0.0,
+                        "mean_final_coverage": 0.4,
+                        "mean_bits_used_total": 150.0,
+                        "mean_flops_used_total": 300.0,
+                        "mean_plan_time_total_sec": 1.0,
+                    },
+                ],
+            )
+            _write_csv(
+                os.path.join(run_dir, RUNS_CSV),
+                [
+                    {
+                        "variant_name": "variant_a",
+                        "rollout_id": "rollout_0",
+                        "rollout_index": 0,
+                        "success": 1,
+                        "termination_reason": "env_done",
+                        "final_coverage": 0.9,
+                        "bits_used_total": 100.0,
+                        "flops_used_total": 200.0,
+                        "plan_time_total_sec": 0.5,
+                        "executed_steps": 3,
+                        "plans": 1,
+                    },
+                    {
+                        "variant_name": "variant_b",
+                        "rollout_id": "rollout_0",
+                        "rollout_index": 0,
+                        "success": 0,
+                        "termination_reason": "max_steps",
+                        "final_coverage": 0.4,
+                        "bits_used_total": 150.0,
+                        "flops_used_total": 300.0,
+                        "plan_time_total_sec": 1.0,
+                        "executed_steps": 3,
+                        "plans": 1,
+                    },
+                ],
+            )
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_b",
+                        "variant_order": ["variant_a", "variant_b"],
+                    },
+                    f,
+                )
+
+            data = load_experiment_review_data(run_dir)
+            summary_html = build_summary_page(data)
+            variant_html = build_variant_page(data, "variant_a")
+
+            self.assertIn("Configured baseline/reference variant: <code>variant_b</code>", summary_html)
+            self.assertIn("<option value='variant_b' selected>variant_b</option>", summary_html)
+            self.assertIn("<option value='variant_b' selected>variant_b</option>", variant_html)
+            self.assertIn("Default reference comparisons use <code>variant_b</code>.", variant_html)
+
+    def test_media_section_uses_backend_specific_titles_and_explainer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, trace_dir = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backend": "wm",
+                        "plan_config": {
+                            "backend": "wm",
+                            "world_model": {"run_dir": "/tmp/checkpoints/world_model_demo"},
+                        },
+                        "replans": [
+                            {
+                                "replan_idx": 0,
+                                "step_start": 0,
+                                "mpc_progress": 0.0,
+                                "base_level_idx": 0,
+                                "bits_used_estimate": 0,
+                                "plan_time_sec": 0.1,
+                                "action_seq": [[0.0, 0.0]],
+                            }
+                        ],
+                    },
+                    f,
+                )
+
+            cached_reference = mock.Mock(
+                summary={
+                    "success": 1,
+                    "success_and_done": 1,
+                    "final_pos_diff": 1.0,
+                    "final_angle_diff": 0.1,
+                    "final_eef_diff": 0.2,
+                    "best_pos_diff": 1.0,
+                    "best_angle_diff": 0.1,
+                    "best_eef_diff": 0.2,
+                    "final_coverage": 0.95,
+                    "auc_pos_diff": 1.0,
+                    "auc_angle_diff": 0.1,
+                    "auc_eef_diff": 0.2,
+                }
+            )
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=cached_reference):
+                data = load_experiment_review_data(run_dir)
+            row = resolve_row(data, "variant_a", "rollout_0")
+            media_html, _ = build_run_media_section(data, row)
+
+            self.assertIn("Execution Replay (GT env)", media_html)
+            self.assertIn("Planner-View Replay (wm (world_model_demo))", media_html)
+            self.assertIn("Predicted-Backend Replay (wm (world_model_demo))", media_html)
+            self.assertIn("Dataset Replay (GT env)", media_html)
+            self.assertIn(
+                "Planner-view and predicted-backend replays use this run's planner backend",
+                media_html,
+            )
+            self.assertIn("Render planner-backend media", media_html)
+
+    def test_media_section_uses_reference_media_and_hides_gt_when_baseline_is_non_gt(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, trace_dir = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [
+                            {
+                                "name": "variant_a",
+                                "plan": {"backend": "particle_sim", "particle_env": {"fidelity_env": {"particle_counts": [1, 4]}}},
+                            }
+                        ],
+                    },
+                    f,
+                )
+            with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backend": "particle_sim",
+                        "plan_config": {"backend": "particle_sim"},
+                        "replans": [],
+                    },
+                    f,
+                )
+
+            cached_reference = mock.Mock(
+                summary={
+                    "success": 1,
+                    "success_and_done": 1,
+                    "final_pos_diff": 1.0,
+                    "final_angle_diff": 0.1,
+                    "final_eef_diff": 0.2,
+                    "best_pos_diff": 1.0,
+                    "best_angle_diff": 0.1,
+                    "best_eef_diff": 0.2,
+                    "final_coverage": 0.95,
+                    "auc_pos_diff": 1.0,
+                    "auc_angle_diff": 0.1,
+                    "auc_eef_diff": 0.2,
+                }
+            )
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=cached_reference):
+                data = load_experiment_review_data(run_dir)
+            row = resolve_row(data, "variant_a", "rollout_0")
+            media_html, _ = build_run_media_section(data, row)
+
+            self.assertIn("Reference Goal State (particle_sim)", media_html)
+            self.assertIn("Reference-Env Replay (particle_sim)", media_html)
+            self.assertIn("Render reference media", media_html)
+            self.assertNotIn("Execution Replay (GT env)", media_html)
+            self.assertNotIn("Dataset Replay (GT env)", media_html)
+
+    def test_load_experiment_review_data_normalizes_compact_reference_plan(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, trace_dir = self._make_experiment_dir(tmpdir)
+            compact_plan = _plan_defaults()
+            compact_plan["backend"]["kind"] = "particle_sim"
+            compact_plan["artifacts"]["render"] = False
+            compact_plan["artifacts"]["save"] = False
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [
+                            {
+                                "name": "variant_a",
+                                "plan": compact_plan,
+                            }
+                        ],
+                    },
+                    f,
+                )
+            with open(os.path.join(trace_dir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "backend": "particle_sim",
+                        "plan_config": {"backend": "particle_sim"},
+                        "replans": [],
+                    },
+                    f,
+                )
+
+            class _DummyEvaluator:
+                def __init__(self, context):
+                    self.context = context
+                    assert context.plan_cfg["env_id"] == "pusht"
+
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=None):
+                with mock.patch("hudm.experiment_review.reference_eval.ReferenceEvaluator", _DummyEvaluator):
+                    with mock.patch("hudm.experiment_review.reference_eval.ensure_reference_eval", return_value=None):
+                        data = load_experiment_review_data(run_dir)
+
+            self.assertEqual(data.meta.get("reference_backend"), "particle_sim")
+            self.assertTrue(bool(data.meta.get("reference_metrics_supported")))
+
     def test_render_media_for_run_writes_into_review_cache_and_run_page_links_it(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir, _ = self._make_experiment_dir(tmpdir)
@@ -387,6 +943,114 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn(
                 "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. States are rendered in the GT environment. Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early.",
                 detail_html,
+            )
+
+    def test_render_media_for_run_routes_reference_media_through_reference_renderer(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [{"name": "variant_a", "plan": {"backend": "particle_sim"}}],
+                    },
+                    f,
+                )
+
+            def fake_reference_render(
+                experiment_root,
+                *,
+                meta_path,
+                context,
+                variant_name,
+                rollout_id,
+                media_name,
+                output_dir,
+            ):
+                self.assertEqual(os.path.abspath(experiment_root), os.path.abspath(run_dir))
+                self.assertEqual(os.path.abspath(meta_path), os.path.abspath(os.path.join(run_dir, EXPERIMENT_JSON)))
+                self.assertEqual(context.backend, "particle_sim")
+                self.assertEqual(variant_name, "variant_a")
+                self.assertEqual(rollout_id, "rollout_0")
+                self.assertEqual(media_name, "reference_env_replay")
+                os.makedirs(output_dir, exist_ok=True)
+                out_path = os.path.join(output_dir, "reference_env_replay.mp4")
+                with open(out_path, "wb") as f:
+                    f.write(b"fake_video")
+                return out_path
+
+            with mock.patch("hudm.experiment_review.reference_eval.render_reference_media", side_effect=fake_reference_render):
+                outputs, errors = render_media_for_run(
+                    run_dir,
+                    variant_name="variant_a",
+                    rollout_id="rollout_0",
+                    media=["reference_env_replay"],
+                )
+            self.assertEqual(len(outputs), 1)
+            self.assertEqual(errors, [])
+            self.assertTrue(outputs[0].endswith("reference_env_replay.mp4"))
+
+    def test_reference_metric_overlay_updates_run_page_labels(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            run_dir, _ = self._make_experiment_dir(tmpdir)
+            with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "schema_version": 1,
+                        "reviewer_version": 1,
+                        "experiment_name": "demo",
+                        "baseline_variant": "variant_a",
+                        "variant_order": ["variant_a"],
+                        "variants": [{"name": "variant_a", "plan": {"backend": "particle_sim"}}],
+                    },
+                    f,
+                )
+
+            cached_reference = mock.Mock(
+                summary={
+                    "success": 1,
+                    "success_and_done": 1,
+                    "final_pos_diff": 0.5,
+                    "final_angle_diff": 0.05,
+                    "final_eef_diff": 0.15,
+                    "best_pos_diff": 0.5,
+                    "best_angle_diff": 0.05,
+                    "best_eef_diff": 0.15,
+                    "final_coverage": 0.98,
+                    "auc_pos_diff": 0.5,
+                    "auc_angle_diff": 0.05,
+                    "auc_eef_diff": 0.15,
+                }
+            )
+            cached_arrays = {
+                "pos_diffs": np.asarray([0.8, 0.5], dtype=np.float32),
+                "angle_diffs": np.asarray([0.1, 0.05], dtype=np.float32),
+                "eef_diffs": np.asarray([0.2, 0.15], dtype=np.float32),
+                "coverages": np.asarray([0.9, 0.98], dtype=np.float32),
+                "state_dists": np.asarray([1.0, 0.8], dtype=np.float32),
+                "metric_success_flags": np.asarray([False, True], dtype=np.bool_),
+                "done_flags": np.asarray([False, True], dtype=np.bool_),
+                "trajectory": np.asarray([[256.0, 256.0, 0, 0, 0], [300.0, 256.0, 0, 0, 0]], dtype=np.float32),
+                "executed_actions": np.asarray([[0.5, 0.0]], dtype=np.float32),
+            }
+
+            with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_eval", return_value=cached_reference):
+                with mock.patch("hudm.experiment_review.reference_eval.load_cached_reference_arrays", return_value=cached_arrays):
+                    data = load_experiment_review_data(run_dir)
+                    row = resolve_row(data, "variant_a", "rollout_0")
+                    html = build_run_page(data, row)
+
+            self.assertIn("Reference Success", html)
+            self.assertIn("Reference Final Pos", html)
+            self.assertIn("Reference Final Coverage", html)
+            self.assertIn("Execution Termination", html)
+            self.assertIn(
+                "Success and final-state metrics are evaluated by replaying each variant's executed actions in the configured baseline/reference backend <code>particle_sim</code>",
+                html,
             )
 
     def test_variant_histogram_legend_groups_cover_every_subplot(self):

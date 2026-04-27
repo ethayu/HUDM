@@ -20,6 +20,8 @@ from omegaconf import OmegaConf
 
 sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
+from hudm.config import resolve_experiment_spec
+from hudm.runtime import resolve_dataset_seed
 from hudm.session import load_plan_cfg
 from pusht.pusht_particle_backend import PushTParticleBackend
 from pusht.pusht_wrapper import PushTWrapper
@@ -44,41 +46,129 @@ def _parse_actions(text: Optional[str]) -> List[np.ndarray]:
 
 
 def _compose_ui(
-    image: np.ndarray,
+    images: List[tuple[str, np.ndarray]],
     lines: List[str],
     display_size: int,
     panel_width: int,
     font_scale: float,
 ) -> np.ndarray:
-    img = np.asarray(image, dtype=np.uint8)
-    vis = cv2.resize(img, (display_size, display_size), interpolation=cv2.INTER_NEAREST)
+    if len(images) <= 0:
+        raise ValueError("images must contain at least one panel.")
 
-    canvas = np.full((display_size, display_size + panel_width, 3), 235, dtype=np.uint8)
-    canvas[:, :display_size] = vis
-    canvas[:, display_size:] = np.array([28, 28, 30], dtype=np.uint8)
+    num_views = len(images)
+    panel_x0 = display_size * num_views
+    canvas = np.full((display_size, panel_x0 + panel_width, 3), 235, dtype=np.uint8)
 
-    x0 = display_size + 12
-    y = 24
-    line_h = max(18, int(round(22 * font_scale / 0.48)))
-
-    for line in lines:
+    for idx, (label, image) in enumerate(images):
+        img = np.asarray(image, dtype=np.uint8)
+        vis = cv2.resize(img, (display_size, display_size), interpolation=cv2.INTER_NEAREST)
+        x_img = idx * display_size
+        canvas[:, x_img : x_img + display_size] = vis
+        cv2.rectangle(canvas, (x_img, 0), (x_img + display_size, 30), (16, 16, 18), -1)
         cv2.putText(
             canvas,
-            line,
-            (x0, y),
+            label,
+            (x_img + 10, 21),
             cv2.FONT_HERSHEY_SIMPLEX,
-            font_scale,
-            (240, 240, 240),
+            max(0.45, float(font_scale)),
+            (245, 245, 245),
             1,
             cv2.LINE_AA,
         )
-        y += line_h
+        if idx > 0:
+            cv2.line(canvas, (x_img, 0), (x_img, display_size - 1), (85, 85, 90), 1)
+
+    canvas[:, panel_x0:] = np.array([28, 28, 30], dtype=np.uint8)
+
+    x0 = panel_x0 + 12
+    y = 24
+    line_h = max(18, int(round(22 * font_scale / 0.48)))
+    max_text_width = max(40, panel_width - 24)
+
+    for raw_line in lines:
+        for line in _wrap_panel_text(str(raw_line), max_text_width=max_text_width, font_scale=font_scale):
+            cv2.putText(
+                canvas,
+                line,
+                (x0, y),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                font_scale,
+                (240, 240, 240),
+                1,
+                cv2.LINE_AA,
+            )
+            y += line_h
+            if y > display_size - 8:
+                break
         if y > display_size - 8:
             break
 
     # Divider
-    cv2.line(canvas, (display_size, 0), (display_size, display_size - 1), (85, 85, 90), 1)
+    cv2.line(canvas, (panel_x0, 0), (panel_x0, display_size - 1), (85, 85, 90), 1)
     return canvas
+
+
+def _wrap_panel_text(text: str, max_text_width: int, font_scale: float) -> List[str]:
+    if text == "":
+        return [""]
+
+    def _line_width(line: str) -> int:
+        return int(cv2.getTextSize(line, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 1)[0][0])
+
+    def _split_long_token(token: str) -> List[str]:
+        pieces: List[str] = []
+        cur = ""
+        for ch in token:
+            candidate = f"{cur}{ch}"
+            if cur and _line_width(candidate) > max_text_width:
+                pieces.append(cur)
+                cur = ch
+            else:
+                cur = candidate
+        if cur:
+            pieces.append(cur)
+        return pieces or [token]
+
+    out: List[str] = []
+    current = ""
+    for word in text.split(" "):
+        candidate = word if current == "" else f"{current} {word}"
+        if _line_width(candidate) <= max_text_width:
+            current = candidate
+            continue
+
+        if current:
+            out.append(current)
+            current = ""
+
+        if _line_width(word) <= max_text_width:
+            current = word
+            continue
+
+        pieces = _split_long_token(word)
+        out.extend(pieces[:-1])
+        current = pieces[-1]
+
+    if current or len(out) == 0:
+        out.append(current)
+    return out
+
+
+def _state_delta_line(cur_state: np.ndarray, gt_state: np.ndarray) -> str:
+    cur = np.asarray(cur_state, dtype=np.float32).reshape(-1)
+    gt = np.asarray(gt_state, dtype=np.float32).reshape(-1)
+    agent = float(np.linalg.norm(cur[:2] - gt[:2]))
+    block = float(np.linalg.norm(cur[2:4] - gt[2:4]))
+    angle = float(abs(((float(cur[4] - gt[4]) + np.pi) % (2.0 * np.pi)) - np.pi))
+    return f"backend-vs-gt: agent={agent:.2f}  block={block:.2f}  ang={angle:.3f}"
+
+
+def _metrics_line(prefix: str, metrics: dict) -> str:
+    success = bool(metrics.get("success", False))
+    return (
+        f"{prefix}: success={success}  dist={metrics['state_dist']:.2f}  "
+        f"pos={metrics['pos_diff']:.2f}  ang={metrics['angle_diff']:.3f}"
+    )
 
 
 class GTEnvDebugAdapter:
@@ -87,7 +177,7 @@ class GTEnvDebugAdapter:
         env_kwargs = OmegaConf.to_container(cfg.env, resolve=True)
         env_kwargs["render_size"] = int(render_size)
         self.env = PushTWrapper(**env_kwargs)
-        self.num_levels = int(cfg.fidelity.num_levels)
+        self.num_levels = int(getattr(cfg.gt_env.fidelity_env, "num_levels", 4))
         self.env.configure_planning_fidelity(
             enabled=True,
             num_levels=self.num_levels,
@@ -132,7 +222,7 @@ class GTEnvDebugAdapter:
 class ParticleDebugAdapter:
     def __init__(self, cfg, render_size: int):
         self.cfg = cfg
-        spacings = [float(s) for s in list(cfg.particle_env.fidelity_env.spacings)]
+        particle_counts = [int(c) for c in list(cfg.particle_env.fidelity_env.particle_counts)]
         self.backend = PushTParticleBackend(
             with_velocity=bool(cfg.env.with_velocity),
             with_target=bool(cfg.env.with_target),
@@ -140,11 +230,11 @@ class ParticleDebugAdapter:
             relative=True,
             action_scale=100.0,
             device=str(cfg.particle_env.fidelity_env.device),
-            fidelity_spacings=spacings,
+            particle_counts=particle_counts,
             warp_cfg=OmegaConf.to_container(cfg.particle_env.fidelity_env, resolve=True),
             seed=int(cfg.init_goal.dataset.seed),
         )
-        self.num_levels = len(spacings)
+        self.num_levels = int(getattr(self.backend, "num_levels", len(particle_counts)))
         self.level_idx = self.num_levels - 1
         self.backend.set_planning_fidelity_level(self.level_idx)
         self.goal_state = None
@@ -182,15 +272,16 @@ class ParticleDebugAdapter:
         return self.backend.eval_state(self.goal_state, self.cur_state)
 
     def fidelity_label(self) -> str:
-        sp = float(self.backend.spacing(self.level_idx))
+        eff_spacing = float(self.backend.spacing(self.level_idx))
         nparts = int(self.backend.num_particles(self.level_idx))
         pr = float(self.backend.particle_radius(self.level_idx))
-        return f"L{self.level_idx}/{self.num_levels - 1} -> spacing={sp:.4f}, N={nparts}, r={pr:.4f}"
+        return f"L{self.level_idx}/{self.num_levels - 1} -> spacing={eff_spacing:.4f}, N={nparts}, r={pr:.4f}"
 
 
 def _handle_control_key(
     key: int,
     adapter,
+    reference_adapter,
     init_state: np.ndarray,
     goal_state: np.ndarray,
     seed: int,
@@ -200,6 +291,8 @@ def _handle_control_key(
 
     if key in (ord("r"), ord("R")):
         adapter.reset(init_state=init_state, goal_state=goal_state, seed=seed)
+        if reference_adapter is not None:
+            reference_adapter.reset(init_state=init_state, goal_state=goal_state, seed=seed)
         return "redraw"
 
     if key in (ord("["), ord("-")):
@@ -231,9 +324,39 @@ def _key_to_action(key: int, key_action_mag: float) -> np.ndarray:
     return a
 
 
+def _load_debug_cfg(cfg_path: str, variant_name: Optional[str]) -> tuple[object, Optional[str]]:
+    root = OmegaConf.load(cfg_path)
+    if hasattr(root, "keys") and "experiment" in root.keys():
+        spec = resolve_experiment_spec(cfg_path)
+        if variant_name is None:
+            if len(spec.variants) == 1:
+                selected = spec.variants[0]
+            else:
+                names = ", ".join(spec.variant_names())
+                raise ValueError(
+                    f"{cfg_path} is an experiment config with multiple variants. "
+                    f"Pass --variant. Available variants: {names}"
+                )
+        else:
+            selected = next((variant for variant in spec.variants if str(variant.name) == str(variant_name)), None)
+            if selected is None:
+                names = ", ".join(spec.variant_names())
+                raise ValueError(
+                    f"Unknown variant '{variant_name}' for experiment config {cfg_path}. "
+                    f"Available variants: {names}"
+                )
+
+        cfg = OmegaConf.create(OmegaConf.to_container(selected.plan.runtime_cfg, resolve=True))
+        cfg.init_goal.dataset.seed = resolve_dataset_seed(getattr(cfg.init_goal.dataset, "seed", 0))
+        return cfg, str(selected.name)
+
+    return load_plan_cfg(cfg_path), None
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default="configs/plan.yaml", help="Path to plan config")
+    ap.add_argument("--variant", type=str, default=None, help="Variant name when --config is an experiment config")
     ap.add_argument("--backend", choices=["gt_env", "particle_sim"], default=None)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--fidelity-level", type=int, default=-1, help="Initial level index; -1 means finest")
@@ -243,15 +366,15 @@ def main() -> None:
     ap.add_argument("--key-action-mag", type=float, default=0.25, help="Action magnitude for WASD keys")
     ap.add_argument("--fps", type=float, default=12.0)
     ap.add_argument("--render-size", type=int, default=224, help="Backend render resolution before display upsampling")
-    ap.add_argument("--display-size", type=int, default=560, help="Displayed image side length in pixels")
-    ap.add_argument("--panel-width", type=int, default=430, help="HUD side panel width in pixels")
+    ap.add_argument("--display-size", type=int, default=480, help="Displayed image side length in pixels")
+    ap.add_argument("--panel-width", type=int, default=520, help="HUD side panel width in pixels")
     ap.add_argument("--font-scale", type=float, default=0.58, help="HUD font scale")
     ap.add_argument("--save", type=str, default="", help="Optional GIF path")
     ap.add_argument("--no-window", action="store_true", help="Disable cv2 window display")
     ap.add_argument("--stop-on-done", action="store_true", help="Stop automatically when env returns done=true")
     args = ap.parse_args()
 
-    cfg = load_plan_cfg(args.config)
+    cfg, selected_variant = _load_debug_cfg(args.config, args.variant)
 
     backend = str(args.backend or cfg.backend).lower()
     if backend not in {"gt_env", "particle_sim"}:
@@ -263,12 +386,17 @@ def main() -> None:
         adapter = GTEnvDebugAdapter(cfg, render_size=int(args.render_size))
     else:
         adapter = ParticleDebugAdapter(cfg, render_size=int(args.render_size))
+    reference_adapter = GTEnvDebugAdapter(cfg, render_size=int(args.render_size)) if backend != "gt_env" else None
 
     init_state, goal_state = adapter.sample_states(seed=args.seed)
     adapter.reset(init_state=init_state, goal_state=goal_state, seed=args.seed)
+    if reference_adapter is not None:
+        reference_adapter.reset(init_state=init_state, goal_state=goal_state, seed=args.seed)
 
     init_level = adapter.num_levels - 1 if int(args.fidelity_level) < 0 else int(args.fidelity_level)
     adapter.set_level(init_level)
+    if reference_adapter is not None:
+        reference_adapter.set_level(reference_adapter.num_levels - 1)
 
     scripted_actions = _parse_actions(args.actions)
     save_frames = bool(str(args.save).strip())
@@ -278,24 +406,39 @@ def main() -> None:
     def _emit_frame(step_idx: int) -> None:
         frame = adapter.render()
         metrics = adapter.eval_state()
-        success = bool(metrics.get("success", False))
+        image_panels: List[tuple[str, np.ndarray]] = [(f"{backend} debug", frame)]
         lines = [
             f"backend: {backend}",
             f"step: {step_idx}",
             f"fidelity: {adapter.fidelity_label()}",
-            f"success: {success}",
-            f"dist: {metrics['state_dist']:.2f}  pos: {metrics['pos_diff']:.2f}  ang: {metrics['angle_diff']:.3f}",
-            "",
-            "Controls",
-            "W/A/S/D: move (realtime)",
-            "no key: no-op",
-            "[ ] or -/=: fidelity down/up",
-            "0-9: set fidelity level",
-            "R: reset",
-            "Q / Esc: quit",
+            _metrics_line("backend", metrics),
         ]
+        if selected_variant is not None:
+            lines.append(f"variant: {selected_variant}")
+        if reference_adapter is not None:
+            gt_frame = reference_adapter.render()
+            gt_metrics = reference_adapter.eval_state()
+            image_panels.append((f"gt env reference ({reference_adapter.fidelity_label()})", gt_frame))
+            lines.extend(
+                [
+                    _metrics_line("gt", gt_metrics),
+                    _state_delta_line(adapter.cur_state, reference_adapter.cur_state),
+                ]
+            )
+        lines.extend(
+            [
+                "",
+                "Controls",
+                "W/A/S/D: move (realtime)",
+                "no key: no-op",
+                "[ ] or -/=: fidelity down/up",
+                "0-9: set fidelity level",
+                "R: reset",
+                "Q / Esc: quit",
+            ]
+        )
         composed = _compose_ui(
-            frame,
+            image_panels,
             lines=lines,
             display_size=int(args.display_size),
             panel_width=int(args.panel_width),
@@ -314,6 +457,8 @@ def main() -> None:
     # Scripted phase.
     for a in scripted_actions:
         _, _, done, _ = adapter.step(a)
+        if reference_adapter is not None:
+            reference_adapter.step(a)
         step_idx += 1
         _emit_frame(step_idx)
         if not args.no_window:
@@ -321,6 +466,7 @@ def main() -> None:
             mode = _handle_control_key(
                 key,
                 adapter,
+                reference_adapter,
                 init_state=init_state,
                 goal_state=goal_state,
                 seed=args.seed,
@@ -347,6 +493,7 @@ def main() -> None:
                 mode = _handle_control_key(
                     key,
                     adapter,
+                    reference_adapter,
                     init_state=init_state,
                     goal_state=goal_state,
                     seed=args.seed,
@@ -356,6 +503,8 @@ def main() -> None:
                     break
                 action = _key_to_action(key, float(args.key_action_mag))
                 _, _, done, _ = adapter.step(action)
+                if reference_adapter is not None:
+                    reference_adapter.step(action)
                 step_idx += 1
                 _emit_frame(step_idx)
                 if bool(args.stop_on_done) and done:

@@ -1,7 +1,7 @@
 imports:
-  - task/pusht_smoke_dataset.yaml
-  - planner/smoke.yaml
-  - backend/gt_env_state.yaml
+  - task/pusht_dataset.yaml
+  - planner/default.yaml
+  - backend/gt_env_image.yaml
   - fidelity/finest.yaml
 
 plan:

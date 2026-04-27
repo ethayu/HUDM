@@ -156,27 +156,31 @@ QUALITY_PROFILES: dict[str, QualityProfile] = {
 
 MODE_PROFILE_WEIGHTS: dict[str, dict[str, float]] = {
     "train": {"translate": 0.45, "rotate": 0.20, "sweep": 0.25, "recover": 0.10},
-    "planning": {"translate": 0.70, "rotate": 0.10, "sweep": 0.10, "recover": 0.10},
+    # Planning: favor straight-line block translation; rotate/sweep/recover are rarer fallbacks.
+    #"planning": {"translate": 0.7, "rotate": 0.15, "sweep": 0.0, "recover": 0.1},
+    "planning": {"translate": 0.4, "rotate": 0.10, "sweep": 0.0, "recover": 0.0},
     "balanced": {"translate": 0.55, "rotate": 0.15, "sweep": 0.20, "recover": 0.10},
 }
 
 MODE_ACCEPTANCE: dict[str, dict[str, Any]] = {
     "train": {
-        "min_net_translation": 20.0,
-        "min_total_angle": 0.35,
-        "min_contact_fraction": 0.10,
+        "min_net_translation": 25.0,
+        "min_total_angle": 0.1,
+        "min_contact_fraction": 0.30,
         "min_motion_fraction": 0.00,
         "max_total_angle": None,
         "strong_translation_threshold": None,
         "require_translation_or_rotation": True,
     },
     "planning": {
-        "min_net_translation": 30.0,
+        "min_net_translation": 36.0,
         "min_total_angle": 0.0,
-        "min_contact_fraction": 0.12,
-        "min_motion_fraction": 0.12,
-        "max_total_angle": 1.20,
-        "strong_translation_threshold": 45.0,
+        # Require frequent block contact so we don't waste long segments approaching.
+        "min_contact_fraction": 0.5,#0.22,
+        "min_motion_fraction": 0.2,#0.05,
+        # Reject high rotation unless net translation is clearly large (sliding-style).
+        "max_total_angle": 0.9,
+        "strong_translation_threshold": 52.0,
         "require_translation_or_rotation": False,
     },
     "balanced": {
@@ -474,8 +478,9 @@ def build_contact_candidates(
         )
 
     if family == "translate":
-        dir_offset_deg = 10.0 if str(mode_profile) == "planning" else 22.5
-        tangent_span = 8.0 if str(mode_profile) == "planning" else 18.0
+        # Planning: keep approach directions tighter to reduce incidental rotation from oblique pushes.
+        dir_offset_deg = 6.0 if str(mode_profile) == "planning" else 22.5
+        tangent_span = 5.0 if str(mode_profile) == "planning" else 18.0
         directions = [
             center_dir,
             rotate_vec(center_dir, math.radians(dir_offset_deg)),
@@ -648,12 +653,20 @@ def choose_maneuver_family(
         low=quality.bounds_low,
         high=quality.bounds_high,
     )
-    if clearance < max(quality.spawn_clearance + 6.0, 18.0):
+    recover_clearance_cap = max(quality.spawn_clearance + 6.0, 18.0)
+    if str(mode_profile) == "planning":
+        # Prefer translate pushes until the block is closer to the wall (recover later than in train).
+        recover_clearance_cap = max(quality.spawn_clearance + 2.0, 12.0)
+    if clearance < recover_clearance_cap:
         return "recover"
     if recent_motion_fraction is not None and recent_contact_fraction is not None:
         if recent_motion_fraction < 0.05 and recent_contact_fraction < 0.05:
-            weights["sweep"] = max(weights.get("sweep", 0.0), 0.25)
-            weights["recover"] = max(weights.get("recover", 0.0), 0.20)
+            if str(mode_profile) == "planning":
+                weights["sweep"] = max(weights.get("sweep", 0.0), 0.12)
+                weights["recover"] = max(weights.get("recover", 0.0), 0.08)
+            else:
+                weights["sweep"] = max(weights.get("sweep", 0.0), 0.25)
+                weights["recover"] = max(weights.get("recover", 0.0), 0.20)
     if str(mode_profile) == "planning":
         weights["rotate"] = 0.0
         if not (
@@ -665,7 +678,10 @@ def choose_maneuver_family(
             weights["sweep"] = 0.0
     if clearance < 28.0:
         weights["rotate"] = 0.0
-        weights["recover"] = max(weights.get("recover", 0.0), 0.25)
+        if str(mode_profile) == "planning":
+            weights["recover"] = max(weights.get("recover", 0.0), 0.12)
+        else:
+            weights["recover"] = max(weights.get("recover", 0.0), 0.25)
     return weighted_choice(weights, rng)
 
 
@@ -832,6 +848,12 @@ def score_shadow_rollout(
     if quality.max_wall_adjacent_fraction is not None:
         score -= 25.0 * diagnostics.wall_adjacent_fraction
 
+    # Prefer candidates that make contact early; long no-contact approaches tend to waste episode budget.
+    if diagnostics.first_contact_step < 0:
+        score -= 8.0
+    else:
+        score -= 0.35 * float(diagnostics.first_contact_step)
+
     if family == "translate":
         score += 2.7 * diagnostics.net_block_translation
         score += 0.8 * diagnostics.total_block_translation_path
@@ -853,12 +875,15 @@ def score_shadow_rollout(
 
     if mode_profile == "planning":
         if family == "translate":
-            score += 0.8 * diagnostics.net_block_translation
-            score -= 4.0 * diagnostics.total_absolute_angle_change
+            score += 1.2 * diagnostics.net_block_translation
+            score -= 6.5 * diagnostics.total_absolute_angle_change
         elif family == "sweep":
-            score -= 3.0 * diagnostics.total_absolute_angle_change
+            score -= 4.5 * diagnostics.total_absolute_angle_change
         elif family == "rotate":
-            score -= 10.0 * diagnostics.total_absolute_angle_change
+            score -= 14.0 * diagnostics.total_absolute_angle_change
+        elif family == "recover":
+            score -= 5.0
+            score -= 1.2 * diagnostics.total_absolute_angle_change
     elif mode_profile == "train":
         if family == "rotate":
             score += 2.0 * diagnostics.total_absolute_angle_change
