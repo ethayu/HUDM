@@ -197,6 +197,11 @@ class PushTParticleBackend:
         li = max(0, min(li, len(self._sims) - 1))
         return self._sims[li]
 
+    def _sim_for_level(self, level_idx: Optional[int] = None) -> PushTWarpEnv:
+        li = self._planning_fidelity_level_idx if level_idx is None else int(level_idx)
+        li = max(0, min(li, len(self._sims) - 1))
+        return self._sims[li]
+
     def _resolve_device(self, device: str) -> str:
         d = (device or "auto").strip().lower()
         if d in {"auto", ""}:

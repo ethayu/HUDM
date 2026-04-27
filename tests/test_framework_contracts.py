@@ -139,6 +139,8 @@ class FrameworkContractTests(unittest.TestCase):
     def test_particle_backend_done_ignores_pose_metric_success(self):
         class DummySim:
             pusher_pos = np.zeros(2, dtype=np.float32)
+            num_particles = 1
+            spacing = 0.1
 
             def step(self, a_world):
                 return None, 0.0, False, {"final_coverage": 0.0}
@@ -164,6 +166,13 @@ class FrameworkContractTests(unittest.TestCase):
             num_particles=lambda: 1,
             spacing=lambda: 0.1,
         )
+        backend._obs_from_sim = lambda sim, cur_state, with_visual: {
+            "visual": None,
+            "proprio": np.asarray(cur_state[:2], dtype=np.float32),
+            "state": np.asarray(cur_state, dtype=np.float32).copy(),
+        }
+        backend._goal_state_for_sim = lambda sim, goal_state=None: np.zeros(7, dtype=np.float32)
+        backend._step_sim = lambda sim, **kwargs: PushTParticleBackend._step_sim(backend, sim, **kwargs)
 
         _, _, done, _ = PushTParticleBackend.step(backend, np.zeros(2, dtype=np.float32), with_visual=False)
         self.assertFalse(done)
@@ -191,6 +200,8 @@ class FrameworkContractTests(unittest.TestCase):
         )
         backend._sim_for_level = lambda level_idx=None: PushTParticleBackend._sim_for_level(backend, level_idx)
         backend._world_xy_to_pix = lambda xy_world: PushTParticleBackend._world_xy_to_pix(backend, xy_world)
+        backend._pusher_position_from_sim = PushTParticleBackend._pusher_position_from_sim
+        backend._particle_positions_from_sim = PushTParticleBackend._particle_positions_from_sim
         backend.current_pusher_position = lambda **kwargs: PushTParticleBackend.current_pusher_position(backend, **kwargs)
         backend.current_particle_positions = lambda **kwargs: PushTParticleBackend.current_particle_positions(backend, **kwargs)
 

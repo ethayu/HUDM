@@ -105,6 +105,17 @@ experiment:
         finally:
             os.unlink(tmp_path)
 
+    def test_particle_variant_experiment_resolves_expected_variants(self):
+        spec = resolve_experiment_spec(os.path.join(ROOT, "configs/planner_eval_particle_variants.yaml"))
+        self.assertEqual(
+            spec.variant_names(),
+            [
+                "particle_finest",
+                "particle_coarse_to_fine",
+                "particle_coarsest",
+            ],
+        )
+
     def test_variant_rejects_task_override(self):
         task_cfg = os.path.join(ROOT, "configs/task/pusht_smoke_dataset.yaml")
         planner_cfg = os.path.join(ROOT, "configs/planner/smoke.yaml")

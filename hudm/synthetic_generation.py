@@ -62,6 +62,8 @@ class AcceptanceSpec:
     min_motion_fraction: float
     max_total_angle: float | None
     strong_translation_threshold: float | None
+    moderate_translation_threshold: float | None
+    moderate_translation_max_angle: float | None
     require_translation_or_rotation: bool
 
 
@@ -156,31 +158,31 @@ QUALITY_PROFILES: dict[str, QualityProfile] = {
 
 MODE_PROFILE_WEIGHTS: dict[str, dict[str, float]] = {
     "train": {"translate": 0.45, "rotate": 0.20, "sweep": 0.25, "recover": 0.10},
-    # Planning: favor straight-line block translation; rotate/sweep/recover are rarer fallbacks.
-    #"planning": {"translate": 0.7, "rotate": 0.15, "sweep": 0.0, "recover": 0.1},
-    "planning": {"translate": 0.4, "rotate": 0.10, "sweep": 0.0, "recover": 0.0},
+    "planning": {"translate": 1.0, "rotate": 0.0, "sweep": 0.0, "recover": 0.0},
     "balanced": {"translate": 0.55, "rotate": 0.15, "sweep": 0.20, "recover": 0.10},
 }
 
 MODE_ACCEPTANCE: dict[str, dict[str, Any]] = {
     "train": {
-        "min_net_translation": 25.0,
-        "min_total_angle": 0.1,
-        "min_contact_fraction": 0.30,
+        "min_net_translation": 20.0,
+        "min_total_angle": 0.35,
+        "min_contact_fraction": 0.10,
         "min_motion_fraction": 0.00,
         "max_total_angle": None,
         "strong_translation_threshold": None,
+        "moderate_translation_threshold": None,
+        "moderate_translation_max_angle": None,
         "require_translation_or_rotation": True,
     },
     "planning": {
-        "min_net_translation": 36.0,
+        "min_net_translation": 50.0,
         "min_total_angle": 0.0,
-        # Require frequent block contact so we don't waste long segments approaching.
-        "min_contact_fraction": 0.5,#0.22,
-        "min_motion_fraction": 0.2,#0.05,
-        # Reject high rotation unless net translation is clearly large (sliding-style).
-        "max_total_angle": 0.9,
-        "strong_translation_threshold": 52.0,
+        "min_contact_fraction": 0.12,
+        "min_motion_fraction": 0.12,
+        "max_total_angle": 0.50,
+        "strong_translation_threshold": 200.0,
+        "moderate_translation_threshold": 40.0,
+        "moderate_translation_max_angle": 0.20,
         "require_translation_or_rotation": False,
     },
     "balanced": {
@@ -190,6 +192,8 @@ MODE_ACCEPTANCE: dict[str, dict[str, Any]] = {
         "min_motion_fraction": 0.00,
         "max_total_angle": None,
         "strong_translation_threshold": None,
+        "moderate_translation_threshold": None,
+        "moderate_translation_max_angle": None,
         "require_translation_or_rotation": True,
     },
 }
@@ -395,6 +399,12 @@ def resolve_acceptance_spec(mode_profile: str, quality_profile: str) -> Acceptan
         strong_translation = float(strong_translation) * 0.9
     elif strong_translation is not None and quality.name == "loose":
         strong_translation = float(strong_translation) * 0.75
+    moderate_translation = base.get("moderate_translation_threshold", None)
+    if moderate_translation is not None and quality.name == "balanced":
+        moderate_translation = float(moderate_translation) * 0.9
+    elif moderate_translation is not None and quality.name == "loose":
+        moderate_translation = float(moderate_translation) * 0.75
+    moderate_angle = base.get("moderate_translation_max_angle", None)
     return AcceptanceSpec(
         mode_profile=str(mode_profile),
         quality_profile=str(quality_profile),
@@ -404,6 +414,8 @@ def resolve_acceptance_spec(mode_profile: str, quality_profile: str) -> Acceptan
         min_motion_fraction=min_motion_fraction,
         max_total_angle=max_total_angle,
         strong_translation_threshold=strong_translation,
+        moderate_translation_threshold=moderate_translation,
+        moderate_translation_max_angle=moderate_angle,
         require_translation_or_rotation=bool(base["require_translation_or_rotation"]),
     )
 
@@ -481,6 +493,7 @@ def build_contact_candidates(
         # Planning: keep approach directions tighter to reduce incidental rotation from oblique pushes.
         dir_offset_deg = 6.0 if str(mode_profile) == "planning" else 22.5
         tangent_span = 5.0 if str(mode_profile) == "planning" else 18.0
+        push_distance = 160.0 if str(mode_profile) == "planning" else 100.0
         directions = [
             center_dir,
             rotate_vec(center_dir, math.radians(dir_offset_deg)),
@@ -492,7 +505,7 @@ def build_contact_candidates(
             tangent_offset = float(rng.uniform(-tangent_span, tangent_span))
             pre = contact - move_dir * 85.0 + tangent * tangent_offset
             approach = contact - move_dir * 55.0 + tangent * tangent_offset
-            push_end = contact + move_dir * 100.0
+            push_end = contact + move_dir * push_distance
             add_candidate(
                 f"translate_{idx}",
                 [pre, approach, push_end],
@@ -822,7 +835,14 @@ def reject_rollout(
             reasons.append("episode_low_translation_or_rotation")
     else:
         if diagnostics.net_block_translation < spec.min_net_translation:
-            reasons.append("episode_low_translation")
+            moderate_translation_ok = (
+                spec.moderate_translation_threshold is not None
+                and spec.moderate_translation_max_angle is not None
+                and diagnostics.net_block_translation >= float(spec.moderate_translation_threshold)
+                and diagnostics.total_absolute_angle_change <= float(spec.moderate_translation_max_angle)
+            )
+            if not moderate_translation_ok:
+                reasons.append("episode_low_translation")
 
     if spec.max_total_angle is not None and diagnostics.total_absolute_angle_change > spec.max_total_angle:
         strong_threshold = spec.strong_translation_threshold
