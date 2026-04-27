@@ -2,18 +2,18 @@ experiment:
   name: "smoke_gt_env"
   shared_plan:
     imports:
-      - task/pusht_dataset.yaml
-      - planner/default.yaml
+      - task/pusht_smoke_dataset.yaml
+      - planner/smoke.yaml
     plan:
       artifacts:
         render: false
         save: false
   rollouts:
-    seed: 0
-    num_rollouts: 20
+    seed: 3
+    num_rollouts: 2
     sample_without_replacement: true
   execution:
-    mode: "auto"
+    mode: "process"
     max_workers: 2
   reporting:
     output_root: "rollouts"
@@ -21,9 +21,9 @@ experiment:
   variants:
     - name: "finest_fixed"
       imports:
-        - backend/gt_env_image.yaml
+        - backend/gt_env_state.yaml
         - fidelity/finest.yaml
-    # - name: "coarse_fixed"
-    #   imports:
-    #     - backend/gt_env_state.yaml
-    #     - fidelity/coarsest.yaml
+    - name: "coarse_fixed"
+      imports:
+        - backend/gt_env_state.yaml
+        - fidelity/coarsest.yaml

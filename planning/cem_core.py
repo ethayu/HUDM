@@ -142,7 +142,6 @@ class SharedCEMCore:
             costs = costs.to(self.device)
         elite_idxs = costs.topk(self.n_elite, largest=False).indices
         elite = actions[elite_idxs]
-        #import pdb; pdb.set_trace()
         new_mu = elite.mean(dim=0)
         # unbiased=False avoids NaNs when n_elite==1 (Bessel ddof would divide by zero).
         std = elite.std(dim=0, unbiased=False)
@@ -240,12 +239,11 @@ class SharedCEMCore:
         )
 
     def rollout_level_indices(self, base_level_idx: int) -> List[int]:
-        
         if self.rollout_mode == "fixed":
             level = self.rollout_cfg.get("level", "base")
             idx = self.resolve_level_spec(level, base_level_idx, "fidelity.rollout.level")
             return [idx] * self.horizon
-        
+
         if self.rollout_mode == "linear":
             start = self.rollout_cfg.get("start_level", "base")
             end = self.rollout_cfg.get("end_level", "coarsest")
