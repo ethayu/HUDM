@@ -39,6 +39,7 @@ def sample_init_goal_states(
     if split_ratio is None:
         split_ratio = 0.8 if wm_cfg is None else float(getattr(wm_cfg.data, "split_ratio", 0.8))
     sample_seed = resolve_dataset_seed(getattr(ds_cfg, "seed", 0))
+    print("dataset path: ", zarr_path)
 
     init_state, goal_state, meta = env.sample_dataset_init_goal_states(
         dataset=str(zarr_path),

@@ -4,9 +4,9 @@ plan:
     wm:
       world_model:
         config_path: "/home/aurora/HUDM-mwm-ethan/configs/world_64.yaml"
-        run_dir: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260329_132250"
+        run_dir: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260420_011657" #"/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260329_132250"
         epoch: 200
-        checkpoint_root: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260329_132250"
+        checkpoint_root: "/home/aurora/HUDM-mwm/checkpoints_world/world_baseline_20260420_011657"
         device: "auto"
         ensemble:
           enabled: false

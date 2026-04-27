@@ -37,7 +37,7 @@
 plan:
   budget:
 
-    max_env_steps: 100
+    max_env_steps: 80
   planner:
     horizon: 20
     replan_every: 20
@@ -45,7 +45,7 @@ plan:
       pop_size: 5000
       elite_frac: 0.1
       n_iter: 10
-      init_std: 0.2 #1
+      init_std: 1
       # If true (and init_goal provides meta.actions), seed CEM with that trajectory on replan 0.
       inject_dataset_gt_actions: false
       warm_start: false

@@ -574,6 +574,95 @@ def save_zarr(
         root.attrs.update(dict(extra_attrs))
 
 
+class ZarrWriter:
+    """Streams episodes directly to a Zarr store, avoiding RAM accumulation of frames."""
+
+    def __init__(
+        self,
+        zarr_out: str,
+        *,
+        env_action_scale: float,
+        env_relative: bool,
+        max_env_input_norm: float | None = None,
+    ) -> None:
+        if zarr is None:
+            raise ImportError("zarr is not installed. Try: pip install zarr")
+        self._root = zarr.group(zarr_out, overwrite=True)
+        self._g_data = self._root.require_group("data")
+        self._g_meta = self._root.require_group("meta")
+        self._img: Any = None
+        self._action: Any = None
+        self._action_abs: Any = None
+        self._state: Any = None
+        self._episode_ends: list[int] = []
+        self._total_steps: int = 0
+        self._root.attrs.update({
+            "action_format": "env_input",
+            "action_abs_format": "absolute_target",
+            "env_action_scale": float(env_action_scale),
+            "env_relative": bool(env_relative),
+        })
+        if max_env_input_norm is not None:
+            self._root.attrs["max_env_input_norm"] = float(max_env_input_norm)
+
+    @property
+    def total_steps(self) -> int:
+        return self._total_steps
+
+    @property
+    def n_episodes(self) -> int:
+        return len(self._episode_ends)
+
+    def append_episode(
+        self,
+        frames: np.ndarray,
+        actions: np.ndarray,
+        actions_abs: np.ndarray,
+        states: np.ndarray,
+    ) -> None:
+        L = min(frames.shape[0], actions.shape[0], actions_abs.shape[0], states.shape[0])
+        frames = frames[:L].astype(np.float32)
+        actions = actions[:L].astype(np.float32)
+        actions_abs = actions_abs[:L].astype(np.float32)
+        states = states[:L].astype(np.float32)
+
+        if self._img is None:
+            H, W, C = frames.shape[1], frames.shape[2], frames.shape[3]
+            action_dim = actions.shape[1]
+            state_dim = states.shape[1]
+            self._img = self._g_data.zeros(
+                "img", shape=(0, H, W, C), chunks=(160, H, W, C), dtype="f4"
+            )
+            self._action = self._g_data.zeros(
+                "action", shape=(0, action_dim), chunks=(160, action_dim), dtype="f4"
+            )
+            self._action_abs = self._g_data.zeros(
+                "action_abs", shape=(0, action_dim), chunks=(160, action_dim), dtype="f4"
+            )
+            self._state = self._g_data.zeros(
+                "state", shape=(0, state_dim), chunks=(160, state_dim), dtype="f4"
+            )
+
+        self._img.append(frames)
+        self._action.append(actions)
+        self._action_abs.append(actions_abs)
+        self._state.append(states)
+        self._total_steps += L
+        self._episode_ends.append(self._total_steps - 1)
+
+    def finalize(self, extra_attrs: Mapping[str, Any] | None = None) -> None:
+        ends = np.asarray(self._episode_ends, dtype=np.int64)
+        self._g_meta.create_dataset(
+            "episode_ends",
+            shape=ends.shape,
+            data=ends,
+            chunks=(max(1, min(1024, len(ends))),),
+            dtype=ends.dtype,
+        )
+        if extra_attrs:
+            self._root.attrs.update(dict(extra_attrs))
+
+
 def _mp_context() -> mp.context.BaseContext:
     if sys.platform != "win32":
         try:
@@ -807,6 +896,7 @@ def generate_split(
     ou_dt: float,
     ou_mu: Optional[np.ndarray],
     max_env_input_norm: float,
+    zarr_writer: Optional["ZarrWriter"] = None,
 ) -> tuple[list[np.ndarray], list[np.ndarray], list[np.ndarray], list[np.ndarray], dict[str, Any]]:
     actions_list: list[np.ndarray] = []
     actions_abs_list: list[np.ndarray] = []
@@ -868,10 +958,16 @@ def generate_split(
                     img_size=img_size,
                     seed=int(result["render_seed"]),
                 )
-                actions_list.append(np.asarray(result["actions"], dtype=np.float32))
-                actions_abs_list.append(np.asarray(result["actions_abs"], dtype=np.float32))
-                frames_list.append(frames)
-                states_list.append(np.asarray(result["states"], dtype=np.float32))
+                ep_actions = np.asarray(result["actions"], dtype=np.float32)
+                ep_actions_abs = np.asarray(result["actions_abs"], dtype=np.float32)
+                ep_states = np.asarray(result["states"], dtype=np.float32)
+                if zarr_writer is not None:
+                    zarr_writer.append_episode(frames, ep_actions, ep_actions_abs, ep_states)
+                else:
+                    actions_list.append(ep_actions)
+                    actions_abs_list.append(ep_actions_abs)
+                    frames_list.append(frames)
+                    states_list.append(ep_states)
                 render_progress.update(1)
                 render_progress.set_postfix(
                     rejected=len(rejection_reasons),
@@ -985,10 +1081,13 @@ def generate_split(
                 img_size=img_size,
                 seed=int(rng.integers(0, 1_000_000)),
             )
-            actions_list.append(accepted_attempt.actions)
-            actions_abs_list.append(accepted_attempt.actions_abs)
-            frames_list.append(frames)
-            states_list.append(accepted_attempt.states)
+            if zarr_writer is not None:
+                zarr_writer.append_episode(frames, accepted_attempt.actions, accepted_attempt.actions_abs, accepted_attempt.states)
+            else:
+                actions_list.append(accepted_attempt.actions)
+                actions_abs_list.append(accepted_attempt.actions_abs)
+                frames_list.append(frames)
+                states_list.append(accepted_attempt.states)
             accepted_episodes += 1
             progress.update(1)
             progress.set_postfix(
@@ -1093,99 +1192,64 @@ def main() -> None:
     policy = "contact_aware" if str(args.policy) == "advanced" else str(args.policy)
     ou_mu = _parse_mu(args.ou_mu, decision_env.action_dim)
 
-    train_actions, train_actions_abs, train_frames, train_states, train_stats = generate_split(
-        n_eps=int(args.train_eps),
-        split_name="train",
-        len_min=int(args.len_min),
-        len_max=int(args.len_max),
-        policy=policy,
-        action_scale=float(args.action_scale),
-        rng=rng,
-        decision_env=decision_env,
-        shadow_env=shadow_env,
-        render_env=render_env,
-        with_velocity=bool(args.with_velocity),
-        img_size=int(args.img_size),
-        mode_profile=str(args.mode_profile),
-        quality_profile=str(args.quality_profile),
-        weights=mode_weights,
-        max_attempts_per_episode=int(args.max_attempts_per_episode),
-        max_failed_episode_batches=int(args.max_failed_episode_batches),
-        workers=int(args.workers),
-        contact_aware_ou_theta=float(args.contact_aware_ou_theta),
-        contact_aware_ou_sigma=float(args.contact_aware_ou_sigma),
-        contact_aware_ou_dt=float(args.contact_aware_ou_dt),
-        ou_theta=float(args.ou_theta),
-        ou_sigma=float(args.ou_sigma),
-        ou_dt=float(args.ou_dt),
-        ou_mu=ou_mu,
-        max_env_input_norm=float(args.max_env_input_norm),
-    )
-    val_actions, val_actions_abs, val_frames, val_states, val_stats = generate_split(
-        n_eps=int(args.val_eps),
-        split_name="valid",
-        len_min=int(args.len_min),
-        len_max=int(args.len_max),
-        policy=policy,
-        action_scale=float(args.action_scale),
-        rng=rng,
-        decision_env=decision_env,
-        shadow_env=shadow_env,
-        render_env=render_env,
-        with_velocity=bool(args.with_velocity),
-        img_size=int(args.img_size),
-        mode_profile=str(args.mode_profile),
-        quality_profile=str(args.quality_profile),
-        weights=mode_weights,
-        max_attempts_per_episode=int(args.max_attempts_per_episode),
-        max_failed_episode_batches=int(args.max_failed_episode_batches),
-        workers=int(args.workers),
-        contact_aware_ou_theta=float(args.contact_aware_ou_theta),
-        contact_aware_ou_sigma=float(args.contact_aware_ou_sigma),
-        contact_aware_ou_dt=float(args.contact_aware_ou_dt),
-        ou_theta=float(args.ou_theta),
-        ou_sigma=float(args.ou_sigma),
-        ou_dt=float(args.ou_dt),
-        ou_mu=ou_mu,
-        max_env_input_norm=float(args.max_env_input_norm),
-    )
-
-    frames_all = train_frames + val_frames
-    actions_all = train_actions + val_actions
-    actions_abs_all = train_actions_abs + val_actions_abs
-    states_all = train_states + val_states
-    rejected_attempts = int(train_stats["rejected_attempts"]) + int(val_stats["rejected_attempts"])
-    failed_episode_batches = int(train_stats["failed_episode_batches"]) + int(val_stats["failed_episode_batches"])
-    save_zarr(
+    writer = ZarrWriter(
         args.zarr_out,
-        frames_all,
-        actions_all,
-        actions_abs_all,
-        states_all,
         env_action_scale=float(decision_env.action_scale),
         env_relative=bool(decision_env.relative),
         max_env_input_norm=float(args.max_env_input_norm),
-        extra_attrs={
-            "generator_policy": str(policy),
-            "mode_profile": str(args.mode_profile),
-            "quality_profile": str(args.quality_profile),
-            "weight_translate": float(mode_weights["translate"]),
-            "weight_rotate": float(mode_weights["rotate"]),
-            "weight_sweep": float(mode_weights["sweep"]),
-            "weight_recover": float(mode_weights["recover"]),
-            "contact_aware_ou_theta": float(args.contact_aware_ou_theta),
-            "contact_aware_ou_sigma": float(args.contact_aware_ou_sigma),
-            "contact_aware_ou_dt": float(args.contact_aware_ou_dt),
-            "accepted_episodes": int(args.train_eps) + int(args.val_eps),
-            "rejected_attempts": rejected_attempts,
-            "failed_episode_batches": failed_episode_batches,
-        },
     )
+    shared_split_kwargs = dict(
+        len_min=int(args.len_min),
+        len_max=int(args.len_max),
+        policy=policy,
+        action_scale=float(args.action_scale),
+        rng=rng,
+        decision_env=decision_env,
+        shadow_env=shadow_env,
+        render_env=render_env,
+        with_velocity=bool(args.with_velocity),
+        img_size=int(args.img_size),
+        mode_profile=str(args.mode_profile),
+        quality_profile=str(args.quality_profile),
+        weights=mode_weights,
+        max_attempts_per_episode=int(args.max_attempts_per_episode),
+        max_failed_episode_batches=int(args.max_failed_episode_batches),
+        workers=int(args.workers),
+        contact_aware_ou_theta=float(args.contact_aware_ou_theta),
+        contact_aware_ou_sigma=float(args.contact_aware_ou_sigma),
+        contact_aware_ou_dt=float(args.contact_aware_ou_dt),
+        ou_theta=float(args.ou_theta),
+        ou_sigma=float(args.ou_sigma),
+        ou_dt=float(args.ou_dt),
+        ou_mu=ou_mu,
+        max_env_input_norm=float(args.max_env_input_norm),
+        zarr_writer=writer,
+    )
+    _, _, _, _, train_stats = generate_split(n_eps=int(args.train_eps), split_name="train", **shared_split_kwargs)
+    _, _, _, _, val_stats = generate_split(n_eps=int(args.val_eps), split_name="valid", **shared_split_kwargs)
+
+    rejected_attempts = int(train_stats["rejected_attempts"]) + int(val_stats["rejected_attempts"])
+    failed_episode_batches = int(train_stats["failed_episode_batches"]) + int(val_stats["failed_episode_batches"])
+    writer.finalize(extra_attrs={
+        "generator_policy": str(policy),
+        "mode_profile": str(args.mode_profile),
+        "quality_profile": str(args.quality_profile),
+        "weight_translate": float(mode_weights["translate"]),
+        "weight_rotate": float(mode_weights["rotate"]),
+        "weight_sweep": float(mode_weights["sweep"]),
+        "weight_recover": float(mode_weights["recover"]),
+        "contact_aware_ou_theta": float(args.contact_aware_ou_theta),
+        "contact_aware_ou_sigma": float(args.contact_aware_ou_sigma),
+        "contact_aware_ou_dt": float(args.contact_aware_ou_dt),
+        "accepted_episodes": int(args.train_eps) + int(args.val_eps),
+        "rejected_attempts": rejected_attempts,
+        "failed_episode_batches": failed_episode_batches,
+    })
     print(f"Saved synthetic Zarr store to {args.zarr_out}")
     print(f"  Training episodes: {args.train_eps}")
     print(f"  Validation episodes: {args.val_eps}")
-    print(f"  Total frames: {sum(len(f) for f in frames_all)}")
-    print(f"  Total actions: {sum(len(a) for a in actions_all)}")
+    print(f"  Total frames: {writer.total_steps}")
+    print(f"  Total actions: {writer.total_steps}")
     print(f"  Rejected attempts: {rejected_attempts}")
     print(f"  Failed episode batches: {failed_episode_batches}")
 

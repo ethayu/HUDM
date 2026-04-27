@@ -2381,8 +2381,7 @@ def _active_review_media(
     if context is not None:
         media_names.extend(REFERENCE_MEDIA)
     media_names.extend(PLANNER_BACKEND_MEDIA)
-    if context is None or context.gt_media_allowed:
-        media_names.extend(("closed_loop_replay", "gt_replay"))
+    media_names.extend(("closed_loop_replay", "gt_replay"))
     seen: set[str] = set()
     ordered: list[str] = []
     for media_name in media_names:
@@ -2567,8 +2566,6 @@ def _media_section_html(
         if reference_context is not None
         else f"Planner-view and predicted-backend replays use this run's planner backend (<code>{html.escape(backend_label)}</code>)."
     )
-    if reference_context is not None and reference_context.gt_media_allowed:
-        media_note += " GT media remain available because GT is the baseline or an evaluated backend."
     controls = ""
     if reference_context is not None:
         controls += f"<a class='button primary' data-async-render='true' href='{render_reference_href}'>Render reference media</a> "
