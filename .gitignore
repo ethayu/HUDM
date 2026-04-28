@@ -4,3 +4,9 @@ wandb/
 rollouts/
 .tmp*
 .DS_Store
+checkpoints/
+logs/
+data/
+synthetic/
+*.h5
+*.hdf5
