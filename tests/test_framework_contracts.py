@@ -15,8 +15,8 @@ from omegaconf import OmegaConf
 from hudm.config import _plan_defaults, _prune_inactive_backend, plan_spec_to_runtime_cfg
 from hudm.metrics import pose_metrics
 from hudm.runtime import build_plan_runtime
-from hudm.session import save_plan_result
-from hudm.session_exec import run_closed_loop
+from hudm.session import _recalculate_goal_for_execution_env, save_plan_result
+from hudm.session_exec import _gt_action_trajectory_for_cem, run_closed_loop
 from hudm.session_helpers import sample_init_goal_states
 from hudm.world_io import checkpoint_epochs, latest_checkpoint_epoch, load_world_checkpoint, save_world_checkpoint
 from models.world.model import HierWorldModel
@@ -136,6 +136,105 @@ class FrameworkContractTests(unittest.TestCase):
         self.assertEqual(int(goal_state[0]), 17)
         self.assertEqual(meta, {"source": "random"})
 
+    def test_recalculate_goal_uses_execution_env_action_replay(self):
+        class ExecutionEnv:
+            _planning_fidelity_num_levels = 1
+            window_size = 512.0
+
+            def __init__(self):
+                self.cur_state = np.zeros(7, dtype=np.float32)
+                self.prepare_calls = 0
+                self.step_calls = 0
+
+            def set_planning_fidelity_level(self, level_idx):
+                del level_idx
+
+            def prepare(self, seed, init_state, goal_state=None, with_visual=True):
+                del seed, goal_state, with_visual
+                self.prepare_calls += 1
+                self.cur_state = np.asarray(init_state, dtype=np.float32).copy()
+                return {"visual": None}, self.cur_state.copy()
+
+            def step(self, action, with_visual=True):
+                del with_visual
+                self.step_calls += 1
+                action_arr = np.asarray(action, dtype=np.float32)
+                self.cur_state[2:4] += action_arr
+                return {"visual": None}, 0.0, False, {"state": self.cur_state.copy()}
+
+        env = ExecutionEnv()
+        init_state = np.asarray([0, 0, 0, 0, 0, 0, 0], dtype=np.float32)
+        old_goal = np.asarray([0, 0, 100, 100, 0, 0, 0], dtype=np.float32)
+        meta = {
+            "source": "dataset",
+            "actions": [[1.0, 2.0], [3.0, 4.0]],
+            "pos_diff": 10.0,
+            "angle_diff": 0.5,
+        }
+
+        goal, recalculated_meta = _recalculate_goal_for_execution_env(env, init_state, old_goal, meta)
+
+        np.testing.assert_allclose(goal[2:4], np.asarray([4.0, 6.0], dtype=np.float32))
+        self.assertEqual(env.prepare_calls, 1)
+        self.assertEqual(env.step_calls, 2)
+        self.assertTrue(recalculated_meta["goal_recalculated_for_execution_env"])
+        self.assertEqual(recalculated_meta["goal_recalculation_action_count"], 2)
+        np.testing.assert_allclose(
+            np.asarray(recalculated_meta["pre_recalculation_goal_state"], dtype=np.float32),
+            old_goal,
+        )
+        self.assertEqual(recalculated_meta["gt_state_trajectory_source"], "baseline_execution_env_action_rollout")
+        self.assertEqual(len(recalculated_meta["gt_state_trajectory"]), 3)
+
+    def test_gt_action_trajectory_for_cem_uses_shifted_window(self):
+        meta = {"actions": [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]]}
+
+        window = _gt_action_trajectory_for_cem(meta, horizon=3, action_dim=2, offset=1)
+
+        np.testing.assert_allclose(
+            window,
+            np.asarray([[3.0, 4.0], [5.0, 6.0], [0.0, 0.0]], dtype=np.float32),
+        )
+
+    def test_particle_planner_passes_gt_action_injection_to_cem_core(self):
+        class DummyCore:
+            def __init__(self):
+                self.inject_actions = None
+                self.inject_count = None
+
+            def base_level_index(self, mpc_progress, cem_progress):
+                del mpc_progress, cem_progress
+                return 0
+
+            def optimize(self, **kwargs):
+                self.inject_actions = kwargs.get("inject_actions")
+                self.inject_count = kwargs.get("inject_count")
+                return torch.zeros((2, 2), dtype=torch.float32), 0, [0, 0], 0
+
+        planner = ParticleCEMPlanner.__new__(ParticleCEMPlanner)
+        planner.core = DummyCore()
+        planner.backend = SimpleNamespace(spacing=lambda level_idx: 0.1, num_particles=lambda level_idx: 1)
+        planner.horizon = 2
+        planner.action_dim = 2
+        planner.device = torch.device("cpu")
+        planner.warm_start = False
+
+        action_seq, _ = ParticleCEMPlanner.plan(
+            planner,
+            init_state=np.zeros(7, dtype=np.float32),
+            goal_state=np.zeros(7, dtype=np.float32),
+            gt_action_trajectory=[[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]],
+            gt_inject_count=2,
+        )
+
+        np.testing.assert_allclose(np.asarray(action_seq), np.zeros((2, 2), dtype=np.float32))
+        self.assertEqual(planner.core.inject_count, 2)
+        self.assertIsNotNone(planner.core.inject_actions)
+        np.testing.assert_allclose(
+            planner.core.inject_actions.detach().cpu().numpy(),
+            np.asarray([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32),
+        )
+
     def test_particle_backend_done_ignores_pose_metric_success(self):
         class DummySim:
             pusher_pos = np.zeros(2, dtype=np.float32)
@@ -176,6 +275,140 @@ class FrameworkContractTests(unittest.TestCase):
 
         _, _, done, _ = PushTParticleBackend.step(backend, np.zeros(2, dtype=np.float32), with_visual=False)
         self.assertFalse(done)
+
+    def test_particle_backend_termination_uses_coverage_when_available(self):
+        backend = SimpleNamespace(
+            success_threshold=0.9,
+            _ensure_state_dim=lambda state: np.asarray(state, dtype=np.float32),
+            eval_state=lambda goal_state, cur_state: {
+                "success": True,
+                "pos_diff": 0.0,
+                "angle_diff": 0.0,
+                "eef_diff": 0.0,
+                "state_dist": 0.0,
+            },
+        )
+
+        low_coverage = PushTParticleBackend.eval_termination(
+            backend,
+            np.zeros(7, dtype=np.float32),
+            np.zeros(7, dtype=np.float32),
+            done=True,
+            info={"final_coverage": 0.74},
+        )
+        self.assertFalse(low_coverage["success"])
+        self.assertFalse(low_coverage["done"])
+        self.assertFalse(low_coverage["success_and_done"])
+        self.assertEqual(low_coverage["coverage"], 0.74)
+
+        high_coverage = PushTParticleBackend.eval_termination(
+            backend,
+            np.zeros(7, dtype=np.float32),
+            np.zeros(7, dtype=np.float32),
+            done=False,
+            info={"final_coverage": 0.91},
+        )
+        self.assertTrue(high_coverage["success"])
+        self.assertTrue(high_coverage["done"])
+        self.assertTrue(high_coverage["success_and_done"])
+        self.assertEqual(high_coverage["coverage"], 0.91)
+
+    def test_run_closed_loop_particle_backend_steps_particle_execution_env(self):
+        class UnusedWrapperEnv:
+            action_dim = 2
+
+            def prepare(self, *args, **kwargs):
+                raise AssertionError("particle_sim execution should not step the wrapper env")
+
+        class ParticleExecEnv:
+            action_dim = 2
+            _planning_fidelity_num_levels = 1
+            relative = True
+            action_scale = 100.0
+            window_size = 512.0
+
+            def __init__(self):
+                self.cur_state = np.zeros(7, dtype=np.float32)
+                self.prepare_calls = 0
+                self.step_calls = 0
+
+            def set_planning_fidelity_level(self, level_idx):
+                del level_idx
+
+            def prepare(self, seed, init_state, goal_state=None, with_visual=True):
+                del seed, goal_state, with_visual
+                self.prepare_calls += 1
+                self.cur_state = np.asarray(init_state, dtype=np.float32).copy()
+                obs = {"visual": np.zeros((8, 8, 3), dtype=np.uint8)}
+                return obs, self.cur_state.copy()
+
+            def render(self, mode, include_start_pose=False):
+                del mode, include_start_pose
+                return np.zeros((8, 8, 3), dtype=np.uint8)
+
+            def step(self, action):
+                del action
+                self.step_calls += 1
+                self.cur_state = np.asarray([0, 0, 100, 100, 0, 0, 0], dtype=np.float32)
+                obs = {"visual": np.zeros((8, 8, 3), dtype=np.uint8)}
+                return obs, 1.0, True, {"state": self.cur_state.copy(), "final_coverage": 0.95}
+
+            def eval_termination(self, goal_state, cur_state, done=None, info=None):
+                del goal_state, cur_state
+                coverage = None if info is None else info.get("final_coverage", None)
+                return {
+                    "success": True,
+                    "pos_diff": 0.0,
+                    "angle_diff": 0.0,
+                    "eef_diff": 0.0,
+                    "state_dist": 0.0,
+                    "done": bool(done),
+                    "coverage": coverage,
+                    "success_and_done": bool(done),
+                }
+
+        class DummyParticlePlanner:
+            def __init__(self):
+                self.backend = ParticleExecEnv()
+
+            def plan(self, **kwargs):
+                info = SimpleNamespace(
+                    base_level_idx=0,
+                    rollout_level_indices=[0],
+                    bits_used_estimate=0,
+                    plan_time_sec=0.0,
+                    base_k=None,
+                    base_spacing=None,
+                    base_num_particles=None,
+                )
+                return torch.zeros((1, 2), dtype=torch.float32), info
+
+        cfg = OmegaConf.create(
+            {
+                "save": False,
+                "render": False,
+                "mpc": {
+                    "steps": 1,
+                    "horizon": 1,
+                    "replan_every": 1,
+                },
+            }
+        )
+        planner = DummyParticlePlanner()
+        success, _, _, _, run_stats, _ = run_closed_loop(
+            env=UnusedWrapperEnv(),
+            wm=None,
+            planner=planner,
+            backend="particle_sim",
+            cfg=cfg,
+            init_state=np.zeros(7, dtype=np.float32),
+            goal_state=np.zeros(7, dtype=np.float32),
+            device=torch.device("cpu"),
+        )
+
+        self.assertTrue(success)
+        self.assertEqual(planner.backend.step_calls, 1)
+        self.assertEqual(run_stats["termination_reason"], "env_done")
 
     def test_particle_backend_particle_cloud_state_uses_pusht_pixel_coordinates(self):
         class DummySim:
@@ -1031,7 +1264,7 @@ class FrameworkContractTests(unittest.TestCase):
             device=torch.device("cpu"),
         )
 
-        self.assertTrue(success)
+        self.assertFalse(success)
         self.assertEqual(run_stats["termination_reason"], "env_done")
         self.assertTrue(run_stats["termination_done"])
         self.assertFalse(run_stats["termination_metric_success"])
@@ -1180,7 +1413,7 @@ class FrameworkContractTests(unittest.TestCase):
             device=torch.device("cpu"),
         )
 
-        self.assertTrue(success)
+        self.assertFalse(success)
         self.assertEqual(run_stats["termination_reason"], "env_done")
         self.assertEqual(len(trace["executed_actions"]), 1)
         self.assertEqual(len(frames), 3)

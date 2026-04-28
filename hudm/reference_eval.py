@@ -17,17 +17,9 @@ from hudm.artifacts import (
     write_video_mp4,
 )
 from hudm.experiment_bundle import review_derived_dir, trace_dir
+from hudm.metrics import tee_pose_coverage_px
 from hudm.runtime import build_plan_runtime, encode_visual
 from hudm.session_helpers import set_execution_fidelity_finest, set_start_pose
-
-try:
-    from shapely import affinity
-    from shapely.geometry import box
-    from shapely.ops import unary_union
-except Exception:  # pragma: no cover - optional runtime dependency
-    affinity = None
-    box = None
-    unary_union = None
 
 
 REFERENCE_MEDIA_ALIASES: dict[str, list[str]] = {
@@ -36,13 +28,6 @@ REFERENCE_MEDIA_ALIASES: dict[str, list[str]] = {
 }
 
 SUPPORTED_REFERENCE_METRIC_BACKENDS = {"gt_env", "particle_sim"}
-
-_GT_T_SCALE_PX = 40.0
-_GT_T_STEM_W_PX = _GT_T_SCALE_PX
-_GT_T_STEM_H_PX = 3.0 * _GT_T_SCALE_PX
-_GT_T_BAR_W_PX = 4.0 * _GT_T_SCALE_PX
-_GT_T_BAR_H_PX = _GT_T_SCALE_PX
-
 
 @dataclass(frozen=True)
 class ReferenceContext:
@@ -227,33 +212,6 @@ def _write_reference_eval_cache(
     np.savez_compressed(arrays_path, **result.arrays)
 
 
-def _tee_pose_polygon(state: np.ndarray) -> Any | None:
-    if affinity is None or box is None or unary_union is None:
-        return None
-    s = np.asarray(state, dtype=np.float32).reshape(-1)
-    if s.shape[0] < 5:
-        return None
-    tee_local = unary_union(
-        [
-            box(-0.5 * _GT_T_BAR_W_PX, 0.0, 0.5 * _GT_T_BAR_W_PX, _GT_T_BAR_H_PX),
-            box(-0.5 * _GT_T_STEM_W_PX, _GT_T_BAR_H_PX, 0.5 * _GT_T_STEM_W_PX, _GT_T_BAR_H_PX + _GT_T_STEM_H_PX),
-        ]
-    )
-    tee_rot = affinity.rotate(tee_local, float(s[4]), origin=(0.0, 0.0), use_radians=True)
-    return affinity.translate(tee_rot, xoff=float(s[2]), yoff=float(s[3]))
-
-
-def tee_pose_coverage(goal_state: np.ndarray, cur_state: np.ndarray) -> float | None:
-    goal_poly = _tee_pose_polygon(goal_state)
-    cur_poly = _tee_pose_polygon(cur_state)
-    if goal_poly is None or cur_poly is None:
-        return None
-    goal_area = float(goal_poly.area)
-    if goal_area <= 0.0:
-        return None
-    return float(goal_poly.intersection(cur_poly).area / goal_area)
-
-
 class ReferenceEvaluator:
     def __init__(self, context: ReferenceContext):
         self.context = context
@@ -321,7 +279,7 @@ class ReferenceEvaluator:
         summary = {
             "reference_backend": self.context.backend,
             "reference_backend_label": self.context.backend_label,
-            "success": int(last_done),
+            "success": int(last_success and last_done),
             "success_and_done": int(last_success and last_done),
             "termination_reason": termination_reason,
             "termination_step": termination_step,
@@ -413,15 +371,20 @@ class ReferenceEvaluator:
             if self.particle_backend is None:
                 raise ValueError("particle_sim reference evaluation requires planner.backend.")
             metrics = dict(self.particle_backend.eval_state(goal_state, cur_state))
-            coverage = tee_pose_coverage(goal_state, cur_state)
+            coverage = tee_pose_coverage_px(goal_state, cur_state)
+            coverage_success = (
+                coverage is not None
+                and coverage > float(getattr(self.particle_backend, "success_threshold", np.inf))
+            )
+            success = bool(coverage_success) if coverage is not None else bool(metrics.get("success", False))
             return {
-                "success": bool(metrics.get("success", False)),
+                "success": success,
                 "pos_diff": float(metrics.get("pos_diff", float("nan"))),
                 "angle_diff": float(metrics.get("angle_diff", float("nan"))),
                 "eef_diff": float(metrics.get("eef_diff", float("nan"))),
                 "state_dist": float(metrics.get("state_dist", float("nan"))),
                 "coverage": coverage,
-                "done": False,
+                "done": success,
             }
         return dict(self.env.eval_termination(goal_state, cur_state, done=None, info=None))
 
@@ -439,15 +402,21 @@ class ReferenceEvaluator:
             del obs
             cur_state = np.asarray(info["state"], dtype=np.float32)
             metrics = dict(info.get("metrics", {}))
-            coverage = tee_pose_coverage(goal_state, cur_state)
+            coverage = tee_pose_coverage_px(goal_state, cur_state)
+            coverage_success = (
+                coverage is not None
+                and coverage > float(getattr(self.particle_backend, "success_threshold", np.inf))
+            )
+            success = bool(coverage_success) if coverage is not None else bool(metrics.get("success", False))
+            done_flag = success if coverage is not None else bool(done)
             term = {
-                "success": bool(metrics.get("success", False)),
+                "success": success,
                 "pos_diff": float(metrics.get("pos_diff", float("nan"))),
                 "angle_diff": float(metrics.get("angle_diff", float("nan"))),
                 "eef_diff": float(metrics.get("eef_diff", float("nan"))),
                 "state_dist": float(metrics.get("state_dist", float("nan"))),
                 "coverage": coverage,
-                "done": bool(done),
+                "done": bool(done_flag),
             }
             return term, cur_state
 

@@ -24,6 +24,7 @@ from hudm.experiment_bundle import (
     write_experiment_bundle,
 )
 from hudm.config import resolve_experiment_spec
+from hudm.metrics import termination_success
 from hudm.runtime import (
     bits_to_flops_estimate,
     build_plan_runtime,
@@ -100,6 +101,10 @@ def result_row(result: dict, run_dir: str) -> dict:
     flops_total = int(run_stats["flops_used_total"])
     plan_time_total = float(run_stats["plan_time_total_sec"])
     shared_plan_time_total = float(run_stats.get("shared_plan_time_total_sec", plan_time_total))
+    success = bool(
+        run_stats.get("termination_metric_success", result.get("success", False))
+        and run_stats.get("termination_done", result.get("success", False))
+    )
     return {
         "variant_name": str(result.get("variant_name", "")),
         "rollout_id": str(sample.get("rollout_id", rollout_id(sample))),
@@ -107,14 +112,12 @@ def result_row(result: dict, run_dir: str) -> dict:
         "episode_index": int(sample.get("episode_index", -1)),
         "start_index": int(sample.get("start_index", -1)),
         "goal_index": int(sample.get("goal_index", -1)),
-        "success": int(bool(result["success"])),
+        "success": int(success),
         "termination_reason": str(run_stats.get("termination_reason", "unknown")),
         "termination_step": int(run_stats.get("termination_step", -1)),
         "executed_steps": executed_steps,
         "plans": plans,
-        "success_and_done": int(
-            bool(run_stats.get("termination_metric_success", False) and run_stats.get("termination_done", False))
-        ),
+        "success_and_done": int(success),
         "final_pos_diff": _trace_final_value(trace.get("pos_diffs", []), run_stats.get("termination_pos_diff")),
         "final_angle_diff": _trace_final_value(trace.get("angle_diffs", []), run_stats.get("termination_angle_diff")),
         "final_eef_diff": _trace_final_value(trace.get("eef_diffs", []), run_stats.get("termination_eef_diff")),
@@ -436,6 +439,9 @@ def _write_experiment_bundle_snapshot(
 
 def _run_variant_task(task: dict) -> dict:
     cfg = OmegaConf.create(task["cfg"])
+    execution_cfg = None
+    if task.get("execution_cfg", None) is not None:
+        execution_cfg = OmegaConf.create(task["execution_cfg"])
     terminal_mode = str(task.get("terminal_mode", "compact")).lower()
     run_dir = str(task["run_dir"])
 
@@ -445,6 +451,7 @@ def _run_variant_task(task: dict) -> dict:
             rollout_selection=task["selection"],
             schedule_name=task["variant_name"],
             print_summary=False,
+            execution_cfg=execution_cfg,
         )
         result["variant_name"] = task["variant_name"]
         save_plan_result(result, run_dir, save_media=bool(result["cfg"].save))
@@ -597,7 +604,7 @@ def _run_wm_batched_variants(
                 result = {
                     "cfg": state["cfg"],
                     "runtime": {"backend": "wm"},
-                    "success": True,
+                    "success": termination_success(initial_term),
                     "trajectory": state["trajectory"],
                     "frames": [],
                     "planner_frames": [],
@@ -726,7 +733,7 @@ def _run_wm_batched_variants(
             result = {
                 "cfg": state["cfg"],
                 "runtime": {"backend": "wm"},
-                "success": bool(state["done"]),
+                "success": termination_success(state["last_term"]),
                 "trajectory": state["trajectory"],
                 "frames": [],
                 "planner_frames": [],
@@ -785,9 +792,11 @@ def _build_variant_task(
     terminal_mode: str,
     backend_kind: str,
     lane_key: str,
+    execution_cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "cfg": OmegaConf.to_container(variant.plan.runtime_cfg, resolve=True),
+        "execution_cfg": execution_cfg,
         "selection": selection,
         "variant_name": variant.name,
         "run_dir": trace_dir(run_root, variant.name, selection["rollout_id"]),
@@ -806,6 +815,14 @@ def _build_execution_lanes(
 ) -> list[dict[str, Any]]:
     lanes: list[dict[str, Any]] = []
     batched_groups, single_variants = _group_wm_variants(spec.variants)
+    baseline_execution_cfg = None
+    baseline_backend_kind = None
+    if spec.baseline:
+        for variant in spec.variants:
+            if variant.name == spec.baseline:
+                baseline_execution_cfg = OmegaConf.to_container(variant.plan.runtime_cfg, resolve=True)
+                baseline_backend_kind = variant.plan.active_backend_kind()
+                break
     for selection in selected:
         for group_idx, variants in enumerate(batched_groups):
             lanes.append(
@@ -824,6 +841,11 @@ def _build_execution_lanes(
         for variant in single_variants:
             backend_kind = variant.plan.active_backend_kind()
             lane_key = f"task_pool:{backend_kind}"
+            execution_cfg = (
+                baseline_execution_cfg
+                if baseline_execution_cfg is not None and backend_kind == baseline_backend_kind
+                else None
+            )
             tasks_by_backend[backend_kind].append(
                 _build_variant_task(
                     variant=variant,
@@ -832,6 +854,7 @@ def _build_execution_lanes(
                     terminal_mode=terminal_mode,
                     backend_kind=backend_kind,
                     lane_key=lane_key,
+                    execution_cfg=execution_cfg,
                 )
             )
 
@@ -948,9 +971,8 @@ def _run_task_lane(
                 for fut in as_completed(futures):
                     row = fut.result()
                     lane_rows.append(row)
-            if row_callback is not None:
-                for row in lane_rows:
-                    row_callback(row)
+                    if row_callback is not None:
+                        row_callback(row)
             return lane_rows
         except Exception as exc:
             print(

@@ -16,6 +16,7 @@ from hudm.artifacts import (
     rollout_level_for_exec_step,
     wm_decode_frame,
 )
+from hudm.metrics import termination_success
 from hudm.runtime import (
     bits_to_flops_estimate,
     encode_visual,
@@ -45,6 +46,7 @@ def _gt_action_trajectory_for_cem(
     init_goal_meta: Optional[dict],
     horizon: int,
     action_dim: int,
+    offset: int = 0,
 ) -> Optional[np.ndarray]:
     if not init_goal_meta:
         return None
@@ -58,9 +60,10 @@ def _gt_action_trajectory_for_cem(
     if arr.ndim != 2 or int(arr.shape[1]) != int(action_dim):
         return None
     out = np.zeros((int(horizon), int(action_dim)), dtype=np.float32)
-    n = min(int(horizon), int(arr.shape[0]))
+    start = max(0, int(offset))
+    n = min(int(horizon), max(0, int(arr.shape[0]) - start))
     if n > 0:
-        out[:n] = arr[:n]
+        out[:n] = arr[start : start + n]
     return out
 
 
@@ -74,25 +77,29 @@ def run_closed_loop(
     goal_state: np.ndarray,
     device: torch.device,
     init_goal_meta: Optional[dict] = None,
+    execution_env: object | None = None,
 ) -> tuple[bool, list[np.ndarray], list[np.ndarray], list[np.ndarray], dict, dict]:
-    set_start_pose(env, init_state)
     particle_backend = None
     if backend == "particle_sim":
         particle_backend = getattr(planner, "backend", None)
         if particle_backend is None:
             raise ValueError("backend='particle_sim' requires planner.backend for planner-view rendering.")
+    exec_env = execution_env
+    if exec_env is None:
+        exec_env = particle_backend if backend == "particle_sim" else env
+    set_start_pose(exec_env, init_state)
     z_goal = None
     if backend == "wm":
         if wm is None:
             raise ValueError("backend='wm' requires a loaded world model.")
-        goal_obs, _ = env.prepare(seed=0, init_state=goal_state)
-        set_goal_pose(env, goal_state)
-        goal_obs["visual"] = env.render("rgb_array", include_start_pose=False)
+        goal_obs, _ = exec_env.prepare(seed=0, init_state=goal_state)
+        set_goal_pose(exec_env, goal_state)
+        goal_obs["visual"] = exec_env.render("rgb_array", include_start_pose=False)
         #save the goal_obs["visual"] to a file
         z_goal = encode_visual(wm, goal_obs["visual"], device)
-    obs, cur_state = env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
-    set_execution_fidelity_finest(env)
-    obs["visual"] = env.render("rgb_array", include_start_pose=False)
+    obs, cur_state = exec_env.prepare(seed=0, init_state=init_state, goal_state=goal_state)
+    set_execution_fidelity_finest(exec_env)
+    obs["visual"] = exec_env.render("rgb_array", include_start_pose=False)
 
     trajectory = [cur_state.copy()]
     frames: list[np.ndarray] = []
@@ -108,9 +115,9 @@ def run_closed_loop(
     replan_traces: list[dict[str, Any]] = []
     last_term: dict | None = None
     if bool(cfg.save):
-        frames.append(env.render("rgb_array", include_start_pose=True))
+        frames.append(exec_env.render("rgb_array", include_start_pose=True))
 
-    initial_term = env.eval_termination(goal_state, cur_state, done=None, info=None)
+    initial_term = exec_env.eval_termination(goal_state, cur_state, done=None, info=None)
     if backend == "wm":
         latent_loss = _wm_termination_latent_loss(wm, z_goal, np.asarray(obs["visual"]), device)
         initial_term["latent_loss"] = float(latent_loss)
@@ -151,19 +158,14 @@ def run_closed_loop(
             "state_dists": [],
             "replans": [],
         }
-        return True, trajectory, frames, planner_frames, stats, trace
+        return termination_success(initial_term), trajectory, frames, planner_frames, stats, trace
 
     steps = int(cfg.mpc.steps)
     horizon = int(cfg.mpc.horizon)
     replan_every = int(cfg.mpc.replan_every)
     n_replans = max(1, int(np.ceil(steps / replan_every)))
     inject_gt_actions = bool(OmegaConf.select(cfg, "cem.inject_dataset_gt_actions", default=False))
-    gt_action_for_cem = (
-        _gt_action_trajectory_for_cem(init_goal_meta, horizon, int(env.action_dim))
-        if inject_gt_actions
-        else None
-    )
-
+    gt_inject_count = int(OmegaConf.select(cfg, "cem.gt_inject_count", default=1))
     render_enabled = bool(cfg.render)
     t = 0
     replan_idx = 0
@@ -172,7 +174,7 @@ def run_closed_loop(
     total_plan_time = 0.0
     n_plans = 0
     prev_exec_steps = 0
-    action_overlay = action_overlay_spec_from_env(env) if bool(cfg.save) else None
+    action_overlay = action_overlay_spec_from_env(exec_env) if bool(cfg.save) else None
 
     def _overlay_target_on_last_frames(state: np.ndarray, action: np.ndarray) -> None:
         if not bool(cfg.save) or action_overlay is None:
@@ -200,12 +202,12 @@ def run_closed_loop(
     def _append_saved_frames_for_step(cur_obs: dict[str, Any], cur_state_after: np.ndarray, exec_step_in_replan: int) -> None:
         if not bool(cfg.save):
             return
-        frame_with_start = env.render("rgb_array", include_start_pose=True)
+        frame_with_start = exec_env.render("rgb_array", include_start_pose=True)
         frames.append(frame_with_start)
         li_exec = rollout_level_for_exec_step(info, exec_step_in_replan=exec_step_in_replan)
         if backend == "gt_env":
             frame = planner_view_frame(
-                env=env,
+                env=exec_env,
                 base_visual=np.asarray(cur_obs["visual"]),
                 level_idx=li_exec,
                 target_hw=frames[-1].shape[:2],
@@ -251,6 +253,16 @@ def run_closed_loop(
         z_cur_for_plan = None
         plan_seed = int(1009 * replan_idx + 7919 * t)
         plan_start_state = np.asarray(cur_state, dtype=np.float32).copy()
+        gt_action_for_cem = (
+            _gt_action_trajectory_for_cem(
+                init_goal_meta,
+                horizon,
+                int(exec_env.action_dim),
+                offset=int(t),
+            )
+            if inject_gt_actions
+            else None
+        )
         if backend == "wm":
             z_cur_for_plan = encode_visual(wm, obs["visual"], device)
             plan_kw: dict[str, Any] = {
@@ -258,9 +270,9 @@ def run_closed_loop(
                 "warm_start_steps": int(prev_exec_steps),
                 "seed": plan_seed,
             }
-            # Episode GT actions match the sampled start state; only meaningful at the first replan.
-            if inject_gt_actions and gt_action_for_cem is not None and replan_idx == 0:
+            if gt_action_for_cem is not None:
                 plan_kw["gt_action_trajectory"] = gt_action_for_cem
+                plan_kw["gt_inject_count"] = gt_inject_count
             action_seq, info = planner.plan(z_cur_for_plan, z_goal, **plan_kw)
         elif backend == "gt_env":
             action_seq, info = planner.plan(
@@ -271,18 +283,26 @@ def run_closed_loop(
                 warm_start_steps=int(prev_exec_steps),
                 rng_seed=plan_seed,
             )
-            obs, cur_state = env.prepare(seed=0, init_state=cur_state, goal_state=goal_state)
-            set_execution_fidelity_finest(env)
-            obs["visual"] = env.render("rgb_array", include_start_pose=False)
+            obs, cur_state = exec_env.prepare(seed=0, init_state=cur_state, goal_state=goal_state)
+            set_execution_fidelity_finest(exec_env)
+            obs["visual"] = exec_env.render("rgb_array", include_start_pose=False)
         else:
-            action_seq, info = planner.plan(
-                init_state=cur_state,
-                goal_state=goal_state,
-                mpc_progress=mpc_progress,
-                seed=plan_seed,
-                warm_start_steps=int(prev_exec_steps),
-                rng_seed=plan_seed,
-            )
+            plan_kw = {
+                "init_state": cur_state,
+                "goal_state": goal_state,
+                "mpc_progress": mpc_progress,
+                "seed": plan_seed,
+                "warm_start_steps": int(prev_exec_steps),
+                "rng_seed": plan_seed,
+            }
+            if backend == "particle_sim" and gt_action_for_cem is not None:
+                plan_kw["gt_action_trajectory"] = gt_action_for_cem
+                plan_kw["gt_inject_count"] = gt_inject_count
+            action_seq, info = planner.plan(**plan_kw)
+            if backend == "particle_sim":
+                obs, cur_state = exec_env.prepare(seed=0, init_state=cur_state, goal_state=goal_state)
+                set_execution_fidelity_finest(exec_env)
+                obs["visual"] = exec_env.render("rgb_array", include_start_pose=False)
 
         planned_actions_np = np.asarray(action_seq.detach().cpu().numpy(), dtype=np.float32)
         bits_used = int(getattr(info, "bits_used_estimate", 0))
@@ -323,6 +343,9 @@ def run_closed_loop(
                 "base_num_particles": None if getattr(info, "base_num_particles", None) is None else int(getattr(info, "base_num_particles")),
                 "batch_impl": None if getattr(info, "batch_impl", None) is None else str(getattr(info, "batch_impl")),
                 "start_state": plan_start_state.tolist(),
+                "gt_action_injected": bool(gt_action_for_cem is not None),
+                "gt_action_offset": None if gt_action_for_cem is None else int(t),
+                "gt_inject_count": int(gt_inject_count) if gt_action_for_cem is not None else 0,
             }
         )
 
@@ -331,7 +354,7 @@ def run_closed_loop(
             target_hw = frames[0].shape[:2] if len(frames) > 0 else np.asarray(obs["visual"]).shape[:2]
             if backend == "gt_env":
                 frame = planner_view_frame(
-                    env=env,
+                    env=exec_env,
                     base_visual=np.asarray(obs["visual"]),
                     level_idx=init_level,
                     target_hw=target_hw,
@@ -378,11 +401,11 @@ def run_closed_loop(
             action = np.asarray(planned_actions_np[i], dtype=np.float32)
             _overlay_target_on_last_frames(cur_state, action)
             executed_actions.append(action.copy())
-            obs, _, done, step_info = env.step(action)
+            obs, _, done, step_info = exec_env.step(action)
             cur_state = step_info["state"]
             trajectory.append(cur_state.copy())
             
-            term = env.eval_termination(goal_state, cur_state, done=done, info=step_info)
+            term = exec_env.eval_termination(goal_state, cur_state, done=done, info=step_info)
             if backend == "wm":
                 latent_loss = _wm_termination_latent_loss(wm, z_goal, np.asarray(obs["visual"]), device)
                 term["latent_loss"] = float(latent_loss)
@@ -413,7 +436,7 @@ def run_closed_loop(
 
             if render_enabled:
                 try:
-                    env.render("human", include_start_pose=True)
+                    exec_env.render("human", include_start_pose=True)
                 except Exception as exc:
                     print(f"[render disabled] {exc}")
                     render_enabled = False
@@ -425,7 +448,7 @@ def run_closed_loop(
                     for j in range(i + 1, n_exec):
                         cont_action = np.asarray(planned_actions_np[j], dtype=np.float32)
                         _overlay_target_on_last_frames(cur_state, cont_action)
-                        obs, _, _, step_info = env.step(cont_action)
+                        obs, _, _, step_info = exec_env.step(cont_action)
                         cur_state = step_info["state"]
                         _append_saved_frames_for_step(obs, cur_state, j)
                 term_reason = "env_done"
@@ -462,7 +485,7 @@ def run_closed_loop(
                     "state_dists": [float(x) for x in state_dists],
                     "replans": replan_traces,
                 }
-                return True, trajectory, frames, planner_frames, stats, trace
+                return termination_success(term), trajectory, frames, planner_frames, stats, trace
 
             t += 1
 

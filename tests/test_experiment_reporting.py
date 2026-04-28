@@ -73,6 +73,46 @@ class ExperimentReportingTests(unittest.TestCase):
             "success": 1,
         }
 
+    def test_result_row_requires_metric_success_and_done(self):
+        result = {
+            "variant_name": "particle_l7_n252_fixed",
+            "success": True,
+            "sample_meta": {
+                "rollout_id": "ep0066_s07067_g07082",
+                "rollout_index": 0,
+                "episode_index": 66,
+                "start_index": 7067,
+                "goal_index": 7082,
+            },
+            "run_stats": {
+                "termination_metric_success": False,
+                "termination_done": True,
+                "termination_reason": "env_done",
+                "termination_step": 10,
+                "termination_pos_diff": 4.94,
+                "termination_angle_diff": 0.129,
+                "termination_eef_diff": 0.0,
+                "termination_coverage": 0.7477,
+                "plans": 1,
+                "bits_used_total": 0,
+                "flops_used_total": 0,
+                "plan_time_total_sec": 0.0,
+            },
+            "trace": {
+                "executed_actions": [[0.0, 0.0]],
+                "pos_diffs": [4.94],
+                "angle_diffs": [0.129],
+                "eef_diffs": [0.0],
+                "coverages": [0.7477],
+            },
+        }
+
+        row = experiment.result_row(result, "/tmp/run")
+
+        self.assertEqual(row["success"], 0)
+        self.assertEqual(row["success_and_done"], 0)
+        self.assertAlmostEqual(row["final_coverage"], 0.7477)
+
     def test_group_wm_variants_groups_backend_lanes_by_compatibility_signature(self):
         shared_backend = {"world_model": {"device": "cpu"}}
         wm_a = ExperimentVariant(name="wm_a", plan=self._make_plan_spec("wm_a", "wm", backend_cfg=shared_backend))
@@ -305,6 +345,51 @@ class ExperimentReportingTests(unittest.TestCase):
         self.assertEqual(worker_counts, [2])
         self.assertEqual(submitted_devices, ["cuda:0", "cuda:1", "cuda:0"])
         self.assertEqual([row["variant_name"] for row in rows], ["particle_0", "particle_1", "particle_2"])
+
+    def test_run_task_lane_process_invokes_row_callback_as_futures_complete(self):
+        tasks = [{"variant_name": f"variant_{idx}"} for idx in range(2)]
+        callbacks: list[str] = []
+
+        class _FakeFuture:
+            def __init__(self, fn, task):
+                self._fn = fn
+                self._task = task
+
+            def result(self):
+                return self._fn(self._task)
+
+        class _FakeExecutor:
+            def __init__(self, *args, **kwargs):
+                del args, kwargs
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                del exc_type, exc, tb
+                return False
+
+            def submit(self, fn, task):
+                return _FakeFuture(fn, task)
+
+        with mock.patch.object(experiment, "ProcessPoolExecutor", _FakeExecutor):
+            with mock.patch.object(experiment, "as_completed", side_effect=lambda futures: list(reversed(futures))):
+                with mock.patch.object(
+                    experiment,
+                    "_run_variant_task",
+                    side_effect=lambda task: self._fake_row(str(task["variant_name"])),
+                ):
+                    rows = experiment._run_task_lane(
+                        tasks,
+                        exec_mode="process",
+                        max_workers=2,
+                        lane_key="task_pool:gt_env",
+                        backend_kind="gt_env",
+                        row_callback=lambda row: callbacks.append(str(row["variant_name"])),
+                    )
+
+        self.assertEqual(callbacks, ["variant_1", "variant_0"])
+        self.assertEqual([row["variant_name"] for row in rows], ["variant_1", "variant_0"])
 
     def test_run_task_lane_particle_auto_device_uses_cpu_parallelism_when_cuda_is_unavailable(self):
         tasks = [

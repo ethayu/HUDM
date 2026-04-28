@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Sequence
 import cv2
 import numpy as np
 
-from hudm.metrics import pose_metrics
+from hudm.metrics import pose_metrics, tee_pose_coverage_px
 from pusht.pusht_particle_warp import (
     GT_PUSHER_RADIUS,
     GT_T_BAR_H,
@@ -77,6 +77,7 @@ class PushTParticleBackend:
 
         self.state_dim = 7
         self.action_dim = 2
+        self.success_threshold = 0.90
 
         warp_cfg = dict(warp_cfg or {})
         self._warp_cfg = warp_cfg
@@ -1108,3 +1109,31 @@ class PushTParticleBackend:
         goal_state = self._ensure_state_dim(goal_state)
         cur_state = self._ensure_state_dim(cur_state)
         return pose_metrics(goal_state, cur_state)
+
+    def eval_termination(self, goal_state: np.ndarray, cur_state: np.ndarray, done=None, info=None) -> dict:
+        metrics = self.eval_state(goal_state, cur_state)
+        coverage = None
+        if isinstance(info, dict) and ("final_coverage" in info):
+            cov_raw = info.get("final_coverage", None)
+            if cov_raw is not None:
+                coverage = float(cov_raw)
+        if coverage is None:
+            coverage = tee_pose_coverage_px(goal_state, cur_state)
+
+        coverage_success = (
+            coverage is not None
+            and coverage > float(getattr(self, "success_threshold", np.inf))
+        )
+        if coverage is None:
+            success_flag = bool(metrics["success"])
+            done_flag = bool(done) if done is not None else bool(success_flag)
+        else:
+            success_flag = bool(coverage_success)
+            done_flag = bool(coverage_success)
+
+        out = dict(metrics)
+        out["success"] = bool(success_flag)
+        out["done"] = bool(done_flag)
+        out["coverage"] = coverage
+        out["success_and_done"] = bool(success_flag) and bool(done_flag)
+        return out

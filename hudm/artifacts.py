@@ -648,7 +648,9 @@ def save_trace_bundle(run_dir: str, result: dict) -> tuple[str, str]:
     arrays = trace_arrays_from_trace(result["trace"])
     arrays_path = os.path.join(run_dir, "trace.npz")
     np.savez_compressed(arrays_path, **arrays)
-    action_overlay = action_overlay_spec_from_env(result["runtime"].get("env", None))
+    action_overlay = action_overlay_spec_from_env(
+        result["runtime"].get("execution_env", result["runtime"].get("env", None))
+    )
     meta = {
         "trace_version": 1,
         "backend": result["runtime"]["backend"],
@@ -730,7 +732,9 @@ def save_plan_result(
         os.path.join(run_dir, "step_metrics.csv"),
         result["trace"],
     )
-    action_overlay = action_overlay_spec_from_env(result["runtime"].get("env", None))
+    action_overlay = action_overlay_spec_from_env(
+        result["runtime"].get("execution_env", result["runtime"].get("env", None))
+    )
     meta = {
         "created_at": created_at,
         "backend": backend,
