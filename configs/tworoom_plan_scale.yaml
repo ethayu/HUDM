@@ -1,0 +1,49 @@
+checkpoint:
+  run_dir: "checkpoints_swm/tworoom_world_RUN_DIR"
+  epoch: null
+
+data:
+  path: "data/tworoom_swm.h5"
+  split_ratio: 0.8
+  pixels_key: "pixels"
+  action_key: "action"
+
+eval:
+  episodes: 100
+  goal_offset: 30
+  seed: 0
+  budget: 50
+  num_envs: 16
+  output_path: "rollouts/tworoom_eval.json"
+  save_video: false
+  video_path: "rollouts/tworoom_eval_videos"
+
+env:
+  max_episode_steps: 100
+  goal_conditioned: true
+  kwargs: {}
+
+restore:
+  import_path: null
+
+planner:
+  horizon: 16
+  receding_horizon: 1
+  pop_size: 512
+  elite_frac: 0.1
+  n_iter: 5
+  init_std: 1.0
+  warm_start: true
+  fidelity:
+    enabled: true
+    mpc:
+      mode: "fixed"
+      level: "finest"
+    cem:
+      mode: "fixed"
+      level: "base"
+    rollout:
+      mode: "fixed"
+      level: "base"
+
+device: "auto"

@@ -1,0 +1,14 @@
+env_id: "swm/TwoRoom-v1"
+image_shape: 96
+max_episode_steps: 100
+num_envs: 16
+episodes: 10000
+seed: 0
+output_path: "data/tworoom_swm.h5"
+goal_conditioned: true
+env_kwargs: {}
+policy:
+  import_path: null
+
+restore:
+  import_path: null
