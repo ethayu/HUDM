@@ -3,6 +3,8 @@ torch>=1.12
 torchvision>=0.13
 numpy>=1.21
 einops>=0.6
+h5py>=3.8
+hdf5plugin>=4.0
 
 # ---------------- Configuration & logging --------
 omegaconf>=2.3
@@ -11,6 +13,8 @@ wandb>=0.15
 
 # ---------------- Environment & simulation -------
 gym>=0.21
+gymnasium>=0.29
+stable-worldmodel[env]
 pygame>=2.1
 pymunk>=6.2
 shapely>=1.8
@@ -21,14 +25,3 @@ imageio-ffmpeg>=0.4.9
 matplotlib>=3.5
 plotly>=5.24
 psutil>=5.9
-zarr>=2.14
-# Optional: required only for backend=particle_sim (Warp particle simulator)
-# warp-lang>=1.5.0
-# decord wheels are not currently built for all OS/Python combos.
-# If unavailable, comment this line out or install from source:
-#   pip install git+https://github.com/dmlc/decord.git
-#decord>=0.6
-
-# ---------------- Misc / dataset -----------------
-# Only required if using the PushT video dataset or zarr files
-#zarr>=2.14

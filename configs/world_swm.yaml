@@ -1,0 +1,47 @@
+seed: 42
+env_id: "swm/PushT-v1"
+image_shape: "auto"
+max_episode_steps: 100
+env_kwargs: {}
+
+data:
+  path: "data/pusht_swm.h5"
+  split_ratio: 0.8
+  pixels_key: "pixels"
+  action_key: "action"
+
+model:
+  input: "images"
+  D: 256
+  K: [32, 64, 128, 256]
+  decoder_mode: "per_level"
+  dynamics_mode: "per_level"
+
+restore:
+  import_path: null
+
+train:
+  batch_size: 8
+  horizon: 16
+  num_workers: 0
+  no_cuda: false
+  checkpoint_dir: "checkpoints_swm"
+  run_name: "swm_world"
+
+optim:
+  lr: 0.0003
+
+loss:
+  recon_weight: 1.0
+  teacher_weight: 1.0
+  rollout_weight: 1.0
+
+schedule:
+  max_epochs: 30
+  patience: 5
+  min_delta: 0.001
+
+wandb:
+  enable: false
+  project: "hudm-world"
+  run_name: "swm-world"

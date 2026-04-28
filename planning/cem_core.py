@@ -23,7 +23,7 @@ EvaluatePopulationFn = Callable[
 
 class SharedCEMCore:
     """
-    Shared CEM optimizer + fidelity scheduling used by both WM and GT-env backends.
+    Shared CEM optimizer and learned-world-model fidelity scheduler.
     """
 
     def __init__(
@@ -34,8 +34,8 @@ class SharedCEMCore:
         elite_frac: float,
         n_iter: int,
         init_std: float,
-        action_low: Optional[float],
-        action_high: Optional[float],
+        action_low: Optional[Any],
+        action_high: Optional[Any],
         fidelity_cfg: Optional[Dict[str, Any]],
         num_levels: int,
         rollout_modes: Sequence[str],
@@ -49,9 +49,9 @@ class SharedCEMCore:
         self.n_iter = int(n_iter)
         self.init_std = float(init_std)
         self.min_std = float(min_std)
-        self.action_low = action_low
-        self.action_high = action_high
         self.device = device or torch.device("cpu")
+        self.action_low = self._prepare_action_bound(action_low, "action_low")
+        self.action_high = self._prepare_action_bound(action_high, "action_high")
 
         self.mu = torch.zeros(self.horizon, self.action_dim, device=self.device)
         self.std = torch.full((self.horizon, self.action_dim), self.init_std, device=self.device)
@@ -147,7 +147,7 @@ class SharedCEMCore:
         std = elite.std(dim=0, unbiased=False)
         new_std = std.clamp(min=self.min_std)
         self._has_distribution = True
-        alpha = 0#0.6
+        alpha = 0.0
         self.mu = alpha * self.mu + (1 - alpha) * new_mu
         self.std = alpha * self.std + (1 - alpha) * new_std
 
@@ -270,9 +270,29 @@ class SharedCEMCore:
     def _clamp_action_tensor(self, actions: torch.Tensor) -> torch.Tensor:
         if self.action_low is None and self.action_high is None:
             return actions
-        low = -float("inf") if self.action_low is None else float(self.action_low)
-        high = float("inf") if self.action_high is None else float(self.action_high)
-        return actions.clamp(min=low, max=high)
+        if self.action_high is not None:
+            actions = torch.minimum(actions, self._bound_for_action_tensor(self.action_high, actions))
+        if self.action_low is not None:
+            actions = torch.maximum(actions, self._bound_for_action_tensor(self.action_low, actions))
+        return actions
+
+    def _bound_for_action_tensor(self, bound: torch.Tensor, actions: torch.Tensor) -> torch.Tensor:
+        bound = bound.to(device=actions.device, dtype=actions.dtype)
+        if bound.ndim == 0:
+            return bound
+        return bound.reshape(*([1] * (actions.ndim - 1)), self.action_dim)
+
+    def _prepare_action_bound(self, value: Optional[Any], name: str) -> Optional[torch.Tensor]:
+        if value is None:
+            return None
+        bound = torch.as_tensor(value, dtype=torch.float32, device=self.device)
+        if bound.ndim == 0:
+            return bound
+        if bound.numel() != self.action_dim:
+            raise ValueError(
+                f"{name} must be scalar or have {self.action_dim} entries, got shape {tuple(bound.shape)}"
+            )
+        return bound.reshape(self.action_dim)
 
     @torch.no_grad()
     def optimize(

@@ -1,151 +1,76 @@
-# HUDM — Hierarchical, Uncertainty‑aware Dynamics Models
+# HUDM
 
-Research code for dimension‑level dropout in model‑based RL, centered on **PushT** planar manipulation.
----
+HUDM is a learned-world-model planning framework for SWM environments.
 
-## 📝 Paper draft
+The active path in this repository is SWM-first:
 
-A draft of our accompanying paper describing the methods and experiments in this repository is available here:
+- collect SWM HDF5 data with `collect_swm.py`
+- train an image-latent hierarchical dynamics model with `train_world_swm.py`
+- run HUDM CEM planning as an SWM-compatible policy with `plan_swm.py`
 
-👉 **[Draft PDF](./draft.pdf)** — _Hierarchical, Uncertainty-aware Dynamics Models_
----
+Legacy environment-specific planning, native multi-fidelity environment backends, particle simulation, discrete action spaces, and state-space planner objectives are out of scope for v1.
 
-## 📂 Repository layout
+## V1 Scope
 
+HUDM v1 supports SWM environments that have:
+
+- continuous `gymnasium.spaces.Box` actions
+- RGB pixel observations
+- a usable restore path for dataset start-goal evaluation
+
+All fidelity levels come from the trained hierarchical dynamics model. The planner objective is terminal L2 distance in learned latent space, using the prefix associated with the selected fidelity level.
+
+## Quick Start
+
+Collect a dataset:
+
+```bash
+python collect_swm.py configs/collect_swm.yaml
 ```
+
+Train a HUDM world model:
+
+```bash
+python train_world_swm.py configs/world_swm.yaml
+```
+
+Run planning/evaluation from dataset start-goal pairs:
+
+```bash
+python plan_swm.py configs/plan_swm.yaml
+```
+
+The example configs default to `swm/PushT-v1`. Change `env_id`, `data.path`, `image_shape`, restore settings, and CEM settings in the YAML files for other supported SWM tasks.
+
+## Repository Layout
+
+```text
 HUDM/
-├─ checkpoints_world/     # saved world model runs (each with world.yaml & .pt weights)
-├─ configs/               # experiment YAMLs (world.yaml)
-├─ docs/                  # configuration and usage references
-├─ datasets/              # Zarr dataset utilities
-│   ├─ zarr_episodes.py  # Zarr-backed full-episode dataset for world training
-│   └─ mixed_zarr.py     # Optional mixing of real + synthetic Zarr datasets
-├─ models/                # world model components
-│   └─ world/             # CNN encoder, upconv decoders, tiny transformer dynamics
-├─ scripts/
-│   ├─ generate_synth.py  # Generate synthetic rollouts in Zarr format
-│   ├─ visualize_rollouts.py  # Visualize rollouts from Zarr datasets
-│   └─ visualize_world_decoder.py  # Visualize decoder reconstructions per level
-└─ train_world.py         # Hierarchical world model training
+├─ collect_swm.py            # SWM HDF5 collection entrypoint
+├─ train_world_swm.py        # SWM HDF5 world-model training entrypoint
+├─ plan_swm.py               # HUDM latent CEM planner as an SWM policy
+├─ configs/
+│  ├─ collect_swm.yaml
+│  ├─ world_swm.yaml
+│  └─ plan_swm.yaml
+├─ datasets/
+│  └─ swm_hdf5.py            # SWM HDF5 episode/window reader
+├─ hudm/
+│  ├─ swm_envs.py            # SWM World construction and action-space checks
+│  ├─ swm_policy.py          # SWM-compatible HUDM planner policy
+│  ├─ swm_restore.py         # restore whitelist and validation
+│  ├─ swm_wrappers.py        # OGBench restore recorder wrapper
+│  └─ world_io.py            # checkpoint and metadata IO
+├─ planning/
+│  ├─ cem_core.py            # reusable CEM optimizer
+│  └─ swm_latent_cem.py      # latent terminal-L2 planner
+└─ models/world/             # configurable image-latent world model
 ```
 
----
+## Reference
 
-## Training
+See [docs/SWM_FIRST.md](docs/SWM_FIRST.md) for supported environments, dataset/checkpoint metadata, command config fields, restore behavior, and test commands.
 
-Train the hierarchical world model:
+## License
 
-```bash
-python train_world.py configs/world.yaml
-```
-
-Log files & checkpoints are written to `checkpoints_world/<run-name>_TIMESTAMP/`.
-
----
-
-## Synthetic Data Generation
-
-Generate synthetic rollouts in Zarr format:
-
-```yaml
-data:
-  synthetic:
-    enable: true
-    zarr_path: "synthetic/pusht_synth.zarr"  # generated via scripts/generate_synth.py
-    frac: 0.5
-    val_source: mixed
-```
-
-```bash
-python scripts/generate_synth.py synthetic/pusht_synth.zarr \
-  --train_eps 200 --val_eps 50 --len_min 50 --len_max 160 --with_velocity \
-  --policy contact_aware --mode-profile train --quality-profile strict --img-size 96 \
-  --contact-aware-ou-sigma 3.0 \
-  --workers 4
-```
-
-`--workers` parallelizes accepted-episode generation across processes while keeping final frame rendering and Zarr writing in the parent process.
-`--contact-aware-ou-sigma` adds a small OU perturbation around contact-aware absolute targets without changing the dataset schema.
-`--max-attempts-per-episode` is now a per-batch retry limit; exhausted batches are skipped and generation continues until enough accepted episodes are collected or the global failed-batch cap is hit. By default `--max-failed-episode-batches=-1`, so there is no global cap.
-
----
-
-## Visualization
-
-Visualize rollouts from Zarr datasets:
-
-```bash
-python scripts/visualize_rollouts.py \
-  --config configs/world.yaml \
-  --source synthetic \
-  --count 5 \
-  --fps 15
-```
-
-Visualize per-level decoder reconstructions:
-
-```bash
-python scripts/visualize_world_decoder.py configs/world.yaml --count 5 --out rollouts/decoder_grid.png
-```
-
----
-
-## Planning (MPC-CEM)
-
-Run closed-loop planning:
-
-```bash
-python plan.py configs/plan.yaml
-```
-
-Key planner controls in `configs/plan.yaml`:
-
-- `backend`: select planning backend (`wm`, `gt_env`, or `particle_sim`).
-- `world_model.*`: world-model config/checkpoint selection.
-- `mpc.*`: horizon, total steps, and replan cadence.
-- `cem.*`: CEM population and sampling controls.
-- `objective.*`: cost weights/metric (latent-space for `wm`, image- or state-space for `gt_env` / `particle_sim`).
-- `gt_env.*`: env-propagation controls (`objective_space`, rollout samples, rollout progress bar, env-side fidelity/noise).
-- `particle_env.*`: Warp-particle controls (`objective_space`, rollout samples, per-level `fidelity_env.spacings`, and solver/device knobs including auto radius scaling via `particle_radius: null` and optional forced single-particle coarsest level).
-- `init_goal.*`: random or dataset-trajectory init/goal sampling.
-- `fidelity.mpc`, `fidelity.cem`, `fidelity.rollout`: unified schedule blocks with `mode` (`fixed`/`linear`, plus `uncertainty_downshift` for rollout).
-- `fidelity`: stage-independent scheduling (MPC sets replan-stage base; CEM schedules within replan; rollout schedules within trajectory).
-- `fidelity.rollout.uncertainty.criterion`: choose `mean` or `percentile` when using `uncertainty_downshift`.
-
-Debug a single backend interactively (scripted actions and/or realtime keyboard controls):
-
-```bash
-python scripts/debug_planning_backend.py --config configs/plan.yaml --backend particle_sim --keyboard
-```
-
----
-
-## Configuration
-
-See full YAML field reference and validation rules:
-
-👉 **[YAML Config Reference](./docs/CONFIG_REFERENCE.md)**
-
-Script command reference:
-
-👉 **[Script CLI Reference](./docs/SCRIPT_CLI_REFERENCE.md)**
-
-For world-model training, configure `configs/world.yaml`:
-
-```yaml
-data:
-  zarr_path: "pusht/pusht_cchi_v7_replay.zarr"  # Real dataset
-  synthetic:
-    enable: true
-    zarr_path: "synthetic/pusht_synth.zarr"    # Synthetic dataset
-    frac: 0.5                                  # 50% synthetic in training mix
-    val_source: mixed                          # Validation source: real | synthetic | mixed
-```
-
----
-
-## License & Acknowledgements
-
-HUDM is released under the MIT License. PushT code and dataset are distributed under the original DINO‑WM terms.
-
-We thank the authors of **PETS**, **MOPO**, **MBDP**, and **DINO‑WM** for open‑sourcing their work.
+HUDM is released under the MIT License.

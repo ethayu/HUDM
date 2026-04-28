@@ -1,0 +1,6 @@
+output_dir: "rollouts/swm_benchmark"
+title: "SWM HUDM Benchmark"
+runs:
+  - name: "default"
+    config: "configs/plan_swm.yaml"
+    overrides: {}

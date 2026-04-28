@@ -1,10 +1,14 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class UpconvDecoder(nn.Module):
-    def __init__(self, in_dim: int):
+    def __init__(self, in_dim: int, image_shape: int | tuple[int, int] = 96):
         super().__init__()
+        if isinstance(image_shape, int):
+            image_shape = (image_shape, image_shape)
+        self.image_shape = (int(image_shape[0]), int(image_shape[1]))
         C = 8
         self.fc = nn.Linear(in_dim, C*8*6*6)
         self.up = nn.Sequential(
@@ -18,30 +22,6 @@ class UpconvDecoder(nn.Module):
         h = self.fc(z_prefix)
         h = h.view(h.size(0), -1, 6, 6)
         x = self.up(h)
-        return x
-
-class StateDecoder(nn.Module):
-    def __init__(self, in_dim: int):
-        super().__init__()
-        self.fc = nn.Sequential(
-                                nn.Linear(in_dim, 512),
-                                nn.LayerNorm(512),
-                                nn.GELU(),
-
-                                nn.Linear(512, 256),
-                                nn.LayerNorm(256),
-                                nn.GELU(),
-
-                                nn.Linear(256, 128),
-                                nn.LayerNorm(128),
-                                nn.GELU(),
-
-                                nn.Linear(128, 64),
-                                nn.GELU(),
-
-                                nn.Linear(64, 5)
-                            )
-
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        x = self.fc(z)
+        if tuple(x.shape[-2:]) != self.image_shape:
+            x = F.interpolate(x, size=self.image_shape, mode="bilinear", align_corners=False)
         return x
