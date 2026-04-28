@@ -322,6 +322,94 @@ class PlanningMediaTests(unittest.TestCase):
 
             self.assertEqual([int(fr[1, 1, 0]) for fr in captured["frames"]], [10, 10, 10])
 
+    def test_predicted_backend_replay_uses_only_executed_replan_prefixes(self):
+        class CountingEnv:
+            def __init__(self):
+                self.relative = True
+                self.action_scale = 1.0
+                self.window_size = 512.0
+                self._state = np.zeros((5,), dtype=np.float32)
+                self._planning_fidelity_level_idx = 0
+
+            def prepare(self, seed, init_state, goal_state=None):
+                del seed, goal_state
+                self._state = np.asarray(init_state, dtype=np.float32).copy()
+                return {"visual": self.render("rgb_array", include_start_pose=False)}, self._state.copy()
+
+            def render(self, mode, include_start_pose=False):
+                del mode
+                frame = np.zeros((4, 4, 3), dtype=np.uint8)
+                frame[:, :, 0] = int(round(float(self._state[0])))
+                if include_start_pose:
+                    frame[0, 0, 1] = 255
+                return frame
+
+            def step(self, action):
+                self._state = self._state.copy()
+                self._state[0] += float(np.asarray(action, dtype=np.float32)[0])
+                return {"visual": self.render("rgb_array", include_start_pose=False)}, 0.0, False, {"state": self._state.copy()}
+
+            def set_planning_fidelity_level(self, level_idx):
+                self._planning_fidelity_level_idx = int(level_idx)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(os.path.join(tmpdir, "trace.json"), "w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "plan_config": {"env": {"render_size": 4}, "mpc": {"replan_every": 2}},
+                        "sample": {},
+                        "init_state": [0.0, 0, 0, 0, 0],
+                        "goal_state": [0.0, 0, 0, 0, 0],
+                    },
+                    f,
+                )
+            np.savez_compressed(
+                os.path.join(tmpdir, "trace.npz"),
+                replan_action_seqs=np.asarray(
+                    [
+                        [[1.0, 0.0], [1.0, 0.0], [9.0, 0.0]],
+                        [[1.0, 0.0], [9.0, 0.0], [9.0, 0.0]],
+                    ],
+                    dtype=np.float32,
+                ),
+                replan_start_states=np.asarray(
+                    [
+                        [100.0, 0, 0, 0, 0],
+                        [200.0, 0, 0, 0, 0],
+                    ],
+                    dtype=np.float32,
+                ),
+                replan_rollout_levels=np.asarray([[0, 0, 0], [0, 0, 0]], dtype=np.int32),
+                replan_rollout_lengths=np.asarray([3, 3], dtype=np.int32),
+                replan_step_starts=np.asarray([0, 2], dtype=np.int32),
+                trajectory=np.asarray(
+                    [
+                        [0.0, 0, 0, 0, 0],
+                        [1.0, 0, 0, 0, 0],
+                        [2.0, 0, 0, 0, 0],
+                        [3.0, 0, 0, 0, 0],
+                    ],
+                    dtype=np.float32,
+                ),
+                executed_actions=np.asarray([[1.0, 0.0], [1.0, 0.0], [1.0, 0.0]], dtype=np.float32),
+            )
+            captured = {}
+
+            def _capture_video(path, frames, fps=15, output_size=256):
+                del path, fps, output_size
+                captured["frames"] = [np.asarray(fr).copy() for fr in frames]
+
+            with mock.patch.object(
+                planning_media,
+                "_build_runtime",
+                return_value=(OmegaConf.create({"env": {"render_size": 4}, "mpc": {"replan_every": 2}}), {"env": CountingEnv(), "backend": "gt_env"}),
+            ):
+                with mock.patch.object(planning_media, "overlay_action_targets_on_frames", side_effect=lambda frames, states, actions, overlay_spec: frames):
+                    with mock.patch.object(planning_media.single_plan, "_write_video_mp4", side_effect=_capture_video):
+                        planning_media.render_media(tmpdir, schedule=None, rollout_id=None, media=["predicted_backend_replay"])
+
+            self.assertEqual([int(fr[1, 1, 0]) for fr in captured["frames"]], [0, 1, 2, 2, 3])
+
     def test_predicted_backend_replay_particle_uses_info_state_not_reward(self):
         class DummyRuntimeEnv:
             relative = True

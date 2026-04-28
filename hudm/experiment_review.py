@@ -407,6 +407,15 @@ def _load_partial_run_row(raw_trace_dir: str, *, variant_name: str) -> dict[str,
         )
     )
     rollout_id = str(sample.get("rollout_id", os.path.basename(raw_trace_dir)))
+    metric_success = run_stats.get(
+        "termination_metric_success",
+        metadata.get("termination_metric_success", trace_meta.get("success", False)),
+    )
+    termination_done = run_stats.get(
+        "termination_done",
+        metadata.get("termination_done", metadata.get("success", trace_meta.get("success", False))),
+    )
+    success = bool(metric_success and termination_done)
 
     return {
         "variant_name": str(variant_name),
@@ -415,17 +424,12 @@ def _load_partial_run_row(raw_trace_dir: str, *, variant_name: str) -> dict[str,
         "episode_index": int(sample.get("episode_index", -1)),
         "start_index": int(sample.get("start_index", -1)),
         "goal_index": int(sample.get("goal_index", -1)),
-        "success": int(bool(metadata.get("success", trace_meta.get("success", False)))),
+        "success": int(success),
         "termination_reason": str(run_stats.get("termination_reason", metadata.get("termination_reason", "unknown"))),
         "termination_step": int(run_stats.get("termination_step", metadata.get("termination_step", -1))),
         "executed_steps": executed_steps,
         "plans": plans,
-        "success_and_done": int(
-            bool(
-                run_stats.get("termination_metric_success", metadata.get("termination_metric_success", False))
-                and run_stats.get("termination_done", metadata.get("termination_done", False))
-            )
-        ),
+        "success_and_done": int(success),
         "final_pos_diff": _trace_final_value(pos_diffs, run_stats.get("termination_pos_diff", metadata.get("termination_pos_diff"))),
         "final_angle_diff": _trace_final_value(angle_diffs, run_stats.get("termination_angle_diff", metadata.get("termination_angle_diff"))),
         "final_eef_diff": _trace_final_value(eef_diffs, run_stats.get("termination_eef_diff", metadata.get("termination_eef_diff"))),
@@ -1308,7 +1312,9 @@ def _base_page(title: str, body_html: str, *, auto_refresh_seconds: int | None =
     .status-succeeded {{ background: #defbe6; color: #198038; }}
     .status-failed {{ background: #ffd7d9; color: #a2191f; }}
     .status-missing {{ background: #eef2f7; color: #52606d; }}
-    .media-card video {{ width: 100%; aspect-ratio: 1 / 1; max-height: none; object-fit: contain; background: #111; }}
+    .media-card video, .media-card img {{ display: block; width: 100%; aspect-ratio: 1 / 1; max-height: none; object-fit: contain; border-radius: 8px; }}
+    .media-card video {{ background: #111; }}
+    .media-card img {{ background: #fff; }}
     .info-chip {{ position: relative; display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 999px; background: #eef2f7; color: #52606d; font-size: 12px; font-weight: 700; cursor: help; margin-left: 6px; vertical-align: middle; }}
     .info-chip::after {{ content: attr(data-tooltip); position: absolute; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%); width: min(280px, 70vw); padding: 8px 10px; border-radius: 8px; background: #18212b; color: white; font-size: 12px; font-weight: 500; line-height: 1.4; text-transform: none; letter-spacing: 0; white-space: normal; box-shadow: 0 8px 24px rgba(0,0,0,0.18); opacity: 0; pointer-events: none; transition: opacity 120ms ease; z-index: 20; }}
     .info-chip::before {{ content: ""; position: absolute; left: 50%; bottom: calc(100% + 2px); transform: translateX(-50%); border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 6px solid #18212b; opacity: 0; pointer-events: none; transition: opacity 120ms ease; z-index: 21; }}
@@ -2456,14 +2462,15 @@ def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = N
             "Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early."
         ),
         "planner_view_replay": (
-            "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. "
+            "Executed actions from the current variant are rolled out in the configured "
+            f"baseline/reference backend ({context.backend_label if context is not None else 'baseline backend'}). "
             f"States are rendered in the planner backend ({backend_label}). "
             "Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early."
         ),
         "predicted_backend_replay": (
             f"s_{{t+1}} = f(s_t, a_t), where f is the planner backend ({backend_label}). "
             f"States are rendered in the planner backend ({backend_label}). "
-            "Here T is plan.planner.horizon * num_replans."
+            "Here T is the sum of the MPC action prefixes actually executed from each replan."
         ),
         "gt_replay": (
             "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. "
@@ -2545,14 +2552,6 @@ def _media_section_html(
     backend_label = _media_backend_label(trace_meta)
     reference_context = reference_eval.resolve_reference_context(data.meta)
     active_media_names = _active_review_media(data, trace_meta=trace_meta)
-    render_reference_href = (
-        f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
-        + "".join(f"&media={quote(media_name)}" for media_name in REFERENCE_MEDIA)
-    )
-    render_backend_href = (
-        f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
-        + "".join(f"&media={quote(media_name)}" for media_name in PLANNER_BACKEND_MEDIA)
-    )
     render_all_href = (
         f"/render?variant={quote(variant)}&rollout_id={quote(rollout_id)}"
         + "".join(f"&media={quote(media_name)}" for media_name in active_media_names)
@@ -2566,11 +2565,7 @@ def _media_section_html(
         if reference_context is not None
         else f"Planner-view and predicted-backend replays use this run's planner backend (<code>{html.escape(backend_label)}</code>)."
     )
-    controls = ""
-    if reference_context is not None:
-        controls += f"<a class='button primary' data-async-render='true' href='{render_reference_href}'>Render reference media</a> "
-    controls += f"<a class='button' data-async-render='true' href='{render_backend_href}'>Render planner-backend media</a> "
-    controls += f"<a class='button' data-async-render='true' href='{render_all_href}'>Render all media for this run</a>"
+    controls = f"<a class='button primary' data-async-render='true' href='{render_all_href}'>Render all media</a>"
     return (
         f"<section class='card' id='mediaSection' data-variant='{html.escape(variant)}' "
         f"data-rollout-id='{html.escape(rollout_id)}' data-active-media='{'true' if active_media else 'false'}'>"

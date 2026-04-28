@@ -311,6 +311,7 @@ class ExperimentReviewTests(unittest.TestCase):
             self.assertIn("plot-shell", html)
             self.assertIn("minmax(min(420px, 100%), 1fr)", html)
             self.assertIn("width: min(100%, 320px)", html)
+            self.assertIn(".media-card video, .media-card img", html)
             self.assertIn("resizePlotlyFigures", html)
             self.assertIn("100.00 b", html)
             self.assertIn("Mean FLOPs", html)
@@ -795,9 +796,10 @@ class ExperimentReviewTests(unittest.TestCase):
                 "Planner-view and predicted-backend replays use this run's planner backend",
                 media_html,
             )
-            self.assertIn("Render planner-backend media", media_html)
+            self.assertIn("Render all media", media_html)
+            self.assertNotIn("Render planner-backend media", media_html)
 
-    def test_media_section_uses_reference_media_and_hides_gt_when_baseline_is_non_gt(self):
+    def test_media_section_uses_reference_media_and_keeps_gt_media_available(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             run_dir, trace_dir = self._make_experiment_dir(tmpdir)
             with open(os.path.join(run_dir, EXPERIMENT_JSON), "w", encoding="utf-8") as f:
@@ -850,9 +852,10 @@ class ExperimentReviewTests(unittest.TestCase):
 
             self.assertIn("Reference Goal State (particle_sim)", media_html)
             self.assertIn("Reference-Env Replay (particle_sim)", media_html)
-            self.assertIn("Render reference media", media_html)
-            self.assertNotIn("Execution Replay (GT env)", media_html)
-            self.assertNotIn("Dataset Replay (GT env)", media_html)
+            self.assertIn("Render all media", media_html)
+            self.assertNotIn("Render reference media", media_html)
+            self.assertIn("Execution Replay (GT env)", media_html)
+            self.assertIn("Dataset Replay (GT env)", media_html)
 
     def test_load_experiment_review_data_normalizes_compact_reference_plan(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -1116,12 +1119,22 @@ class ExperimentReviewTests(unittest.TestCase):
                 "backend": "wm",
                 "world_model": {"run_dir": "/tmp/checkpoints/world_model_demo"},
             },
+            "experiment_meta": {
+                "baseline_variant": "baseline_particle",
+                "variants": [
+                    {
+                        "name": "baseline_particle",
+                        "plan": {"backend": "particle_sim"},
+                    }
+                ],
+            },
         }
         planner_desc = _media_description("planner_view_replay", trace_meta=trace_meta)
         predicted_desc = _media_description("predicted_backend_replay", trace_meta=trace_meta)
         self.assertEqual(
             planner_desc,
-            "s_{t+1} = f(s_t, a_t), where f is the GT environment transition. "
+            "Executed actions from the current variant are rolled out in the configured "
+            "baseline/reference backend (particle_sim). "
             "States are rendered in the planner backend (wm (world_model_demo)). "
             "Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early.",
         )
@@ -1129,7 +1142,7 @@ class ExperimentReviewTests(unittest.TestCase):
             predicted_desc,
             "s_{t+1} = f(s_t, a_t), where f is the planner backend (wm (world_model_demo)). "
             "States are rendered in the planner backend (wm (world_model_demo)). "
-            "Here T is plan.planner.horizon * num_replans.",
+            "Here T is the sum of the MPC action prefixes actually executed from each replan.",
         )
 
     def test_figure_html_adds_barmode_toggle_only_for_stackable_figures(self):
