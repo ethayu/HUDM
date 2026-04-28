@@ -119,6 +119,24 @@ class ParticleCEMPlanner:
         self.core.reset_distribution()
 
     @staticmethod
+    def _prepare_inject_actions_tensor(
+        gt_action_trajectory: Any,
+        horizon: int,
+        action_dim: int,
+        device: torch.device,
+    ) -> torch.Tensor:
+        arr = np.asarray(gt_action_trajectory, dtype=np.float32)
+        if arr.ndim != 2 or arr.shape[1] != int(action_dim):
+            raise ValueError(
+                f"gt_action_trajectory must have shape (T, {action_dim}), got {arr.shape}"
+            )
+        out = np.zeros((int(horizon), int(action_dim)), dtype=np.float32)
+        n = min(int(horizon), int(arr.shape[0]))
+        if n > 0:
+            out[:n] = arr[:n]
+        return torch.as_tensor(out, device=device, dtype=torch.float32)
+
+    @staticmethod
     def _angle_delta(a: float, b: float) -> float:
         d = a - b
         return abs(math.atan2(math.sin(d), math.cos(d)))
@@ -370,6 +388,8 @@ class ParticleCEMPlanner:
         seed: int = 0,
         warm_start_steps: int = 0,
         rng_seed: Optional[int] = None,
+        gt_action_trajectory: Optional[Any] = None,
+        gt_inject_count: int = 1,
     ) -> tuple[torch.Tensor, ParticleCEMInfo]:
         t0 = time.perf_counter()
 
@@ -430,12 +450,22 @@ class ParticleCEMPlanner:
             return torch.as_tensor(costs, device=self.device), rollout_levels, bits_iter
 
         start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
+        inject_tensor: Optional[torch.Tensor] = None
+        if gt_action_trajectory is not None:
+            inject_tensor = self._prepare_inject_actions_tensor(
+                gt_action_trajectory,
+                self.horizon,
+                self.action_dim,
+                self.device,
+            )
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
             evaluate_population=_evaluate,
             warm_start=self.warm_start,
             shift_steps=int(warm_start_steps),
             rng_seed=rng_seed,
+            inject_actions=inject_tensor,
+            inject_count=int(gt_inject_count),
         )
 
         base_spacing = float(self.backend.spacing(final_level_idx))
@@ -719,6 +749,8 @@ class BatchedParticleCEMPlanner(ParticleCEMPlanner):
         seed: int = 0,
         warm_start_steps: int = 0,
         rng_seed: Optional[int] = None,
+        gt_action_trajectory: Optional[Any] = None,
+        gt_inject_count: int = 1,
     ) -> tuple[torch.Tensor, ParticleCEMInfo]:
         t0 = time.perf_counter()
 
@@ -862,12 +894,22 @@ class BatchedParticleCEMPlanner(ParticleCEMPlanner):
             return torch.as_tensor(costs, device=self.device), rollout_levels, int(bits_iter)
 
         start_level_idx = self.core.base_level_index(mpc_progress, 0.0)
+        inject_tensor: Optional[torch.Tensor] = None
+        if gt_action_trajectory is not None:
+            inject_tensor = self._prepare_inject_actions_tensor(
+                gt_action_trajectory,
+                self.horizon,
+                self.action_dim,
+                self.device,
+            )
         action_seq, final_level_idx, final_rollout_levels, total_bits = self.core.optimize(
             mpc_progress=mpc_progress,
             evaluate_population=_evaluate,
             warm_start=self.warm_start,
             shift_steps=int(warm_start_steps),
             rng_seed=rng_seed,
+            inject_actions=inject_tensor,
+            inject_count=int(gt_inject_count),
         )
 
         base_spacing = float(self.backend.spacing(final_level_idx))

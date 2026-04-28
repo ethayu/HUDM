@@ -8,7 +8,7 @@ plan:
       progress_leave: false
       objective:
         action_l2_weight: 0.05
-        eef_weight: 1.0
+        eef_weight: 0.0
         block_pos_weight: 1.0
         block_angle_weight: 0.1
         state_l2_weight: 0.0

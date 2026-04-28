@@ -54,6 +54,7 @@ def validate_plan_cfg(cfg) -> None:
             "n_iter",
             "init_std",
             "inject_dataset_gt_actions",
+            "gt_inject_count",
             "warm_start",
             "action_low",
             "action_high",
@@ -185,6 +186,8 @@ def validate_plan_cfg(cfg) -> None:
             "plan.cem.inject_dataset_gt_actions must be a bool, "
             f"got {type(_inject_gt).__name__}"
         )
+    if int(getattr(cfg.cem, "gt_inject_count", 1)) <= 0:
+        raise ValueError(f"plan.cem.gt_inject_count must be > 0, got {cfg.cem.gt_inject_count}")
     if int(cfg.gt_env.rollout_samples) <= 0:
         raise ValueError(f"plan.gt_env.rollout_samples must be > 0, got {cfg.gt_env.rollout_samples}")
     objective_space = str(getattr(cfg.gt_env, "objective_space", "image")).lower()

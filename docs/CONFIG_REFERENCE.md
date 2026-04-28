@@ -137,6 +137,8 @@ Loading behavior:
 | `n_iter` | int | `> 0` | CEM iterations per replan. |
 | `init_std` | float | `> 0` recommended | Initial Gaussian std for action sampling. |
 | `warm_start` | bool | `true/false` | Reuse previous replan CEM distribution by shifting it forward by executed MPC actions. |
+| `inject_dataset_gt_actions` | bool | `true/false` | When dataset actions are available, inject the current GT action window into CEM. |
+| `gt_inject_count` | int | `> 0` | Number of CEM candidates to replace with the GT action window when injection is enabled. |
 | `action_low` | float\|null | optional | Lower clip bound on sampled actions. |
 | `action_high` | float\|null | optional | Upper clip bound on sampled actions. |
 
@@ -148,10 +150,10 @@ Loading behavior:
 | `terminal_weight` | float | any real | Terminal distance weight (`wm` latent or `gt_env` image mode). |
 | `running_weight` | float | any real | Per-step distance weight (`wm` latent or `gt_env` image mode). |
 | `action_l2_weight` | float | any real | Action magnitude regularization weight. |
-| `eef_weight` | float | any real | `gt_env` backend: end-effector distance weight. |
-| `block_pos_weight` | float | any real | `gt_env` backend: block position distance weight. |
-| `block_angle_weight` | float | any real | `gt_env` backend: block angle distance weight. |
-| `state_l2_weight` | float | any real | `gt_env` backend: full-state L2 term weight. |
+| `eef_weight` | float | any real | State-objective end-effector distance weight. For PushT success/coverage-aligned particle planning, keep this at `0.0`. |
+| `block_pos_weight` | float | any real | State-objective block position distance weight. |
+| `block_angle_weight` | float | any real | State-objective block angle distance weight. |
+| `state_l2_weight` | float | any real | State-objective full-state L2 term weight. |
 
 ### `fidelity`
 

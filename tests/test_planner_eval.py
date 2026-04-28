@@ -61,6 +61,8 @@ class ExperimentConfigTests(unittest.TestCase):
             ],
         )
         self.assertEqual(spec.baseline, "particle_l7_n252_fixed")
+        baseline = next(variant for variant in spec.variants if variant.name == spec.baseline)
+        self.assertEqual(float(baseline.plan.backend["particle_sim"]["objective"]["eef_weight"]), 0.0)
 
     def test_experiment_config_accepts_particle_device_slots(self):
         task_cfg = os.path.join(ROOT, "configs/task/pusht_smoke_dataset.yaml")
