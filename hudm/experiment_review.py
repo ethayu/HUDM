@@ -2462,7 +2462,7 @@ def _media_description(media_name: str, *, trace_meta: dict[str, Any] | None = N
             "Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early."
         ),
         "planner_view_replay": (
-            "Executed actions from the current variant are rolled out in the configured "
+            "s_{t+1} = f(s_t, a_t), where f is the configured "
             f"baseline/reference backend ({context.backend_label if context is not None else 'baseline backend'}). "
             f"States are rendered in the planner backend ({backend_label}). "
             "Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early."
