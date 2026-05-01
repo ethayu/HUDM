@@ -10,7 +10,7 @@ plan:
     init_goal:
       source: "dataset"
       dataset:
-        zarr_path: "/home/aurora/HUDM-mwm/synthetic/pusht_noise.zarr" #"synthetic/pusht_synth_planning_translation_100_len15.zarr"
+        zarr_path: "synthetic/pusht_synth_planning_translation_100_len15.zarr" #"/home/aurora/HUDM-mwm/synthetic/pusht_noise.zarr" #
         split: "train"
         split_ratio: null
         trajectory_len: 15

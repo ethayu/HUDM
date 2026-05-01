@@ -10,7 +10,7 @@ experiment:
         save: false
   rollouts:
     seed: 0
-    num_rollouts: 20
+    num_rollouts: 100
     sample_without_replacement: true
   execution:
     mode: "auto"

@@ -1,0 +1,140 @@
+experiment:
+  name: "particle_fidelity_sweep_5"
+  shared_plan:
+    imports:
+      - task/pusht_dataset.yaml
+      - planner/default.yaml
+      - backend/particle_state.yaml
+    plan:
+      budget:
+        max_env_steps: 30
+      planner:
+        horizon: 30
+        replan_every: 10
+        cem:
+          pop_size: 500
+          elite_frac: 0.1
+          n_iter: 10
+          init_std: 1
+          warm_start: true
+          action_low: null
+          action_high: null
+      artifacts:
+        render: false
+        save: false
+  rollouts:
+    seed: 0
+    num_rollouts: 50
+    sample_without_replacement: true
+  execution:
+    mode: "auto"
+    max_workers: 12
+  reporting:
+    output_root: "rollouts"
+  baseline: "particle_l7_n252_fixed"
+  variants:
+    - name: "particle_l5_n64_fixed"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "fixed"
+              level: 5
+            cem:
+              mode: "fixed"
+              level: "base"
+            rollout:
+              mode: "fixed"
+              level: "base"
+    - name: "particle_l6_n128_fixed"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "fixed"
+              level: 6
+            cem:
+              mode: "fixed"
+              level: "base"
+            rollout:
+              mode: "fixed"
+              level: "base"
+    - name: "particle_l7_n252_fixed"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "fixed"
+              level: 7
+            cem:
+              mode: "fixed"
+              level: "base"
+            rollout:
+              mode: "fixed"
+              level: "base"
+    - name: "particle_linear_mpc"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "linear"
+              start_level: "5"
+              end_level: "finest"
+            cem:
+              mode: "fixed"
+              level: "base"
+            rollout:
+              mode: "fixed"
+              level: "base"
+    - name: "particle_linear_mpc_cem"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "linear"
+              start_level: 5
+              end_level: "finest"
+            cem:
+              mode: "linear"
+              start_level: "base"
+              end_level: "finest"
+            rollout:
+              mode: "fixed"
+              level: "base"
+    - name: "particle_linear_all"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "linear"
+              start_level: 5
+              end_level: "finest"
+            cem:
+              mode: "linear"
+              start_level: "base"
+              end_level: "finest"
+            rollout:
+              mode: "linear"
+              start_level: "base"
+              end_level: "coarsest"
+    - name: "particle_linear_cem"
+      overrides:
+        planner:
+          fidelity:
+            enabled: true
+            mpc:
+              mode: "fixed"
+              level: 5
+            cem:
+              mode: "linear"
+              start_level: "base"
+              end_level: "finest"
+            rollout:
+              mode: "fixed"
+              level: "base"
