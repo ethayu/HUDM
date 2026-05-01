@@ -1133,7 +1133,7 @@ class ExperimentReviewTests(unittest.TestCase):
         predicted_desc = _media_description("predicted_backend_replay", trace_meta=trace_meta)
         self.assertEqual(
             planner_desc,
-            "Executed actions from the current variant are rolled out in the configured "
+            "s_{t+1} = f(s_t, a_t), where f is the configured "
             "baseline/reference backend (particle_sim). "
             "States are rendered in the planner backend (wm (world_model_demo)). "
             "Here T is bounded by plan.budget.max_env_steps, and is smaller if the rollout terminates early.",
