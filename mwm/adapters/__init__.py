@@ -30,3 +30,12 @@ else:
         if _name not in __all__:
             __all__.append(_name)
     del _lewm
+
+for _optional_module in ("mwm.adapters.prejepa", "mwm.adapters.pldm"):
+    _module = import_module(_optional_module)
+    for _name in getattr(_module, "__all__", ()):
+        globals()[_name] = getattr(_module, _name)
+        if _name not in __all__:
+            __all__.append(_name)
+    del _module
+del _optional_module

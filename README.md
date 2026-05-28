@@ -1,76 +1,77 @@
-# HUDM
+# MWM
 
-HUDM is a learned-world-model planning framework for SWM environments.
+Matryoshka World Models (MWM) is a Stable-WM-compatible benchmark and evaluation repo for multi-fidelity world models.
 
-The active path in this repository is SWM-first:
-
-- collect SWM HDF5 data with `collect_swm.py`
-- train an image-latent hierarchical dynamics model with `train_world_swm.py`
-- run HUDM CEM planning as an SWM-compatible policy with `plan_swm.py`
-
-Legacy environment-specific planning, native multi-fidelity environment backends, particle simulation, discrete action spaces, and state-space planner objectives are out of scope for v1.
-
-## V1 Scope
-
-HUDM v1 supports SWM environments that have:
-
-- continuous `gymnasium.spaces.Box` actions
-- RGB pixel observations
-- a usable restore path for dataset start-goal evaluation
-
-All fidelity levels come from the trained hierarchical dynamics model. The planner objective is terminal L2 distance in learned latent space, using the prefix associated with the selected fidelity level.
+The review story is intentionally narrow: every evaluated checkpoint is loaded as an `MWMWorldModel`, datasets are Lance, and all benchmark roles run through the same scheduled CEM evaluator. Trainable Le-WM MWM keeps a shared Le-WM encoder/projector trunk and adds fresh per-`K` transition heads (`action_encoder`, `predictor`, `pred_proj`) trained with Le-WM loss semantics.
 
 ## Quick Start
 
-Collect a dataset:
+```bash
+python collect_mwm_data.py configs/collect_mwm_pusht.yaml
+python collect_mwm_data.py configs/collect_mwm_tworoom.yaml
+python verify_mwm_data.py
+python prepare_upstream_lewm.py
+python train_mwm.py configs/train_mwm_lewm_pusht.yaml
+python train_mwm.py configs/train_mwm_lewm_tworoom.yaml
+python train_mwm.py configs/train_mwm_scheduled_pusht.yaml
+python train_mwm.py configs/train_mwm_scheduled_tworoom.yaml
+python benchmark_mwm.py configs/benchmark_mwm.yaml
+python verify_mwm_benchmark.py configs/benchmark_mwm.yaml
+```
+
+The full gate is:
 
 ```bash
-python collect_swm.py configs/collect_swm.yaml
+scripts/run_mwm_v1_gate.sh
 ```
 
-Train a HUDM world model:
+To rerun only the benchmark matrix from existing canonical checkpoints:
 
 ```bash
-python train_world_swm.py configs/world_swm.yaml
+scripts/run_mwm_benchmark_gate.sh
 ```
 
-Run planning/evaluation from dataset start-goal pairs:
+To rerun the paper-parity evaluator sanity check:
 
 ```bash
-python plan_swm.py configs/plan_swm.yaml
+scripts/run_mwm_paper_parity.sh
 ```
 
-The example configs default to `swm/PushT-v1`. Change `env_id`, `data.path`, `image_shape`, restore settings, and CEM settings in the YAML files for other supported SWM tasks.
+On Betty/PARCC, submit the paper-parity gate first and the full MWM gate after it:
 
-## Repository Layout
-
-```text
-HUDM/
-├─ collect_swm.py            # SWM HDF5 collection entrypoint
-├─ train_world_swm.py        # SWM HDF5 world-model training entrypoint
-├─ plan_swm.py               # HUDM latent CEM planner as an SWM policy
-├─ configs/
-│  ├─ collect_swm.yaml
-│  ├─ world_swm.yaml
-│  └─ plan_swm.yaml
-├─ datasets/
-│  └─ swm_hdf5.py            # SWM HDF5 episode/window reader
-├─ hudm/
-│  ├─ swm_envs.py            # SWM World construction and action-space checks
-│  ├─ swm_policy.py          # SWM-compatible HUDM planner policy
-│  ├─ swm_restore.py         # restore whitelist and validation
-│  ├─ swm_wrappers.py        # OGBench restore recorder wrapper
-│  └─ world_io.py            # checkpoint and metadata IO
-├─ planning/
-│  ├─ cem_core.py            # reusable CEM optimizer
-│  └─ swm_latent_cem.py      # latent terminal-L2 planner
-└─ models/world/             # configurable image-latent world model
+```bash
+scripts/submit_mwm_gates.sh
 ```
 
-## Reference
+## Architecture
 
-See [docs/SWM_FIRST.md](docs/SWM_FIRST.md) for supported environments, dataset/checkpoint metadata, command config fields, restore behavior, and test commands.
+- `mwm.models.world_model.MWMWorldModel` is the only runtime model contract.
+- `mwm.adapters.lewm` contains the current Le-WM base adapter and trusted-object importer.
+- `mwm.adapters.lewm.LeWMMatryoshkaWorldModel` is the trainable implementation. `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path; multi-`K` training encodes once and aggregates requested prefix losses only.
+- `mwm.checkpoints` reads and writes strict canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`.
+- `mwm.planning.scheduled_cem` is the active evaluator/planner path.
+- `mwm.data.stable_wm` is Lance-only data glue for Stable-WM datasets and immutable eval manifests.
 
-## License
+## Base-Adaptive MWM
 
-HUDM is released under the MIT License.
+MWM reads Stable-WM `config.json` files for architecture and never copies source
+weights for fair training. The Stable-WM config is an architecture oracle; the
+training recipe comes from the MWM YAML and is applied across matryoshka levels.
+Adapters declare top-level component groups, then configs choose which groups are
+shared or duplicated. Le-WM is implemented first: `encoder + projector` are the
+shared latent producer, while `action_encoder + predictor + pred_proj` are
+fresh per-`K` transition tails.
+
+PreJEPA/DINO-WM and PLDM currently expose component-group declarations only.
+They fail explicitly until an explicit Stable-WM training recipe artifact is
+available, so unknown bases cannot silently fall through to generic MWM dynamics.
+
+## Benchmark Roles
+
+The benchmark matrix is PushT and TwoRoom, seeds `0,1,2`, with:
+
+- `upstream_lewm_converted`: upstream Le-WM imported into a canonical single-fidelity MWM checkpoint.
+- `retrained_lewm_single`: exact Le-WM single-level training with `K=[192]`, exported as a canonical MWM checkpoint.
+- `mwm_scheduled`: this repo's multi-fidelity training with `K=[48,96,144,192]`.
+
+Generated datasets, checkpoints, rollouts, logs, and caches are intentionally ignored by git. See `REVIEW_GUIDE.md` for the code-review map and acceptance checks.

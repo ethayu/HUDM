@@ -333,3 +333,37 @@ class LeWMStableConfigTests(unittest.TestCase):
         self.assertEqual(model.num_preds, 2)
         self.assertEqual(model.metadata["head_architectures"][0]["pred_proj_hidden_dim"], 16)
         self.assertEqual(model.transitions[0].pred_proj.net[0].out_features, 16)
+
+
+class UnsupportedAdapterTests(unittest.TestCase):
+    def test_prejepa_adapter_declares_groups_but_requires_recipe(self) -> None:
+        from mwm.adapters.prejepa import PreJEPAStableWMAdapter
+
+        adapter = PreJEPAStableWMAdapter()
+        groups = adapter.component_groups()
+        self.assertEqual(groups["latent_producer"].components, ("backbone",))
+        self.assertEqual(groups["transition"].components, ("predictor", "extra_encoders"))
+        with self.assertRaisesRegex(NotImplementedError, "training recipe"):
+            adapter.resolve_spec(
+                source_config={"_target_": "stable_worldmodel.wm.prejepa.PreJEPA"},
+                source_config_sha256="abc",
+                training_recipe={},
+                levels=(4,),
+                component_policy=None,
+            )
+
+    def test_pldm_adapter_declares_groups_but_requires_recipe(self) -> None:
+        from mwm.adapters.pldm import PLDMStableWMAdapter
+
+        adapter = PLDMStableWMAdapter()
+        groups = adapter.component_groups()
+        self.assertEqual(groups["latent_producer"].components, ("encoder", "projector"))
+        self.assertEqual(groups["transition"].components, ("action_encoder", "predictor", "pred_proj"))
+        with self.assertRaisesRegex(NotImplementedError, "training recipe"):
+            adapter.resolve_spec(
+                source_config={"_target_": "stable_worldmodel.wm.pldm.PLDM"},
+                source_config_sha256="abc",
+                training_recipe={},
+                levels=(4,),
+                component_policy=None,
+            )
