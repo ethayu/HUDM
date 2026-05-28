@@ -431,9 +431,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         ):
             self.assertNotIn(token, world_model_text)
 
-        training_text = (ROOT / "mwm" / "training.py").read_text(encoding="utf-8")
-        self.assertIn("adapter-owned training_loss", training_text)
-        self.assertNotIn("mwm_prediction_loss", training_text)
+        self.assertFalse((ROOT / "mwm" / "training.py").exists())
 
         train_entrypoint_text = (ROOT / "train_mwm.py").read_text(encoding="utf-8")
         for token in (
@@ -449,18 +447,11 @@ class MWMRepoHygieneTests(unittest.TestCase):
     def test_unused_helper_modules_and_ogbench_restore_support_are_removed(self) -> None:
         removed = [
             "mwm/metrics.py",
+            "mwm/training.py",
             "mwm/swm/wrappers.py",
         ]
         for rel in removed:
             self.assertFalse((ROOT / rel).exists(), rel)
-
-        training_text = (ROOT / "mwm" / "training.py").read_text(encoding="utf-8")
-        for token in (
-            "StablePretrainingMWMModule",
-            "build_stable_pretraining_module",
-            "build_stable_sigreg",
-        ):
-            self.assertNotIn(token, training_text)
 
         restore_text = (ROOT / "mwm" / "swm" / "restore.py").read_text(encoding="utf-8")
         self.assertNotIn("OGB", restore_text)

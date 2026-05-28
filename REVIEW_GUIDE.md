@@ -268,8 +268,6 @@ scripts/run_mwm_v1_gate.sh
 - `mwm/swm/restore.py`: Restore adapter registry. Defines built-in restore specs
   for PushT, TwoRoom/Piecewise, and DMControl; supports user restore specs;
   validates required dataset columns; returns Stable-WM eval callables.
-- `mwm/training.py`: Narrow training loss bridge used by `train_mwm.py`; adapter
-  models with `training_loss` own their base-specific loss behavior.
 
 ## Config Files
 

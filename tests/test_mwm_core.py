@@ -34,7 +34,6 @@ from mwm.models.world_model import (
     weighted_level_mean,
 )
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from mwm.training import mwm_spt_forward
 from train_mwm import (
     _build_trainable_model_from_base,
     _lewm_base_adapter_checkpoint_callback,
@@ -513,14 +512,6 @@ class MWMCoreTests(unittest.TestCase):
         self.assertFalse(hasattr(model, "decoders"))
         with self.assertRaisesRegex(NotImplementedError, "decoder"):
             model.decode(0, torch.zeros(1, 4))
-        with self.assertRaisesRegex(RuntimeError, "adapter-owned training_loss"):
-            mwm_spt_forward(
-                model,
-                {
-                    "x": torch.rand(1, 2, 3, 8, 8),
-                    "a": torch.zeros(1, 1, 2),
-                },
-            )
 
     def test_raw_world_model_allows_levels_without_base_dimension(self) -> None:
         model = MWMWorldModel(

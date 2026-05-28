@@ -29,7 +29,7 @@ Workers are not alone in the codebase. They must not revert edits made by others
 - Create `mwm/adapters/registry.py`: adapter registration and family lookup.
 - Modify `mwm/adapters/lewm.py`: implement the new Le-WM adapter on top of Stable-WM config specs while preserving current public builders.
 - Modify `mwm/adapters/__init__.py`: export new adapter protocol and registry APIs.
-- Modify `mwm/training.py`: pass loss config through adapter-owned `training_loss`, build shared regularizers once, and preserve generic fallback only as non-production compatibility.
+- Remove the old `mwm/training.py` bridge; adapter-owned loss dispatch lives in the active `train_mwm.py` path and shared world-model helpers.
 - Modify `train_mwm.py`: add resolver-driven model construction, record source config and component policy metadata, and preserve current Le-WM config compatibility.
 - Modify `mwm/checkpoints.py`: persist/validate source config hash, adapter family, component policy, fresh-init status, and loss-scope policy.
 - Create `mwm/eval/reference.py`: reference Stable-WM evaluator helpers for upstream evaluator fallback.
@@ -761,7 +761,7 @@ git commit -m "feat: build Le-WM MWM from Stable-WM configs"
 
 **Files:**
 - Modify: `mwm/adapters/lewm.py`
-- Modify: `mwm/training.py`
+- Modify: `train_mwm.py`
 - Test: `tests/test_mwm_core.py`
 
 - [ ] **Step 1: Add failing loss-scope tests**
@@ -887,9 +887,9 @@ if sigreg is not None and float(sigreg_weight):
 
 Remove the old per-level SIGReg block from inside the prediction loop.
 
-- [ ] **Step 4: Update `mwm/training.py` dispatch**
+- [ ] **Step 4: Update `train_mwm.py` dispatch**
 
-When `model.training_loss` exists, pass:
+In the Le-WM base-adapter forward path, pass:
 
 ```python
 sigreg=cfg.get("sigreg_module"),
@@ -897,7 +897,7 @@ sigreg_weight=float(cfg.get("sigreg_weight", 0.0)),
 sigreg_scope=str(cfg.get("sigreg_scope", cfg.get("regularizers", "shared_latent"))),
 ```
 
-Keep current callers that pass `sigreg` directly working by updating `_exact_lewm_forward` to pass `sigreg=module.sigreg`, `sigreg_weight=float(cfg.loss.get("sigreg_weight", cfg.loss.get("sigreg", {}).get("weight", 0.0)))`, and `sigreg_scope=cfg.loss.get("sigreg_scope", "shared_latent")` into `model.training_loss`.
+Keep active callers that pass `sigreg` directly working by passing `sigreg=module.sigreg`, `sigreg_weight=float(cfg.loss.get("sigreg_weight", cfg.loss.get("sigreg", {}).get("weight", 0.0)))`, and `sigreg_scope=cfg.loss.get("sigreg_scope", "shared_latent")` into `model.training_loss`.
 
 - [ ] **Step 5: Run task tests**
 
@@ -912,7 +912,7 @@ Expected: pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add mwm/adapters/lewm.py mwm/training.py train_mwm.py tests/test_mwm_core.py
+git add mwm/adapters/lewm.py mwm/models/world_model.py train_mwm.py tests/test_mwm_core.py
 git commit -m "feat: scope MWM regularizers explicitly"
 ```
 
