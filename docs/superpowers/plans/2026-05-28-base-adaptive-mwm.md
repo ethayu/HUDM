@@ -1437,11 +1437,34 @@ Paper-parity job details: `scripts/slurm_mwm_paper_parity.sbatch` uses partition
 
 Full MWM gate details: `scripts/slurm_mwm_v1_gate.sbatch` uses partition `b200-mig90`, GRES `gpu:90gb:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `7-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_v1_gate_%j.out` and `logs/mwm_v1_gate_%j.err`, and runs `scripts/run_mwm_v1_gate.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
 
+Single-level fresh-training split launch path, added after the user requested separate jobs for Push-T and Two-Room:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+scripts/submit_mwm_single_level_split.sh
+```
+
+The split launcher submits:
+
+```bash
+sbatch --parsable scripts/slurm_mwm_train_pusht_single.sbatch
+sbatch --parsable scripts/slurm_mwm_train_tworoom_single.sbatch
+sbatch --parsable --dependency=afterok:${pusht_id}:${tworoom_id} scripts/slurm_mwm_single_level_benchmark.sbatch
+```
+
+Push-T single-level training details: `scripts/slurm_mwm_train_pusht_single.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `2-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_train_pusht_single_%j.out` and `logs/mwm_train_pusht_single_%j.err`, and runs `scripts/run_mwm_train_single_level_env.sh pusht` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
+Two-Room single-level training details: `scripts/slurm_mwm_train_tworoom_single.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `2-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_train_tworoom_single_%j.out` and `logs/mwm_train_tworoom_single_%j.err`, and runs `scripts/run_mwm_train_single_level_env.sh tworoom` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
+Single-level benchmark details: `scripts/slurm_mwm_single_level_benchmark.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_single_level_benchmark_%j.out` and `logs/mwm_single_level_benchmark_%j.err`, and runs `scripts/run_mwm_single_level_benchmark.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
 Monitor with:
 
 ```bash
 squeue -j "${paper_id},${v1_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
 sacct -j "${paper_id},${v1_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
+squeue -j "${pusht_id},${tworoom_id},${benchmark_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
+sacct -j "${pusht_id},${tworoom_id},${benchmark_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
 ```
 
 - [ ] **Step 1: Prepare upstream Le-WM checkpoints and data**
