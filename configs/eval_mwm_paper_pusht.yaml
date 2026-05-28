@@ -3,8 +3,8 @@ checkpoint:
   epoch: null
 env_id: swm/PushT-v1
 data:
-  path: data/upstream/pusht_expert_train.lance
-  format: lance
+  path: data/upstream/pusht_expert_train.h5
+  format: hdf5
   split_ratio: 0.9
   pixels_key: pixels
   action_key: action

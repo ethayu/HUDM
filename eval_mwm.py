@@ -610,9 +610,9 @@ def _combine_policy_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]
 def main(cfg_path: str) -> None:
     cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
     device = _device(str(cfg.device))
-    data_format = str(cfg.data.get("format", "lance"))
-    if data_format != "lance":
-        raise ValueError(f"MWM v1 evaluation only supports Lance datasets, got format={data_format!r}.")
+    data_format = str(cfg.data.get("format", "lance")).lower()
+    if data_format not in {"lance", "hdf5"}:
+        raise ValueError(f"MWM evaluation only supports Lance or HDF5 datasets, got format={data_format!r}.")
     from stable_worldmodel.data import load_dataset
 
     model, metadata, epoch = load_world_model_from_checkpoint(
@@ -622,7 +622,7 @@ def main(cfg_path: str) -> None:
     )
     dataset = load_dataset(
         _local_path(cfg.data.path),
-        format="lance",
+        format=data_format,
         frameskip=1,
         num_steps=2,
         keys_to_load=_eval_keys_to_load(cfg, model, metadata),
@@ -631,7 +631,7 @@ def main(cfg_path: str) -> None:
     if _uses_standardized_action_space(model, metadata, cfg):
         stats_dataset = load_dataset(
             _local_path(cfg.data.path),
-            format="lance",
+            format=data_format,
             frameskip=1,
             num_steps=2,
             keys_to_load=_available_stat_keys_for_action_process(cfg, dataset.column_names),

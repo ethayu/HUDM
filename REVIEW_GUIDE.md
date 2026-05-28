@@ -70,8 +70,9 @@ configs/benchmark_mwm.yaml
 - A canonical checkpoint directory must contain only `config.json`, `weights.pt`,
   and `world_metadata.json`.
 - Checkpoint metadata format must be `mwm_world_v1`.
-- Runtime datasets must be Lance (`format: lance`) with sidecar format
-  `swm_lance`.
+- Runtime training datasets remain Lance (`format: lance`) with sidecar format
+  `swm_lance`; paper-parity eval configs may use raw upstream HDF5 when that is
+  the base protocol being validated.
 - The checkpoint, dataset sidecar, and runtime restore adapter must agree on
   `env_id`, `restore_spec`, action bounds, action dimensions, and image shape.
 - `action_dim` in checkpoint metadata is the base environment action dimension,
@@ -310,10 +311,10 @@ scripts/run_mwm_v1_gate.sh
   paper CEM iteration count 10, linear CEM schedule, and writes TwoRoom
   manifest/output paths unless overridden.
 - `configs/eval_mwm_paper_pusht.yaml`: PushT paper-parity eval config using the
-  official upstream Lance dataset, 50 episodes, Stable-WM start/goal sampling,
+  official upstream HDF5 dataset, 50 episodes, Stable-WM start/goal sampling,
   standardized action planning, and fixed finest-level CEM.
 - `configs/eval_mwm_paper_tworoom.yaml`: TwoRoom paper-parity eval config using
-  the official upstream Lance dataset, 50 episodes, goal offset 25, budget 50,
+  the official upstream HDF5 dataset, 50 episodes, goal offset 25, budget 50,
   CEM `batch_size: 1`, CEM `n_iter: 30`, standardized action planning, and
   fixed finest-level CEM.
 - `configs/benchmark_mwm.yaml`: The required benchmark matrix. Defines output
@@ -529,9 +530,10 @@ Each per-run directory contains:
   as the full benchmark, but for the paper-parity sanity matrix.
 - Current paper-parity investigation evidence is recorded in
   `docs/superpowers/paper-parity-investigation-2026-05-28.md`. The strict
-  PushT target gate is intentionally still incomplete: the converted evaluator
-  and Stable-WM reference path reached 98.0%, while the raw upstream Le-WM
-  evaluator reached 92.0% on the same seed-42 protocol.
+  PushT target gate is intentionally still incomplete: after switching
+  paper-parity eval to raw upstream HDF5, the converted evaluator, Stable-WM
+  reference path, and raw upstream Le-WM evaluator all report 92.0% on the same
+  seed-42 protocol.
 - After rerunning `scripts/run_mwm_paper_parity.sh`, this directory should
   contain four cells: PushT/TwoRoom x upstream converted/retrained single.
 

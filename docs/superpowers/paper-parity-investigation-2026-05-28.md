@@ -19,20 +19,22 @@ strict PushT paper target remains unresolved.
   CEM `planner.batch_size: 1` to match the upstream CEM chunking default.
 - Slurm job `6169560` ran the official Le-WM `eval.py` path through
   `scripts/slurm_lewm_official_pusht_eval.sbatch`.
+- Slurm job `6169581` reran `scripts/slurm_mwm_paper_parity.sbatch` after
+  switching paper-parity eval configs to raw upstream HDF5 datasets.
 
 ## Current Results
 
 - `rollouts/mwm_paper_reference/summary.json`:
-  - PushT converted upstream Le-WM: 98.0%.
-  - PushT Stable-WM reference path: 98.0%.
+  - PushT converted upstream Le-WM: 92.0%.
+  - PushT Stable-WM reference path: 92.0%.
   - TwoRoom converted upstream Le-WM: 86.0%.
   - TwoRoom Stable-WM reference path: 86.0%.
 - `rollouts/lewm_official_reference/pusht_eval_6169560.txt`:
   - PushT official Le-WM `eval.py`: 92.0%.
 
-TwoRoom is within the 87.0 +/- 1.0 pp gate. PushT is not: both the MWM
-converted path and Stable-WM reference path are 2.0 pp above the paper mean, and
-the raw official evaluator is 4.0 pp below the paper mean.
+TwoRoom is within the 87.0 +/- 1.0 pp gate. PushT is not: the MWM converted
+path, Stable-WM reference path, and raw official evaluator all report 92.0%,
+which is 4.0 pp below the paper mean.
 
 ## Raw-HDF5 vs Lance Diagnostic
 
@@ -85,10 +87,10 @@ mean differences around 0.10-0.12.
 
 ## Interpretation
 
-The current evidence does not prove a bug in the MWM evaluator alone. The
-Stable-WM Lance reference path agrees with the converted MWM evaluator at
-98.0%, while the raw official Le-WM evaluator and raw-HDF5 Stable-WM policy path
-give 92.0% on the same seed-42 protocol. The paper's 96.0% PushT target is a
+The current evidence does not prove a bug in the MWM evaluator. After switching
+paper-parity eval configs to raw upstream HDF5, the converted MWM evaluator,
+Stable-WM reference path, and raw official Le-WM evaluator agree at 92.0% on
+PushT with the same seed-42 protocol. The paper's 96.0% PushT target is a
 three-training-seed mean, not a guaranteed score for the released checkpoint on
 a single seed-42 evaluation.
 
