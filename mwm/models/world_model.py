@@ -56,8 +56,10 @@ class MWMWorldModel(nn.Module):
         self.metadata = dict(metadata or {})
         if not self.K:
             raise ValueError("K must contain at least one fidelity level.")
-        if max(self.K) != self.D:
-            raise ValueError(f"Largest K must equal D={self.D}, got {self.K}")
+        if any(k <= 0 or k > self.D for k in self.K):
+            raise ValueError(f"All K values must be in [1, D={self.D}], got {self.K}.")
+        if len(set(self.K)) != len(self.K):
+            raise ValueError(f"K values must be unique, got {self.K}.")
 
         if dynamics is None:
             raise ValueError("MWMWorldModel requires explicit dynamics from a base adapter.")

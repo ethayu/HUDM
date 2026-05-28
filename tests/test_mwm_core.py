@@ -522,6 +522,20 @@ class MWMCoreTests(unittest.TestCase):
                 },
             )
 
+    def test_raw_world_model_allows_levels_without_base_dimension(self) -> None:
+        model = MWMWorldModel(
+            encoder=FakeLeWMEncoder(out_dim=4),
+            K=(2,),
+            D=4,
+            action_dim=2,
+            dynamics=[FakeStepDynamics(action_dim=2, out_dim=2)],
+            decoder=None,
+        )
+
+        pred = model.predict_next(0, torch.zeros(1, 4), torch.zeros(1, 2))
+
+        self.assertEqual(tuple(pred.shape), (1, 2))
+
     def test_world_model_provides_matryoshka_loss_and_regularizer_routing(self) -> None:
         losses = [torch.tensor(2.0), torch.tensor(6.0)]
 
