@@ -512,16 +512,15 @@ runs:
             report = verify_data_configs([cfg_path])
             self.assertEqual(report["count"], 1)
 
-    def test_hdf5_eval_dataset_verifier_accepts_raw_upstream_file(self) -> None:
+    def test_dataset_verifier_rejects_hdf5_runtime_configs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             dataset = root / "tiny.h5"
             dataset.write_bytes(b"placeholder")
             cfg_path = root / "eval.yaml"
             cfg_path.write_text(f"data: {{path: {dataset}, format: hdf5}}\n", encoding="utf-8")
-            report = verify_data_configs([cfg_path])
-            self.assertEqual(report["count"], 1)
-            self.assertEqual(report["datasets"][str(dataset)]["format"], "hdf5")
+            with self.assertRaisesRegex(ValueError, "requires format lance"):
+                verify_data_configs([cfg_path])
 
     def test_review_html_has_required_plots_and_drilldowns(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

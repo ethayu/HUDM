@@ -43,25 +43,10 @@ def verify_data_configs(config_paths: list[str | Path] | None = None) -> dict[st
         if not data:
             continue
         fmt = str(data.get("format", "lance")).lower()
-        if fmt not in {"lance", "hdf5"}:
-            errors.append(f"{cfg_path}: MWM runtime requires format lance or hdf5, got {fmt!r}")
+        if fmt != "lance":
+            errors.append(f"{cfg_path}: MWM runtime requires format lance, got {fmt!r}")
             continue
         dataset_path = Path(str(data.get("path", "")))
-        if fmt == "hdf5":
-            if not dataset_path.exists():
-                errors.append(f"{cfg_path}: missing HDF5 dataset {dataset_path}")
-                continue
-            if dataset_path.suffix.lower() not in {".h5", ".hdf5"}:
-                errors.append(f"{cfg_path}: HDF5 dataset path must end in .h5 or .hdf5, got {dataset_path}")
-                continue
-            seen[str(dataset_path)] = {
-                "config": str(cfg_path),
-                "metadata": None,
-                "env_id": None,
-                "restore_spec": None,
-                "format": "hdf5",
-            }
-            continue
         if not dataset_path.exists():
             errors.append(f"{cfg_path}: missing Lance dataset {dataset_path}")
             continue

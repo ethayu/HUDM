@@ -3,8 +3,6 @@ torch>=1.12
 torchvision>=0.13
 numpy>=1.21
 einops>=0.6
-h5py>=3.8
-hdf5plugin>=4.0
 
 # ---------------- Configuration & logging --------
 omegaconf>=2.3
@@ -15,13 +13,16 @@ wandb>=0.15
 gym>=0.21
 gymnasium>=0.29
 stable-worldmodel[env]
+stable-pretraining
 pygame>=2.1
 pymunk>=6.2
 shapely>=1.8
 scikit-image>=0.19
+scikit-learn>=1.2
 opencv-python>=4.7
 imageio>=2.31
 imageio-ffmpeg>=0.4.9
+huggingface-hub>=0.23
 matplotlib>=3.5
 plotly>=5.24
 psutil>=5.9

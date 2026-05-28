@@ -70,9 +70,8 @@ configs/benchmark_mwm.yaml
 - A canonical checkpoint directory must contain only `config.json`, `weights.pt`,
   and `world_metadata.json`.
 - Checkpoint metadata format must be `mwm_world_v1`.
-- Runtime training datasets remain Lance (`format: lance`) with sidecar format
-  `swm_lance`; paper-parity eval configs may use raw upstream HDF5 when that is
-  the base protocol being validated.
+- Runtime training and eval datasets are Lance (`format: lance`) with sidecar
+  format `swm_lance`; paper-parity eval also uses Lance.
 - The checkpoint, dataset sidecar, and runtime restore adapter must agree on
   `env_id`, `restore_spec`, action bounds, action dimensions, and image shape.
 - `action_dim` in checkpoint metadata is the base environment action dimension,
@@ -163,7 +162,7 @@ scripts/run_mwm_v1_gate.sh
 ## Top-Level Files
 
 - `.gitignore`: Ignores generated training/eval artifacts (`data/`, `logs/`,
-  `rollouts/`, `checkpoints_mwm/`, `*.pt`, caches, HDF5 scratch files). The
+  `rollouts/`, `checkpoints_mwm/`, `*.pt`, and caches). The
   current worktree still contains ignored generated artifacts on disk for review.
 - `README.md`: User-facing project overview, quick-start commands, architecture
   bullets, benchmark roles, and pointer to this review guide.
@@ -183,10 +182,9 @@ scripts/run_mwm_v1_gate.sh
   saves source objects under `checkpoints_mwm/upstream_sources/`, imports them
   through `LeWMObjectImporter`, and exports canonical single-fidelity MWM
   checkpoints with dependency metadata.
-- `prepare_upstream_lewm_data.py`: Prepares the public upstream PushT Le-WM
-  dataset for paper-parity debugging by downloading the compressed HDF5 artifact,
-  decompressing it, delegating HDF5-to-Lance conversion to Stable-WM, and writing
-  MWM sidecar metadata. This keeps HDF5 reading out of the MWM runtime.
+- `prepare_upstream_lewm_data.py`: Prepares public upstream Le-WM datasets as
+  Lance tables with MWM sidecar metadata. Any legacy upstream archive handling is
+  isolated to this ingestion script; runtime training and eval stay Lance-only.
 - `train_mwm.py`: Loads Lance training data, performs the Stable-Pretraining
   random split, infers image/action dimensions, builds the Le-WM base adapter
   for both `K=[D]` and scheduled `K`, trains with the Le-WM AdamW/warmup-cosine
@@ -252,9 +250,6 @@ scripts/run_mwm_v1_gate.sh
 - `mwm/fidelity.py`: Fidelity scheduler and decision objects. Supports `fixed`,
   `linear_cem`, and `table` policies; resolves tokens like `coarsest`, `finest`,
   and `base`; validates horizon length and forbids low-to-high rollout schedules.
-- `mwm/metrics.py`: Small helpers for success rate and aggregate policy
-  diagnostics. Currently not central to the benchmark path but useful for summary
-  calculations.
 - `mwm/models/__init__.py`: Re-exports `MWMWorldModel`.
 - `mwm/models/world_model.py`: Legacy generic model utilities and the public
   `MWMWorldModel` contract. The trainable Le-WM path no longer uses its default
@@ -267,18 +262,13 @@ scripts/run_mwm_v1_gate.sh
   and variance, and records diagnostics.
 - `mwm/swm/__init__.py`: Empty namespace marker for Stable-WM integration.
 - `mwm/swm/envs.py`: Stable-WM environment helpers. Parses image shapes and env
-  kwargs, imports user objects, adds restore wrappers when needed, constructs
-  `stable_worldmodel.World`, validates continuous finite Box action spaces, and
-  can infer action bounds.
+  kwargs, imports user objects, constructs `stable_worldmodel.World`, validates
+  continuous finite Box action spaces, and can infer action bounds.
 - `mwm/swm/restore.py`: Restore adapter registry. Defines built-in restore specs
-  for PushT, TwoRoom/Piecewise, DMControl, and OGBench; supports user restore
-  specs; validates required dataset columns; returns Stable-WM eval callables.
-- `mwm/swm/wrappers.py`: OGBench restore wrapper that records/restores
-  concatenated MuJoCo `qpos`/`qvel` state and exposes `set_restore_state` to
-  Stable-WM dataset evaluation.
-- `mwm/training.py`: Training helper layer around `mwm_prediction_loss`. Provides
-  a Stable-Pretraining-compatible module/fallback module and an optional
-  Stable-WM SIGReg builder.
+  for PushT, TwoRoom/Piecewise, and DMControl; supports user restore specs;
+  validates required dataset columns; returns Stable-WM eval callables.
+- `mwm/training.py`: Narrow training loss bridge used by `train_mwm.py`; adapter
+  models with `training_loss` own their base-specific loss behavior.
 
 ## Config Files
 
@@ -311,10 +301,10 @@ scripts/run_mwm_v1_gate.sh
   paper CEM iteration count 10, linear CEM schedule, and writes TwoRoom
   manifest/output paths unless overridden.
 - `configs/eval_mwm_paper_pusht.yaml`: PushT paper-parity eval config using the
-  official upstream HDF5 dataset, 50 episodes, Stable-WM start/goal sampling,
+  official upstream Lance dataset, 50 episodes, Stable-WM start/goal sampling,
   standardized action planning, and fixed finest-level CEM.
 - `configs/eval_mwm_paper_tworoom.yaml`: TwoRoom paper-parity eval config using
-  the official upstream HDF5 dataset, 50 episodes, goal offset 25, budget 50,
+  the official upstream Lance dataset, 50 episodes, goal offset 25, budget 50,
   CEM `batch_size: 1`, CEM `n_iter: 30`, standardized action planning, and
   fixed finest-level CEM.
 - `configs/benchmark_mwm.yaml`: The required benchmark matrix. Defines output
@@ -377,10 +367,9 @@ These files are ignored by git but currently present on disk for review.
   `data/tworoom_swm.lance/_versions/*.manifest`, and
   `data/tworoom_swm.lance/data/*.lance`: Lance internals for the TwoRoom dataset.
 - `data/upstream/pusht_expert_train.lance.metadata.json`: Sidecar for the
-  official PushT Le-WM dataset converted to Lance by Stable-WM tooling from the
-  public compressed HDF5 artifact.
+  official PushT Le-WM Lance dataset prepared by Stable-WM tooling.
 - `data/upstream/tworoom.lance.metadata.json`: Sidecar for the official TwoRoom
-  Le-WM dataset extracted from the public compressed Lance archive.
+  Le-WM Lance dataset prepared by Stable-WM tooling.
 
 ## Generated Checkpoint Files
 
@@ -528,12 +517,6 @@ Each per-run directory contains:
 - `rollouts/mwm_paper_parity/summary.json`, `.csv`, `metrics.jsonl`,
   `per_env_summary.csv`, `review.html`, and `plots/*.png`: Same artifact schema
   as the full benchmark, but for the paper-parity sanity matrix.
-- Current paper-parity investigation evidence is recorded in
-  `docs/superpowers/paper-parity-investigation-2026-05-28.md`. The strict
-  PushT target gate is intentionally still incomplete: after switching
-  paper-parity eval to raw upstream HDF5, the converted evaluator, Stable-WM
-  reference path, and raw upstream Le-WM evaluator all report 92.0% on the same
-  seed-42 protocol.
 - After rerunning `scripts/run_mwm_paper_parity.sh`, this directory should
   contain four cells: PushT/TwoRoom x upstream converted/retrained single.
 

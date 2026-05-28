@@ -7,7 +7,6 @@ from typing import Any, Callable
 import numpy as np
 
 from mwm.swm.restore import restore_spec_for_env
-from mwm.swm.wrappers import ogbench_restore_wrapper
 
 
 def parse_image_shape(value: int | str | tuple[int, int] | list[int]) -> tuple[int, int]:
@@ -49,8 +48,7 @@ def swm_extra_wrappers_for_env(env_id: str) -> list[Callable]:
         spec = restore_spec_for_env(env_id)
     except ValueError:
         return wrappers
-    if spec.needs_restore_recorder:
-        wrappers.append(ogbench_restore_wrapper)
+    del spec
     return wrappers
 
 

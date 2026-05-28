@@ -239,6 +239,70 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertIn("SLURM_JOB_ID", text, script)
             self.assertIn("must run inside a Slurm allocation", text, script)
 
+    def test_lance_only_runtime_has_no_hdf5_support_paths(self) -> None:
+        runtime_files = [
+            ROOT / "eval_mwm.py",
+            ROOT / "verify_mwm_data.py",
+        ]
+        hits: list[str] = []
+        for path in runtime_files:
+            text = path.read_text(encoding="utf-8", errors="ignore").lower()
+            for token in ("hdf5", ".h5"):
+                if token in text:
+                    hits.append(f"{path.relative_to(ROOT)} contains {token}")
+
+        self.assertEqual(hits, [])
+
+    def test_legacy_top_level_swm_and_reference_diagnostics_are_removed(self) -> None:
+        removed = [
+            "benchmark_swm.py",
+            "collect_swm.py",
+            "plan_swm.py",
+            "train_world_swm.py",
+            "datasets/swm_hdf5.py",
+            "docs/SWM_FIRST.md",
+            "scripts/lewm_reference_matrix.py",
+            "scripts/slurm_lewm_reference_matrix.sbatch",
+            "scripts/slurm_lewm_official_pusht_eval.sbatch",
+            "docs/superpowers/paper-parity-investigation-2026-05-28.md",
+        ]
+        for rel in removed:
+            self.assertFalse((ROOT / rel).exists(), rel)
+        self.assertTrue((ROOT / "mwm" / "planning" / "scheduled_cem.py").is_file())
+
+    def test_lewm_adapter_file_does_not_export_dead_generic_scaffolding(self) -> None:
+        text = (ROOT / "mwm" / "adapters" / "lewm.py").read_text(encoding="utf-8")
+        forbidden = [
+            "class MWMComponents",
+            "class MWMAdapter",
+            "class MWMImporter",
+            "class LeWMAdapter",
+            "class HFViTCLSBackbone",
+            "class StablePretrainingViTBackbone",
+        ]
+        for token in forbidden:
+            self.assertNotIn(token, text)
+
+    def test_unused_helper_modules_and_ogbench_restore_support_are_removed(self) -> None:
+        removed = [
+            "mwm/metrics.py",
+            "mwm/swm/wrappers.py",
+        ]
+        for rel in removed:
+            self.assertFalse((ROOT / rel).exists(), rel)
+
+        training_text = (ROOT / "mwm" / "training.py").read_text(encoding="utf-8")
+        for token in (
+            "StablePretrainingMWMModule",
+            "build_stable_pretraining_module",
+            "build_stable_sigreg",
+        ):
+            self.assertNotIn(token, training_text)
+
+        restore_text = (ROOT / "mwm" / "swm" / "restore.py").read_text(encoding="utf-8")
+        self.assertNotIn("OGB", restore_text)
+        self.assertNotIn("needs_restore_recorder=True", restore_text)
+
 
 if __name__ == "__main__":
     unittest.main()

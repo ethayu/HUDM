@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 import copy
 import warnings
 from dataclasses import asdict, dataclass
@@ -12,51 +11,6 @@ import torch.nn as nn
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
 from mwm.models.world_model import MWMWorldModel
-
-
-@dataclass(frozen=True)
-class MWMComponents:
-    encoder: nn.Module
-    K: tuple[int, ...]
-    D: int
-    action_dim: int
-    dynamics: Sequence[nn.Module] | nn.Module | None
-    decoder: Sequence[nn.Module] | nn.Module | None
-    preprocess: nn.Module | None
-    preprocessing_spec: dict[str, Any]
-    action_spec: dict[str, Any]
-    metadata: dict[str, Any]
-
-
-class MWMAdapter(ABC):
-    @abstractmethod
-    def build_components(self) -> MWMComponents:
-        raise NotImplementedError
-
-    def build_model(self) -> MWMWorldModel:
-        c = self.build_components()
-        metadata = {
-            **dict(c.metadata),
-            "preprocessing_spec": dict(c.preprocessing_spec),
-            "action_spec": dict(c.action_spec),
-        }
-        return MWMWorldModel(
-            encoder=c.encoder,
-            K=list(c.K),
-            D=int(c.D),
-            action_dim=int(c.action_dim),
-            dynamics=c.dynamics,
-            decoder=c.decoder,
-            preprocess=c.preprocess,
-            dynamics_mode="per_level",
-            metadata=metadata,
-        )
-
-
-class MWMImporter(ABC):
-    @abstractmethod
-    def import_model(self) -> MWMWorldModel:
-        raise NotImplementedError
 
 
 class ImageNetPreprocess(nn.Module):
@@ -98,60 +52,6 @@ class TinyCNNEncoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.proj(self.conv(x))
-
-
-class HFViTCLSBackbone(nn.Module):
-    def __init__(self, model_name: str = "google/vit-base-patch16-224-in21k", out_dim: int = 768, freeze: bool = False) -> None:
-        super().__init__()
-        try:
-            from transformers import ViTModel
-        except Exception as exc:  # pragma: no cover
-            raise ImportError("HFViTCLSBackbone requires transformers.") from exc
-        self.vit = ViTModel.from_pretrained(model_name)
-        in_dim = int(self.vit.config.hidden_size)
-        self.proj = nn.Identity() if in_dim == int(out_dim) else nn.Linear(in_dim, int(out_dim))
-        if freeze:
-            for param in self.vit.parameters():
-                param.requires_grad_(False)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.vit(pixel_values=x)
-        return self.proj(out.last_hidden_state[:, 0])
-
-
-class StablePretrainingViTBackbone(nn.Module):
-    def __init__(
-        self,
-        *,
-        size: str = "tiny",
-        patch_size: int = 14,
-        image_size: int = 224,
-        out_dim: int = 192,
-        pretrained: bool = False,
-        use_mask_token: bool = False,
-        freeze: bool = False,
-    ) -> None:
-        super().__init__()
-        try:
-            from stable_pretraining.backbone.utils import vit_hf
-        except Exception as exc:  # pragma: no cover
-            raise ImportError("StablePretrainingViTBackbone requires stable-pretraining.") from exc
-        self.vit = vit_hf(
-            size=str(size),
-            patch_size=int(patch_size),
-            image_size=int(image_size),
-            pretrained=bool(pretrained),
-            use_mask_token=bool(use_mask_token),
-        )
-        in_dim = int(self.vit.config.hidden_size)
-        self.proj = nn.Identity() if in_dim == int(out_dim) else nn.Linear(in_dim, int(out_dim))
-        if freeze:
-            for param in self.vit.parameters():
-                param.requires_grad_(False)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.vit(x, interpolate_pos_encoding=True)
-        return self.proj(out.last_hidden_state[:, 0])
 
 
 class LeWMObjectEncoder(nn.Module):
@@ -566,7 +466,7 @@ class ImportedLeWMMWMWorldModel(MWMWorldModel):
 
 @dataclass(frozen=True)
 class MWMLeWMAdapterConfig:
-    encoder: str = "hf_vit"
+    encoder: str = "stable_vit"
     vit_model_name: str = "google/vit-base-patch16-224-in21k"
     vit_size: str = "tiny"
     vit_patch_size: int = 14
@@ -593,25 +493,11 @@ class MWMLeWMAdapterConfig:
     projector_hidden_dim: int = 2048
 
 
-class LeWMAdapter(MWMAdapter):
-    def __init__(self, cfg: MWMLeWMAdapterConfig | dict[str, Any]) -> None:
-        self.cfg = cfg if isinstance(cfg, MWMLeWMAdapterConfig) else MWMLeWMAdapterConfig(**dict(cfg))
-
-    def build_components(self) -> MWMComponents:
-        raise NotImplementedError(
-            "Le-WM MWM is adapter-owned and does not expose generic MWMComponents. "
-            "Use LeWMAdapter.build_model()."
-        )
-
-    def build_model(self) -> LeWMMatryoshkaWorldModel:
-        return build_lewm_matryoshka_model(self.cfg)
-
-
 def build_mwm_lewm(cfg: MWMLeWMAdapterConfig | dict[str, Any] | None = None, **overrides: Any) -> MWMWorldModel:
     params = dict(cfg or {}) if not isinstance(cfg, MWMLeWMAdapterConfig) else asdict(cfg)
     params.update(overrides)
     cfg_obj = MWMLeWMAdapterConfig(**params)
-    model = LeWMAdapter(cfg_obj).build_model()
+    model = build_lewm_matryoshka_model(cfg_obj)
     model.mwm_config = {"target": "mwm.adapters.lewm.build_mwm_lewm", "kwargs": asdict(cfg_obj)}
     return model
 
@@ -927,8 +813,6 @@ def _lewm_encoder(raw: MWMLeWMAdapterConfig) -> nn.Module:
         return encoder
     if encoder_name in {"cnn", "tiny_cnn", "smoke"}:
         return TinyCNNEncoder(out_dim=int(raw.D), image_shape=tuple(raw.image_shape))
-    if encoder_name in {"hf_vit", "vit", "huggingface_vit"}:
-        return HFViTCLSBackbone(raw.vit_model_name, out_dim=int(raw.D), freeze=bool(raw.freeze_encoder))
     raise ValueError(f"Unknown Le-WM encoder adapter {raw.encoder!r}")
 
 
@@ -1089,7 +973,7 @@ def build_lewm_matryoshka_model(raw: MWMLeWMAdapterConfig) -> LeWMMatryoshkaWorl
     )
 
 
-class LeWMObjectImporter(MWMImporter):
+class LeWMObjectImporter:
     DEFAULT_EXPECTED_CLASS = "stable_worldmodel.wm.lewm.lewm.LeWM"
 
     def __init__(
@@ -1219,20 +1103,14 @@ def build_mwm_lewm_from_object(**kwargs: Any) -> MWMWorldModel:
 
 
 __all__ = [
-    "HFViTCLSBackbone",
     "ImageNetPreprocess",
-    "LeWMAdapter",
     "LeWMMatryoshkaWorldModel",
     "LeWMObjectDynamics",
     "LeWMObjectEncoder",
     "LeWMObjectImporter",
     "LeWMStableWMAdapter",
     "LeWMTransitionPackage",
-    "MWMAdapter",
-    "MWMComponents",
-    "MWMImporter",
     "MWMLeWMAdapterConfig",
-    "StablePretrainingViTBackbone",
     "TinyCNNEncoder",
     "build_mwm_lewm",
     "build_mwm_lewm_from_object",

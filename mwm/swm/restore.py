@@ -100,18 +100,6 @@ RESTORE_SPECS: tuple[RestoreSpec, ...] = (
             {"method": "_set_goal_state", "args": {"goal_state": {"value": "goal_pos_agent", "in_dataset": True}}},
         ),
     ),
-    RestoreSpec(
-        spec_id="ogbench_restore_state",
-        env_ids=("swm/OGBCube-v0", "swm/OGBScene-v0", "swm/OGBPointMaze-v0", "swm/OGBMaze-v0"),
-        required_columns=("restore_state",),
-        needs_restore_recorder=True,
-        eval_callables=(
-            {
-                "method": "set_restore_state",
-                "args": {"restore_state": {"value": "restore_state", "in_dataset": True}},
-            },
-        ),
-    ),
 )
 
 

@@ -3,9 +3,8 @@ checkpoint:
   epoch: null
 env_id: swm/TwoRoom-v1
 data:
-  # Stable-WM's current default data path is Lance. The Lance table is
-  # converted from the same HDF5 trajectories, but image columns are stored as
-  # JPEG blobs, matching the upstream Le-WM training representation.
+  # Stable-WM's current default data path is Lance. This matches the upstream
+  # Le-WM training/eval representation used by the paper-parity gate.
   path: data/upstream/tworoom.lance
   format: lance
   split_ratio: 0.9

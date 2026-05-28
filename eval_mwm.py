@@ -611,8 +611,8 @@ def main(cfg_path: str) -> None:
     cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
     device = _device(str(cfg.device))
     data_format = str(cfg.data.get("format", "lance")).lower()
-    if data_format not in {"lance", "hdf5"}:
-        raise ValueError(f"MWM evaluation only supports Lance or HDF5 datasets, got format={data_format!r}.")
+    if data_format != "lance":
+        raise ValueError(f"MWM evaluation requires format lance, got format={data_format!r}.")
     from stable_worldmodel.data import load_dataset
 
     model, metadata, epoch = load_world_model_from_checkpoint(
