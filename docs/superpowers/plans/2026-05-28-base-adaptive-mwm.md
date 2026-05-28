@@ -1479,6 +1479,14 @@ Each full V1 training job uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=
 
 Full V1 benchmark details: `scripts/slurm_mwm_v1_benchmark.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_v1_benchmark_%j.out` and `logs/mwm_v1_benchmark_%j.err`, and runs `scripts/run_mwm_v1_benchmark.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
 
+Paper reference Lance-only rerun path, used to refresh stale HDF5-era reference artifacts:
+
+```bash
+sbatch --parsable scripts/slurm_mwm_paper_reference.sbatch
+```
+
+Paper reference details: `scripts/slurm_mwm_paper_reference.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_paper_reference_%j.out` and `logs/mwm_paper_reference_%j.err`, and runs `scripts/run_mwm_paper_reference.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
 Monitor with:
 
 ```bash
@@ -1488,6 +1496,8 @@ squeue -j "${pusht_id},${tworoom_id},${benchmark_id}" -o '%.18i %.30j %.8T %.10M
 sacct -j "${pusht_id},${tworoom_id},${benchmark_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
 squeue -j "${pusht_single_id},${tworoom_single_id},${pusht_scheduled_id},${tworoom_scheduled_id},${v1_benchmark_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
 sacct -j "${pusht_single_id},${tworoom_single_id},${pusht_scheduled_id},${tworoom_scheduled_id},${v1_benchmark_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
+squeue -j "${paper_reference_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
+sacct -j "${paper_reference_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
 ```
 
 - [ ] **Step 1: Prepare upstream Le-WM checkpoints and data**
