@@ -232,6 +232,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
             ROOT / "scripts" / "run_mwm_single_level_match.sh",
             ROOT / "scripts" / "run_mwm_train_single_level_env.sh",
             ROOT / "scripts" / "run_mwm_single_level_benchmark.sh",
+            ROOT / "scripts" / "run_mwm_train_v1_env.sh",
+            ROOT / "scripts" / "run_mwm_v1_benchmark.sh",
         ]
         for script in scripts:
             text = script.read_text(encoding="utf-8")

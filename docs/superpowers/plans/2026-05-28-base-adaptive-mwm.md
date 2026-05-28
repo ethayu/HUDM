@@ -1458,6 +1458,27 @@ Two-Room single-level training details: `scripts/slurm_mwm_train_tworoom_single.
 
 Single-level benchmark details: `scripts/slurm_mwm_single_level_benchmark.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_single_level_benchmark_%j.out` and `logs/mwm_single_level_benchmark_%j.err`, and runs `scripts/run_mwm_single_level_benchmark.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
 
+Full V1 split launch path, used because old `rollouts/mwm_benchmark` artifacts point at stale generic checkpoints and fresh base-adapter single/scheduled checkpoints are required:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+scripts/submit_mwm_v1_split.sh
+```
+
+The full V1 split launcher submits:
+
+```bash
+sbatch --parsable scripts/slurm_mwm_train_pusht_v1_single.sbatch
+sbatch --parsable scripts/slurm_mwm_train_tworoom_v1_single.sbatch
+sbatch --parsable scripts/slurm_mwm_train_pusht_v1_scheduled.sbatch
+sbatch --parsable scripts/slurm_mwm_train_tworoom_v1_scheduled.sbatch
+sbatch --parsable --dependency=afterok:${pusht_single_id}:${tworoom_single_id}:${pusht_scheduled_id}:${tworoom_scheduled_id} scripts/slurm_mwm_v1_benchmark.sbatch
+```
+
+Each full V1 training job uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `2-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, and `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`. The four train scripts run `scripts/run_mwm_train_v1_env.sh` with one of `pusht-single`, `tworoom-single`, `pusht-scheduled`, or `tworoom-scheduled`, writing logs under `logs/mwm_train_*_v1_*_%j.{out,err}`.
+
+Full V1 benchmark details: `scripts/slurm_mwm_v1_benchmark.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_v1_benchmark_%j.out` and `logs/mwm_v1_benchmark_%j.err`, and runs `scripts/run_mwm_v1_benchmark.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
 Monitor with:
 
 ```bash
@@ -1465,6 +1486,8 @@ squeue -j "${paper_id},${v1_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
 sacct -j "${paper_id},${v1_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
 squeue -j "${pusht_id},${tworoom_id},${benchmark_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
 sacct -j "${pusht_id},${tworoom_id},${benchmark_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
+squeue -j "${pusht_single_id},${tworoom_single_id},${pusht_scheduled_id},${tworoom_scheduled_id},${v1_benchmark_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
+sacct -j "${pusht_single_id},${tworoom_single_id},${pusht_scheduled_id},${tworoom_scheduled_id},${v1_benchmark_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
 ```
 
 - [ ] **Step 1: Prepare upstream Le-WM checkpoints and data**
