@@ -20,7 +20,7 @@ from mwm.adapters.lewm import (
     LeWMMatryoshkaWorldModel,
     LeWMObjectImporter,
     LeWMTransitionPackage,
-    build_mwm_lewm,
+    build_mwm_lewm_from_stable_config,
     mwm_from_lewm_object,
 )
 from mwm.checkpoints import CHECKPOINT_FORMAT, load_world_model_from_checkpoint, save_world_checkpoint
@@ -161,6 +161,146 @@ class CountingRegularizer(nn.Module):
         self.calls += 1
         self.shapes.append(tuple(value.shape))
         return value.square().mean() * 0.0
+
+
+def _lewm_source_config(
+    *,
+    D: int,
+    action_dim: int,
+    history_size: int = 2,
+    predictor_depth: int = 1,
+    predictor_heads: int = 2,
+    predictor_dim_head: int = 4,
+    predictor_mlp_dim: int = 16,
+    predictor_dropout: float = 0.0,
+    projector_hidden_dim: int = 16,
+) -> dict:
+    return {
+        "_target_": "stable_worldmodel.wm.lewm.LeWM",
+        "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": int(D)},
+        "predictor": {
+            "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+            "num_frames": int(history_size),
+            "input_dim": int(D),
+            "hidden_dim": int(D),
+            "output_dim": int(D),
+            "depth": int(predictor_depth),
+            "heads": int(predictor_heads),
+            "mlp_dim": int(predictor_mlp_dim),
+            "dim_head": int(predictor_dim_head),
+            "dropout": float(predictor_dropout),
+            "emb_dropout": 0.0,
+        },
+        "action_encoder": {
+            "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+            "input_dim": int(action_dim),
+            "emb_dim": int(D),
+        },
+        "projector": {
+            "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+            "input_dim": int(D),
+            "output_dim": int(D),
+            "hidden_dim": int(projector_hidden_dim),
+            "norm_fn": {"_target_": "torch.nn.BatchNorm1d", "_partial_": True},
+        },
+        "pred_proj": {
+            "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+            "input_dim": int(D),
+            "output_dim": int(D),
+            "hidden_dim": int(projector_hidden_dim),
+            "norm_fn": {"_target_": "torch.nn.BatchNorm1d", "_partial_": True},
+        },
+    }
+
+
+def _stable_vit_lewm_source_config(model_cfg: dict) -> dict:
+    d = int(model_cfg["D"])
+    return {
+        "_target_": "stable_worldmodel.wm.lewm.LeWM",
+        "encoder": {
+            "_target_": "stable_pretraining.backbone.utils.vit_hf",
+            "size": str(model_cfg.get("vit_size", "tiny")),
+            "patch_size": int(model_cfg.get("vit_patch_size", 14)),
+            "image_size": int(model_cfg.get("vit_image_size", 224)),
+            "pretrained": bool(model_cfg.get("vit_pretrained", False)),
+            "use_mask_token": bool(model_cfg.get("vit_use_mask_token", False)),
+        },
+        "predictor": {
+            "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+            "num_frames": int(model_cfg.get("history_size", 3)),
+            "input_dim": d,
+            "hidden_dim": d,
+            "output_dim": d,
+            "depth": int(model_cfg.get("predictor_depth", 6)),
+            "heads": int(model_cfg.get("predictor_heads", 16)),
+            "mlp_dim": int(model_cfg.get("predictor_mlp_dim", 2048)),
+            "dim_head": int(model_cfg.get("predictor_dim_head", 64)),
+            "dropout": float(model_cfg.get("predictor_dropout", 0.1)),
+            "emb_dropout": float(model_cfg.get("predictor_emb_dropout", 0.0)),
+        },
+        "action_encoder": {
+            "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+            "input_dim": int(model_cfg["action_dim"]),
+            "emb_dim": d,
+        },
+        "projector": {
+            "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+            "input_dim": d,
+            "output_dim": d,
+            "hidden_dim": int(model_cfg.get("projector_hidden_dim", 2048)),
+            "norm_fn": {"_target_": "torch.nn.BatchNorm1d", "_partial_": True},
+        },
+        "pred_proj": {
+            "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+            "input_dim": d,
+            "output_dim": d,
+            "hidden_dim": int(model_cfg.get("projector_hidden_dim", 2048)),
+            "norm_fn": {"_target_": "torch.nn.BatchNorm1d", "_partial_": True},
+        },
+    }
+
+
+def _base_adaptive_lewm(
+    *,
+    K: tuple[int, ...] | list[int],
+    D: int = 8,
+    action_dim: int = 2,
+    action_block: int = 1,
+    image_shape: tuple[int, int] = (8, 8),
+    normalize_imagenet: bool = False,
+    history_size: int = 2,
+    num_preds: int = 1,
+    predictor_depth: int = 1,
+    predictor_heads: int = 2,
+    predictor_dim_head: int = 4,
+    predictor_mlp_dim: int = 16,
+    predictor_dropout: float = 0.0,
+    projector_hidden_dim: int = 16,
+) -> LeWMMatryoshkaWorldModel:
+    return build_mwm_lewm_from_stable_config(
+        source_config=_lewm_source_config(
+            D=int(D),
+            action_dim=int(action_dim),
+            history_size=int(history_size),
+            predictor_depth=int(predictor_depth),
+            predictor_heads=int(predictor_heads),
+            predictor_dim_head=int(predictor_dim_head),
+            predictor_mlp_dim=int(predictor_mlp_dim),
+            predictor_dropout=float(predictor_dropout),
+            projector_hidden_dim=int(projector_hidden_dim),
+        ),
+        source_config_sha256="test-source-config",
+        training_recipe={
+            "history_size": int(history_size),
+            "num_preds": int(num_preds),
+            "loss_scope": {"regularizers": "shared_latent"},
+        },
+        K=tuple(int(k) for k in K),
+        action_dim=int(action_dim),
+        action_block=int(action_block),
+        image_shape=tuple(int(x) for x in image_shape),
+        normalize_imagenet=bool(normalize_imagenet),
+    )
 
 
 class FakeSolver:
@@ -356,17 +496,7 @@ class MWMCoreTests(unittest.TestCase):
             extra_dir = root / "checkpoint"
             extra_dir.mkdir()
             (extra_dir / "notes.txt").write_text("not canonical", encoding="utf-8")
-            model = build_mwm_lewm(
-                {
-                    "encoder": "cnn",
-                    "D": 4,
-                    "K": [4],
-                    "action_dim": 2,
-                    "image_shape": (8, 8),
-                    "normalize_imagenet": False,
-                    "dynamics": "mlp",
-                }
-            )
+            model = _base_adaptive_lewm(K=(4,), D=4, action_dim=2)
             with self.assertRaisesRegex(ValueError, "non-checkpoint files"):
                 save_world_checkpoint(model, extra_dir, metadata={"env_id": "swm/PushT-v1"})
 
@@ -403,23 +533,7 @@ class MWMCoreTests(unittest.TestCase):
                 importer.import_model()
 
     def test_single_fidelity_k_equals_d_uses_adapter_owned_lewm_loss(self) -> None:
-        model = build_mwm_lewm(
-            {
-                "encoder": "cnn",
-                "D": 8,
-                "K": [8],
-                "action_dim": 2,
-                "image_shape": (8, 8),
-                "normalize_imagenet": False,
-                "history_size": 2,
-                "num_preds": 1,
-                "predictor_depth": 1,
-                "predictor_heads": 2,
-                "predictor_dim_head": 4,
-                "predictor_mlp_dim": 16,
-                "projector_hidden_dim": 16,
-            }
-        )
+        model = _base_adaptive_lewm(K=(8,), D=8, action_dim=2)
         self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
         self.assertEqual(model.K, [model.D])
         self.assertFalse(hasattr(model, "decoders"))
@@ -434,53 +548,31 @@ class MWMCoreTests(unittest.TestCase):
         self.assertIn("loss", out)
 
     def test_lewm_matryoshka_head_scaling_and_k_may_omit_d(self) -> None:
-        model = build_mwm_lewm(
-            {
-                "encoder": "cnn",
-                "D": 192,
-                "K": [48, 96],
-                "action_dim": 10,
-                "action_block": 5,
-                "image_shape": (8, 8),
-                "normalize_imagenet": False,
-                "predictor_depth": 1,
-                "predictor_heads": 16,
-                "predictor_dim_head": 64,
-                "predictor_mlp_dim": 2048,
-                "projector_hidden_dim": 2048,
-            }
+        model = _base_adaptive_lewm(
+            K=(4, 8),
+            D=8,
+            action_dim=10,
+            action_block=5,
+            predictor_heads=2,
+            predictor_dim_head=4,
+            predictor_mlp_dim=16,
+            projector_hidden_dim=16,
         )
 
-        self.assertEqual(model.K, [48, 96])
+        self.assertEqual(model.K, [4, 8])
         self.assertEqual(len(model.transitions), 2)
-        self.assertEqual([h["predictor_heads"] for h in model.metadata["head_architectures"]], [4, 8])
-        self.assertEqual([h["predictor_dim_head"] for h in model.metadata["head_architectures"]], [16, 32])
-        self.assertEqual([h["predictor_mlp_dim"] for h in model.metadata["head_architectures"]], [512, 1024])
+        self.assertEqual([h["predictor_heads"] for h in model.metadata["head_architectures"]], [1, 2])
+        self.assertEqual([h["predictor_dim_head"] for h in model.metadata["head_architectures"]], [2, 4])
+        self.assertEqual([h["predictor_mlp_dim"] for h in model.metadata["head_architectures"]], [8, 16])
 
-        batch = {"pixels": torch.rand(2, 4, 3, 8, 8), "action": torch.randn(2, 4, 10)}
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 10)}
         out = model.training_loss(batch)
         self.assertIn("pred_loss_l0", out)
         self.assertIn("pred_loss_l1", out)
         self.assertNotIn("pred_loss_l2", out)
 
     def test_lewm_sigreg_is_shared_once_by_default(self) -> None:
-        model = build_mwm_lewm(
-            {
-                "encoder": "cnn",
-                "D": 8,
-                "K": [4, 8],
-                "action_dim": 2,
-                "image_shape": (8, 8),
-                "normalize_imagenet": False,
-                "history_size": 2,
-                "num_preds": 1,
-                "predictor_depth": 1,
-                "predictor_heads": 2,
-                "predictor_dim_head": 4,
-                "predictor_mlp_dim": 16,
-                "projector_hidden_dim": 16,
-            }
-        )
+        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
         reg = CountingRegularizer()
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
@@ -491,23 +583,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(reg.shapes[0][-1], 8)
 
     def test_lewm_sigreg_can_be_per_level_when_explicit(self) -> None:
-        model = build_mwm_lewm(
-            {
-                "encoder": "cnn",
-                "D": 8,
-                "K": [4, 8],
-                "action_dim": 2,
-                "image_shape": (8, 8),
-                "normalize_imagenet": False,
-                "history_size": 2,
-                "num_preds": 1,
-                "predictor_depth": 1,
-                "predictor_heads": 2,
-                "predictor_dim_head": 4,
-                "predictor_mlp_dim": 16,
-                "projector_hidden_dim": 16,
-            }
-        )
+        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
         reg = CountingRegularizer()
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
@@ -517,19 +593,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual([shape[-1] for shape in reg.shapes], [4, 8])
 
     def test_train_entrypoint_builds_from_stable_wm_base_config(self) -> None:
-        source_config = {
-            "_target_": "stable_worldmodel.wm.lewm.LeWM",
-            "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": 4},
-            "predictor": {
-                "_target_": "tests.test_mwm_core.FakeLeWMPredictor",
-                "input_dim": 4,
-                "hidden_dim": 4,
-                "output_dim": 4,
-            },
-            "action_encoder": {"_target_": "tests.test_mwm_core.FakeLeWMActionEncoder", "action_dim": 2, "out_dim": 4},
-            "projector": {"_target_": "torch.nn.Identity"},
-            "pred_proj": {"_target_": "torch.nn.Identity"},
-        }
+        source_config = _lewm_source_config(D=4, action_dim=2, predictor_heads=1, predictor_dim_head=2, predictor_mlp_dim=8)
         with tempfile.TemporaryDirectory() as tmp:
             checkpoint_dir = Path(tmp)
             (checkpoint_dir / "config.json").write_text(json.dumps(source_config), encoding="utf-8")
@@ -603,7 +667,20 @@ class MWMCoreTests(unittest.TestCase):
         torch.manual_seed(123)
         direct = _build_exact_lewm_object(model_cfg, cfg)
         torch.manual_seed(123)
-        mwm = build_mwm_lewm(model_cfg)
+        mwm = build_mwm_lewm_from_stable_config(
+            source_config=_stable_vit_lewm_source_config(model_cfg),
+            source_config_sha256="test-stable-vwm-config",
+            training_recipe={
+                "history_size": int(model_cfg["history_size"]),
+                "num_preds": int(model_cfg["num_preds"]),
+                "loss_scope": {"regularizers": "shared_latent"},
+            },
+            K=tuple(int(k) for k in model_cfg["K"]),
+            action_dim=int(model_cfg["action_dim"]),
+            action_block=int(model_cfg["action_block"]),
+            image_shape=tuple(int(x) for x in model_cfg["image_shape"]),
+            normalize_imagenet=bool(model_cfg["normalize_imagenet"]),
+        )
 
         mapping = {
             "encoder.": "encoder.",
@@ -685,18 +762,7 @@ class MWMCoreTests(unittest.TestCase):
         )
 
     def test_action_spec_distinguishes_base_and_block_dims(self) -> None:
-        model = build_mwm_lewm(
-            {
-                "encoder": "cnn",
-                "D": 8,
-                "K": [8],
-                "action_dim": 10,
-                "action_block": 5,
-                "image_shape": (8, 8),
-                "normalize_imagenet": False,
-                "dynamics": "mlp",
-            }
-        )
+        model = _base_adaptive_lewm(K=(8,), D=8, action_dim=10, action_block=5)
 
         self.assertEqual(model.action_dim, 10)
         self.assertEqual(model.metadata["action_spec"], {"dim": 10, "base_dim": 2, "block": 5})
@@ -808,6 +874,60 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(policy.solver.topk, 4)
         self.assertEqual(policy.solver.n_steps, 7)
         self.assertEqual(policy.cfg.horizon, 5)
+
+    def test_mwm_and_reference_policies_share_action_block_recipe(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "eval": {"num_envs": 2, "seed": 11},
+                "planner": {
+                    "horizon": 5,
+                    "receding_horizon": 5,
+                    "action_block": 5,
+                    "batch_size": "auto",
+                    "pop_size": 13,
+                    "topk": 4,
+                    "elite_frac": 0.1,
+                    "n_iter": 7,
+                    "init_std": 1.5,
+                    "seed": 19,
+                    "warm_start": True,
+                    "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+                },
+            }
+        )
+        action_space = Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
+        mwm_policy = _build_mwm_policy(
+            FakeFidelityCostModel(),
+            {"action_block": 5},
+            cfg,
+            torch.device("cpu"),
+            action_space,
+            process={},
+        )
+        source_model = FakeCostLeWMObject()
+        imported = mwm_from_lewm_object(
+            source_model,
+            source_checkpoint="fake.pt",
+            D=4,
+            K=(4,),
+            action_dim=10,
+            action_block=5,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+        )
+        reference_policy = _build_stable_wm_reference_policy(imported, imported.metadata, cfg, torch.device("cpu"), process={})
+        env = SimpleNamespace(num_envs=2, single_action_space=action_space, action_space=Box(low=-1.0, high=1.0, shape=(2, 2), dtype=np.float32))
+
+        mwm_policy.set_env(env)
+        reference_policy.set_env(env)
+
+        self.assertEqual(mwm_policy.cfg.action_block, reference_policy.cfg.action_block)
+        self.assertEqual(mwm_policy.cfg.horizon, reference_policy.cfg.horizon)
+        self.assertEqual(mwm_policy.cfg.receding_horizon, reference_policy.cfg.receding_horizon)
+        self.assertEqual(mwm_policy.solver.action_dim, reference_policy.solver.action_dim)
+        self.assertEqual(mwm_policy.solver.num_samples, reference_policy.solver.num_samples)
+        self.assertEqual(mwm_policy.solver.topk, reference_policy.solver.topk)
+        self.assertEqual(mwm_policy.solver.n_steps, reference_policy.solver.n_steps)
 
     def test_reference_eval_policy_normalizes_imagenet_source_inputs(self) -> None:
         source = AssertingImageNetCostLeWMObject()

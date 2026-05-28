@@ -317,7 +317,7 @@ runs:
             cfg_path.write_text(
                 json.dumps(
                     {
-                        "target": "mwm.adapters.lewm.build_mwm_lewm",
+                        "target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config",
                         "kwargs": {"action_dim": 2, "action_block": 1, "K": [2]},
                     }
                 ),
@@ -442,7 +442,7 @@ runs:
 
         self.assertTrue(any("missing retrained_lewm_single rows" in error for error in errors), errors)
 
-    def test_role_checkpoint_contract_rejects_generic_single_level_backend(self) -> None:
+    def test_role_checkpoint_contract_rejects_direct_target_and_wrong_backend(self) -> None:
         row = {"role": "retrained_lewm_single", "checkpoint_run_dir": "checkpoints_mwm/retrained"}
         metadata = {
             "levels": [192],
@@ -454,6 +454,7 @@ runs:
         _validate_role_checkpoint_contract(row, metadata, errors)
 
         self.assertTrue(any("exact Le-WM backend" in error for error in errors), errors)
+        self.assertTrue(any("base-adapter target" in error for error in errors), errors)
         self.assertTrue(any("corrected architecture version" in error for error in errors), errors)
 
     def test_role_checkpoint_contract_accepts_base_adaptive_lewm_target(self) -> None:

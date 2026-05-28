@@ -340,7 +340,7 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
     model_meta = metadata.get("model", {})
     target = str(model_meta.get("target", "")) if isinstance(model_meta, dict) else ""
     backend = str(metadata.get("training_backend", ""))
-    trainable_lewm_targets = ("build_mwm_lewm", "build_mwm_lewm_from_stable_config")
+    trainable_lewm_targets = ("build_mwm_lewm_from_stable_config",)
     if role == "upstream_lewm_converted":
         if metadata.get("role") != "upstream_lewm_converted":
             errors.append(f"upstream role checkpoint missing upstream_lewm_converted metadata role: {checkpoint_dir}")

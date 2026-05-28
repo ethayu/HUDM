@@ -242,7 +242,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
             ROOT / "scripts" / "run_mwm_single_level_benchmark.sh",
             ROOT / "scripts" / "run_mwm_train_v1_env.sh",
             ROOT / "scripts" / "run_mwm_v1_benchmark.sh",
+            ROOT / "scripts" / "run_mwm_paper_parity.sh",
             ROOT / "scripts" / "run_mwm_paper_reference.sh",
+            ROOT / "scripts" / "run_mwm_v1_gate.sh",
         ]
         for script in scripts:
             text = script.read_text(encoding="utf-8")
@@ -307,6 +309,24 @@ class MWMRepoHygieneTests(unittest.TestCase):
         ]
         for token in forbidden:
             self.assertNotIn(token, text)
+
+    def test_lewm_adapter_is_split_into_focused_modules(self) -> None:
+        modules = [
+            "lewm_common.py",
+            "lewm_model.py",
+            "lewm_stable.py",
+            "lewm_import.py",
+        ]
+        for name in modules:
+            self.assertTrue((ROOT / "mwm" / "adapters" / name).is_file(), name)
+        self.assertFalse((ROOT / "mwm" / "adapters" / "lewm_direct.py").exists())
+
+        facade_lines = (ROOT / "mwm" / "adapters" / "lewm.py").read_text(encoding="utf-8").splitlines()
+        self.assertLessEqual(len(facade_lines), 80)
+        facade_text = "\n".join(facade_lines)
+        self.assertNotIn("lewm_direct", facade_text)
+        self.assertNotIn("build_lewm_matryoshka_model", facade_text)
+        self.assertNotIn("MWMLeWMAdapterConfig", facade_text)
 
     def test_unused_helper_modules_and_ogbench_restore_support_are_removed(self) -> None:
         removed = [

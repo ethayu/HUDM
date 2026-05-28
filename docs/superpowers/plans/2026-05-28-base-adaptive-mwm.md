@@ -786,7 +786,7 @@ Add tests:
 
 ```python
     def test_lewm_sigreg_is_shared_once_by_default(self) -> None:
-        model = build_mwm_lewm(
+        model = _base_adaptive_lewm(
             {
                 "encoder": "cnn",
                 "D": 8,
@@ -813,7 +813,7 @@ Add tests:
         self.assertEqual(reg.shapes[0][-1], 8)
 
     def test_lewm_sigreg_can_be_per_level_when_explicit(self) -> None:
-        model = build_mwm_lewm(
+        model = _base_adaptive_lewm(
             {
                 "encoder": "cnn",
                 "D": 8,
@@ -1100,7 +1100,7 @@ def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> tor
 
     base = cfg.get("base", {})
     if not base:
-        return build_mwm_lewm(model_cfg)
+        raise ValueError("Trainable Le-WM MWM requires a Stable-WM base checkpoint config.")
     config_path = _stable_checkpoint_config_path(str(base["checkpoint"]))
     source_config, loaded_path = load_stable_wm_config(config_path)
     policy = ComponentPolicy.from_mapping(cfg.get("mwm", {}).get("component_policy", None))
@@ -1124,7 +1124,7 @@ def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> tor
     )
 ```
 
-Use this helper in exact Le-WM training and export paths in place of direct `build_mwm_lewm(model_cfg)` when `cfg.base` exists.
+Use this helper in exact Le-WM training and export paths. Direct no-base Le-WM construction is intentionally unsupported.
 
 - [ ] **Step 5: Metadata includes source config**
 

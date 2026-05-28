@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, Subset
 
 from mwm.dependency_refs import dependency_refs
 from mwm.training import mwm_spt_forward
-from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, build_mwm_lewm, mwm_from_lewm_object
+from mwm.adapters.lewm import LeWMMatryoshkaWorldModel
 from mwm.data.stable_wm import MWMTrainSampleTransform, load_dataset_metadata, load_stable_wm_dataset_for_mwm
 from mwm.swm.restore import validate_restore_columns
 from mwm.checkpoints import save_world_checkpoint
@@ -316,7 +316,7 @@ def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> tor
     base = cfg.get("base", {}) if hasattr(cfg, "get") else {}
     base = _as_container(base)
     if not base:
-        return build_mwm_lewm(model_cfg)
+        raise ValueError("Trainable Le-WM MWM requires a Stable-WM base checkpoint config.")
 
     config_path = _stable_checkpoint_config_path(str(base["checkpoint"]))
     source_config, loaded_path = load_stable_wm_config(config_path)
@@ -698,7 +698,7 @@ def _prepare_exact_lewm_context(cfg: Any) -> tuple[Any, Any, Any, dict[str, Any]
             "split": "stable_pretraining_random_split",
             "normalized_columns": list(cfg.data.get("keys_to_load", ["pixels", "action", "proprio", "state"])),
         },
-        "model": {"target": "mwm.adapters.lewm.build_mwm_lewm", **model_cfg},
+        "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
     }
     for key in ("action_low", "action_high"):
         if key in dataset_meta:
@@ -812,7 +812,7 @@ def main(cfg_path: str) -> None:
             "pixels_key": str(cfg.data.pixels_key),
             "action_key": str(cfg.data.action_key),
         },
-        "model": {"target": "mwm.adapters.lewm.build_mwm_lewm", **model_cfg},
+        "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
     }
     for key in ("action_low", "action_high"):
         if key in dataset_meta:

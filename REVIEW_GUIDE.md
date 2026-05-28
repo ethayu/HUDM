@@ -215,13 +215,18 @@ scripts/run_mwm_v1_gate.sh
 - `mwm/__init__.py`: Public package marker; exports `MWMWorldModel`.
 - `mwm/adapters/__init__.py`: Re-exports adapter base classes and component
   dataclass.
-- `mwm/adapters/lewm.py`: Adapter/importer implementation for Le-WM. It defines
-  common adapter contracts, image preprocessing, CNN/ViT backbones,
-  `LeWMMatryoshkaWorldModel`, per-`K` transition packages, proportional head
-  scaling, trusted-object importing, and builder functions used by checkpoint
-  config targets. Review source-class validation, expected components,
-  single-fidelity import restriction, `K=[D]` exactness, and `action_spec`
-  construction.
+- `mwm/adapters/lewm.py`: Stable public facade for Le-WM builders/importers and
+  adapter registration. Checkpoint config targets intentionally keep using this
+  module.
+- `mwm/adapters/lewm_model.py`: Trainable `LeWMMatryoshkaWorldModel`, per-`K`
+  transition packages, Le-WM loss routing, rollout, and fidelity-aware cost.
+- `mwm/adapters/lewm_stable.py`: Stable-WM `config.json` adapter, component
+  policy validation, fresh architecture instantiation, and proportional
+  per-level head construction from source configs.
+- `mwm/adapters/lewm_import.py`: Trusted upstream Le-WM object import and
+  eval-only wrapper that delegates single-level planning to the raw Stable-WM
+  `get_cost` path.
+- `mwm/adapters/lewm_common.py`: Shared image preprocessing helpers.
 - `mwm/benchmark/__init__.py`: Empty namespace marker for benchmark helpers.
 - `mwm/benchmark/artifacts.py`: Artifact writer and renderer. It writes JSON,
   CSV, JSONL, per-run sidecars, per-environment tables, seven default plots, and
@@ -393,18 +398,18 @@ before making performance claims.
   `upstream_lewm_converted`.
 - `checkpoints_mwm/retrained_lewm_single_pusht/`: Locally trained PushT
   single-fidelity checkpoint, expected after refresh to use
-  `mwm.adapters.lewm.build_mwm_lewm` with `architecture_version:
+  `mwm.adapters.lewm.build_mwm_lewm_from_stable_config` with `architecture_version:
   lewm_base_adapter_v1`, `K=[192]`, and action block 5.
 - `checkpoints_mwm/retrained_lewm_single_tworoom/`: Locally trained TwoRoom
   single-fidelity checkpoint, expected after refresh to use
-  `mwm.adapters.lewm.build_mwm_lewm` with `architecture_version:
+  `mwm.adapters.lewm.build_mwm_lewm_from_stable_config` with `architecture_version:
   lewm_base_adapter_v1`, `K=[192]`, and action block 5.
 - `checkpoints_mwm/retrained_lewm_single_pusht_upstream/`: Paper-parity PushT
   exact Le-WM retrain on the official upstream dataset, exported through the
-  Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm`.
+  Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
 - `checkpoints_mwm/retrained_lewm_single_tworoom_upstream/`: Paper-parity
   TwoRoom exact Le-WM retrain on the official upstream dataset, exported through
-  the Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm`.
+  the Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
 - `checkpoints_mwm/mwm_scheduled_pusht/`: Locally trained PushT multi-fidelity
   MWM, `K=[48,96,144,192]`, action block 5.
 - `checkpoints_mwm/mwm_scheduled_tworoom/`: Locally trained TwoRoom multi-fidelity
@@ -534,8 +539,9 @@ reviewer should confirm no required functionality was accidentally lost.
    `mwm/data/manifest.py`, `mwm/checkpoints.py`, and `verify_mwm_benchmark.py`.
 3. Review the model/planner path: `mwm/models/world_model.py`,
    `mwm/fidelity.py`, `mwm/planning/scheduled_cem.py`, and `mwm/eval/policy.py`.
-4. Review the Le-WM adapter/import path: `mwm/adapters/lewm.py` and
-   `prepare_upstream_lewm.py`.
+4. Review the Le-WM adapter/import path: `mwm/adapters/lewm.py`,
+   `mwm/adapters/lewm_model.py`, `mwm/adapters/lewm_stable.py`,
+   `mwm/adapters/lewm_import.py`, and `prepare_upstream_lewm.py`.
 5. Review orchestration: `collect_mwm_data.py`, `train_mwm.py`, `eval_mwm.py`,
    `benchmark_mwm.py`, and the shell/SLURM scripts.
 6. Review tests and generated artifacts last, checking whether the tests cover

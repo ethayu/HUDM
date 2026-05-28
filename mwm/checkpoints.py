@@ -182,13 +182,7 @@ def validate_checkpoint_contract(config: dict[str, Any], metadata: dict[str, Any
             raise ValueError("Trusted upstream Le-WM object imports must remain single-fidelity eval-only checkpoints.")
         return
     if target.endswith("build_mwm_lewm"):
-        arch = str(metadata.get("architecture_version", ""))
-        if arch != LEWM_BASE_ADAPTER_ARCH:
-            raise ValueError(
-                "Old generic MWM trainable checkpoint architecture detected; "
-                "retrain required with architecture_version='lewm_base_adapter_v1'."
-            )
-        return
+        raise ValueError("Legacy direct Le-WM MWM checkpoints are no longer supported; retrain from a base config.")
 
 
 def instantiate_from_config(config: dict[str, Any]) -> Any:
