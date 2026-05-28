@@ -57,6 +57,48 @@ class AdapterPolicyTests(unittest.TestCase):
         self.assertTrue(spec.fresh_init)
         self.assertEqual(spec.component_policy.shared, ("latent_producer",))
         self.assertEqual(spec.loss_scope["regularizers"], "shared_latent")
+        self.assertEqual(
+            spec.metadata(),
+            {
+                "adapter_family": "lewm",
+                "source_config_sha256": "abc123",
+                "component_policy": {
+                    "shared": ["latent_producer"],
+                    "per_level": ["transition"],
+                    "reconstructor": [],
+                },
+                "levels": [4],
+                "D": 4,
+                "fresh_init": True,
+                "loss_scope": {"regularizers": "shared_latent"},
+            },
+        )
+
+    def test_component_policy_from_mapping_and_as_dict(self) -> None:
+        self.assertEqual(
+            ComponentPolicy.from_mapping(None).as_dict(),
+            {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []},
+        )
+
+        policy = ComponentPolicy.from_mapping(
+            {
+                "shared": ["latent_producer"],
+                "per_level": ("transition", "reward_head"),
+                "reconstructor": ["decoder"],
+            }
+        )
+
+        self.assertEqual(policy.shared, ("latent_producer",))
+        self.assertEqual(policy.per_level, ("transition", "reward_head"))
+        self.assertEqual(policy.reconstructor, ("decoder",))
+        self.assertEqual(
+            policy.as_dict(),
+            {
+                "shared": ["latent_producer"],
+                "per_level": ["transition", "reward_head"],
+                "reconstructor": ["decoder"],
+            },
+        )
 
     def test_adapter_package_exports_base_api_without_lewm_module(self) -> None:
         import importlib
