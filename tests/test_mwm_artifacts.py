@@ -453,7 +453,7 @@ runs:
         errors: list[str] = []
         _validate_role_checkpoint_contract(row, metadata, errors)
 
-        self.assertTrue(any("exact Le-WM backend" in error for error in errors), errors)
+        self.assertTrue(any("Le-WM base-adapter backend" in error for error in errors), errors)
         self.assertTrue(any("base-adapter target" in error for error in errors), errors)
         self.assertTrue(any("corrected architecture version" in error for error in errors), errors)
 

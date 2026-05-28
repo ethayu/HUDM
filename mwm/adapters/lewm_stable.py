@@ -84,14 +84,7 @@ class LeWMStableWMAdapter:
 
 
 def _instantiate_module(config: dict[str, Any]) -> nn.Module:
-    cfg = copy.deepcopy(config)
-    try:
-        return instantiate(cfg)
-    except Exception:
-        target = str(cfg.get("_target_", ""))
-        if target.startswith("tests.test_mwm_core.Fake") and len(cfg) > 1:
-            return instantiate({"_target_": target})
-        raise
+    return instantiate(copy.deepcopy(config))
 
 
 def _scale_positive_int(value: Any, k: int, D: int, minimum: int = 1) -> int:
@@ -168,7 +161,7 @@ def _transition_config_bundle_from_stable_config(
         "pred_proj_input_dim": pred_proj_widths.get("input_dim"),
         "pred_proj_output_dim": pred_proj_widths.get("output_dim"),
         "pred_proj_hidden_dim": pred_proj_widths.get("hidden_dim"),
-        "constructor_exact_base_lewm": int(k) == int(D),
+        "constructor_identity_base_lewm": int(k) == int(D),
     }
     return _TransitionConfigBundle(
         predictor_config=predictor_config,

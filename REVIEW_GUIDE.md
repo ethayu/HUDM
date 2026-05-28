@@ -13,7 +13,7 @@ benchmark stack. The narrow review story is:
 
 1. Collect Stable-WM datasets as Lance datasets with sidecar metadata.
 2. Convert trusted upstream Le-WM objects into canonical MWM checkpoints.
-3. Train local exact single-fidelity Le-WM and multi-fidelity MWM checkpoints
+3. Train local single-fidelity Le-WM and multi-fidelity MWM checkpoints
    through the same Le-WM base adapter.
 4. Evaluate every role through the same `MWMWorldModel` and scheduled CEM path.
 5. Generate a fixed benchmark matrix and verify that its artifacts are complete,
@@ -149,7 +149,7 @@ a minimal prebuilt-loader LightningDataModule so Stable-Pretraining does not
 attach trainer state to Lance-backed datasets before worker spawn.
 The paper-parity eval config uses `eval.sampling: stable_worldmodel`, matching
 upstream row-based start/goal sampling and sorted eval order for PushT. Converted
-or exact Le-WM checkpoints use `action_preprocessing: standard_scaler`: CEM plans
+or retrained Le-WM base-adapter checkpoints use `action_preprocessing: standard_scaler`: CEM plans
 in the normalized action space the world model was trained on, then the policy
 inverse-transforms only the selected action before stepping the environment.
 
@@ -186,11 +186,11 @@ scripts/run_mwm_v1_gate.sh
   tables and writes MWM sidecar metadata. The paper-parity path is Lance-only;
   missing Lance artifacts are treated as setup errors.
 - `train_mwm.py`: Loads Lance training data, performs the Stable-Pretraining
-  random split, infers image/action dimensions, builds the Le-WM base adapter
-  for both `K=[D]` and scheduled `K`, trains with the Le-WM AdamW/warmup-cosine
-  recipe, and saves a canonical checkpoint. Review exact-backend selection,
-  `_prepare_exact_lewm_context`, `_load_exact_lewm_train_valid_datasets`, and
-  the `action_block`/frameskip handling carefully.
+  random split, derives architecture from the Stable-WM base checkpoint config,
+  builds the Le-WM base adapter for both `K=[D]` and scheduled `K`, trains with
+  the Le-WM AdamW/warmup-cosine recipe, and saves a canonical checkpoint. Review
+  `_prepare_lewm_base_adapter_context`, `_load_lewm_base_adapter_train_valid_datasets`, and the
+  `action_block`/frameskip handling carefully.
 - `eval_mwm.py`: Loads a canonical checkpoint and Lance dataset, validates
   metadata compatibility, samples or loads immutable start/goal manifests,
   fits evaluation-only action/stat scalers when required by the checkpoint,
@@ -256,10 +256,9 @@ scripts/run_mwm_v1_gate.sh
   `linear_cem`, and `table` policies; resolves tokens like `coarsest`, `finest`,
   and `base`; validates horizon length and forbids low-to-high rollout schedules.
 - `mwm/models/__init__.py`: Re-exports `MWMWorldModel`.
-- `mwm/models/world_model.py`: Legacy generic model utilities and the public
-  `MWMWorldModel` contract. The trainable Le-WM path no longer uses its default
-  dynamics/decoder stack; reviewers should treat those generic helpers as
-  non-production compatibility code until removed.
+- `mwm/models/world_model.py`: Public `MWMWorldModel` runtime contract plus
+  shared matryoshka aggregation/regularizer helpers. It refuses to invent default
+  dynamics or decoder modules; base adapters own architecture and level losses.
 - `mwm/planning/__init__.py`: Empty namespace marker for planners.
 - `mwm/planning/scheduled_cem.py`: Stable-WM-compatible CEM planner that asks a
   `FidelityScheduler` which level to use at each CEM iteration, samples/clamps
@@ -282,10 +281,10 @@ scripts/run_mwm_v1_gate.sh
 - `configs/collect_mwm_tworoom.yaml`: Collects 100 TwoRoom episodes at 224x224
   with 8 envs into `data/tworoom_swm.lance`.
 - `configs/train_mwm_lewm_pusht.yaml`: Trains PushT single-fidelity retrained
-  Le-WM checkpoint with `K: [192]` through the exact Stable-WM Le-WM backend:
+  Le-WM checkpoint with `K: [192]` through the Le-WM base-adapter backend:
   history/context prediction, projector heads, standardized non-pixel columns,
   SIGReg, AdamW, and a canonical MWM checkpoint export.
-- `configs/train_mwm_lewm_tworoom.yaml`: Same exact single-fidelity backend for
+- `configs/train_mwm_lewm_tworoom.yaml`: Same single-fidelity base-adapter backend for
   TwoRoom with run name `retrained_lewm_single_tworoom`.
 - `configs/train_mwm_lewm_pusht_upstream.yaml`: PushT paper-parity retrain on
   `data/upstream/pusht_expert_train.lance`; this is the strict upstream-data
@@ -316,7 +315,7 @@ scripts/run_mwm_v1_gate.sh
   directory, gate envs/seeds/roles, and 18 runs with checkpoint overrides for
   upstream converted, retrained single, and scheduled roles.
 - `configs/benchmark_mwm_paper_parity.yaml`: Paper-parity sanity matrix for
-  PushT and TwoRoom, seed 42, comparing converted upstream Le-WM against exact
+  PushT and TwoRoom, seed 42, comparing converted upstream Le-WM against
   from-scratch single-level MWM/Le-WM checkpoints. Its verifier targets come
   from arXiv v1 Fig. 6: PushT 96.0% and Two-Room 87.0%, with a 5 percentage
   point tolerance and the same tolerance for retrained-single vs upstream.
@@ -326,7 +325,7 @@ scripts/run_mwm_v1_gate.sh
 - `scripts/run_mwm_benchmark_gate.sh`: Runs benchmark and benchmark verification
   from the repo root using `$MWM_PYTHON` or the hardcoded MWM conda Python.
 - `scripts/run_mwm_paper_parity.sh`: Prepares upstream converted checkpoints and
-  upstream Lance datasets, verifies paper-parity data configs, trains exact
+  upstream Lance datasets, verifies paper-parity data configs, trains
   single-level PushT/TwoRoom baselines, then runs and verifies the paper-parity
   benchmark.
 - `scripts/run_mwm_v1_gate.sh`: Runs data verification, upstream conversion,
@@ -405,10 +404,10 @@ before making performance claims.
   `mwm.adapters.lewm.build_mwm_lewm_from_stable_config` with `architecture_version:
   lewm_base_adapter_v1`, `K=[192]`, and action block 5.
 - `checkpoints_mwm/retrained_lewm_single_pusht_upstream/`: Paper-parity PushT
-  exact Le-WM retrain on the official upstream dataset, exported through the
+  Le-WM base-adapter retrain on the official upstream dataset, exported through the
   Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
 - `checkpoints_mwm/retrained_lewm_single_tworoom_upstream/`: Paper-parity
-  TwoRoom exact Le-WM retrain on the official upstream dataset, exported through
+  TwoRoom Le-WM base-adapter retrain on the official upstream dataset, exported through
   the Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
 - `checkpoints_mwm/mwm_scheduled_pusht/`: Locally trained PushT multi-fidelity
   MWM, `K=[48,96,144,192]`, action block 5.
@@ -562,7 +561,7 @@ reviewer should confirm no required functionality was accidentally lost.
 - Every run has nonzero CEM work diagnostics.
 - Every checkpoint has a valid `action_spec`, matching config kwargs and metadata.
 - Benchmark roles satisfy checkpoint contracts: upstream is converted through
-  the trusted Le-WM object importer, retrained single is exact Le-WM `K=[192]`,
+  the trusted Le-WM object importer, retrained single is base-adapter Le-WM `K=[192]`,
   and scheduled MWM is `K=[48,96,144,192]`.
 - Each env/seed shares one manifest across all three roles.
 - `review.html` links all run drilldowns and embeds all seven required plots.

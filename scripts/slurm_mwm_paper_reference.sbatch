@@ -12,6 +12,11 @@
 
 set -euo pipefail
 
+if [[ -z "${SLURM_JOB_ID:-}" ]]; then
+  echo "ERROR: scripts/slurm_mwm_paper_reference.sbatch must be submitted with sbatch; do not run Slurm batch scripts directly on login nodes." >&2
+  exit 2
+fi
+
 ROOT="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PY="${MWM_PYTHON:-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python}"
 

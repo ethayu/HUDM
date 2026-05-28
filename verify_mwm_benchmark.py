@@ -351,9 +351,9 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
     elif role == "retrained_lewm_single":
         if levels != [192]:
             errors.append(f"retrained single checkpoint must be K=[192], got {levels}: {checkpoint_dir}")
-        if backend not in {"stable_worldmodel_lewm", "exact_lewm"}:
+        if backend != "stable_worldmodel_lewm":
             errors.append(
-                f"retrained single checkpoint must use exact Le-WM backend, got {backend!r}: {checkpoint_dir}"
+                f"retrained single checkpoint must use the Le-WM base-adapter backend, got {backend!r}: {checkpoint_dir}"
             )
         if not target.endswith(trainable_lewm_targets):
             errors.append(f"retrained single checkpoint must export the Le-WM base-adapter target: {checkpoint_dir}")

@@ -1,59 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Sequence
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from mwm.fidelity import FidelityDecision
-
-
-@dataclass(frozen=True)
-class MWMActionSpec:
-    dim: int
-    low: list[float] | None = None
-    high: list[float] | None = None
-
-
-@dataclass(frozen=True)
-class MWMComponentSpec:
-    target: str
-    kwargs: dict[str, Any]
-
-
-class _DefaultDynamics(nn.Module):
-    def __init__(self, k_dim: int, action_dim: int, hidden_dim: int = 256) -> None:
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(int(k_dim) + int(action_dim), int(hidden_dim)),
-            nn.GELU(),
-            nn.Linear(int(hidden_dim), int(k_dim)),
-        )
-
-    def forward(self, z: torch.Tensor, a: torch.Tensor) -> torch.Tensor:
-        return z + self.net(torch.cat([z, a], dim=-1))
-
-
-class _DefaultImageDecoder(nn.Module):
-    def __init__(self, k_dim: int, image_shape: tuple[int, int], hidden_channels: int = 128) -> None:
-        super().__init__()
-        self.image_shape = (int(image_shape[0]), int(image_shape[1]))
-        self.fc = nn.Sequential(nn.Linear(int(k_dim), int(hidden_channels) * 7 * 7), nn.GELU())
-        self.conv = nn.Sequential(
-            nn.Conv2d(int(hidden_channels), 64, 3, padding=1),
-            nn.GELU(),
-            nn.Conv2d(64, 32, 3, padding=1),
-            nn.GELU(),
-            nn.Conv2d(32, 3, 3, padding=1),
-            nn.Sigmoid(),
-        )
-
-    def forward(self, z: torch.Tensor) -> torch.Tensor:
-        x = self.fc(z).reshape(z.shape[0], -1, 7, 7)
-        x = F.interpolate(x, size=self.image_shape, mode="bilinear", align_corners=False)
-        return self.conv(x)
 
 
 class MWMWorldModel(nn.Module):
@@ -87,18 +39,15 @@ class MWMWorldModel(nn.Module):
             raise ValueError(f"Largest K must equal D={self.D}, got {self.K}")
 
         if dynamics is None:
-            self.dynamics = nn.ModuleList([_DefaultDynamics(k, self.action_dim) for k in self.K])
-            self.dynamics_mode = "per_level"
-        elif isinstance(dynamics, nn.Module):
+            raise ValueError("MWMWorldModel requires explicit dynamics from a base adapter.")
+        if isinstance(dynamics, nn.Module):
             self.dynamics = dynamics
         else:
             self.dynamics = nn.ModuleList(list(dynamics))
             self.dynamics_mode = "per_level"
 
-        image_shape = tuple(int(x) for x in self.metadata.get("image_shape", (96, 96)))
         if decoder is None:
-            self.decoders = nn.ModuleList([_DefaultImageDecoder(k, image_shape) for k in self.K])
-            self.decoder_mode = "per_level"
+            self.decoder_mode = "none"
         elif isinstance(decoder, nn.Module):
             self.decoder = decoder
         else:
@@ -159,6 +108,8 @@ class MWMWorldModel(nn.Module):
         return z_next[..., :k]
 
     def decode(self, level: int, z: torch.Tensor) -> torch.Tensor:
+        if self.decoder_mode == "none":
+            raise NotImplementedError("This base adapter did not provide a decoder.")
         k = self.K[int(level)]
         if self.decoder_mode == "per_level":
             return self.decoders[int(level)](z[..., :k])
@@ -280,84 +231,99 @@ class MWMWorldModel(nn.Module):
         return z.reshape(batch * samples, self.D)
 
 
-def _sigreg_loss(proj: torch.Tensor, *, knots: int = 17, num_proj: int = 1024) -> torch.Tensor:
-    """CPU/GPU-safe Sketch Isotropic Gaussian regularizer on full latents."""
-
-    if proj.ndim != 3:
-        raise ValueError(f"SIGReg expects (T,B,D), got {tuple(proj.shape)}")
-    t = torch.linspace(0, 3, int(knots), dtype=proj.dtype, device=proj.device)
-    dt = 3 / max(1, int(knots) - 1)
-    weights = torch.full((int(knots),), 2 * dt, dtype=proj.dtype, device=proj.device)
-    weights[[0, -1]] = dt
-    window = torch.exp(-t.square() / 2.0)
-    weights = weights * window
-    basis = torch.randn(proj.size(-1), int(num_proj), dtype=proj.dtype, device=proj.device)
-    basis = basis / basis.norm(p=2, dim=0).clamp_min(1e-12)
-    x_t = (proj @ basis).unsqueeze(-1) * t
-    err = (x_t.cos().mean(-3) - window).square() + x_t.sin().mean(-3).square()
-    return ((err @ weights) * proj.size(-2)).mean()
-
-
-def mwm_prediction_loss(
-    model: MWMWorldModel,
-    batch: dict[str, torch.Tensor],
+def weighted_level_mean(
+    level_losses: Sequence[torch.Tensor],
     *,
-    level: int | None = None,
     level_weights: Sequence[float] | None = None,
-    recon_weight: float = 0.0,
-    rollout_weight: float = 1.0,
-    sigreg_weight: float = 0.0,
-    sigreg_knots: int = 17,
-    sigreg_num_proj: int = 1024,
-) -> dict[str, torch.Tensor]:
-    if getattr(model, "eval_only", False):
-        raise RuntimeError("Eval-only imported checkpoints cannot be used for MWM training.")
-    x = batch["x"]
-    actions = batch["a"]
-    if x.ndim != 5:
-        raise ValueError(f"batch['x'] must have shape (B,T,C,H,W), got {tuple(x.shape)}")
-    if actions.ndim < 3:
-        actions = actions.reshape(actions.shape[0], actions.shape[1], -1)
-    expected_actions = int(x.shape[1]) - 1
-    if int(actions.shape[1]) < expected_actions:
-        raise ValueError(f"Expected at least {expected_actions} action steps for {x.shape[1]} frames, got {actions.shape[1]}")
-    if int(actions.shape[1]) > expected_actions:
-        actions = actions[:, :expected_actions]
-    z = model.encode(x.reshape(-1, *x.shape[2:])).reshape(x.shape[0], x.shape[1], model.D)
-    levels = [int(level)] if level is not None else list(range(model.num_levels))
-    weights = list(level_weights or [1.0] * len(levels))
-    if len(weights) != len(levels):
-        raise ValueError(f"level_weights has {len(weights)} entries for {len(levels)} levels")
+    log_prefix: str,
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """Aggregate per-level objective terms with the shared MWM weighting rule."""
+
+    losses = list(level_losses)
+    if not losses:
+        raise ValueError("weighted_level_mean requires at least one level loss.")
+    weights = list(level_weights or [1.0] * len(losses))
+    if len(weights) != len(losses):
+        raise ValueError(f"level_weights has {len(weights)} entries for {len(losses)} levels")
     denom = float(sum(weights)) if sum(weights) else 1.0
-    loss = z.new_tensor(0.0)
+    total = losses[0].new_tensor(0.0)
     logs: dict[str, torch.Tensor] = {}
-    for level_idx, weight in zip(levels, weights):
-        pred = model.rollout(level_idx, z[:, 0], actions)
-        target = z[:, 1 : 1 + pred.shape[1], : model.K[level_idx]].detach()
-        level_loss = F.mse_loss(pred, target)
-        logs[f"rollout_loss_l{level_idx}"] = level_loss.detach()
-        loss = loss + float(weight) * level_loss / denom
-    rollout_loss = loss
-    loss = float(rollout_weight) * rollout_loss
-    logs.update({"loss": loss, "rollout_loss": rollout_loss})
-    if float(sigreg_weight):
-        sigreg = _sigreg_loss(z.transpose(0, 1), knots=int(sigreg_knots), num_proj=int(sigreg_num_proj))
-        loss = loss + float(sigreg_weight) * sigreg
-        logs["loss"] = loss
-        logs["sigreg_loss"] = sigreg.detach()
-    if recon_weight:
-        level_idx = levels[-1]
-        recon = model.decode(level_idx, z[:, 0])
-        recon_loss = F.mse_loss(recon, x[:, 0])
-        loss = loss + float(recon_weight) * recon_loss
-        logs["loss"] = loss
-        logs["recon_loss"] = recon_loss
+    for level_idx, (loss, weight) in enumerate(zip(losses, weights)):
+        logs[f"{log_prefix}_l{level_idx}"] = loss.detach()
+        total = total + float(weight) * loss / denom
+    return total, logs
+
+
+def latent_regularizer_loss(
+    latents: torch.Tensor,
+    *,
+    K: Sequence[int],
+    regularizer: nn.Module,
+    scope: str = "shared_latent",
+    level_weights: Sequence[float] | None = None,
+    log_prefix: str = "sigreg_loss",
+) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+    """Apply a latent regularizer using MWM's shared/per-level scope policy."""
+
+    if latents.ndim != 3:
+        raise ValueError(f"latent_regularizer_loss expects (B,T,D) latents, got {tuple(latents.shape)}")
+    if scope == "shared_latent":
+        total = regularizer(latents.transpose(0, 1))
+        return total, {log_prefix: total.detach()}
+    if scope != "per_level_prefix":
+        raise ValueError(f"Unknown regularizer scope {scope!r}")
+    losses = [regularizer(latents[..., : int(k)].transpose(0, 1)) for k in K]
+    total, logs = weighted_level_mean(losses, level_weights=level_weights, log_prefix=log_prefix)
+    logs[log_prefix] = total.detach()
+    return total, logs
+
+
+def matryoshka_base_loss(
+    level_losses: Sequence[torch.Tensor],
+    *,
+    latents: torch.Tensor | None = None,
+    K: Sequence[int] | None = None,
+    level_weights: Sequence[float] | None = None,
+    primary_log_prefix: str = "pred_loss",
+    primary_aliases: Sequence[str] = (),
+    rollout_weight: float = 1.0,
+    regularizer: nn.Module | None = None,
+    regularizer_weight: float = 0.0,
+    regularizer_scope: str = "shared_latent",
+    regularizer_log_prefix: str = "sigreg_loss",
+) -> dict[str, torch.Tensor]:
+    """Aggregate base-provided level losses and optional shared regularization."""
+
+    primary_loss, logs = weighted_level_mean(
+        level_losses,
+        level_weights=level_weights,
+        log_prefix=primary_log_prefix,
+    )
+    for alias in primary_aliases:
+        logs[str(alias)] = primary_loss.detach()
+    loss = float(rollout_weight) * primary_loss
+    if regularizer is not None and float(regularizer_weight):
+        if latents is None:
+            raise ValueError("matryoshka_base_loss requires latents when regularizer_weight is non-zero.")
+        if K is None:
+            raise ValueError("matryoshka_base_loss requires K when regularizer_weight is non-zero.")
+        reg_loss, reg_logs = latent_regularizer_loss(
+            latents,
+            K=K,
+            regularizer=regularizer,
+            scope=regularizer_scope,
+            level_weights=level_weights,
+            log_prefix=regularizer_log_prefix,
+        )
+        loss = loss + float(regularizer_weight) * reg_loss
+        logs.update(reg_logs)
+    logs["loss"] = loss
     return logs
 
 
 __all__ = [
-    "MWMActionSpec",
-    "MWMComponentSpec",
     "MWMWorldModel",
-    "mwm_prediction_loss",
+    "latent_regularizer_loss",
+    "matryoshka_base_loss",
+    "weighted_level_mean",
 ]

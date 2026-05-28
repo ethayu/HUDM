@@ -18,6 +18,7 @@ from stable_worldmodel.wm.lewm.lewm import LeWM as StableLeWM
 from eval_mwm import _available_stat_keys_for_action_process, _build_mwm_policy, _build_stable_wm_reference_policy
 from mwm.adapters.lewm import (
     LeWMMatryoshkaWorldModel,
+    LeWMObjectDynamics,
     LeWMObjectImporter,
     LeWMTransitionPackage,
     build_mwm_lewm_from_stable_config,
@@ -28,11 +29,16 @@ from mwm.data.stable_wm import MWMTrainSampleTransform
 from mwm.eval import build_stable_wm_reference_policy as exported_reference_policy_builder
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
-from mwm.models.world_model import MWMWorldModel, mwm_prediction_loss
+from mwm.models.world_model import MWMWorldModel, latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from train_mwm import _build_trainable_model_from_base, _exact_lewm_checkpoint_callback, _load_exact_lewm_lightning_state
+from mwm.training import mwm_spt_forward
+from train_mwm import (
+    _build_trainable_model_from_base,
+    _lewm_base_adapter_checkpoint_callback,
+    _load_lewm_base_adapter_lightning_state,
+)
 from train_mwm import _prepare_trainer_root
-from train_mwm import _build_exact_lewm_object, main as train_mwm_main
+from train_mwm import main as train_mwm_main
 
 
 class FakeLeWMEncoder(nn.Module):
@@ -67,6 +73,9 @@ class FakeLeWMActionEncoder(nn.Module):
 
 
 class FakeLeWMPredictor(nn.Module):
+    def __init__(self, **_: object) -> None:
+        super().__init__()
+
     def forward(self, z: torch.Tensor, action_emb: torch.Tensor) -> torch.Tensor:
         return z + action_emb
 
@@ -260,6 +269,50 @@ def _stable_vit_lewm_source_config(model_cfg: dict) -> dict:
     }
 
 
+def _build_direct_lewm_reference(model_cfg: dict, cfg: Any) -> nn.Module:
+    from stable_pretraining.backbone.utils import vit_hf
+    from stable_worldmodel.wm.lewm.lewm import LeWM
+    from stable_worldmodel.wm.lewm.module import Embedder, MLP, Predictor
+
+    d = int(model_cfg["D"])
+    history_size = int(cfg.model.get("history_size", cfg.loss.get("history_size", 3)))
+    encoder = vit_hf(
+        size=str(model_cfg.get("vit_size", "tiny")),
+        patch_size=int(model_cfg.get("vit_patch_size", 14)),
+        image_size=int(model_cfg.get("vit_image_size", 224)),
+        pretrained=bool(model_cfg.get("vit_pretrained", False)),
+        use_mask_token=bool(model_cfg.get("vit_use_mask_token", False)),
+    )
+    return LeWM(
+        encoder=encoder,
+        predictor=Predictor(
+            num_frames=history_size,
+            input_dim=d,
+            hidden_dim=d,
+            output_dim=d,
+            depth=int(model_cfg.get("predictor_depth", 6)),
+            heads=int(model_cfg.get("predictor_heads", 16)),
+            mlp_dim=int(model_cfg.get("predictor_mlp_dim", 2048)),
+            dim_head=int(model_cfg.get("predictor_dim_head", 64)),
+            dropout=float(model_cfg.get("predictor_dropout", 0.1)),
+            emb_dropout=float(model_cfg.get("predictor_emb_dropout", 0.0)),
+        ),
+        action_encoder=Embedder(input_dim=int(model_cfg["action_dim"]), emb_dim=d),
+        projector=MLP(
+            input_dim=d,
+            output_dim=d,
+            hidden_dim=int(cfg.model.get("projector_hidden_dim", 2048)),
+            norm_fn=nn.BatchNorm1d,
+        ),
+        pred_proj=MLP(
+            input_dim=d,
+            output_dim=d,
+            hidden_dim=int(cfg.model.get("projector_hidden_dim", 2048)),
+            norm_fn=nn.BatchNorm1d,
+        ),
+    )
+
+
 def _base_adaptive_lewm(
     *,
     K: tuple[int, ...] | list[int],
@@ -389,6 +442,7 @@ class MWMCoreTests(unittest.TestCase):
             ).import_model()
             self.assertIsInstance(model, MWMWorldModel)
             self.assertEqual(model.K, [4])
+            self.assertFalse(hasattr(model, "decoders"))
 
             out_dir = root / "checkpoint"
             save_world_checkpoint(
@@ -421,6 +475,95 @@ class MWMCoreTests(unittest.TestCase):
             (out_dir / "extra.txt").write_text("bad", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "non-checkpoint files"):
                 load_world_model_from_checkpoint(out_dir, None, device=torch.device("cpu"))
+
+    def test_raw_world_model_does_not_create_default_base_modules(self) -> None:
+        encoder = FakeLeWMEncoder(out_dim=4)
+
+        with self.assertRaisesRegex(ValueError, "explicit dynamics"):
+            MWMWorldModel(encoder=encoder, K=(4,), D=4, action_dim=2)
+
+        model = MWMWorldModel(
+            encoder=encoder,
+            K=(4,),
+            D=4,
+            action_dim=2,
+            dynamics=[LeWMObjectDynamics(FakeLeWMActionEncoder(action_dim=2, out_dim=4), FakeLeWMPredictor())],
+            decoder=None,
+            metadata={"image_shape": [8, 8]},
+        )
+
+        self.assertFalse(hasattr(model, "decoders"))
+        with self.assertRaisesRegex(NotImplementedError, "decoder"):
+            model.decode(0, torch.zeros(1, 4))
+        with self.assertRaisesRegex(RuntimeError, "adapter-owned training_loss"):
+            mwm_spt_forward(
+                model,
+                {
+                    "x": torch.rand(1, 2, 3, 8, 8),
+                    "a": torch.zeros(1, 1, 2),
+                },
+            )
+
+    def test_world_model_provides_matryoshka_loss_and_regularizer_routing(self) -> None:
+        losses = [torch.tensor(2.0), torch.tensor(6.0)]
+
+        total, logs = weighted_level_mean(losses, level_weights=[1.0, 3.0], log_prefix="pred_loss")
+
+        self.assertTrue(torch.equal(total, torch.tensor(5.0)))
+        self.assertEqual(set(logs), {"pred_loss_l0", "pred_loss_l1"})
+
+        latents = torch.ones(2, 3, 8)
+        shared_reg = CountingRegularizer()
+        total_reg, reg_logs = latent_regularizer_loss(
+            latents,
+            K=[4, 8],
+            regularizer=shared_reg,
+            scope="shared_latent",
+            level_weights=[1.0, 3.0],
+            log_prefix="sigreg_loss",
+        )
+
+        self.assertTrue(torch.equal(total_reg, torch.tensor(0.0)))
+        self.assertEqual(shared_reg.calls, 1)
+        self.assertEqual(shared_reg.shapes, [(3, 2, 8)])
+        self.assertEqual(set(reg_logs), {"sigreg_loss"})
+
+        per_level_reg = CountingRegularizer()
+        _, per_level_logs = latent_regularizer_loss(
+            latents,
+            K=[4, 8],
+            regularizer=per_level_reg,
+            scope="per_level_prefix",
+            level_weights=[1.0, 3.0],
+            log_prefix="sigreg_loss",
+        )
+
+        self.assertEqual(per_level_reg.calls, 2)
+        self.assertEqual([shape[-1] for shape in per_level_reg.shapes], [4, 8])
+        self.assertEqual(set(per_level_logs), {"sigreg_loss", "sigreg_loss_l0", "sigreg_loss_l1"})
+
+    def test_world_model_builds_base_loss_from_adapter_level_terms(self) -> None:
+        latents = torch.ones(2, 3, 8)
+        reg = CountingRegularizer()
+
+        logs = matryoshka_base_loss(
+            [torch.tensor(2.0), torch.tensor(6.0)],
+            latents=latents,
+            K=[4, 8],
+            level_weights=[1.0, 3.0],
+            primary_log_prefix="pred_loss",
+            primary_aliases=("pred_loss", "rollout_loss"),
+            rollout_weight=2.0,
+            regularizer=reg,
+            regularizer_weight=0.5,
+            regularizer_scope="shared_latent",
+        )
+
+        self.assertTrue(torch.equal(logs["pred_loss"], torch.tensor(5.0)))
+        self.assertTrue(torch.equal(logs["rollout_loss"], torch.tensor(5.0)))
+        self.assertTrue(torch.equal(logs["loss"], torch.tensor(10.0)))
+        self.assertEqual(reg.calls, 1)
+        self.assertEqual(set(logs), {"loss", "pred_loss", "pred_loss_l0", "pred_loss_l1", "rollout_loss", "sigreg_loss"})
 
     def test_imported_lewm_cost_delegates_to_source_object(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -665,7 +808,7 @@ class MWMCoreTests(unittest.TestCase):
         }
 
         torch.manual_seed(123)
-        direct = _build_exact_lewm_object(model_cfg, cfg)
+        direct = _build_direct_lewm_reference(model_cfg, cfg)
         torch.manual_seed(123)
         mwm = build_mwm_lewm_from_stable_config(
             source_config=_stable_vit_lewm_source_config(model_cfg),
@@ -1112,15 +1255,15 @@ class MWMCoreTests(unittest.TestCase):
             trainer_root = _prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
             self.assertTrue((trainer_root / "keep.ckpt").is_file())
 
-    def test_exact_lewm_checkpoint_callback_can_save_within_large_epochs(self) -> None:
+    def test_lewm_base_adapter_checkpoint_callback_can_save_within_large_epochs(self) -> None:
         cfg = OmegaConf.create({"train": {"checkpoint_every_n_train_steps": 1000}})
-        callback = _exact_lewm_checkpoint_callback(cfg)
+        callback = _lewm_base_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback._every_n_train_steps, 1000)
         self.assertEqual(callback._every_n_epochs, 0)
         self.assertTrue(callback.save_last)
 
-    def test_exact_lewm_lightning_state_loader_strips_model_prefix(self) -> None:
+    def test_lewm_base_adapter_lightning_state_loader_strips_model_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "last.ckpt"
             expected = nn.Linear(3, 2)
@@ -1136,7 +1279,7 @@ class MWMCoreTests(unittest.TestCase):
             )
 
             actual = nn.Linear(3, 2)
-            checkpoint = _load_exact_lewm_lightning_state(actual, path)
+            checkpoint = _load_lewm_base_adapter_lightning_state(actual, path)
 
             self.assertEqual(checkpoint["epoch"], 7)
             self.assertTrue(torch.equal(actual.weight, expected.weight))
@@ -1157,7 +1300,7 @@ train:
                 encoding="utf-8",
             )
 
-            with self.assertRaisesRegex(ValueError, "Trainable Le-WM MWM"):
+            with self.assertRaisesRegex(ValueError, "adapter-owned Stable-WM base architecture"):
                 train_mwm_main(str(cfg_path))
 
     def test_multi_fidelity_scheduler_monotonicity_and_no_low_to_high_rollout(self) -> None:

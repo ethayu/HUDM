@@ -6,7 +6,7 @@ import torch
 import torch.nn as nn
 
 from mwm.adapters.lewm_common import ImageNetPreprocess
-from mwm.models.world_model import MWMWorldModel
+from mwm.models.world_model import MWMWorldModel, matryoshka_base_loss
 
 
 class LeWMTransitionPackage(nn.Module):
@@ -26,13 +26,7 @@ class LeWMTransitionPackage(nn.Module):
 
 
 class LeWMMatryoshkaWorldModel(MWMWorldModel):
-    """Le-WM base adapter with fresh per-K transition heads.
-
-    This class intentionally does not call ``MWMWorldModel.__init__`` because
-    the generic model creates default dynamics/decoders.  It still subclasses
-    ``MWMWorldModel`` so the public runtime contract remains one model type,
-    while the architecture is fully adapter-owned.
-    """
+    """Le-WM base adapter with fresh per-K transition heads."""
 
     architecture_version = "lewm_base_adapter_v1"
 
@@ -164,13 +158,8 @@ class LeWMMatryoshkaWorldModel(MWMWorldModel):
         emb = self._encode_pixels(batch["pixels"], already_preprocessed=True)
         actions = batch["action"]
         levels = list(range(self.num_levels))
-        weights = list(level_weights or [1.0] * len(levels))
-        if len(weights) != len(levels):
-            raise ValueError(f"level_weights has {len(weights)} entries for {len(levels)} levels")
-        denom = float(sum(weights)) if sum(weights) else 1.0
-        pred_total = emb.new_tensor(0.0)
-        logs: dict[str, torch.Tensor] = {}
-        for level_idx, weight in zip(levels, weights):
+        pred_losses: list[torch.Tensor] = []
+        for level_idx in levels:
             k = self.K[level_idx]
             pred_emb = self._predict_prefix(
                 level_idx,
@@ -178,26 +167,20 @@ class LeWMMatryoshkaWorldModel(MWMWorldModel):
                 actions[:, : self.history_size],
             )
             tgt_emb = emb[:, self.num_preds :, :k].detach()
-            pred_loss = (pred_emb - tgt_emb).pow(2).mean()
-            logs[f"pred_loss_l{level_idx}"] = pred_loss.detach()
-            pred_total = pred_total + float(weight) * pred_loss / denom
-        loss = float(rollout_weight) * pred_total
-        if sigreg is not None and float(sigreg_weight):
-            if sigreg_scope == "shared_latent":
-                sigreg_total = sigreg(emb.transpose(0, 1))
-            elif sigreg_scope == "per_level_prefix":
-                sigreg_total = emb.new_tensor(0.0)
-                for level_idx, weight in zip(levels, weights):
-                    k = self.K[level_idx]
-                    sigreg_loss = sigreg(emb[..., :k].transpose(0, 1))
-                    logs[f"sigreg_loss_l{level_idx}"] = sigreg_loss.detach()
-                    sigreg_total = sigreg_total + float(weight) * sigreg_loss / denom
-            else:
-                raise ValueError(f"Unknown sigreg_scope {sigreg_scope!r}")
-            loss = loss + float(sigreg_weight) * sigreg_total
-            logs["sigreg_loss"] = sigreg_total.detach()
-        logs.update({"loss": loss, "pred_loss": pred_total.detach(), "rollout_loss": pred_total.detach()})
-        return logs
+            pred_losses.append((pred_emb - tgt_emb).pow(2).mean())
+
+        return matryoshka_base_loss(
+            pred_losses,
+            latents=emb,
+            K=self.K,
+            level_weights=level_weights,
+            primary_log_prefix="pred_loss",
+            primary_aliases=("pred_loss", "rollout_loss"),
+            rollout_weight=rollout_weight,
+            regularizer=sigreg,
+            regularizer_weight=sigreg_weight,
+            regularizer_scope=sigreg_scope,
+        )
 
     def rollout_at_level(self, infos: dict[str, Any], action_sequence: torch.Tensor, level_idx: int) -> dict[str, Any]:
         if "pixels" not in infos:

@@ -11,6 +11,16 @@ from mwm.swm.restore import eval_callables_for_env
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def _first_line_index(lines: list[str], tokens: tuple[str, ...]) -> int | None:
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if any(token in line for token in tokens):
+            return index
+    return None
+
+
 def _tracked_review_files() -> list[Path]:
     skip_dirs = {
         ".git",
@@ -90,12 +100,24 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["model"]["K"], [192])
         self.assertEqual(cfg["model"]["history_size"], 3)
         self.assertEqual(cfg["model"]["num_preds"], 1)
-        self.assertEqual(cfg["model"]["vit_image_size"], 224)
-        self.assertEqual(cfg["model"]["predictor_depth"], 6)
-        self.assertEqual(cfg["model"]["predictor_heads"], 16)
-        self.assertEqual(cfg["model"]["predictor_dim_head"], 64)
-        self.assertEqual(cfg["model"]["predictor_mlp_dim"], 2048)
-        self.assertEqual(cfg["model"]["predictor_dropout"], 0.1)
+        for key in (
+            "encoder",
+            "freeze_encoder",
+            "normalize_imagenet",
+            "vit_size",
+            "vit_patch_size",
+            "vit_image_size",
+            "vit_pretrained",
+            "vit_use_mask_token",
+            "dynamics",
+            "predictor_depth",
+            "predictor_heads",
+            "predictor_dim_head",
+            "predictor_mlp_dim",
+            "predictor_dropout",
+            "projector_hidden_dim",
+        ):
+            self.assertNotIn(key, cfg["model"])
 
         self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm")
         self.assertEqual(cfg["train"]["batch_size"], 128)
@@ -112,7 +134,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["loss"]["sigreg_knots"], 17)
         self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024)
 
-    def test_public_single_fidelity_configs_use_exact_lewm_backend(self) -> None:
+    def test_public_single_fidelity_configs_use_lewm_base_adapter_backend(self) -> None:
         for name in ("train_mwm_lewm_pusht.yaml", "train_mwm_lewm_tworoom.yaml"):
             cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
 
@@ -130,6 +152,33 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
             self.assertEqual(cfg["train"]["batch_size"], 128, name)
             self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
+
+    def test_train_configs_do_not_override_base_architecture_knobs(self) -> None:
+        forbidden_model_keys = {
+            "encoder",
+            "freeze_encoder",
+            "normalize_imagenet",
+            "vit_model_name",
+            "vit_size",
+            "vit_patch_size",
+            "vit_image_size",
+            "vit_pretrained",
+            "vit_use_mask_token",
+            "dynamics",
+            "predictor_depth",
+            "predictor_heads",
+            "predictor_dim_head",
+            "predictor_mlp_scale",
+            "predictor_mlp_dim",
+            "predictor_dropout",
+            "predictor_emb_dropout",
+            "projector_hidden_dim",
+        }
+
+        for path in sorted((ROOT / "configs").glob("train_mwm*.yaml")):
+            cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+            model = cfg.get("model", {})
+            self.assertFalse(forbidden_model_keys & set(model), path)
 
     def test_paper_parity_train_configs_use_base_adaptive_resolver(self) -> None:
         expected_checkpoints = {
@@ -236,21 +285,52 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["planner"]["batch_size"], 1)
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
-        scripts = [
-            ROOT / "scripts" / "run_mwm_single_level_match.sh",
-            ROOT / "scripts" / "run_mwm_train_single_level_env.sh",
-            ROOT / "scripts" / "run_mwm_single_level_benchmark.sh",
-            ROOT / "scripts" / "run_mwm_train_v1_env.sh",
-            ROOT / "scripts" / "run_mwm_v1_benchmark.sh",
-            ROOT / "scripts" / "run_mwm_paper_parity.sh",
-            ROOT / "scripts" / "run_mwm_paper_reference.sh",
-            ROOT / "scripts" / "run_mwm_v1_gate.sh",
-        ]
+        work_tokens = (
+            '"$PY"',
+            "train_mwm.py",
+            "benchmark_mwm.py",
+            "verify_mwm_",
+            "prepare_upstream_",
+        )
+        scripts = sorted((ROOT / "scripts").glob("run_mwm*.sh"))
+        self.assertGreater(len(scripts), 0)
+
         for script in scripts:
             text = script.read_text(encoding="utf-8")
+            if not any(token in text for token in work_tokens):
+                continue
+            lines = text.splitlines()
+            guard_line = _first_line_index(lines, ("SLURM_JOB_ID",))
+            work_line = _first_line_index(lines, work_tokens)
 
             self.assertIn("SLURM_JOB_ID", text, script)
             self.assertIn("must run inside a Slurm allocation", text, script)
+            self.assertIsNotNone(guard_line, script)
+            self.assertIsNotNone(work_line, script)
+            self.assertLess(guard_line, work_line, script)
+
+    def test_slurm_mwm_scripts_refuse_direct_bash_before_gpu_or_work(self) -> None:
+        risk_tokens = (
+            "nvidia-smi",
+            "torch.cuda",
+            "exec scripts/run_mwm",
+        )
+        scripts = sorted((ROOT / "scripts").glob("slurm_mwm*.sbatch"))
+        self.assertGreater(len(scripts), 0)
+
+        for script in scripts:
+            text = script.read_text(encoding="utf-8")
+            if not any(token in text for token in risk_tokens):
+                continue
+            lines = text.splitlines()
+            guard_line = _first_line_index(lines, ("SLURM_JOB_ID",))
+            work_line = _first_line_index(lines, risk_tokens)
+
+            self.assertIn("SLURM_JOB_ID", text, script)
+            self.assertIn("must be submitted with sbatch", text, script)
+            self.assertIsNotNone(guard_line, script)
+            self.assertIsNotNone(work_line, script)
+            self.assertLess(guard_line, work_line, script)
 
     def test_lance_only_runtime_has_no_hdf5_support_paths(self) -> None:
         runtime_files = [
@@ -327,6 +407,32 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertNotIn("lewm_direct", facade_text)
         self.assertNotIn("build_lewm_matryoshka_model", facade_text)
         self.assertNotIn("MWMLeWMAdapterConfig", facade_text)
+
+    def test_generic_world_model_fallbacks_and_raw_lewm_training_are_removed(self) -> None:
+        world_model_text = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")
+        for token in (
+            "MWMActionSpec",
+            "MWMComponentSpec",
+            "_DefaultDynamics",
+            "_DefaultImageDecoder",
+            "def mwm_prediction_loss",
+        ):
+            self.assertNotIn(token, world_model_text)
+
+        training_text = (ROOT / "mwm" / "training.py").read_text(encoding="utf-8")
+        self.assertIn("adapter-owned training_loss", training_text)
+        self.assertNotIn("mwm_prediction_loss", training_text)
+
+        train_entrypoint_text = (ROOT / "train_mwm.py").read_text(encoding="utf-8")
+        for token in (
+            "_build_exact_lewm_object",
+            "_resolve_model_cfg",
+            "_load_train_valid_datasets",
+            "_run_stable_pretraining",
+            "module.model.predict",
+            'backend in {"stable_worldmodel_lewm", "exact_lewm"}',
+        ):
+            self.assertNotIn(token, train_entrypoint_text)
 
     def test_unused_helper_modules_and_ogbench_restore_support_are_removed(self) -> None:
         removed = [
