@@ -7,6 +7,7 @@ import unittest
 from unittest import mock
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
+from mwm.adapters.lewm import LeWMStableWMAdapter, LeWMMatryoshkaWorldModel, build_mwm_lewm_from_stable_config
 import mwm.adapters.registry as adapter_registry
 from mwm.adapters.registry import adapter_for_family, adapter_for_target, family_for_target, register_adapter
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
@@ -200,3 +201,73 @@ class ConfigResolverTests(unittest.TestCase):
         finally:
             adapter_registry._ADAPTERS.clear()
             adapter_registry._ADAPTERS.update(original_adapters)
+
+
+class LeWMStableConfigTests(unittest.TestCase):
+    def _lewm_config(self) -> dict:
+        return {
+            "_target_": "stable_worldmodel.wm.lewm.LeWM",
+            "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": 4},
+            "predictor": {
+                "_target_": "tests.test_mwm_core.FakeLeWMPredictor",
+                "input_dim": 4,
+                "hidden_dim": 4,
+                "output_dim": 4,
+            },
+            "action_encoder": {"_target_": "tests.test_mwm_core.FakeLeWMActionEncoder", "action_dim": 2, "out_dim": 4},
+            "projector": {"_target_": "torch.nn.Identity"},
+            "pred_proj": {"_target_": "torch.nn.Identity"},
+        }
+
+    def test_lewm_adapter_declares_groups(self) -> None:
+        adapter = LeWMStableWMAdapter()
+        groups = adapter.component_groups()
+        self.assertEqual(groups["latent_producer"].components, ("encoder", "projector"))
+        self.assertTrue(groups["latent_producer"].latent_producer)
+        self.assertEqual(groups["transition"].components, ("action_encoder", "predictor", "pred_proj"))
+
+    def test_build_from_stable_config_fresh_initializes_without_weights(self) -> None:
+        model = build_mwm_lewm_from_stable_config(
+            source_config=self._lewm_config(),
+            source_config_sha256="abc",
+            training_recipe={"loss": {"sigreg_weight": 0.0}},
+            K=(4,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+        )
+        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
+        self.assertEqual(model.metadata["adapter_family"], "lewm")
+        self.assertTrue(model.metadata["fresh_init"])
+        self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
+
+    def test_resolve_spec_requires_shared_latent_producer(self) -> None:
+        adapter = LeWMStableWMAdapter()
+
+        with self.assertRaisesRegex(ValueError, "shared latent producer"):
+            adapter.resolve_spec(
+                source_config=self._lewm_config(),
+                source_config_sha256="abc",
+                training_recipe={},
+                levels=(4,),
+                component_policy=ComponentPolicy(shared=(), per_level=("transition",), reconstructor=()),
+            )
+
+    def test_config_driven_transition_widths_scale_per_level(self) -> None:
+        model = build_mwm_lewm_from_stable_config(
+            source_config=self._lewm_config(),
+            source_config_sha256="abc",
+            training_recipe={},
+            K=(2, 4),
+            action_dim=2,
+            action_block=1,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+        )
+
+        self.assertEqual(model.K, [2, 4])
+        self.assertEqual(model.D, 4)
+        self.assertEqual(model.transitions[0].action_encoder.proj.out_features, 2)
+        self.assertEqual(model.transitions[1].action_encoder.proj.out_features, 4)
+        self.assertEqual([h["predictor_input_dim"] for h in model.metadata["head_architectures"]], [2, 4])
