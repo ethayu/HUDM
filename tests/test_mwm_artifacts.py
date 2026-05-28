@@ -14,6 +14,7 @@ from mwm.benchmark.artifacts import eval_summary_row, write_default_plots, write
 from mwm.checkpoints import (
     CHECKPOINT_FORMAT,
     CONFIG_FILENAME,
+    LEWM_BASE_ADAPTER_ARCH,
     METADATA_FILENAME,
     WEIGHTS_FILENAME,
     file_sha256,
@@ -289,6 +290,32 @@ runs:
 
         self.assertTrue(any("exact Le-WM backend" in error for error in errors), errors)
         self.assertTrue(any("corrected architecture version" in error for error in errors), errors)
+
+    def test_role_checkpoint_contract_accepts_base_adaptive_lewm_target(self) -> None:
+        rows = [
+            {"role": "retrained_lewm_single", "checkpoint_run_dir": "checkpoints_mwm/retrained"},
+            {"role": "mwm_scheduled", "checkpoint_run_dir": "checkpoints_mwm/scheduled"},
+        ]
+        metadatas = [
+            {
+                "levels": [192],
+                "training_backend": "stable_worldmodel_lewm",
+                "architecture_version": LEWM_BASE_ADAPTER_ARCH,
+                "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
+            },
+            {
+                "levels": [48, 96, 144, 192],
+                "training_backend": "stable_worldmodel_lewm",
+                "architecture_version": LEWM_BASE_ADAPTER_ARCH,
+                "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
+            },
+        ]
+
+        errors: list[str] = []
+        for row, metadata in zip(rows, metadatas):
+            _validate_role_checkpoint_contract(row, metadata, errors)
+
+        self.assertEqual(errors, [])
 
     def test_lance_dataset_verifier_rejects_missing_dataset(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

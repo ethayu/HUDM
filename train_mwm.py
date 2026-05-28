@@ -294,6 +294,72 @@ def _resolve_exact_model_cfg(cfg: Any, dataset: Any) -> dict[str, Any]:
     return model_cfg
 
 
+def _stable_checkpoint_config_path(checkpoint: str) -> Path:
+    from stable_worldmodel.data import get_cache_dir
+
+    root = Path(str(checkpoint)).expanduser()
+    if root.exists():
+        if root.is_dir():
+            return root / "config.json"
+        if root.name == "config.json":
+            return root
+        return root.parent / "config.json"
+    return Path(get_cache_dir(None, sub_folder="checkpoints")) / str(checkpoint) / "config.json"
+
+
+def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torch.nn.Module:
+    from mwm.adapters.base import ComponentPolicy
+    from mwm.adapters.lewm import build_mwm_lewm_from_stable_config
+    from mwm.adapters.registry import family_for_target
+    from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
+
+    base = cfg.get("base", {}) if hasattr(cfg, "get") else {}
+    base = _as_container(base)
+    if not base:
+        return build_mwm_lewm(model_cfg)
+
+    config_path = _stable_checkpoint_config_path(str(base["checkpoint"]))
+    source_config, loaded_path = load_stable_wm_config(config_path)
+    detected_family = family_for_target(root_target(source_config))
+    configured_family = str(base.get("family", detected_family))
+    if configured_family != detected_family:
+        raise ValueError(
+            f"Configured Stable-WM base family {configured_family!r} does not match config target family {detected_family!r}."
+        )
+    if configured_family != "lewm":
+        raise ValueError(f"Unsupported trainable Stable-WM base family {configured_family!r}.")
+
+    mwm_cfg = _as_container(cfg.get("mwm", {}) if hasattr(cfg, "get") else {})
+    loss_cfg = _as_container(cfg.get("loss", {}) if hasattr(cfg, "get") else {})
+    model_section = cfg.get("model", {}) if hasattr(cfg, "get") else {}
+    recipe = {
+        **dict(loss_cfg),
+        "history_size": int(model_section.get("history_size", loss_cfg.get("history_size", 3))),
+        "num_preds": int(model_section.get("num_preds", loss_cfg.get("num_preds", 1))),
+        "action_preprocessing": "standard_scaler",
+        "loss_scope": dict(mwm_cfg.get("loss_terms", {"regularizers": "shared_latent"})),
+    }
+    return build_mwm_lewm_from_stable_config(
+        source_config=source_config,
+        source_config_sha256=stable_config_sha256(loaded_path),
+        training_recipe=recipe,
+        K=tuple(int(k) for k in model_cfg["K"]),
+        action_dim=int(model_cfg["action_dim"]),
+        action_block=int(model_cfg.get("action_block", 1)),
+        image_shape=tuple(int(x) for x in model_cfg["image_shape"]),
+        normalize_imagenet=bool(model_cfg.get("normalize_imagenet", True)),
+        component_policy=ComponentPolicy.from_mapping(mwm_cfg.get("component_policy", None)),
+    )
+
+
+def _metadata_for_model(metadata: dict[str, Any], model: torch.nn.Module) -> dict[str, Any]:
+    merged = {**metadata, **dict(getattr(model, "metadata", {}) or {})}
+    mwm_config = getattr(model, "mwm_config", None)
+    if isinstance(mwm_config, dict):
+        merged["model"] = _as_container(mwm_config)
+    return merged
+
+
 class _ZScoreScaler:
     def __init__(self, eps: float = 1e-8) -> None:
         self.mean: np.ndarray | None = None
@@ -673,14 +739,14 @@ def export_exact_lewm_lightning_checkpoint(
     tr_ds, va_ds, base_ds, model_cfg, metadata = _prepare_exact_lewm_context(cfg)
     del tr_ds, va_ds
     try:
-        model = build_mwm_lewm(model_cfg)
+        model = _build_trainable_model_from_base(cfg, model_cfg)
         checkpoint = _load_exact_lewm_lightning_state(model, checkpoint_path)
         train_info = {
             "epoch": int(checkpoint.get("epoch", 0)),
             "last_checkpoint": str(checkpoint_path),
             "exported_from_lightning_checkpoint": True,
         }
-        save_world_checkpoint(model, run_dir, metadata={**metadata, **train_info})
+        save_world_checkpoint(model, run_dir, metadata={**_metadata_for_model(metadata, model), **train_info})
     finally:
         _close_dataset_handles(base_ds)
     print(f"Exported exact Le-WM Lightning checkpoint to canonical MWM checkpoint: {run_dir}")
@@ -711,9 +777,9 @@ def main(cfg_path: str) -> None:
 
     if backend in {"stable_worldmodel_lewm", "exact_lewm"}:
         tr_ds, va_ds, base_ds, model_cfg, metadata = _prepare_exact_lewm_context(cfg)
-        model = build_mwm_lewm(model_cfg)
+        model = _build_trainable_model_from_base(cfg, model_cfg)
         train_info = _run_exact_lewm_training(model, tr_ds, va_ds, cfg, run_dir)
-        save_world_checkpoint(model, run_dir, metadata={**metadata, **train_info})
+        save_world_checkpoint(model, run_dir, metadata={**_metadata_for_model(metadata, model), **train_info})
         _close_dataset_handles(base_ds)
         print(f"Exact Le-WM training complete. Checkpoints: {run_dir}")
         return
@@ -752,10 +818,10 @@ def main(cfg_path: str) -> None:
         if key in dataset_meta:
             metadata[key] = dataset_meta[key]
 
-    model = build_mwm_lewm(model_cfg)
+    model = _build_trainable_model_from_base(cfg, model_cfg)
     if backend == "stable_pretraining":
         train_info = _run_stable_pretraining(model, tr_ds, va_ds, cfg, run_dir)
-        save_world_checkpoint(model, run_dir, metadata={**metadata, **train_info})
+        save_world_checkpoint(model, run_dir, metadata={**_metadata_for_model(metadata, model), **train_info})
         print(f"Training complete. Checkpoints: {run_dir}")
         return
 
@@ -773,7 +839,7 @@ def main(cfg_path: str) -> None:
         if val_loss + float(cfg.schedule.min_delta) < best_val:
             best_val = val_loss
             no_improve = 0
-            save_world_checkpoint(model, run_dir, metadata={**metadata, "epoch": epoch, "best_val": best_val})
+            save_world_checkpoint(model, run_dir, metadata={**_metadata_for_model(metadata, model), "epoch": epoch, "best_val": best_val})
         else:
             no_improve += 1
             if no_improve >= int(cfg.schedule.patience):

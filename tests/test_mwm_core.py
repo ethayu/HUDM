@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,7 +22,8 @@ from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
 from mwm.models.world_model import MWMWorldModel, mwm_prediction_loss
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from train_mwm import _exact_lewm_checkpoint_callback, _load_exact_lewm_lightning_state, _prepare_trainer_root
+from train_mwm import _build_trainable_model_from_base, _exact_lewm_checkpoint_callback, _load_exact_lewm_lightning_state
+from train_mwm import _prepare_trainer_root
 from train_mwm import _build_exact_lewm_object, main as train_mwm_main
 
 
@@ -457,6 +459,55 @@ class MWMCoreTests(unittest.TestCase):
 
         self.assertEqual(reg.calls, 2)
         self.assertEqual([shape[-1] for shape in reg.shapes], [4, 8])
+
+    def test_train_entrypoint_builds_from_stable_wm_base_config(self) -> None:
+        source_config = {
+            "_target_": "stable_worldmodel.wm.lewm.LeWM",
+            "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": 4},
+            "predictor": {
+                "_target_": "tests.test_mwm_core.FakeLeWMPredictor",
+                "input_dim": 4,
+                "hidden_dim": 4,
+                "output_dim": 4,
+            },
+            "action_encoder": {"_target_": "tests.test_mwm_core.FakeLeWMActionEncoder", "action_dim": 2, "out_dim": 4},
+            "projector": {"_target_": "torch.nn.Identity"},
+            "pred_proj": {"_target_": "torch.nn.Identity"},
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            checkpoint_dir = Path(tmp)
+            (checkpoint_dir / "config.json").write_text(json.dumps(source_config), encoding="utf-8")
+            cfg = OmegaConf.create(
+                {
+                    "base": {"family": "lewm", "checkpoint": str(checkpoint_dir)},
+                    "mwm": {
+                        "component_policy": {
+                            "shared": ["latent_producer"],
+                            "per_level": ["transition"],
+                            "reconstructor": [],
+                        },
+                        "loss_terms": {"regularizers": "shared_latent"},
+                    },
+                    "model": {"history_size": 2, "num_preds": 1},
+                    "loss": {"sigreg_weight": 0.09},
+                }
+            )
+            model_cfg = {
+                "K": (4,),
+                "action_dim": 2,
+                "action_block": 1,
+                "image_shape": (8, 8),
+                "normalize_imagenet": False,
+            }
+
+            model = _build_trainable_model_from_base(cfg, model_cfg)
+
+            self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
+            self.assertEqual(model.metadata["adapter_family"], "lewm")
+            self.assertTrue(model.metadata["fresh_init"])
+            self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
+            self.assertEqual(model.metadata["loss_scope"]["regularizers"], "shared_latent")
+            self.assertEqual(model.mwm_config["target"], "mwm.adapters.lewm.build_mwm_lewm_from_stable_config")
 
     def test_k_equals_d_lewm_init_forward_grad_and_step_match_direct_backend(self) -> None:
         cfg = OmegaConf.create(

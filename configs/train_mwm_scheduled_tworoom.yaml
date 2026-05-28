@@ -1,0 +1,81 @@
+seed: 42
+env_id: swm/TwoRoom-v1
+base:
+  family: lewm
+  checkpoint: models--quentinll--lewm-tworooms
+mwm:
+  component_policy:
+    shared: [latent_producer]
+    per_level: [transition]
+    reconstructor: []
+  loss_terms:
+    regularizers: shared_latent
+    reconstructor_detach_encoder: true
+    reconstructor_contributes_to_encoder_loss: false
+data:
+  path: data/tworoom_swm.lance
+  format: lance
+  split_ratio: 0.9
+  pixels_key: pixels
+  action_key: action
+  frameskip: 5
+  keys_to_load: [pixels, action, proprio, state]
+  keys_to_cache: [action, proprio, state]
+model:
+  encoder: stable_vit
+  D: 192
+  K: [48, 96, 144, 192]
+  action_dim: auto
+  action_block: 5
+  image_shape: auto
+  freeze_encoder: false
+  normalize_imagenet: true
+  vit_size: tiny
+  vit_patch_size: 14
+  vit_image_size: 224
+  vit_pretrained: false
+  vit_use_mask_token: false
+  dynamics: lewm
+  history_size: 3
+  num_preds: 1
+  predictor_depth: 6
+  predictor_heads: 16
+  predictor_dim_head: 64
+  predictor_mlp_dim: 2048
+  predictor_dropout: 0.1
+  projector_hidden_dim: 2048
+train:
+  batch_size: 128
+  horizon: 4
+  num_workers: 6
+  drop_last: true
+  prefetch_factor: 3
+  pin_memory: false
+  precision: bf16
+  no_cuda: false
+  checkpoint_dir: checkpoints_mwm
+  run_name: mwm_scheduled_tworoom
+  backend: stable_worldmodel_lewm
+  timestamp_run_dir: false
+  clean_trainer_root: true
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  checkpoint_every_n_train_steps: 1000
+  gradient_clip_val: 1.0
+  matmul_precision: high
+  slurm_auto_requeue: false
+optim:
+  lr: 0.00005
+  weight_decay: 0.001
+loss:
+  rollout_weight: 1.0
+  recon_weight: 0.0
+  sigreg_weight: 0.09
+  sigreg_knots: 17
+  sigreg_num_proj: 1024
+  history_size: 3
+  num_preds: 1
+schedule:
+  max_epochs: 10
+  patience: 10
+  min_delta: 0.0
