@@ -123,3 +123,15 @@ class AdapterPolicyTests(unittest.TestCase):
 
         self.assertEqual(adapters.ComponentPolicy().as_dict()["shared"], ["latent_producer"])
         self.assertIn("ComponentPolicy", adapters.__all__)
+
+    def test_adapter_package_reexports_available_lewm_public_api(self) -> None:
+        import importlib
+        import sys
+
+        sys.modules.pop("mwm.adapters", None)
+        adapters = importlib.import_module("mwm.adapters")
+        lewm = importlib.import_module("mwm.adapters.lewm")
+
+        for name in lewm.__all__:
+            self.assertIn(name, adapters.__all__)
+            self.assertIs(getattr(adapters, name), getattr(lewm, name))

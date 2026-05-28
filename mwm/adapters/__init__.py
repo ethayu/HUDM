@@ -1,3 +1,5 @@
+from importlib import import_module
+
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseAdapter, StableWMBaseSpec, validate_component_policy
 
 __all__ = [
@@ -9,9 +11,13 @@ __all__ = [
 ]
 
 try:
-    from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, MWMAdapter, MWMComponents, MWMImporter
+    _lewm = import_module("mwm.adapters.lewm")
 except ModuleNotFoundError as exc:
     if exc.name != "mwm.adapters.lewm":
         raise
 else:
-    __all__.extend(["LeWMMatryoshkaWorldModel", "MWMAdapter", "MWMComponents", "MWMImporter"])
+    for _name in getattr(_lewm, "__all__", ()):
+        globals()[_name] = getattr(_lewm, _name)
+        if _name not in __all__:
+            __all__.append(_name)
+    del _lewm, _name
