@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest import mock
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
 
@@ -56,3 +57,27 @@ class AdapterPolicyTests(unittest.TestCase):
         self.assertTrue(spec.fresh_init)
         self.assertEqual(spec.component_policy.shared, ("latent_producer",))
         self.assertEqual(spec.loss_scope["regularizers"], "shared_latent")
+
+    def test_adapter_package_exports_base_api_without_lewm_module(self) -> None:
+        import importlib
+        import sys
+
+        class BlockLeWMImport:
+            def find_spec(self, fullname, path=None, target=None):
+                del path, target
+                if fullname == "mwm.adapters.lewm":
+                    raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
+                return None
+
+        original_modules = dict(sys.modules)
+        sys.modules.pop("mwm.adapters", None)
+        sys.modules.pop("mwm.adapters.lewm", None)
+        try:
+            with mock.patch.object(sys, "meta_path", [BlockLeWMImport(), *sys.meta_path]):
+                adapters = importlib.import_module("mwm.adapters")
+        finally:
+            sys.modules.clear()
+            sys.modules.update(original_modules)
+
+        self.assertEqual(adapters.ComponentPolicy().as_dict()["shared"], ["latent_producer"])
+        self.assertIn("ComponentPolicy", adapters.__all__)
