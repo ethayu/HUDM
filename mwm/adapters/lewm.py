@@ -328,6 +328,7 @@ class LeWMMatryoshkaWorldModel(MWMWorldModel):
         rollout_weight: float = 1.0,
         sigreg: nn.Module | None = None,
         sigreg_weight: float = 0.0,
+        sigreg_scope: str = "shared_latent",
     ) -> dict[str, torch.Tensor]:
         batch["action"] = torch.nan_to_num(batch["action"], 0.0)
         emb = self._encode_pixels(batch["pixels"], already_preprocessed=True)
@@ -338,7 +339,6 @@ class LeWMMatryoshkaWorldModel(MWMWorldModel):
             raise ValueError(f"level_weights has {len(weights)} entries for {len(levels)} levels")
         denom = float(sum(weights)) if sum(weights) else 1.0
         pred_total = emb.new_tensor(0.0)
-        sigreg_total = emb.new_tensor(0.0)
         logs: dict[str, torch.Tensor] = {}
         for level_idx, weight in zip(levels, weights):
             k = self.K[level_idx]
@@ -351,12 +351,19 @@ class LeWMMatryoshkaWorldModel(MWMWorldModel):
             pred_loss = (pred_emb - tgt_emb).pow(2).mean()
             logs[f"pred_loss_l{level_idx}"] = pred_loss.detach()
             pred_total = pred_total + float(weight) * pred_loss / denom
-            if sigreg is not None and float(sigreg_weight):
-                sigreg_loss = sigreg(emb[..., :k].transpose(0, 1))
-                logs[f"sigreg_loss_l{level_idx}"] = sigreg_loss.detach()
-                sigreg_total = sigreg_total + float(weight) * sigreg_loss / denom
         loss = float(rollout_weight) * pred_total
         if sigreg is not None and float(sigreg_weight):
+            if sigreg_scope == "shared_latent":
+                sigreg_total = sigreg(emb.transpose(0, 1))
+            elif sigreg_scope == "per_level_prefix":
+                sigreg_total = emb.new_tensor(0.0)
+                for level_idx, weight in zip(levels, weights):
+                    k = self.K[level_idx]
+                    sigreg_loss = sigreg(emb[..., :k].transpose(0, 1))
+                    logs[f"sigreg_loss_l{level_idx}"] = sigreg_loss.detach()
+                    sigreg_total = sigreg_total + float(weight) * sigreg_loss / denom
+            else:
+                raise ValueError(f"Unknown sigreg_scope {sigreg_scope!r}")
             loss = loss + float(sigreg_weight) * sigreg_total
             logs["sigreg_loss"] = sigreg_total.detach()
         logs.update({"loss": loss, "pred_loss": pred_total.detach(), "rollout_loss": pred_total.detach()})

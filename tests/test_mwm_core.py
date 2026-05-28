@@ -93,6 +93,18 @@ class FakeActionScaler:
         return (action - np.array([10.0, 20.0], dtype=np.float32)) / np.array([2.0, 3.0], dtype=np.float32)
 
 
+class CountingRegularizer(nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.calls = 0
+        self.shapes: list[tuple[int, ...]] = []
+
+    def forward(self, value: torch.Tensor) -> torch.Tensor:
+        self.calls += 1
+        self.shapes.append(tuple(value.shape))
+        return value.square().mean() * 0.0
+
+
 class FakeSolver:
     def __init__(self) -> None:
         self.solve_history = []
@@ -392,6 +404,59 @@ class MWMCoreTests(unittest.TestCase):
         self.assertIn("pred_loss_l0", out)
         self.assertIn("pred_loss_l1", out)
         self.assertNotIn("pred_loss_l2", out)
+
+    def test_lewm_sigreg_is_shared_once_by_default(self) -> None:
+        model = build_mwm_lewm(
+            {
+                "encoder": "cnn",
+                "D": 8,
+                "K": [4, 8],
+                "action_dim": 2,
+                "image_shape": (8, 8),
+                "normalize_imagenet": False,
+                "history_size": 2,
+                "num_preds": 1,
+                "predictor_depth": 1,
+                "predictor_heads": 2,
+                "predictor_dim_head": 4,
+                "predictor_mlp_dim": 16,
+                "projector_hidden_dim": 16,
+            }
+        )
+        reg = CountingRegularizer()
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        out = model.training_loss(batch, sigreg=reg, sigreg_weight=0.5, sigreg_scope="shared_latent")
+
+        self.assertIn("sigreg_loss", out)
+        self.assertEqual(reg.calls, 1)
+        self.assertEqual(reg.shapes[0][-1], 8)
+
+    def test_lewm_sigreg_can_be_per_level_when_explicit(self) -> None:
+        model = build_mwm_lewm(
+            {
+                "encoder": "cnn",
+                "D": 8,
+                "K": [4, 8],
+                "action_dim": 2,
+                "image_shape": (8, 8),
+                "normalize_imagenet": False,
+                "history_size": 2,
+                "num_preds": 1,
+                "predictor_depth": 1,
+                "predictor_heads": 2,
+                "predictor_dim_head": 4,
+                "predictor_mlp_dim": 16,
+                "projector_hidden_dim": 16,
+            }
+        )
+        reg = CountingRegularizer()
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        model.training_loss(batch, sigreg=reg, sigreg_weight=0.5, sigreg_scope="per_level_prefix")
+
+        self.assertEqual(reg.calls, 2)
+        self.assertEqual([shape[-1] for shape in reg.shapes], [4, 8])
 
     def test_k_equals_d_lewm_init_forward_grad_and_step_match_direct_backend(self) -> None:
         cfg = OmegaConf.create(
