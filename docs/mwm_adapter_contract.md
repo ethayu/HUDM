@@ -21,6 +21,18 @@ Checkpoint `config.json` files store the builder import target. Prefer stable
 targets under the family module, such as
 `mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
 
+Adapters are construction code, not new model semantics. They should answer:
+
+- which base components produce the shared latent;
+- which base components are duplicated per fidelity level;
+- how to instantiate a level-sized tail from the Stable-WM config;
+- where the authoritative base latent dimension `D` comes from;
+- which preprocessing, action shape, history length, and objective recipe the
+  base already uses.
+
+The adapter should not reimplement matryoshka aggregation, invent a new loss,
+delegate inference to an upstream object, or create a one-off planner path.
+
 ## Required Adapter Methods
 
 `family`
@@ -82,6 +94,41 @@ The returned model must expose:
 - `mwm_config`, an importable checkpoint builder config;
 - normal `state_dict` loading with no hidden source-object delegation.
 
+## Builder Function
+
+Each completed adapter needs a checkpoint-stable builder function. The Le-WM
+one is the template:
+
+```python
+def build_mwm_<family>_from_stable_config(
+    *,
+    source_config: dict[str, Any],
+    source_config_sha256: str,
+    training_recipe: dict[str, Any],
+    K: Sequence[int],
+    action_dim: int,
+    expected_D: int | None = None,
+    action_block: int = 1,
+    image_shape: Sequence[int] = (224, 224),
+    normalize_imagenet: bool = True,
+    component_policy: ComponentPolicy | dict[str, Any] | None = None,
+) -> nn.Module:
+    ...
+```
+
+This function should:
+
+- create the family adapter;
+- turn a mapping policy into `ComponentPolicy`;
+- call `resolve_spec`;
+- reject `expected_D` mismatches against config-derived `D`;
+- call `adapter.build_model(...)`;
+- set `model.mwm_config["target"]` to this builder's import path.
+
+The builder is what canonical checkpoint `config.json` points at during load.
+Changing its import path causes checkpoint/config target churn, so keep the
+target under the stable family module once the adapter is real.
+
 ## Generic Runtime Pieces
 
 `mwm.models.world_model.MatryoshkaWorldModel` currently provides the shared
@@ -101,6 +148,22 @@ If another base has a different objective or rollout contract, add a generic hoo
 to `world_model.py` for base-provided per-level loss/rollout behavior. Do not
 put special inference behavior or hidden source-model calls in the adapter.
 
+Use this rule of thumb:
+
+- if the base encodes pixels to a latent, encodes actions, predicts next latent
+  prefixes, and scores planning rollouts through those predicted latents, the
+  existing `MatryoshkaWorldModel` plus `TransitionPackage` may be enough;
+- if the base has a different per-level objective, the generic model should gain
+  a reusable loss hook such as "call this base loss on each level package, then
+  aggregate";
+- if the base has a different rollout contract, the generic model should gain a
+  reusable rollout hook, while the adapter only supplies the modules and config
+  needed by that hook.
+
+The framework boundary is: adapters construct base-derived modules and metadata;
+`world_model.py` owns shared latent reuse, per-level dispatch, loss aggregation,
+checkpoint behavior, and planner-facing runtime behavior.
+
 ## Training And Evaluation Wiring
 
 To make a new family trainable:
@@ -108,7 +171,7 @@ To make a new family trainable:
 - add the family to the Stable-WM registry mapping in `mwm/adapters/registry.py`;
 - add a train config with `base.family`, source checkpoint, data path, `D`, `K`,
   and the base training recipe;
-- route `train_mwm.py` to the new builder for that family;
+- route `train_mwm.py` to the new builder for that family and its dataset shape;
 - export canonical checkpoints with `config.json`, `weights.pt`, and
   `world_metadata.json`;
 - teach `verify_mwm_benchmark.py` the expected checkpoint contract for the new
@@ -124,14 +187,24 @@ planner-facing action shape.
 `mwm/adapters/prejepa.py` is currently only a policy stub. To complete it,
 identify from the Stable-WM PreJEPA config:
 
-- the latent producer components and the authoritative source of `D`;
-- the non-encoder tail modules to duplicate per `K`;
-- the tail width keys that become exactly `K`;
-- the internal width keys that scale by `K / D`;
-- the base objective terms and whether they fit the existing
-  `TransitionPackage` prediction shape;
-- the regularizer scope, if any;
-- preprocessing and action/frame-skip conventions.
+- latent producer components: the modules that create the one shared latent
+  space consumed by all levels;
+- authoritative `D`: the base config field or module dimension that defines the
+  full latent width, never `max(K)`;
+- per-level tail modules: every non-encoder component that should be freshly
+  duplicated for each level;
+- exact-`K` width keys: fields that should be set to the level size, such as
+  latent input/output widths;
+- scaled internal keys: fields that should scale by `K / D`, such as hidden
+  widths, heads, or MLP dimensions when that preserves the base architecture;
+- untouched base knobs: depth, normalization, activations, stochasticity,
+  frame/history sizes, and other recipe fields that should remain identical;
+- objective contract: the base loss terms, their inputs, and whether the
+  existing `TransitionPackage` prediction shape can supply them;
+- regularizer scope: whether regularization is once on the shared latent or per
+  level prefix, matching the base recipe where applicable;
+- inference contract: action preprocessing, action block/frame skip, image
+  preprocessing, rollout horizon, and planner-facing action shape.
 
 Then implement:
 
@@ -139,8 +212,13 @@ Then implement:
 - `build_mwm_prejepa_from_stable_config`;
 - a model path that applies the exact base recipe at each level and aggregates
   the per-level losses;
+- canonical metadata and `mwm_config` fields matching the builder;
 - checkpoint contract tests;
 - `K=D` identity tests for architecture, loss keys, optimizer path, and
   inference recipe;
 - a single-level benchmark check before using scheduled `K<D` results.
 
+Do not fill in `prejepa.py` by guessing component names from Le-WM. The first
+step is to inspect the actual Stable-WM PreJEPA config/model and write down the
+component map above. After that, the adapter implementation should be mostly
+mechanical.
