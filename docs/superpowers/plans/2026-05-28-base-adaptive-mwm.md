@@ -1479,7 +1479,7 @@ Each full V1 training job uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=
 
 Full V1 benchmark details: `scripts/slurm_mwm_v1_benchmark.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_v1_benchmark_%j.out` and `logs/mwm_v1_benchmark_%j.err`, and runs `scripts/run_mwm_v1_benchmark.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
 
-Paper reference Lance-only rerun path, used to refresh stale HDF5-era reference artifacts:
+Paper reference Lance-only rerun path, used to refresh stale reference artifacts:
 
 ```bash
 sbatch --parsable scripts/slurm_mwm_paper_reference.sbatch

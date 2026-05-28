@@ -182,9 +182,9 @@ scripts/run_mwm_v1_gate.sh
   saves source objects under `checkpoints_mwm/upstream_sources/`, imports them
   through `LeWMObjectImporter`, and exports canonical single-fidelity MWM
   checkpoints with dependency metadata.
-- `prepare_upstream_lewm_data.py`: Prepares public upstream Le-WM datasets as
-  Lance tables with MWM sidecar metadata. Any legacy upstream archive handling is
-  isolated to this ingestion script; runtime training and eval stay Lance-only.
+- `prepare_upstream_lewm_data.py`: Validates the public upstream Le-WM Lance
+  tables and writes MWM sidecar metadata. The paper-parity path is Lance-only;
+  missing Lance artifacts are treated as setup errors.
 - `train_mwm.py`: Loads Lance training data, performs the Stable-Pretraining
   random split, infers image/action dimensions, builds the Le-WM base adapter
   for both `K=[D]` and scheduled `K`, trains with the Le-WM AdamW/warmup-cosine

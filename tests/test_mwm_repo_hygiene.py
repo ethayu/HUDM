@@ -264,6 +264,20 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
         self.assertEqual(hits, [])
 
+    def test_upstream_data_prep_is_lance_only(self) -> None:
+        text = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
+        forbidden = [
+            "hdf5",
+            ".h5",
+            "tar.zst",
+            "zstd",
+            "stable_worldmodel.data.convert",
+            "source_format",
+            "dest_format",
+        ]
+        for token in forbidden:
+            self.assertNotIn(token, text)
+
     def test_legacy_top_level_swm_and_reference_diagnostics_are_removed(self) -> None:
         removed = [
             "benchmark_swm.py",
