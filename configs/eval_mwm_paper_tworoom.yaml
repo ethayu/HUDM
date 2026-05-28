@@ -32,7 +32,7 @@ planner:
   horizon: 5
   receding_horizon: 5
   action_block: 5
-  batch_size: auto
+  batch_size: 1
   pop_size: 300
   topk: 30
   elite_frac: 0.1

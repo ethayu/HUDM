@@ -164,6 +164,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(eval_cfg["eval"]["episodes"], 50)
         self.assertEqual(eval_cfg["eval"]["goal_offset"], 25)
         self.assertEqual(eval_cfg["eval"]["budget"], 50)
+        self.assertEqual(eval_cfg["planner"]["batch_size"], 1)
         self.assertEqual(eval_cfg["planner"]["n_iter"], 30)
         self.assertEqual(eval_cfg["planner"]["topk"], 30)
         self.assertEqual(bench_cfg["gate"]["env_ids"], ["swm/PushT-v1", "swm/TwoRoom-v1"])
@@ -188,7 +189,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(callables[0]["args"]["state"]["value"], "pos_agent")
         self.assertEqual(callables[1]["args"]["goal_state"]["value"], "goal_pos_agent")
 
-    def test_paper_parity_eval_config_tracks_scientific_protocol_not_chunking_defaults(self) -> None:
+    def test_paper_parity_eval_config_tracks_upstream_eval_protocol(self) -> None:
         cfg = yaml.safe_load((ROOT / "configs" / "eval_mwm_paper_pusht.yaml").read_text(encoding="utf-8"))
 
         self.assertEqual(cfg["data"]["path"], "data/upstream/pusht_expert_train.lance")
@@ -207,8 +208,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["planner"]["topk"], 30)
         self.assertEqual(cfg["planner"]["n_iter"], 30)
         self.assertEqual(cfg["planner"]["init_std"], 1.0)
-        self.assertEqual(cfg["planner"]["batch_size"], "auto")
-        self.assertNotEqual(cfg["planner"]["batch_size"], 1)
+        self.assertEqual(cfg["planner"]["batch_size"], 1)
 
 
 if __name__ == "__main__":
