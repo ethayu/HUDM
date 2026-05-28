@@ -33,6 +33,19 @@ REQUIRED_PLOTS = {
 }
 
 
+def _required_plots_for_gate(cfg: Any) -> set[str]:
+    roles = {str(role) for role in cfg.get("gate", {}).get("roles", [])}
+    required = {"success_vs_compute.png", "success_vs_wall_time.png", "success_by_env_role.png"}
+    comparison_roles = roles - {"upstream_lewm_converted"}
+    if "upstream_lewm_converted" in roles and comparison_roles:
+        required.update({"efficiency_ratios.png", "paired_success_delta.png"})
+    if "mwm_scheduled" in roles:
+        required.update({"schedule_level_usage.png", "schedule_usage_by_role.png"})
+    if not roles:
+        return set(REQUIRED_PLOTS)
+    return required
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     with path.open("r", encoding="utf-8") as f:
         return [json.loads(line) for line in f if line.strip()]
@@ -427,11 +440,12 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
         if len(hashes) != 1:
             errors.append(f"benchmark roles do not share one manifest for {key}: {sorted(hashes)}")
 
+    required_plots = _required_plots_for_gate(cfg)
     plot_dir = output_dir / "plots"
-    for name in REQUIRED_PLOTS:
+    for name in required_plots:
         _require_file(plot_dir / name, errors)
     summary_plot_names = {Path(str(plot)).name for plot in summary.get("plots", [])}
-    missing_summary_plots = sorted(REQUIRED_PLOTS - summary_plot_names)
+    missing_summary_plots = sorted(required_plots - summary_plot_names)
     if missing_summary_plots:
         errors.append(f"summary.json missing required plot refs: {missing_summary_plots}")
 
@@ -439,7 +453,7 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
     for token in ("Gate Status", "Outcome Summary", "Plots", "Paired Seed Comparison", "Run Drilldown", "Review Notes"):
         if token not in review_text:
             errors.append(f"review.html missing section {token!r}")
-    for name in REQUIRED_PLOTS:
+    for name in required_plots:
         if f"plots/{name}" not in review_text:
             errors.append(f"review.html does not embed/link plots/{name}")
     for row in rows:
@@ -465,7 +479,7 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
         "output_dir": str(output_dir),
         "runs": len(rows),
         "cells": sorted(manifest_by_cell),
-        "plots": sorted(REQUIRED_PLOTS),
+        "plots": sorted(required_plots),
     }
 
 

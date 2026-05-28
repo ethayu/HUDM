@@ -204,6 +204,10 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
         self.assertEqual(report["paper_targets"]["tolerance_pp"], 1.0)
         self.assertEqual(report["paper_targets"]["single_level_tolerance_pp"], 5.0)
 
+        reference_report = verify_benchmark_static("configs/benchmark_mwm_paper_reference.yaml")
+        self.assertEqual(reference_report["runs"], 4)
+        self.assertIn(("swm/PushT-v1", 42, "stable_wm_reference"), reference_report["expected_cells"])
+
     def test_benchmark_role_filter_runs_upstream_gate_first(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
