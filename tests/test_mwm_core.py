@@ -16,7 +16,13 @@ from stable_worldmodel.solver import CEMSolver
 from stable_worldmodel.wm.lewm.lewm import LeWM as StableLeWM
 
 from eval_mwm import _available_stat_keys_for_action_process, _build_mwm_policy, _build_stable_wm_reference_policy
-from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, LeWMObjectImporter, build_mwm_lewm, mwm_from_lewm_object
+from mwm.adapters.lewm import (
+    LeWMMatryoshkaWorldModel,
+    LeWMObjectImporter,
+    LeWMTransitionPackage,
+    build_mwm_lewm,
+    mwm_from_lewm_object,
+)
 from mwm.checkpoints import CHECKPOINT_FORMAT, load_world_model_from_checkpoint, save_world_checkpoint
 from mwm.data.stable_wm import MWMTrainSampleTransform
 from mwm.eval import build_stable_wm_reference_policy as exported_reference_policy_builder
@@ -694,6 +700,37 @@ class MWMCoreTests(unittest.TestCase):
 
         self.assertEqual(model.action_dim, 10)
         self.assertEqual(model.metadata["action_spec"], {"dim": 10, "base_dim": 2, "block": 5})
+
+    def test_rollout_ignores_raw_history_actions_for_blocked_lewm_heads(self) -> None:
+        model = LeWMMatryoshkaWorldModel(
+            encoder=FakeLeWMEncoder(out_dim=4),
+            projector=nn.Identity(),
+            transitions=[
+                LeWMTransitionPackage(
+                    action_encoder=FakeLeWMActionEncoder(action_dim=10, out_dim=4),
+                    predictor=FakeLeWMPredictor(),
+                    pred_proj=nn.Identity(),
+                )
+            ],
+            K=[4],
+            D=4,
+            action_dim=10,
+            action_block=5,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+            history_size=3,
+            num_preds=1,
+            head_architectures=[{"K": 4}],
+        )
+        infos = {
+            "pixels": torch.rand(1, 2, 3, 3, 8, 8),
+            "action": torch.rand(1, 2, 3, 2),
+        }
+        candidates = torch.rand(1, 2, 5, 10)
+
+        out = model.rollout_at_level(infos, candidates, level_idx=0)
+
+        self.assertEqual(tuple(out["predicted_emb"].shape), (1, 2, 6, 4))
 
     def test_eval_policy_uses_explicit_topk_and_auto_batching(self) -> None:
         cfg = OmegaConf.create(

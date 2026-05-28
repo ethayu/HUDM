@@ -281,6 +281,7 @@ class LeWMMatryoshkaWorldModel(MWMWorldModel):
         n_steps = horizon - history
         if "emb" not in infos:
             init = {k: v[:, 0] for k, v in infos.items() if torch.is_tensor(v)}
+            init.pop("action", None)
             init = self.encode(init, already_preprocessed=False)
             infos["emb"] = init["emb"].detach().unsqueeze(1).expand(batch, samples, -1, -1)
         k = self.K[int(level_idx)]
