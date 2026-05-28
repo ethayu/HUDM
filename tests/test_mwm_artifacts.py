@@ -477,7 +477,7 @@ runs:
                 "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
             },
             {
-                "levels": [48, 96, 144, 192],
+                "levels": [48, 96, 144],
                 "training_backend": "stable_worldmodel_lewm",
                 "architecture_version": LEWM_BASE_ADAPTER_ARCH,
                 "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},

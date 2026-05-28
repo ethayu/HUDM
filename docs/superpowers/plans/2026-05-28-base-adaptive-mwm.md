@@ -1570,7 +1570,7 @@ Run:
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python benchmark_mwm.py configs/benchmark_mwm.yaml --roles mwm_scheduled
 ```
 
-Expected: scheduled checkpoints use `K=[48,96,144,192]`, evaluator runs successfully, and diagnostics include fidelity/latent-work fields.
+Expected: scheduled checkpoints use `K=[48,96,144]`, evaluator runs successfully, and diagnostics include fidelity/latent-work fields.
 
 - [ ] **Step 7: Run final benchmark verifier**
 

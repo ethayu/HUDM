@@ -288,7 +288,7 @@ scripts/run_mwm_v1_gate.sh
 - `configs/train_mwm_lewm_tworoom_upstream.yaml`: TwoRoom paper-parity retrain
   on `data/upstream/tworoom.lance`.
 - `configs/train_mwm_scheduled_pusht.yaml`: Trains PushT multi-fidelity MWM with
-  `K: [48, 96, 144, 192]`, same action block/training backend, run name
+  `K: [48, 96, 144]`, same action block/training backend, run name
   `mwm_scheduled_pusht`.
 - `configs/train_mwm_scheduled_tworoom.yaml`: Same as above for TwoRoom with run
   name `mwm_scheduled_tworoom`.
@@ -405,9 +405,9 @@ before making performance claims.
   TwoRoom Le-WM base-adapter retrain on the official upstream dataset, exported through
   the Le-WM base adapter target `mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
 - `checkpoints_mwm/mwm_scheduled_pusht/`: Locally trained PushT multi-fidelity
-  MWM, `K=[48,96,144,192]`, action block 5.
+  MWM, `K=[48,96,144]`, action block 5.
 - `checkpoints_mwm/mwm_scheduled_tworoom/`: Locally trained TwoRoom multi-fidelity
-  MWM, `K=[48,96,144,192]`, action block 5.
+  MWM, `K=[48,96,144]`, action block 5.
 - `checkpoints_mwm/upstream_sources/upstream_lewm_pusht_object.pt`: Trusted raw
   upstream object cached before conversion.
 - `checkpoints_mwm/upstream_sources/upstream_lewm_tworoom_object.pt`: Trusted raw
@@ -557,7 +557,7 @@ reviewer should confirm no required functionality was accidentally lost.
 - Every checkpoint has a valid `action_spec`, matching config kwargs and metadata.
 - Benchmark roles satisfy checkpoint contracts: upstream is converted through
   the trusted Le-WM object importer, retrained single is base-adapter Le-WM `K=[192]`,
-  and scheduled MWM is `K=[48,96,144,192]`.
+  and scheduled MWM is `K=[48,96,144]`.
 - Each env/seed shares one manifest across all three roles.
 - `review.html` links all run drilldowns and embeds all seven required plots.
 - Generated logs are interpreted as provenance; final claims should rely on the

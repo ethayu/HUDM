@@ -76,6 +76,6 @@ The benchmark matrix is PushT and TwoRoom, seeds `0,1,2`, with:
 
 - `upstream_lewm_converted`: upstream Le-WM imported into a canonical single-fidelity MWM checkpoint.
 - `retrained_lewm_single`: exact Le-WM single-level training with `K=[192]`, exported as a canonical MWM checkpoint.
-- `mwm_scheduled`: this repo's multi-fidelity training with `K=[48,96,144,192]`.
+- `mwm_scheduled`: this repo's multi-fidelity training with `K=[48,96,144]`.
 
 Generated datasets, checkpoints, rollouts, logs, and caches are intentionally ignored by git. See `REVIEW_GUIDE.md` for the code-review map and acceptance checks.

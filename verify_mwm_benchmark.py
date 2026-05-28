@@ -362,8 +362,8 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
             errors.append(f"retrained single checkpoint missing corrected architecture version: {checkpoint_dir}")
     elif role == "mwm_scheduled":
-        if levels != [48, 96, 144, 192]:
-            errors.append(f"scheduled MWM checkpoint must be K=[48,96,144,192], got {levels}: {checkpoint_dir}")
+        if levels != [48, 96, 144]:
+            errors.append(f"scheduled MWM checkpoint must be K=[48,96,144], got {levels}: {checkpoint_dir}")
         if not target.endswith(trainable_lewm_targets):
             errors.append(f"scheduled MWM checkpoint must export the Le-WM base-adapter target: {checkpoint_dir}")
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:

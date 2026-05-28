@@ -23,7 +23,7 @@ data:
   keys_to_cache: [action, proprio]
 model:
   D: 192
-  K: [48, 96, 144, 192]
+  K: [48, 96, 144]
   action_dim: auto
   action_block: 5
   image_shape: auto

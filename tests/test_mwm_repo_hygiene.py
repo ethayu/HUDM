@@ -207,7 +207,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["mwm"]["component_policy"]["per_level"], ["transition"], name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
             self.assertEqual(cfg["model"]["D"], 192, name)
-            self.assertEqual(cfg["model"]["K"], [48, 96, 144, 192], name)
+            self.assertEqual(cfg["model"]["K"], [48, 96, 144], name)
             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
             self.assertEqual(cfg["train"]["batch_size"], 128, name)
             self.assertEqual(cfg["train"]["num_workers"], 6, name)
