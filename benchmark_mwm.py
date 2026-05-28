@@ -81,6 +81,34 @@ def _role(run: Any, cfg: Any) -> str:
     return "mwm_scheduled"
 
 
+def _normalize_role_filter(roles: Any = None) -> set[str]:
+    if roles is None:
+        return set()
+    if isinstance(roles, str):
+        raw_items = [roles]
+    else:
+        raw_items = list(roles)
+    selected: set[str] = set()
+    for item in raw_items:
+        for part in str(item).split(","):
+            role = part.strip()
+            if role:
+                selected.add(role)
+    return selected
+
+
+def _filter_resolved_by_roles(cfg: Any, resolved: list[tuple[Any, Any]], roles: Any = None) -> list[tuple[Any, Any]]:
+    selected = _normalize_role_filter(roles)
+    if not selected:
+        return resolved
+    filtered = [(run, run_cfg) for run, run_cfg in resolved if _role(run, run_cfg) in selected]
+    if not filtered:
+        raise ValueError(f"No benchmark runs matched requested roles: {sorted(selected)}")
+    if bool(cfg.get("gate", {}).get("enabled", False)):
+        cfg.gate.roles = sorted({_role(run, run_cfg) for run, run_cfg in filtered})
+    return filtered
+
+
 def _validate_gate_matrix(cfg: Any, resolved: list[tuple[Any, Any]]) -> None:
     gate = cfg.get("gate", {})
     if not bool(gate.get("enabled", False)):
@@ -121,7 +149,7 @@ def _episode_trace_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def main(cfg_path: str) -> None:
+def main(cfg_path: str, *, roles: Any = None) -> None:
     cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
     output_dir = Path(str(cfg.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -136,6 +164,7 @@ def main(cfg_path: str) -> None:
     for run in runs:
         _, run_cfg = _merged_run_config(run)
         resolved.append((run, run_cfg))
+    resolved = _filter_resolved_by_roles(cfg, resolved, roles)
     _validate_gate_matrix(cfg, resolved)
 
     for idx, (run, run_cfg) in enumerate(resolved):
@@ -222,9 +251,10 @@ def main(cfg_path: str) -> None:
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if len(sys.argv) != 2:
-        print("Usage: python benchmark_mwm.py configs/benchmark_mwm.yaml")
-        raise SystemExit(1)
-    main(sys.argv[1])
+    parser = argparse.ArgumentParser(description="Run an MWM benchmark matrix.")
+    parser.add_argument("config", help="Benchmark YAML config")
+    parser.add_argument("--roles", nargs="+", help="Optional role filter, e.g. upstream_lewm_converted")
+    args = parser.parse_args()
+    main(args.config, roles=args.roles)

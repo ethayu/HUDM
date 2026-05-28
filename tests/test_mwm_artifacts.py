@@ -204,6 +204,63 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
         self.assertEqual(report["paper_targets"]["tolerance_pp"], 1.0)
         self.assertEqual(report["paper_targets"]["single_level_tolerance_pp"], 5.0)
 
+    def test_benchmark_role_filter_runs_upstream_gate_first(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            eval_cfg = root / "eval.yaml"
+            eval_cfg.write_text(
+                """
+env_id: swm/PushT-v1
+checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
+data: {path: data/pusht_swm.lance, format: lance}
+eval: {seed: 0}
+planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+""",
+                encoding="utf-8",
+            )
+            bench_cfg = root / "benchmark.yaml"
+            bench_cfg.write_text(
+                f"""
+output_dir: {root / "out"}
+require_shared_manifests: false
+gate: {{enabled: true, env_ids: [swm/PushT-v1], seeds: [0], roles: [upstream_lewm_converted, retrained_lewm_single]}}
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    config: {eval_cfg}
+    overrides:
+      checkpoint:
+        run_dir: checkpoints_mwm/upstream
+  - name: retrained
+    role: retrained_lewm_single
+    config: {eval_cfg}
+    overrides:
+      checkpoint:
+        run_dir: checkpoints_mwm/retrained
+""",
+                encoding="utf-8",
+            )
+
+            calls: list[str] = []
+            old_run_eval = benchmark_mwm.run_eval_mwm
+
+            def _fake_run(cfg_path: str) -> None:
+                cfg = OmegaConf.load(cfg_path)
+                calls.append(str(cfg.checkpoint.run_dir))
+                _payload("stub", str(cfg.env_id), int(cfg.eval.seed), Path(str(cfg.eval.output_path)))
+
+            benchmark_mwm.run_eval_mwm = _fake_run
+            try:
+                benchmark_mwm.main(str(bench_cfg), roles=["upstream_lewm_converted"])
+            finally:
+                benchmark_mwm.run_eval_mwm = old_run_eval
+
+            summary = json.loads((root / "out" / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(calls, ["checkpoints_mwm/upstream"])
+            self.assertEqual([row["role"] for row in summary["runs"]], ["upstream_lewm_converted"])
+            static_report = verify_benchmark_static(str(bench_cfg), roles=["upstream_lewm_converted"])
+            self.assertEqual(static_report["expected_cells"], [("swm/PushT-v1", 0, "upstream_lewm_converted")])
+
     def test_benchmark_failure_writes_traceback_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -305,6 +362,25 @@ runs:
         rows[1]["success_rate"] = 70.0
         _validate_paper_targets(cfg, rows, errors)
         self.assertTrue(any("single-level match check failed" in error for error in errors), errors)
+
+    def test_paper_target_upstream_only_gate_skips_retrained_match(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "gate": {"roles": ["upstream_lewm_converted"]},
+                "paper_targets": {
+                    "enabled": True,
+                    "tolerance_pp": 1.0,
+                    "single_level_tolerance_pp": 5.0,
+                    "success_rate": {"swm/PushT-v1": 96.0},
+                },
+            }
+        )
+        rows = [{"env_id": "swm/PushT-v1", "role": "upstream_lewm_converted", "success_rate": 96.0}]
+
+        errors: list[str] = []
+        _validate_paper_targets(cfg, rows, errors)
+
+        self.assertEqual(errors, [])
 
     def test_paper_target_gate_requires_reference_when_mwm_misses_by_more_than_one_point(self) -> None:
         rows = [

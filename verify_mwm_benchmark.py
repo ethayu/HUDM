@@ -8,7 +8,7 @@ from typing import Any
 from omegaconf import OmegaConf
 
 from benchmark_mwm import DEFAULTS as BENCHMARK_DEFAULTS
-from benchmark_mwm import _merged_run_config, _role, _validate_gate_matrix
+from benchmark_mwm import _filter_resolved_by_roles, _merged_run_config, _role, _validate_gate_matrix
 from mwm.benchmark.artifacts import file_sha256, load_json
 from mwm.checkpoints import (
     CHECKPOINT_FORMAT,
@@ -78,11 +78,12 @@ def _expected_cells(cfg: Any) -> set[tuple[str, int, str]]:
     }
 
 
-def _load_expected(cfg: Any) -> list[tuple[Any, Any]]:
+def _load_expected(cfg: Any, *, roles: Any = None) -> list[tuple[Any, Any]]:
     resolved = []
     for run in cfg.runs:
         _, run_cfg = _merged_run_config(run)
         resolved.append((run, run_cfg))
+    resolved = _filter_resolved_by_roles(cfg, resolved, roles)
     _validate_gate_matrix(cfg, resolved)
     return resolved
 
@@ -117,6 +118,8 @@ def _validate_paper_targets(cfg: Any, rows: list[dict[str, Any]], errors: list[s
     expected = dict(OmegaConf.to_container(expected, resolve=True) if OmegaConf.is_config(expected) else expected)
     upstream_tol = float(targets.get("tolerance_pp", targets.get("upstream_tolerance_pp", 1.0)))
     match_tol = float(targets.get("single_level_tolerance_pp", targets.get("retrained_match_tolerance_pp", 5.0)))
+    gate_roles = {str(role) for role in cfg.get("gate", {}).get("roles", [])}
+    require_retrained = not gate_roles or "retrained_lewm_single" in gate_roles
     for env_id, target in sorted((str(k), float(v)) for k, v in expected.items()):
         upstream_rows = [
             row
@@ -157,6 +160,8 @@ def _validate_paper_targets(cfg: Any, rows: list[dict[str, Any]], errors: list[s
                     "check data/checkpoint/protocol mismatch"
                 )
         if retrained is None:
+            if not require_retrained:
+                continue
             errors.append(f"paper target check missing retrained_lewm_single rows for {env_id}")
             continue
         if abs(retrained - upstream) > match_tol:
@@ -303,9 +308,9 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
             errors.append(f"scheduled MWM checkpoint missing corrected architecture version: {checkpoint_dir}")
 
 
-def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml") -> dict[str, Any]:
+def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml", *, roles: Any = None) -> dict[str, Any]:
     cfg = OmegaConf.merge(BENCHMARK_DEFAULTS, OmegaConf.load(str(cfg_path)))
-    resolved = _load_expected(cfg)
+    resolved = _load_expected(cfg, roles=roles)
     output_dir = Path(str(cfg.output_dir))
     errors: list[str] = []
 
@@ -464,9 +469,9 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml")
     }
 
 
-def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml") -> dict[str, Any]:
+def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml", *, roles: Any = None) -> dict[str, Any]:
     cfg = OmegaConf.merge(BENCHMARK_DEFAULTS, OmegaConf.load(str(cfg_path)))
-    resolved = _load_expected(cfg)
+    resolved = _load_expected(cfg, roles=roles)
     targets = cfg.get("paper_targets", {})
     paper_targets: dict[str, Any] = {}
     if bool(targets.get("enabled", False)):
@@ -497,13 +502,17 @@ def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml")
     }
 
 
-def main(cfg_path: str, *, static_only: bool = False) -> None:
-    report = verify_benchmark_static(cfg_path) if static_only else verify_benchmark_output(cfg_path)
+def main(cfg_path: str, *, static_only: bool = False, roles: Any = None) -> None:
+    report = verify_benchmark_static(cfg_path, roles=roles) if static_only else verify_benchmark_output(cfg_path, roles=roles)
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    args = [arg for arg in sys.argv[1:] if arg != "--static-only"]
-    main(args[0] if args else "configs/benchmark_mwm.yaml", static_only="--static-only" in sys.argv[1:])
+    parser = argparse.ArgumentParser(description="Verify MWM benchmark artifacts.")
+    parser.add_argument("config", nargs="?", default="configs/benchmark_mwm.yaml", help="Benchmark YAML config")
+    parser.add_argument("--static-only", action="store_true", help="Only validate the config matrix")
+    parser.add_argument("--roles", nargs="+", help="Optional role filter, e.g. upstream_lewm_converted")
+    args = parser.parse_args()
+    main(args.config, static_only=args.static_only, roles=args.roles)
