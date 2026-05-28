@@ -6,7 +6,7 @@ from typing import Any
 import torch
 from omegaconf import OmegaConf
 
-from mwm.adapters.lewm import LeWMObjectImporter
+from mwm.adapters.lewm import build_mwm_lewm_from_upstream_object
 from mwm.checkpoints import save_world_checkpoint
 from mwm.dependency_refs import dependency_refs
 
@@ -75,16 +75,16 @@ def prepare_one(spec: Any, output_root: str | Path) -> Path:
     if not source_path.is_file():
         obj = _load_upstream(str(spec.get("object_checkpoint", spec.get("repo"))))
         torch.save(obj, source_path)
-    model = LeWMObjectImporter(
-        str(source_path),
+    model = build_mwm_lewm_from_upstream_object(
+        object_checkpoint=str(source_path),
         D=int(spec.get("D", 192)),
         K=tuple(int(k) for k in spec.get("K", [192])),
         action_dim=int(action_spec["dim"]),
         action_block=int(action_spec["block"]),
         image_shape=tuple(int(x) for x in spec.image_shape),
         normalize_imagenet=bool(spec.get("normalize_imagenet", True)),
-        expected_class_name=spec.get("expected_class_name", None),
-    ).import_model()
+        expected_class_name=spec.get("expected_class_name", "stable_worldmodel.wm.lewm.lewm.LeWM"),
+    )
     metadata = {
         "env_id": str(spec.env_id),
         "restore_spec": str(spec.restore_spec),
@@ -92,7 +92,7 @@ def prepare_one(spec: Any, output_root: str | Path) -> Path:
         "action_dim": int(action_spec["base_dim"]),
         "action_block": int(action_spec["block"]),
         "action_preprocessing": "standard_scaler",
-        "source_history_size": int(getattr(model, "source_history_size", spec.get("history_size", 3))),
+        "source_history_size": int(getattr(model, "history_size", spec.get("history_size", 3))),
         "action_spec": action_spec,
         "levels": [int(k) for k in spec.get("K", [192])],
         "role": "upstream_lewm_converted",
@@ -105,7 +105,7 @@ def prepare_one(spec: Any, output_root: str | Path) -> Path:
             "action_key": str(spec.get("action_key", "action")),
         },
         "model": {
-            "target": "mwm.adapters.lewm.build_mwm_lewm_from_object",
+            "target": "mwm.adapters.lewm.build_mwm_lewm_from_upstream_object",
             "D": int(spec.get("D", 192)),
             "K": [int(k) for k in spec.get("K", [192])],
             "action_dim": int(action_spec["dim"]),

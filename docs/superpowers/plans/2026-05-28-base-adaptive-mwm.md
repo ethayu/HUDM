@@ -243,15 +243,14 @@ Modify `mwm/adapters/__init__.py` to export these names:
 
 ```python
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseAdapter, StableWMBaseSpec, validate_component_policy
-from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, MWMAdapter, MWMComponents, MWMImporter
+from mwm.adapters.lewm import build_mwm_lewm_from_stable_config
+from mwm.models.world_model import MatryoshkaWorldModel
 
 __all__ = [
     "ComponentGroup",
     "ComponentPolicy",
-    "LeWMMatryoshkaWorldModel",
-    "MWMAdapter",
-    "MWMComponents",
-    "MWMImporter",
+    "build_mwm_lewm_from_stable_config",
+    "MatryoshkaWorldModel",
     "StableWMBaseAdapter",
     "StableWMBaseSpec",
     "validate_component_policy",
@@ -488,7 +487,7 @@ class LeWMStableConfigTests(unittest.TestCase):
             normalize_imagenet=False,
         )
 
-        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
+        self.assertIsInstance(model, MatryoshkaWorldModel)
         self.assertEqual(model.metadata["adapter_family"], "lewm")
         self.assertTrue(model.metadata["fresh_init"])
         self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
@@ -557,7 +556,7 @@ class LeWMStableWMAdapter:
             loss_scope=dict(training_recipe.get("loss_scope", {"regularizers": "shared_latent"})),
         )
 
-    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> LeWMMatryoshkaWorldModel:
+    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> MatryoshkaWorldModel:
         return _build_lewm_from_base_spec(spec, **runtime)
 ```
 
@@ -577,11 +576,11 @@ def _build_lewm_from_base_spec(
     action_block: int,
     image_shape: Sequence[int],
     normalize_imagenet: bool,
-) -> LeWMMatryoshkaWorldModel:
+) -> MatryoshkaWorldModel:
     cfg = copy.deepcopy(spec.source_config)
     encoder = _instantiate_module(cfg["encoder"])
     projector = _instantiate_module(cfg.get("projector", {"_target_": "torch.nn.Identity"}))
-    transitions: list[LeWMTransitionPackage] = []
+    transitions: list[TransitionPackage] = []
     arches: list[dict[str, Any]] = []
     for k in spec.levels:
         transition, arch = _build_transition_head_from_stable_config(int(k), int(spec.D), cfg)
@@ -590,14 +589,14 @@ def _build_lewm_from_base_spec(
     metadata = {
         "adapter": "lewm",
         "adapter_family": "lewm",
-        "architecture_version": LeWMMatryoshkaWorldModel.architecture_version,
+        "architecture_version": "lewm_base_adapter_v1",
         **spec.metadata(),
         "source_config": copy.deepcopy(spec.source_config),
         "training_recipe": copy.deepcopy(spec.training_recipe),
         "head_architectures": arches,
         "action_preprocessing": str(spec.training_recipe.get("action_preprocessing", "standard_scaler")),
     }
-    model = LeWMMatryoshkaWorldModel(
+    model = MatryoshkaWorldModel(
         encoder=encoder,
         projector=projector,
         transitions=transitions,
@@ -658,7 +657,7 @@ def _build_transition_head_from_stable_config(
     k: int,
     D: int,
     source_config: dict[str, Any],
-) -> tuple[LeWMTransitionPackage, dict[str, Any]]:
+) -> tuple[TransitionPackage, dict[str, Any]]:
     predictor_cfg = _level_config(
         source_config["predictor"],
         k=int(k),
@@ -680,7 +679,7 @@ def _build_transition_head_from_stable_config(
         width_keys=("input_dim", "output_dim", "hidden_dim"),
         scaled_keys=(),
     )
-    transition = LeWMTransitionPackage(
+    transition = TransitionPackage(
         action_encoder=_instantiate_module(action_cfg),
         predictor=_instantiate_module(predictor_cfg),
         pred_proj=_instantiate_module(pred_proj_cfg),
@@ -710,7 +709,7 @@ def build_mwm_lewm_from_stable_config(
     image_shape: Sequence[int] = (224, 224),
     normalize_imagenet: bool = True,
     component_policy: dict[str, Any] | ComponentPolicy | None = None,
-) -> LeWMMatryoshkaWorldModel:
+) -> MatryoshkaWorldModel:
     adapter = LeWMStableWMAdapter()
     policy = component_policy if isinstance(component_policy, ComponentPolicy) else ComponentPolicy.from_mapping(component_policy)
     spec = adapter.resolve_spec(

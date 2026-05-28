@@ -45,10 +45,13 @@ scripts/submit_mwm_gates.sh
 
 ## Architecture
 
-- `mwm.models.world_model.MWMWorldModel` is the only runtime model contract.
-- `mwm.adapters.lewm` is the stable public facade for Le-WM builders and importers.
-- `mwm.adapters.lewm_model.LeWMMatryoshkaWorldModel` is the trainable implementation. `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path; multi-`K` training encodes once and aggregates requested prefix losses only.
-- Le-WM implementation details are split across `lewm_model`, `lewm_stable`, `lewm_import`, and `lewm_common` so the public facade stays small. Trainable Le-WM MWM models are built only from Stable-WM base configs.
+- `mwm.models.world_model.MWMWorldModel` is the runtime model contract, and
+  `MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
+- `mwm.adapters.lewm` is the stable public facade for Le-WM builders.
+- `mwm.adapters.lewm_stable` derives Le-WM components from Stable-WM configs or
+  trusted upstream objects, then returns the normal `MatryoshkaWorldModel`.
+  `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
+  multi-`K` training encodes once and aggregates requested prefix losses only.
 - `mwm.checkpoints` reads and writes strict canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`.
 - `mwm.planning.scheduled_cem` is the active evaluator/planner path.
 - `mwm.data.stable_wm` is Lance-only data glue for Stable-WM datasets and immutable eval manifests.

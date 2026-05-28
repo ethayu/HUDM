@@ -346,8 +346,10 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
             errors.append(f"upstream role checkpoint missing upstream_lewm_converted metadata role: {checkpoint_dir}")
         if levels != [192]:
             errors.append(f"upstream role checkpoint must be single-fidelity K=[192], got {levels}: {checkpoint_dir}")
-        if not target.endswith("build_mwm_lewm_from_object"):
-            errors.append(f"upstream role checkpoint must load from trusted Le-WM object importer: {checkpoint_dir}")
+        if not target.endswith("build_mwm_lewm_from_upstream_object"):
+            errors.append(f"upstream role checkpoint must load through the normal converted Le-WM MWM target: {checkpoint_dir}")
+        if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
+            errors.append(f"upstream role checkpoint missing corrected architecture version: {checkpoint_dir}")
     elif role == "retrained_lewm_single":
         if levels != [192]:
             errors.append(f"retrained single checkpoint must be K=[192], got {levels}: {checkpoint_dir}")

@@ -111,11 +111,6 @@ def _jsonable(value: Any) -> Any:
     return value
 
 
-def _metadata_model_target(metadata: dict[str, Any]) -> str:
-    model_meta = metadata.get("model", {})
-    return str(model_meta.get("target", "")) if isinstance(model_meta, dict) else ""
-
-
 def _uses_standardized_action_space(model: Any, metadata: dict[str, Any], cfg: Any) -> bool:
     raw = cfg.eval.get("action_preprocessing", cfg.data.get("action_preprocessing", "auto"))
     if isinstance(raw, bool):
@@ -135,11 +130,9 @@ def _uses_standardized_action_space(model: Any, metadata: dict[str, Any], cfg: A
     normalized = dataset_meta.get("normalized_columns", []) if isinstance(dataset_meta, dict) else []
     if "action" in {str(x) for x in normalized}:
         return True
-    if hasattr(model, "source_model"):
-        return True
     if str(metadata.get("role", "")) == "upstream_lewm_converted":
         return True
-    return _metadata_model_target(metadata).endswith("build_mwm_lewm_from_object")
+    return False
 
 
 def _stat_keys_for_action_process(cfg: Any) -> list[str]:
@@ -376,9 +369,20 @@ def _build_stable_wm_reference_policy(
     device: torch.device,
     process: dict[str, Any],
 ) -> Any:
-    source_model = getattr(model, "source_model", None)
-    if source_model is None:
-        raise TypeError("Stable-WM reference evaluation requires an imported upstream model with `source_model`.")
+    del model
+    upstream = metadata.get("upstream", {})
+    checkpoint = upstream.get("object_checkpoint") if isinstance(upstream, dict) else None
+    if not checkpoint:
+        model_meta = metadata.get("model", {})
+        kwargs = model_meta.get("kwargs", {}) if isinstance(model_meta, dict) else {}
+        checkpoint = kwargs.get("object_checkpoint") if isinstance(kwargs, dict) else None
+    if not checkpoint:
+        raise TypeError("Stable-WM reference evaluation requires metadata.upstream.object_checkpoint.")
+    reference_model = torch.load(str(checkpoint), map_location=device, weights_only=False)
+    if not isinstance(reference_model, torch.nn.Module):
+        raise TypeError(f"Expected torch.nn.Module in reference checkpoint {checkpoint!r}, got {type(reference_model).__name__}.")
+    reference_model.to(device)
+    reference_model.eval()
     configured_action_block = int(metadata.get("action_block", metadata.get("model", {}).get("action_block", 1)))
     action_block = int(cfg.planner.get("action_block", configured_action_block))
     raw_batch_size = cfg.planner.get("batch_size", "auto")
@@ -414,7 +418,7 @@ def _build_stable_wm_reference_policy(
     )
     image_fn = imagenet_image_input_transform if use_imagenet else mwm_image_input_transform
     image_transform = {"pixels": image_fn, "goal": image_fn}
-    return build_stable_wm_reference_policy(source_model, plan_cfg, cem_kwargs=cem_kwargs, process=process, transform=image_transform)
+    return build_stable_wm_reference_policy(reference_model, plan_cfg, cem_kwargs=cem_kwargs, process=process, transform=image_transform)
 
 
 def _manifest_row_to_pair(row: dict[str, Any]) -> StartGoalPair:

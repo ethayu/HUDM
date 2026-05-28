@@ -9,10 +9,11 @@ from unittest import mock
 import torch
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
-from mwm.adapters.lewm import LeWMStableWMAdapter, LeWMMatryoshkaWorldModel, build_mwm_lewm_from_stable_config
+from mwm.adapters.lewm import LeWMStableWMAdapter, build_mwm_lewm_from_stable_config
 import mwm.adapters.registry as adapter_registry
 from mwm.adapters.registry import adapter_for_family, adapter_for_target, family_for_target, register_adapter
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
+from mwm.models.world_model import MatryoshkaWorldModel
 
 
 class AdapterPolicyTests(unittest.TestCase):
@@ -245,7 +246,7 @@ class LeWMStableConfigTests(unittest.TestCase):
             image_shape=(8, 8),
             normalize_imagenet=False,
         )
-        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
+        self.assertIsInstance(model, MatryoshkaWorldModel)
         self.assertEqual(model.metadata["adapter_family"], "lewm")
         self.assertTrue(model.metadata["fresh_init"])
         self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])

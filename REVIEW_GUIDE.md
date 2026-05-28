@@ -179,8 +179,8 @@ scripts/run_mwm_v1_gate.sh
   Review refusal-to-append behavior in `_record_dataset_to_path`; it prevents
   accidental mixed datasets.
 - `prepare_upstream_lewm.py`: Downloads or loads trusted upstream Le-WM objects,
-  saves source objects under `checkpoints_mwm/upstream_sources/`, imports them
-  through `LeWMObjectImporter`, and exports canonical single-fidelity MWM
+  saves source objects under `checkpoints_mwm/upstream_sources/`, converts them
+  into the normal base-adaptive MWM model shell, and exports canonical single-fidelity MWM
   checkpoints with dependency metadata.
 - `prepare_upstream_lewm_data.py`: Validates the public upstream Le-WM Lance
   tables and writes MWM sidecar metadata. The paper-parity path is Lance-only;
@@ -215,18 +215,15 @@ scripts/run_mwm_v1_gate.sh
 - `mwm/__init__.py`: Public package marker; exports `MWMWorldModel`.
 - `mwm/adapters/__init__.py`: Re-exports adapter base classes and component
   dataclass.
-- `mwm/adapters/lewm.py`: Stable public facade for Le-WM builders/importers and
+- `mwm/adapters/lewm.py`: Stable public facade for Le-WM builders and
   adapter registration. Checkpoint config targets intentionally keep using this
   module.
-- `mwm/adapters/lewm_model.py`: Trainable `LeWMMatryoshkaWorldModel`, per-`K`
-  transition packages, Le-WM loss routing, rollout, and fidelity-aware cost.
 - `mwm/adapters/lewm_stable.py`: Stable-WM `config.json` adapter, component
   policy validation, fresh architecture instantiation, and proportional
-  per-level head construction from source configs.
-- `mwm/adapters/lewm_import.py`: Trusted upstream Le-WM object import and
-  eval-only wrapper that delegates single-level planning to the raw Stable-WM
-  `get_cost` path.
-- `mwm/adapters/lewm_common.py`: Shared image preprocessing helpers.
+  per-level head construction from source configs or trusted upstream objects.
+- `mwm/models/world_model.py`: Shared MWM model shell, transition package,
+  preprocessing helper, matryoshka loss aggregation, rollout, and fidelity-aware
+  cost path used by Le-WM and future base adapters.
 - `mwm/benchmark/__init__.py`: Empty namespace marker for benchmark helpers.
 - `mwm/benchmark/artifacts.py`: Artifact writer and renderer. It writes JSON,
   CSV, JSONL, per-run sidecars, per-environment tables, seven default plots, and
@@ -390,10 +387,10 @@ metadata predates the current configs, regenerate them with the gate scripts
 before making performance claims.
 
 - `checkpoints_mwm/upstream_lewm_pusht/`: Converted upstream PushT Le-WM object,
-  single level `K=[192]`, target `mwm.adapters.lewm.build_mwm_lewm_from_object`,
+  single level `K=[192]`, target `mwm.adapters.lewm.build_mwm_lewm_from_upstream_object`,
   role `upstream_lewm_converted`.
 - `checkpoints_mwm/upstream_lewm_tworoom/`: Converted upstream TwoRoom Le-WM
-  object, single level `K=[192]`, same importer target, role
+  object, single level `K=[192]`, same converted-object target, role
   `upstream_lewm_converted`.
 - `checkpoints_mwm/retrained_lewm_single_pusht/`: Locally trained PushT
   single-fidelity checkpoint, expected after refresh to use
@@ -538,9 +535,9 @@ reviewer should confirm no required functionality was accidentally lost.
    `mwm/data/manifest.py`, `mwm/checkpoints.py`, and `verify_mwm_benchmark.py`.
 3. Review the model/planner path: `mwm/models/world_model.py`,
    `mwm/fidelity.py`, `mwm/planning/scheduled_cem.py`, and `mwm/eval/policy.py`.
-4. Review the Le-WM adapter/import path: `mwm/adapters/lewm.py`,
-   `mwm/adapters/lewm_model.py`, `mwm/adapters/lewm_stable.py`,
-   `mwm/adapters/lewm_import.py`, and `prepare_upstream_lewm.py`.
+4. Review the Le-WM adapter/conversion path: `mwm/adapters/lewm.py`,
+   `mwm/adapters/lewm_stable.py`, `mwm/models/world_model.py`, and
+   `prepare_upstream_lewm.py`.
 5. Review orchestration: `collect_mwm_data.py`, `train_mwm.py`, `eval_mwm.py`,
    `benchmark_mwm.py`, and the shell/SLURM scripts.
 6. Review tests and generated artifacts last, checking whether the tests cover

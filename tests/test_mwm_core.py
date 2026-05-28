@@ -17,19 +17,22 @@ from stable_worldmodel.wm.lewm.lewm import LeWM as StableLeWM
 
 from eval_mwm import _available_stat_keys_for_action_process, _build_mwm_policy, _build_stable_wm_reference_policy
 from mwm.adapters.lewm import (
-    LeWMMatryoshkaWorldModel,
-    LeWMObjectDynamics,
-    LeWMObjectImporter,
-    LeWMTransitionPackage,
     build_mwm_lewm_from_stable_config,
-    mwm_from_lewm_object,
+    build_mwm_lewm_from_upstream_object,
 )
 from mwm.checkpoints import CHECKPOINT_FORMAT, load_world_model_from_checkpoint, save_world_checkpoint
 from mwm.data.stable_wm import MWMTrainSampleTransform
 from mwm.eval import build_stable_wm_reference_policy as exported_reference_policy_builder
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
-from mwm.models.world_model import MWMWorldModel, latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
+from mwm.models.world_model import (
+    MWMWorldModel,
+    MatryoshkaWorldModel,
+    TransitionPackage,
+    latent_regularizer_loss,
+    matryoshka_base_loss,
+    weighted_level_mean,
+)
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
 from mwm.training import mwm_spt_forward
 from train_mwm import (
@@ -78,6 +81,15 @@ class FakeLeWMPredictor(nn.Module):
 
     def forward(self, z: torch.Tensor, action_emb: torch.Tensor) -> torch.Tensor:
         return z + action_emb
+
+
+class FakeStepDynamics(nn.Module):
+    def __init__(self, action_dim: int = 2, out_dim: int = 4) -> None:
+        super().__init__()
+        self.action_encoder = FakeLeWMActionEncoder(action_dim=action_dim, out_dim=out_dim)
+
+    def forward(self, z: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        return z + self.action_encoder(action)
 
 
 class FakeLeWMObject(nn.Module):
@@ -329,7 +341,7 @@ def _base_adaptive_lewm(
     predictor_mlp_dim: int = 16,
     predictor_dropout: float = 0.0,
     projector_hidden_dim: int = 16,
-) -> LeWMMatryoshkaWorldModel:
+) -> MatryoshkaWorldModel:
     return build_mwm_lewm_from_stable_config(
         source_config=_lewm_source_config(
             D=int(D),
@@ -424,14 +436,14 @@ class FakeCEMParityCostModel(nn.Module):
 
 
 class MWMCoreTests(unittest.TestCase):
-    def test_lewm_object_import_roundtrips_canonical_checkpoint(self) -> None:
+    def test_upstream_object_conversion_roundtrips_as_normal_world_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source_path = root / "lewm_object.pt"
             torch.save(FakeLeWMObject(), source_path)
 
-            model = LeWMObjectImporter(
-                str(source_path),
+            model = build_mwm_lewm_from_upstream_object(
+                object_checkpoint=str(source_path),
                 D=4,
                 K=(4,),
                 action_dim=2,
@@ -439,10 +451,13 @@ class MWMCoreTests(unittest.TestCase):
                 image_shape=(8, 8),
                 normalize_imagenet=False,
                 expected_class_name=FakeLeWMObject.__name__,
-            ).import_model()
-            self.assertIsInstance(model, MWMWorldModel)
+            )
+            self.assertIsInstance(model, MatryoshkaWorldModel)
             self.assertEqual(model.K, [4])
             self.assertFalse(hasattr(model, "decoders"))
+            self.assertFalse(hasattr(model, "source_model"))
+            self.assertFalse(getattr(model, "eval_only", False))
+            self.assertEqual(model.mwm_config["target"], "mwm.adapters.lewm.build_mwm_lewm_from_upstream_object")
 
             out_dir = root / "checkpoint"
             save_world_checkpoint(
@@ -455,6 +470,8 @@ class MWMCoreTests(unittest.TestCase):
                     "action_dim": 2,
                     "action_block": 1,
                     "levels": [4],
+                    "role": "upstream_lewm_converted",
+                    "upstream": {"object_checkpoint": str(source_path)},
                     "dataset": {"pixels_key": "pixels", "action_key": "action"},
                 },
             )
@@ -464,7 +481,8 @@ class MWMCoreTests(unittest.TestCase):
             )
 
             loaded, metadata, epoch = load_world_model_from_checkpoint(out_dir, None, device=torch.device("cpu"))
-            self.assertIsInstance(loaded, MWMWorldModel)
+            self.assertIsInstance(loaded, MatryoshkaWorldModel)
+            self.assertFalse(hasattr(loaded, "source_model"))
             self.assertEqual(metadata["format"], CHECKPOINT_FORMAT)
             self.assertEqual(epoch, 0)
             self.assertTrue(metadata["artifacts"]["weights"]["sha256"])
@@ -487,7 +505,7 @@ class MWMCoreTests(unittest.TestCase):
             K=(4,),
             D=4,
             action_dim=2,
-            dynamics=[LeWMObjectDynamics(FakeLeWMActionEncoder(action_dim=2, out_dim=4), FakeLeWMPredictor())],
+            dynamics=[FakeStepDynamics(action_dim=2, out_dim=4)],
             decoder=None,
             metadata={"image_shape": [8, 8]},
         )
@@ -565,14 +583,14 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(reg.calls, 1)
         self.assertEqual(set(logs), {"loss", "pred_loss", "pred_loss_l0", "pred_loss_l1", "rollout_loss", "sigreg_loss"})
 
-    def test_imported_lewm_cost_delegates_to_source_object(self) -> None:
+    def test_upstream_object_conversion_uses_normal_mwm_cost_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             source_path = root / "lewm_object.pt"
             torch.save(FakeCostLeWMObject(), source_path)
 
-            model = LeWMObjectImporter(
-                str(source_path),
+            model = build_mwm_lewm_from_upstream_object(
+                object_checkpoint=str(source_path),
                 D=4,
                 K=(4,),
                 action_dim=2,
@@ -580,7 +598,7 @@ class MWMCoreTests(unittest.TestCase):
                 image_shape=(8, 8),
                 normalize_imagenet=False,
                 expected_class_name=FakeCostLeWMObject.__name__,
-            ).import_model()
+            )
             decision = FidelityScheduler.from_config(
                 {"policy": "fixed", "level": 0, "rollout_level": 0},
                 num_levels=1,
@@ -593,45 +611,11 @@ class MWMCoreTests(unittest.TestCase):
             }
             actions = torch.randn(2, 5, 3, 2)
 
-            expected = model.source_model.get_cost(dict(infos), actions)
             actual = model.get_cost_with_fidelity(dict(infos), actions, decision)
 
-            self.assertTrue(torch.allclose(actual, expected))
-            self.assertTrue(model._last_cost_diagnostics["delegated_source_cost"])
-
-    def test_imported_lewm_precomputes_batched_goal_embedding(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            root = Path(tmp)
-            source_path = root / "lewm_object.pt"
-            torch.save(FakeGoalEmbCostLeWMObject(), source_path)
-
-            model = LeWMObjectImporter(
-                str(source_path),
-                D=4,
-                K=(4,),
-                action_dim=2,
-                action_block=1,
-                image_shape=(8, 8),
-                normalize_imagenet=False,
-                expected_class_name=FakeGoalEmbCostLeWMObject.__name__,
-            ).import_model()
-            decision = FidelityScheduler.from_config(
-                {"policy": "fixed", "level": 0, "rollout_level": 0},
-                num_levels=1,
-                horizon=3,
-            ).decision(cem_iter=0, n_iter=1)
-            infos = {
-                "pixels": torch.rand(2, 5, 1, 3, 8, 8),
-                "goal": torch.rand(2, 5, 1, 3, 8, 8),
-                "action": torch.zeros(2, 5, 1, 2),
-            }
-            actions = torch.randn(2, 5, 3, 2)
-
-            costs = model.get_cost_with_fidelity(infos, actions, decision)
-
-            self.assertEqual(tuple(infos["goal_emb"].shape), (2, 1, 1, 4))
-            self.assertEqual(tuple(costs.shape), (2, 5))
-            self.assertTrue(model._last_cost_diagnostics["delegated_source_cost"])
+            self.assertEqual(tuple(actual.shape), (2, 5))
+            self.assertFalse(hasattr(model, "source_model"))
+            self.assertNotIn("delegated_source_cost", model._last_cost_diagnostics)
 
     def test_canonical_checkpoint_export_rejects_extra_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -643,41 +627,39 @@ class MWMCoreTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "non-checkpoint files"):
                 save_world_checkpoint(model, extra_dir, metadata={"env_id": "swm/PushT-v1"})
 
-    def test_lewm_object_import_validates_required_components(self) -> None:
+    def test_upstream_object_conversion_validates_required_components(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "broken.pt"
             torch.save(BrokenLeWMObject(), source)
 
-            importer = LeWMObjectImporter(
-                str(source),
-                D=4,
-                K=(4,),
-                action_dim=2,
-                image_shape=(8, 8),
-                expected_class_name=BrokenLeWMObject.__name__,
-            )
             with self.assertRaisesRegex(ValueError, "missing components"):
-                importer.import_model()
+                build_mwm_lewm_from_upstream_object(
+                    object_checkpoint=str(source),
+                    D=4,
+                    K=(4,),
+                    action_dim=2,
+                    image_shape=(8, 8),
+                    expected_class_name=BrokenLeWMObject.__name__,
+                )
 
-    def test_lewm_object_import_validates_expected_class_when_declared(self) -> None:
+    def test_upstream_object_conversion_validates_expected_class_when_declared(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             source = Path(tmp) / "lewm_object.pt"
             torch.save(FakeLeWMObject(), source)
 
-            importer = LeWMObjectImporter(
-                str(source),
-                D=4,
-                K=(4,),
-                action_dim=2,
-                image_shape=(8, 8),
-                expected_class_name="wrong.Module",
-            )
             with self.assertRaisesRegex(ValueError, "expected"):
-                importer.import_model()
+                build_mwm_lewm_from_upstream_object(
+                    object_checkpoint=str(source),
+                    D=4,
+                    K=(4,),
+                    action_dim=2,
+                    image_shape=(8, 8),
+                    expected_class_name="wrong.Module",
+                )
 
     def test_single_fidelity_k_equals_d_uses_adapter_owned_lewm_loss(self) -> None:
         model = _base_adaptive_lewm(K=(8,), D=8, action_dim=2)
-        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
+        self.assertIsInstance(model, MatryoshkaWorldModel)
         self.assertEqual(model.K, [model.D])
         self.assertFalse(hasattr(model, "decoders"))
         self.assertEqual(len(model.transitions), 1)
@@ -765,7 +747,7 @@ class MWMCoreTests(unittest.TestCase):
 
             model = _build_trainable_model_from_base(cfg, model_cfg)
 
-            self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
+            self.assertIsInstance(model, MatryoshkaWorldModel)
             self.assertEqual(model.metadata["adapter_family"], "lewm")
             self.assertTrue(model.metadata["fresh_init"])
             self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
@@ -806,6 +788,13 @@ class MWMCoreTests(unittest.TestCase):
             "predictor_dropout": 0.0,
             "projector_hidden_dim": 64,
         }
+
+        # Keep the identity assertion about construction order, not cold-import RNG side effects.
+        from stable_pretraining.backbone.utils import vit_hf as _vit_hf  # noqa: F401
+        from stable_worldmodel.wm.lewm.lewm import LeWM as _LeWM  # noqa: F401
+        from stable_worldmodel.wm.lewm.module import Embedder as _Embedder  # noqa: F401
+        from stable_worldmodel.wm.lewm.module import MLP as _MLP  # noqa: F401
+        from stable_worldmodel.wm.lewm.module import Predictor as _Predictor  # noqa: F401
 
         torch.manual_seed(123)
         direct = _build_direct_lewm_reference(model_cfg, cfg)
@@ -911,11 +900,11 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(model.metadata["action_spec"], {"dim": 10, "base_dim": 2, "block": 5})
 
     def test_rollout_ignores_raw_history_actions_for_blocked_lewm_heads(self) -> None:
-        model = LeWMMatryoshkaWorldModel(
+        model = MatryoshkaWorldModel(
             encoder=FakeLeWMEncoder(out_dim=4),
             projector=nn.Identity(),
             transitions=[
-                LeWMTransitionPackage(
+                TransitionPackage(
                     action_encoder=FakeLeWMActionEncoder(action_dim=10, out_dim=4),
                     predictor=FakeLeWMPredictor(),
                     pred_proj=nn.Identity(),
@@ -976,47 +965,46 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(policy.solver.num_samples, 300)
         self.assertEqual(policy.solver.topk, 30)
 
-    def test_reference_eval_policy_uses_stable_wm_solver_and_source_model(self) -> None:
-        source = FakeCostLeWMObject()
-        model = mwm_from_lewm_object(
-            source,
-            source_checkpoint="fake.pt",
-            D=4,
-            K=(4,),
-            action_dim=2,
-            action_block=1,
-            image_shape=(8, 8),
-            normalize_imagenet=False,
-        )
-        cfg = OmegaConf.create(
-            {
-                "eval": {"num_envs": 3, "seed": 11},
-                "planner": {
-                    "horizon": 5,
-                    "receding_horizon": 2,
-                    "action_block": 1,
-                    "batch_size": "auto",
-                    "pop_size": 13,
-                    "topk": 4,
-                    "elite_frac": 0.1,
-                    "n_iter": 7,
-                    "init_std": 1.5,
-                    "seed": 19,
-                    "warm_start": True,
-                },
+    def test_reference_eval_policy_loads_source_checkpoint_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            source_path = Path(tmp) / "source.pt"
+            source = FakeCostLeWMObject()
+            torch.save(source, source_path)
+            model = _base_adaptive_lewm(K=(4,), D=4, action_dim=2)
+            metadata = {
+                "action_block": 1,
+                "upstream": {"object_checkpoint": str(source_path)},
+                "preprocessing_spec": {"image": "identity"},
             }
-        )
+            cfg = OmegaConf.create(
+                {
+                    "eval": {"num_envs": 3, "seed": 11},
+                    "planner": {
+                        "horizon": 5,
+                        "receding_horizon": 2,
+                        "action_block": 1,
+                        "batch_size": "auto",
+                        "pop_size": 13,
+                        "topk": 4,
+                        "elite_frac": 0.1,
+                        "n_iter": 7,
+                        "init_std": 1.5,
+                        "seed": 19,
+                        "warm_start": True,
+                    },
+                }
+            )
+            policy = _build_stable_wm_reference_policy(model, metadata, cfg, torch.device("cpu"), process={})
 
-        policy = _build_stable_wm_reference_policy(model, {"action_block": 1}, cfg, torch.device("cpu"), process={})
-
-        self.assertIs(policy.solver.model, source)
-        self.assertNotIsInstance(policy, MWMWorldModelPolicy)
-        self.assertTrue(callable(exported_reference_policy_builder))
-        self.assertEqual(policy.solver.batch_size, 3)
-        self.assertEqual(policy.solver.num_samples, 13)
-        self.assertEqual(policy.solver.topk, 4)
-        self.assertEqual(policy.solver.n_steps, 7)
-        self.assertEqual(policy.cfg.horizon, 5)
+            self.assertIsInstance(policy.solver.model, FakeCostLeWMObject)
+            self.assertFalse(hasattr(model, "source_model"))
+            self.assertNotIsInstance(policy, MWMWorldModelPolicy)
+            self.assertTrue(callable(exported_reference_policy_builder))
+            self.assertEqual(policy.solver.batch_size, 3)
+            self.assertEqual(policy.solver.num_samples, 13)
+            self.assertEqual(policy.solver.topk, 4)
+            self.assertEqual(policy.solver.n_steps, 7)
+            self.assertEqual(policy.cfg.horizon, 5)
 
     def test_mwm_and_reference_policies_share_action_block_recipe(self) -> None:
         cfg = OmegaConf.create(
@@ -1047,18 +1035,20 @@ class MWMCoreTests(unittest.TestCase):
             action_space,
             process={},
         )
-        source_model = FakeCostLeWMObject()
-        imported = mwm_from_lewm_object(
-            source_model,
-            source_checkpoint="fake.pt",
-            D=4,
-            K=(4,),
-            action_dim=10,
-            action_block=5,
-            image_shape=(8, 8),
-            normalize_imagenet=False,
-        )
-        reference_policy = _build_stable_wm_reference_policy(imported, imported.metadata, cfg, torch.device("cpu"), process={})
+        with tempfile.TemporaryDirectory() as tmp:
+            source_path = Path(tmp) / "source.pt"
+            torch.save(FakeCostLeWMObject(), source_path)
+            reference_policy = _build_stable_wm_reference_policy(
+                _base_adaptive_lewm(K=(4,), D=4, action_dim=10, action_block=5),
+                {
+                    "action_block": 5,
+                    "upstream": {"object_checkpoint": str(source_path)},
+                    "preprocessing_spec": {"image": "identity"},
+                },
+                cfg,
+                torch.device("cpu"),
+                process={},
+            )
         env = SimpleNamespace(num_envs=2, single_action_space=action_space, action_space=Box(low=-1.0, high=1.0, shape=(2, 2), dtype=np.float32))
 
         mwm_policy.set_env(env)
@@ -1073,86 +1063,84 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(mwm_policy.solver.n_steps, reference_policy.solver.n_steps)
 
     def test_reference_eval_policy_normalizes_imagenet_source_inputs(self) -> None:
-        source = AssertingImageNetCostLeWMObject()
-        model = mwm_from_lewm_object(
-            source,
-            source_checkpoint="fake.pt",
-            D=4,
-            K=(4,),
-            action_dim=2,
-            action_block=1,
-            image_shape=(8, 8),
-            normalize_imagenet=True,
-        )
-        cfg = OmegaConf.create(
-            {
-                "eval": {"num_envs": 1, "seed": 11},
-                "planner": {
-                    "horizon": 2,
-                    "receding_horizon": 1,
-                    "action_block": 1,
-                    "batch_size": "auto",
-                    "pop_size": 3,
-                    "topk": 2,
-                    "elite_frac": 0.1,
-                    "n_iter": 1,
-                    "init_std": 1.0,
-                    "seed": 19,
-                    "warm_start": False,
-                },
+        with tempfile.TemporaryDirectory() as tmp:
+            source_path = Path(tmp) / "source.pt"
+            torch.save(AssertingImageNetCostLeWMObject(), source_path)
+            model = _base_adaptive_lewm(K=(4,), D=4, action_dim=2, normalize_imagenet=True)
+            metadata = {
+                "action_block": 1,
+                "upstream": {"object_checkpoint": str(source_path)},
+                "preprocessing_spec": {"image": "imagenet"},
+                "normalize_imagenet": True,
             }
-        )
-        policy = _build_stable_wm_reference_policy(model, model.metadata, cfg, torch.device("cpu"), process={})
-        policy.set_env(
-            SimpleNamespace(
-                num_envs=1,
-                action_space=Box(low=-1.0, high=1.0, shape=(1, 2), dtype=np.float32),
-                single_action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            cfg = OmegaConf.create(
+                {
+                    "eval": {"num_envs": 1, "seed": 11},
+                    "planner": {
+                        "horizon": 2,
+                        "receding_horizon": 1,
+                        "action_block": 1,
+                        "batch_size": "auto",
+                        "pop_size": 3,
+                        "topk": 2,
+                        "elite_frac": 0.1,
+                        "n_iter": 1,
+                        "init_std": 1.0,
+                        "seed": 19,
+                        "warm_start": False,
+                    },
+                }
             )
-        )
+            policy = _build_stable_wm_reference_policy(model, metadata, cfg, torch.device("cpu"), process={})
 
-        policy.get_action(
-            {
-                "pixels": np.zeros((1, 1, 8, 8, 3), dtype=np.uint8),
-                "goal": np.zeros((1, 1, 8, 8, 3), dtype=np.uint8),
-            }
-        )
+            policy.set_env(
+                SimpleNamespace(
+                    num_envs=1,
+                    action_space=Box(low=-1.0, high=1.0, shape=(1, 2), dtype=np.float32),
+                    single_action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+                )
+            )
 
-        self.assertTrue(source.saw_normalized_pixels)
+            policy.get_action(
+                {
+                    "pixels": np.zeros((1, 1, 8, 8, 3), dtype=np.uint8),
+                    "goal": np.zeros((1, 1, 8, 8, 3), dtype=np.uint8),
+                }
+            )
+
+            self.assertTrue(policy.solver.model.saw_normalized_pixels)
 
     def test_reference_eval_policy_uses_raw_stable_lewm_cost_model(self) -> None:
-        source = AssertingSampleExpandedStableLeWM()
-        model = mwm_from_lewm_object(
-            source,
-            source_checkpoint="fake.pt",
-            D=4,
-            K=(4,),
-            action_dim=2,
-            action_block=1,
-            image_shape=(8, 8),
-            normalize_imagenet=False,
-        )
-        cfg = OmegaConf.create(
-            {
-                "eval": {"num_envs": 2, "seed": 11},
-                "planner": {
-                    "horizon": 2,
-                    "receding_horizon": 1,
-                    "action_block": 1,
-                    "batch_size": "auto",
-                    "pop_size": 3,
-                    "topk": 2,
-                    "elite_frac": 0.1,
-                    "n_iter": 1,
-                    "init_std": 1.0,
-                    "seed": 19,
-                    "warm_start": False,
-                },
+        with tempfile.TemporaryDirectory() as tmp:
+            source_path = Path(tmp) / "source.pt"
+            torch.save(AssertingSampleExpandedStableLeWM(), source_path)
+            model = _base_adaptive_lewm(K=(4,), D=4, action_dim=2)
+            metadata = {
+                "action_block": 1,
+                "upstream": {"object_checkpoint": str(source_path)},
+                "preprocessing_spec": {"image": "identity"},
             }
-        )
-        policy = _build_stable_wm_reference_policy(model, model.metadata, cfg, torch.device("cpu"), process={})
+            cfg = OmegaConf.create(
+                {
+                    "eval": {"num_envs": 2, "seed": 11},
+                    "planner": {
+                        "horizon": 2,
+                        "receding_horizon": 1,
+                        "action_block": 1,
+                        "batch_size": "auto",
+                        "pop_size": 3,
+                        "topk": 2,
+                        "elite_frac": 0.1,
+                        "n_iter": 1,
+                        "init_std": 1.0,
+                        "seed": 19,
+                        "warm_start": False,
+                    },
+                }
+            )
+            policy = _build_stable_wm_reference_policy(model, metadata, cfg, torch.device("cpu"), process={})
 
-        self.assertIs(policy.solver.model, source)
+            self.assertIsInstance(policy.solver.model, AssertingSampleExpandedStableLeWM)
 
     def test_eval_action_process_stats_skip_missing_optional_columns(self) -> None:
         cfg = OmegaConf.create(

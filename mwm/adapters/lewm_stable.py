@@ -5,10 +5,15 @@ from dataclasses import dataclass
 from typing import Any, Sequence
 
 from hydra.utils import instantiate
+import torch
 import torch.nn as nn
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
-from mwm.adapters.lewm_model import LeWMMatryoshkaWorldModel, LeWMTransitionPackage
+from mwm.models.world_model import MatryoshkaWorldModel, TransitionPackage
+
+
+LEWM_BASE_ADAPTER_ARCH = "lewm_base_adapter_v1"
+DEFAULT_EXPECTED_UPSTREAM_CLASS = "stable_worldmodel.wm.lewm.lewm.LeWM"
 
 
 @dataclass(frozen=True)
@@ -79,7 +84,7 @@ class LeWMStableWMAdapter:
             loss_scope=copy.deepcopy(recipe_copy.get("loss_scope", {"regularizers": "shared_latent"})),
         )
 
-    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> LeWMMatryoshkaWorldModel:
+    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> MatryoshkaWorldModel:
         return _build_lewm_from_base_spec(spec, **runtime)
 
 
@@ -186,7 +191,7 @@ def _source_component_order(source_config: dict[str, Any]) -> list[str]:
 def _instantiate_components_in_source_order(
     source_config: dict[str, Any],
     bundles: Sequence[_TransitionConfigBundle],
-) -> tuple[nn.Module, nn.Module, list[LeWMTransitionPackage]]:
+) -> tuple[nn.Module, nn.Module, list[TransitionPackage]]:
     encoder: nn.Module | None = None
     projector: nn.Module | None = None
     predictors: list[nn.Module | None] = [None for _ in bundles]
@@ -213,12 +218,12 @@ def _instantiate_components_in_source_order(
     if projector is None:
         projector = nn.Identity()
 
-    transitions: list[LeWMTransitionPackage] = []
+    transitions: list[TransitionPackage] = []
     for idx, (predictor, action_encoder, pred_proj) in enumerate(zip(predictors, action_encoders, pred_projs)):
         if predictor is None or action_encoder is None or pred_proj is None:
             raise ValueError(f"Le-WM source_config did not instantiate a complete transition package for level {idx}.")
         transitions.append(
-            LeWMTransitionPackage(action_encoder=action_encoder, predictor=predictor, pred_proj=pred_proj)
+            TransitionPackage(action_encoder=action_encoder, predictor=predictor, pred_proj=pred_proj)
         )
     return encoder, projector, transitions
 
@@ -244,7 +249,7 @@ def _build_lewm_from_base_spec(
     action_block: int,
     image_shape: Sequence[int],
     normalize_imagenet: bool,
-) -> LeWMMatryoshkaWorldModel:
+) -> MatryoshkaWorldModel:
     source_config = copy.deepcopy(spec.source_config)
     _validate_action_dim_from_source_config(source_config, int(action_dim))
     bundles = [
@@ -266,7 +271,7 @@ def _build_lewm_from_base_spec(
     metadata = {
         "adapter": "lewm",
         "adapter_family": "lewm",
-        "architecture_version": LeWMMatryoshkaWorldModel.architecture_version,
+        "architecture_version": LEWM_BASE_ADAPTER_ARCH,
         **spec.metadata(),
         "source_config": copy.deepcopy(spec.source_config),
         "training_recipe": copy.deepcopy(spec.training_recipe),
@@ -283,7 +288,7 @@ def _build_lewm_from_base_spec(
             "block": int(action_block),
         },
     }
-    model = LeWMMatryoshkaWorldModel(
+    model = MatryoshkaWorldModel(
         encoder=encoder,
         projector=projector,
         transitions=transitions,
@@ -297,6 +302,7 @@ def _build_lewm_from_base_spec(
         num_preds=num_preds,
         head_architectures=head_architectures,
         metadata=metadata,
+        architecture_version=LEWM_BASE_ADAPTER_ARCH,
     )
     model.mwm_config = {
         "target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config",
@@ -326,7 +332,7 @@ def build_mwm_lewm_from_stable_config(
     image_shape: Sequence[int] = (224, 224),
     normalize_imagenet: bool = True,
     component_policy: ComponentPolicy | dict[str, Any] | None = None,
-) -> LeWMMatryoshkaWorldModel:
+) -> MatryoshkaWorldModel:
     adapter = LeWMStableWMAdapter()
     policy = component_policy if isinstance(component_policy, ComponentPolicy) else ComponentPolicy.from_mapping(component_policy)
     spec = adapter.resolve_spec(
@@ -345,4 +351,113 @@ def build_mwm_lewm_from_stable_config(
     )
 
 
-__all__ = ["LeWMStableWMAdapter", "build_mwm_lewm_from_stable_config"]
+def _load_upstream_object(path: str) -> nn.Module:
+    obj = torch.load(path, map_location="cpu", weights_only=False)
+    if not isinstance(obj, nn.Module):
+        raise TypeError(f"Expected torch.nn.Module in {path}, got {type(obj).__name__}")
+    return obj
+
+
+def _validate_upstream_object(obj: nn.Module, *, expected_class_name: str | None) -> None:
+    missing = [name for name in ("encoder", "predictor", "action_encoder") if not hasattr(obj, name)]
+    if missing:
+        raise ValueError(f"Trusted Le-WM object is missing components: {missing}")
+    if not expected_class_name:
+        return
+    class_name = f"{type(obj).__module__}.{type(obj).__qualname__}"
+    allowed = {str(expected_class_name), str(expected_class_name).rsplit(".", 1)[-1]}
+    if class_name not in allowed and type(obj).__name__ not in allowed:
+        raise ValueError(f"Trusted Le-WM object has class {class_name!r}; expected {expected_class_name!r}.")
+
+
+def build_mwm_lewm_from_upstream_object(
+    *,
+    object_checkpoint: str,
+    D: int = 192,
+    K: Sequence[int] = (192,),
+    action_dim: int,
+    action_block: int = 1,
+    image_shape: Sequence[int] = (224, 224),
+    normalize_imagenet: bool = True,
+    expected_class_name: str | None = DEFAULT_EXPECTED_UPSTREAM_CLASS,
+) -> MatryoshkaWorldModel:
+    d = int(D)
+    levels = tuple(int(k) for k in K)
+    if levels != (d,):
+        raise ValueError("Trusted upstream Le-WM object conversion supports single-fidelity K=[D] only.")
+    obj = _load_upstream_object(str(object_checkpoint))
+    _validate_upstream_object(obj, expected_class_name=expected_class_name)
+    image_shape_tuple = tuple(int(x) for x in image_shape)
+    pred_proj = getattr(obj, "pred_proj", None) or nn.Identity()
+    projector = getattr(obj, "projector", None) or nn.Identity()
+    transition = TransitionPackage(
+        action_encoder=obj.action_encoder,
+        predictor=obj.predictor,
+        pred_proj=pred_proj,
+    )
+    metadata = {
+        "adapter": "lewm",
+        "adapter_family": "lewm",
+        "architecture_version": LEWM_BASE_ADAPTER_ARCH,
+        "source": "stable_worldmodel_object",
+        "source_checkpoint": str(object_checkpoint),
+        "source_class": f"{type(obj).__module__}.{type(obj).__qualname__}",
+        "expected_source_class": expected_class_name,
+        "action_block": int(action_block),
+        "image_shape": list(image_shape_tuple),
+        "normalize_imagenet": bool(normalize_imagenet),
+        "action_preprocessing": "standard_scaler",
+        "source_history_size": int(getattr(getattr(obj, "predictor", None), "num_frames", 3)),
+        "preprocessing_spec": {
+            "image": "imagenet" if bool(normalize_imagenet) else "identity",
+            "layout": "BCHW",
+            "image_shape": list(image_shape_tuple),
+        },
+        "action_spec": {
+            "dim": int(action_dim),
+            "base_dim": int(action_dim) // max(1, int(action_block)),
+            "block": int(action_block),
+        },
+        "levels": [int(k) for k in levels],
+        "D": d,
+        "fresh_init": False,
+    }
+    model = MatryoshkaWorldModel(
+        encoder=obj.encoder,
+        projector=projector,
+        transitions=[transition],
+        K=levels,
+        D=d,
+        action_dim=int(action_dim),
+        action_block=int(action_block),
+        image_shape=image_shape_tuple,
+        normalize_imagenet=bool(normalize_imagenet),
+        history_size=int(getattr(getattr(obj, "predictor", None), "num_frames", 3)),
+        num_preds=1,
+        head_architectures=[{"K": d, "constructor_identity_base_lewm": True}],
+        metadata=metadata,
+        architecture_version=LEWM_BASE_ADAPTER_ARCH,
+    )
+    model.mwm_config = {
+        "target": "mwm.adapters.lewm.build_mwm_lewm_from_upstream_object",
+        "kwargs": {
+            "object_checkpoint": str(object_checkpoint),
+            "D": d,
+            "K": list(levels),
+            "action_dim": int(action_dim),
+            "action_block": int(action_block),
+            "image_shape": list(image_shape_tuple),
+            "normalize_imagenet": bool(normalize_imagenet),
+            "expected_class_name": expected_class_name,
+        },
+    }
+    return model
+
+
+__all__ = [
+    "DEFAULT_EXPECTED_UPSTREAM_CLASS",
+    "LEWM_BASE_ADAPTER_ARCH",
+    "LeWMStableWMAdapter",
+    "build_mwm_lewm_from_stable_config",
+    "build_mwm_lewm_from_upstream_object",
+]

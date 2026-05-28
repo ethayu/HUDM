@@ -177,9 +177,19 @@ def validate_checkpoint_contract(config: dict[str, Any], metadata: dict[str, Any
                 if canonical_policy != expected_canonical:
                     raise ValueError("Base-adaptive Le-WM metadata component_policy does not match config.")
         return
-    if target.endswith("build_mwm_lewm_from_object"):
+    if target.endswith("build_mwm_lewm_from_upstream_object"):
+        if metadata.get("role") != "upstream_lewm_converted":
+            raise ValueError("Converted upstream Le-WM checkpoints require metadata role='upstream_lewm_converted'.")
         if len(metadata.get("levels", [])) != 1:
-            raise ValueError("Trusted upstream Le-WM object imports must remain single-fidelity eval-only checkpoints.")
+            raise ValueError("Converted upstream Le-WM checkpoints must remain single-fidelity K=[D] checkpoints.")
+        if metadata.get("fresh_init") is not False:
+            raise ValueError("Converted upstream Le-WM checkpoints require metadata fresh_init=False.")
+        kwargs = config.get("kwargs", {})
+        if not isinstance(kwargs, dict) or not kwargs.get("object_checkpoint"):
+            raise ValueError("Converted upstream Le-WM checkpoints require config kwargs.object_checkpoint.")
+        upstream = metadata.get("upstream", {})
+        if not isinstance(upstream, dict) or not upstream.get("object_checkpoint"):
+            raise ValueError("Converted upstream Le-WM checkpoints require metadata upstream.object_checkpoint.")
         return
     if target.endswith("build_mwm_lewm"):
         raise ValueError("Legacy direct Le-WM MWM checkpoints are no longer supported; retrain from a base config.")

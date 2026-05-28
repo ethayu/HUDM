@@ -390,23 +390,35 @@ class MWMRepoHygieneTests(unittest.TestCase):
         for token in forbidden:
             self.assertNotIn(token, text)
 
-    def test_lewm_adapter_is_split_into_focused_modules(self) -> None:
-        modules = [
-            "lewm_common.py",
-            "lewm_model.py",
-            "lewm_stable.py",
-            "lewm_import.py",
-        ]
-        for name in modules:
-            self.assertTrue((ROOT / "mwm" / "adapters" / name).is_file(), name)
+    def test_lewm_adapter_keeps_generic_model_logic_in_world_model(self) -> None:
+        adapter_dir = ROOT / "mwm" / "adapters"
+        self.assertTrue((adapter_dir / "lewm_stable.py").is_file())
+        self.assertFalse((adapter_dir / "lewm_common.py").exists())
+        self.assertFalse((adapter_dir / "lewm_model.py").exists())
+        self.assertFalse((adapter_dir / "lewm_import.py").exists())
         self.assertFalse((ROOT / "mwm" / "adapters" / "lewm_direct.py").exists())
 
         facade_lines = (ROOT / "mwm" / "adapters" / "lewm.py").read_text(encoding="utf-8").splitlines()
         self.assertLessEqual(len(facade_lines), 80)
         facade_text = "\n".join(facade_lines)
         self.assertNotIn("lewm_direct", facade_text)
+        self.assertNotIn("lewm_model", facade_text)
+        self.assertNotIn("lewm_import", facade_text)
         self.assertNotIn("build_lewm_matryoshka_model", facade_text)
         self.assertNotIn("MWMLeWMAdapterConfig", facade_text)
+
+        world_model_text = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")
+        self.assertIn("class MatryoshkaWorldModel", world_model_text)
+        self.assertIn("class TransitionPackage", world_model_text)
+        for path in (adapter_dir / "lewm.py", adapter_dir / "lewm_stable.py", ROOT / "mwm" / "models" / "world_model.py"):
+            text = path.read_text(encoding="utf-8")
+            self.assertNotIn("source_model", text, path)
+            self.assertNotIn("delegated_source_cost", text, path)
+            self.assertNotIn("ImportedLeWMMWMWorldModel", text, path)
+            self.assertNotIn("build_mwm_lewm_from_object", text, path)
+        prep_text = (ROOT / "prepare_upstream_lewm.py").read_text(encoding="utf-8")
+        self.assertNotIn("LeWMObjectImporter", prep_text)
+        self.assertNotIn("build_mwm_lewm_from_object", prep_text)
 
     def test_generic_world_model_fallbacks_and_raw_lewm_training_are_removed(self) -> None:
         world_model_text = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")

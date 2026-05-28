@@ -35,15 +35,15 @@ def _sample_expand_goal_emb(emb: torch.Tensor, num_samples: int) -> torch.Tensor
 
 
 class SampleExpandedGoalCostModel(nn.Module):
-    def __init__(self, source_model: nn.Module) -> None:
+    def __init__(self, wrapped_model: nn.Module) -> None:
         super().__init__()
-        self.source_model = source_model
+        self.wrapped_model = wrapped_model
 
     def __getattr__(self, name: str) -> Any:
         try:
             return super().__getattr__(name)
         except AttributeError:
-            return getattr(self.source_model, name)
+            return getattr(self.wrapped_model, name)
 
     def _ensure_goal_emb(self, info_dict: dict[str, Any], action_candidates: torch.Tensor) -> None:
         num_samples = int(action_candidates.shape[1])
@@ -51,7 +51,7 @@ class SampleExpandedGoalCostModel(nn.Module):
         if torch.is_tensor(existing):
             info_dict["goal_emb"] = _sample_expand_goal_emb(existing, num_samples)
             return
-        if "goal" not in info_dict or not hasattr(self.source_model, "encode"):
+        if "goal" not in info_dict or not hasattr(self.wrapped_model, "encode"):
             return
         goal: dict[str, Any] = {}
         for key, value in info_dict.items():
@@ -62,12 +62,12 @@ class SampleExpandedGoalCostModel(nn.Module):
             if key.startswith("goal_"):
                 goal[key[len("goal_") :]] = goal.pop(key)
         goal.pop("action", None)
-        encoded = self.source_model.encode(goal)
+        encoded = self.wrapped_model.encode(goal)
         info_dict["goal_emb"] = _sample_expand_goal_emb(encoded["emb"].detach(), num_samples)
 
     def get_cost(self, info_dict: dict[str, Any], action_candidates: torch.Tensor) -> torch.Tensor:
         self._ensure_goal_emb(info_dict, action_candidates)
-        return self.source_model.get_cost(info_dict, action_candidates)
+        return self.wrapped_model.get_cost(info_dict, action_candidates)
 
 
 def _needs_sample_expanded_goal_wrapper(model: Any) -> bool:

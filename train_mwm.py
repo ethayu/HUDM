@@ -15,10 +15,10 @@ from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 
 from mwm.dependency_refs import dependency_refs
-from mwm.adapters.lewm import LeWMMatryoshkaWorldModel
 from mwm.data.stable_wm import load_dataset_metadata
 from mwm.swm.restore import validate_restore_columns
-from mwm.checkpoints import save_world_checkpoint
+from mwm.checkpoints import LEWM_BASE_ADAPTER_ARCH, save_world_checkpoint
+from mwm.models.world_model import MatryoshkaWorldModel
 
 
 DEFAULTS = {
@@ -264,7 +264,7 @@ def _load_lewm_base_adapter_train_valid_datasets(cfg: Any) -> tuple[Any, Any, An
 
 def _lewm_base_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage: str) -> dict[str, torch.Tensor]:
     cfg = module.lewm_base_adapter_cfg
-    if not isinstance(module.model, LeWMMatryoshkaWorldModel):
+    if not isinstance(module.model, MatryoshkaWorldModel):
         raise RuntimeError("Le-WM training requires the MWM base-adapter model, not a raw Stable-WM object.")
     output = module.model.training_loss(
         batch,
@@ -407,7 +407,7 @@ def _prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[st
         "action_block": int(model_cfg.get("action_block", 1)),
         "action_preprocessing": "standard_scaler",
         "levels": [int(k) for k in model_cfg["K"]],
-        "architecture_version": LeWMMatryoshkaWorldModel.architecture_version,
+        "architecture_version": LEWM_BASE_ADAPTER_ARCH,
         "action_spec": {
             "dim": int(model_cfg["action_dim"]),
             "base_dim": base_action_dim,

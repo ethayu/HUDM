@@ -1,5 +1,5 @@
 """Canonical Matryoshka World Models package."""
 
-from mwm.models.world_model import MWMWorldModel
+from mwm.models.world_model import ImageNetPreprocess, MatryoshkaWorldModel, MWMWorldModel, TransitionPackage
 
-__all__ = ["MWMWorldModel"]
+__all__ = ["ImageNetPreprocess", "MatryoshkaWorldModel", "MWMWorldModel", "TransitionPackage"]
