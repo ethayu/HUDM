@@ -88,7 +88,7 @@ RESTORE_SPECS: tuple[RestoreSpec, ...] = (
         required_columns=("pos_agent", "pos_target"),
         eval_callables=(
             {"method": "_set_state", "args": {"state": {"value": "pos_agent", "in_dataset": True}}},
-            {"method": "_set_goal_state", "args": {"goal_state": {"value": "pos_target", "in_dataset": True}}},
+            {"method": "_set_goal_state", "args": {"goal_state": {"value": "goal_pos_agent", "in_dataset": True}}},
         ),
     ),
     RestoreSpec(
