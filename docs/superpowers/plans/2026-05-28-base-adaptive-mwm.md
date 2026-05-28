@@ -542,7 +542,14 @@ class LeWMStableWMAdapter:
         groups = self.component_groups()
         validate_component_policy(groups, policy)
         predictor_cfg = dict(source_config.get("predictor", {}))
-        d = int(predictor_cfg.get("output_dim", predictor_cfg.get("input_dim", max(levels))))
+        dims = [
+            int(predictor_cfg[key])
+            for key in ("input_dim", "output_dim")
+            if predictor_cfg.get(key) is not None
+        ]
+        if not dims or len(set(dims)) != 1:
+            raise ValueError("Le-WM base latent dimension D must come from matching predictor input/output dims.")
+        d = dims[0]
         return StableWMBaseSpec(
             family=self.family,
             source_config=copy.deepcopy(source_config),

@@ -61,7 +61,7 @@ scripts/submit_mwm_gates.sh
 ## Base-Adaptive MWM
 
 MWM reads Stable-WM `config.json` files for architecture and never copies source
-weights for fair training. The Stable-WM config is an architecture oracle; the
+weights for fair training. The Stable-WM config is the architecture source; the
 training recipe comes from the MWM YAML and is applied across matryoshka levels.
 Adapters declare top-level component groups, then configs choose which groups are
 shared or duplicated. Le-WM is implemented first: `encoder + projector` are the

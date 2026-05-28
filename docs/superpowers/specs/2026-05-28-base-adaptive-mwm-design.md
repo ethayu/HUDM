@@ -2,7 +2,7 @@
 
 ## Purpose
 
-MWM must be a framework that adapts to a Stable-WM base without changing the base's semantics. A Stable-WM checkpoint or object is used as an architecture and recipe oracle, not as a source of weights for fair MWM training. Fair MWM training fresh-initializes the base architecture, then applies the base training recipe across matryoshka levels.
+MWM must be a framework that adapts to a Stable-WM base without changing the base's semantics. A Stable-WM checkpoint or object is used as the architecture and recipe source, not as a source of weights for fair MWM training. Fair MWM training fresh-initializes the base architecture, then applies the base training recipe across matryoshka levels.
 
 The initial supported paper-parity scope is Push-T and Two-Room with Le-WM. The framework design must also support Stable-WM base families such as PreJEPA/DINO-WM and PLDM once their Stable-WM architecture configs and training recipes are available.
 
