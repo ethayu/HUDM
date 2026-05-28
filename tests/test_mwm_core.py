@@ -820,7 +820,7 @@ class MWMCoreTests(unittest.TestCase):
 
         self.assertTrue(source.saw_normalized_pixels)
 
-    def test_reference_eval_policy_expands_upstream_lewm_goal_embeddings_across_cem_samples(self) -> None:
+    def test_reference_eval_policy_uses_raw_stable_lewm_cost_model(self) -> None:
         source = AssertingSampleExpandedStableLeWM()
         model = mwm_from_lewm_object(
             source,
@@ -851,24 +851,8 @@ class MWMCoreTests(unittest.TestCase):
             }
         )
         policy = _build_stable_wm_reference_policy(model, model.metadata, cfg, torch.device("cpu"), process={})
-        policy.set_env(
-            SimpleNamespace(
-                num_envs=2,
-                action_space=Box(low=-1.0, high=1.0, shape=(2, 2), dtype=np.float32),
-                single_action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
-            )
-        )
 
-        action = policy.get_action(
-            {
-                "pixels": np.zeros((2, 1, 8, 8, 3), dtype=np.float32),
-                "goal": np.ones((2, 1, 8, 8, 3), dtype=np.float32),
-                "action": np.zeros((2, 1, 2), dtype=np.float32),
-            }
-        )
-
-        self.assertEqual(action.shape, (2, 2))
-        self.assertTrue(source.saw_sample_expanded_goal)
+        self.assertIs(policy.solver.model, source)
 
     def test_eval_action_process_stats_skip_missing_optional_columns(self) -> None:
         cfg = OmegaConf.create(

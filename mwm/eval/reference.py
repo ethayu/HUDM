@@ -72,11 +72,10 @@ class SampleExpandedGoalCostModel(nn.Module):
 
 def _needs_sample_expanded_goal_wrapper(model: Any) -> bool:
     try:
-        from stable_worldmodel.wm.lewm.lewm import LeWM
         from stable_worldmodel.wm.pldm.pldm import PLDM
     except Exception:
         return False
-    return isinstance(model, (LeWM, PLDM))
+    return isinstance(model, PLDM)
 
 
 def build_stable_wm_reference_policy(
