@@ -4,6 +4,7 @@ import time
 from typing import Any
 
 import torch
+from torch import nn
 
 
 REFERENCE_ROLE = "stable_wm_reference"
@@ -15,6 +16,67 @@ def needs_reference_evaluator(upstream_success: float, target_success: float, to
 
 def reference_role_name() -> str:
     return REFERENCE_ROLE
+
+
+def _sample_expand_goal_emb(emb: torch.Tensor, num_samples: int) -> torch.Tensor:
+    if emb.ndim == 2:
+        emb = emb[:, None, None, :]
+    elif emb.ndim == 3:
+        emb = emb[:, None, :, :]
+    elif emb.ndim != 4:
+        raise ValueError(f"Stable-WM goal embedding must be 2D, 3D, or 4D; got {tuple(emb.shape)}")
+    if emb.shape[1] == num_samples:
+        return emb
+    if emb.shape[1] != 1:
+        raise ValueError(
+            f"Stable-WM goal embedding sample dimension must be 1 or {num_samples}; got {tuple(emb.shape)}"
+        )
+    return emb.expand(-1, num_samples, *([-1] * (emb.ndim - 2)))
+
+
+class SampleExpandedGoalCostModel(nn.Module):
+    def __init__(self, source_model: nn.Module) -> None:
+        super().__init__()
+        self.source_model = source_model
+
+    def __getattr__(self, name: str) -> Any:
+        try:
+            return super().__getattr__(name)
+        except AttributeError:
+            return getattr(self.source_model, name)
+
+    def _ensure_goal_emb(self, info_dict: dict[str, Any], action_candidates: torch.Tensor) -> None:
+        num_samples = int(action_candidates.shape[1])
+        existing = info_dict.get("goal_emb")
+        if torch.is_tensor(existing):
+            info_dict["goal_emb"] = _sample_expand_goal_emb(existing, num_samples)
+            return
+        if "goal" not in info_dict or not hasattr(self.source_model, "encode"):
+            return
+        goal: dict[str, Any] = {}
+        for key, value in info_dict.items():
+            if torch.is_tensor(value):
+                goal[key] = value[:, 0]
+        goal["pixels"] = goal["goal"]
+        for key in list(goal):
+            if key.startswith("goal_"):
+                goal[key[len("goal_") :]] = goal.pop(key)
+        goal.pop("action", None)
+        encoded = self.source_model.encode(goal)
+        info_dict["goal_emb"] = _sample_expand_goal_emb(encoded["emb"].detach(), num_samples)
+
+    def get_cost(self, info_dict: dict[str, Any], action_candidates: torch.Tensor) -> torch.Tensor:
+        self._ensure_goal_emb(info_dict, action_candidates)
+        return self.source_model.get_cost(info_dict, action_candidates)
+
+
+def _needs_sample_expanded_goal_wrapper(model: Any) -> bool:
+    try:
+        from stable_worldmodel.wm.lewm.lewm import LeWM
+        from stable_worldmodel.wm.pldm.pldm import PLDM
+    except Exception:
+        return False
+    return isinstance(model, (LeWM, PLDM))
 
 
 def build_stable_wm_reference_policy(
@@ -91,7 +153,8 @@ def build_stable_wm_reference_policy(
                 },
             }
 
-    solver = CEMSolver(model=model, **cem_kwargs)
+    solver_model = SampleExpandedGoalCostModel(model) if _needs_sample_expanded_goal_wrapper(model) else model
+    solver = CEMSolver(model=solver_model, **cem_kwargs)
     return StableWMReferencePolicy()
 
 

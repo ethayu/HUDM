@@ -13,6 +13,7 @@ from gymnasium.spaces import Box
 from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 from stable_worldmodel.solver import CEMSolver
+from stable_worldmodel.wm.lewm.lewm import LeWM as StableLeWM
 
 from eval_mwm import _available_stat_keys_for_action_process, _build_mwm_policy, _build_stable_wm_reference_policy
 from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, LeWMObjectImporter, build_mwm_lewm, mwm_from_lewm_object
@@ -37,6 +38,17 @@ class FakeLeWMEncoder(nn.Module):
         del interpolate_pos_encoding
         pooled = x.mean(dim=(-2, -1))
         return SimpleNamespace(last_hidden_state=self.proj(pooled).unsqueeze(1))
+
+
+class ShapeAgnosticLeWMEncoder(nn.Module):
+    def __init__(self, out_dim: int = 4) -> None:
+        super().__init__()
+        self.scale = nn.Parameter(torch.ones(out_dim))
+
+    def forward(self, x: torch.Tensor, interpolate_pos_encoding: bool = False) -> SimpleNamespace:
+        del interpolate_pos_encoding
+        pooled = x.reshape(x.shape[0], -1).mean(dim=1, keepdim=True)
+        return SimpleNamespace(last_hidden_state=(pooled * self.scale).unsqueeze(1))
 
 
 class FakeLeWMActionEncoder(nn.Module):
@@ -96,6 +108,27 @@ class FakeGoalEmbCostLeWMObject(FakeLeWMObject):
         if int(goal_emb.shape[0]) != int(action_candidates.shape[0]):
             raise AssertionError("goal_emb batch dimension must match candidate batch dimension")
         return goal_emb.expand(action_candidates.shape[0], action_candidates.shape[1], goal_emb.shape[2], goal_emb.shape[3]).sum(dim=(2, 3))
+
+
+class AssertingSampleExpandedStableLeWM(StableLeWM):
+    def __init__(self) -> None:
+        super().__init__(
+            encoder=ShapeAgnosticLeWMEncoder(),
+            predictor=FakeLeWMPredictor(),
+            action_encoder=FakeLeWMActionEncoder(),
+        )
+        self.saw_sample_expanded_goal = False
+
+    def criterion(self, info_dict: dict) -> torch.Tensor:
+        goal_emb = info_dict["goal_emb"]
+        predicted_emb = info_dict["predicted_emb"]
+        if goal_emb.ndim != predicted_emb.ndim or tuple(goal_emb.shape[:2]) != tuple(predicted_emb.shape[:2]):
+            raise AssertionError(
+                "Stable-WM reference Le-WM goal embeddings must be expanded across CEM samples; "
+                f"goal_emb={tuple(goal_emb.shape)} predicted_emb={tuple(predicted_emb.shape)}"
+            )
+        self.saw_sample_expanded_goal = True
+        return super().criterion(info_dict)
 
 
 class BrokenLeWMObject(nn.Module):
@@ -786,6 +819,56 @@ class MWMCoreTests(unittest.TestCase):
         )
 
         self.assertTrue(source.saw_normalized_pixels)
+
+    def test_reference_eval_policy_expands_upstream_lewm_goal_embeddings_across_cem_samples(self) -> None:
+        source = AssertingSampleExpandedStableLeWM()
+        model = mwm_from_lewm_object(
+            source,
+            source_checkpoint="fake.pt",
+            D=4,
+            K=(4,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+        )
+        cfg = OmegaConf.create(
+            {
+                "eval": {"num_envs": 2, "seed": 11},
+                "planner": {
+                    "horizon": 2,
+                    "receding_horizon": 1,
+                    "action_block": 1,
+                    "batch_size": "auto",
+                    "pop_size": 3,
+                    "topk": 2,
+                    "elite_frac": 0.1,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "seed": 19,
+                    "warm_start": False,
+                },
+            }
+        )
+        policy = _build_stable_wm_reference_policy(model, model.metadata, cfg, torch.device("cpu"), process={})
+        policy.set_env(
+            SimpleNamespace(
+                num_envs=2,
+                action_space=Box(low=-1.0, high=1.0, shape=(2, 2), dtype=np.float32),
+                single_action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            )
+        )
+
+        action = policy.get_action(
+            {
+                "pixels": np.zeros((2, 1, 8, 8, 3), dtype=np.float32),
+                "goal": np.ones((2, 1, 8, 8, 3), dtype=np.float32),
+                "action": np.zeros((2, 1, 2), dtype=np.float32),
+            }
+        )
+
+        self.assertEqual(action.shape, (2, 2))
+        self.assertTrue(source.saw_sample_expanded_goal)
 
     def test_eval_action_process_stats_skip_missing_optional_columns(self) -> None:
         cfg = OmegaConf.create(
