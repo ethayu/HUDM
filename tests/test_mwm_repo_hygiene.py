@@ -65,12 +65,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 self.assertEqual(cfg["format"], "lance", path)
             data = cfg.get("data")
             if isinstance(data, dict) and "format" in data:
-                if path.name.startswith("eval_mwm_paper_"):
-                    self.assertEqual(data["format"], "hdf5", path)
-                    self.assertTrue(str(data.get("path", "")).endswith(".h5"), path)
-                else:
-                    self.assertEqual(data["format"], "lance", path)
-                    self.assertTrue(str(data.get("path", "")).endswith(".lance"), path)
+                self.assertEqual(data["format"], "lance", path)
+                self.assertTrue(str(data.get("path", "")).endswith(".lance"), path)
                 if path.name.startswith("eval_"):
                     self.assertNotIn("frameskip", data, path)
             planner = cfg.get("planner")
@@ -179,8 +175,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(train_cfg["data"]["keys_to_cache"], ["action", "proprio"])
         self.assertEqual(train_cfg["train"]["backend"], "stable_worldmodel_lewm")
         self.assertEqual(train_cfg["model"]["K"], [192])
-        self.assertEqual(eval_cfg["data"]["path"], "data/upstream/tworoom.h5")
-        self.assertEqual(eval_cfg["data"]["format"], "hdf5")
+        self.assertEqual(eval_cfg["data"]["path"], "data/upstream/tworoom.lance")
+        self.assertEqual(eval_cfg["data"]["format"], "lance")
         self.assertEqual(eval_cfg["data"]["keys_to_cache"], ["action", "proprio"])
         self.assertEqual(eval_cfg["eval"]["episodes"], 50)
         self.assertEqual(eval_cfg["eval"]["goal_offset"], 25)
@@ -213,8 +209,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
     def test_paper_parity_eval_config_tracks_upstream_eval_protocol(self) -> None:
         cfg = yaml.safe_load((ROOT / "configs" / "eval_mwm_paper_pusht.yaml").read_text(encoding="utf-8"))
 
-        self.assertEqual(cfg["data"]["path"], "data/upstream/pusht_expert_train.h5")
-        self.assertEqual(cfg["data"]["format"], "hdf5")
+        self.assertEqual(cfg["data"]["path"], "data/upstream/pusht_expert_train.lance")
+        self.assertEqual(cfg["data"]["format"], "lance")
         self.assertEqual(cfg["data"]["action_preprocessing"], "standard_scaler")
         self.assertEqual(cfg["eval"]["episodes"], 50)
         self.assertEqual(cfg["eval"]["goal_offset"], 25)
@@ -230,6 +226,18 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["planner"]["n_iter"], 30)
         self.assertEqual(cfg["planner"]["init_std"], 1.0)
         self.assertEqual(cfg["planner"]["batch_size"], 1)
+
+    def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
+        scripts = [
+            ROOT / "scripts" / "run_mwm_single_level_match.sh",
+            ROOT / "scripts" / "run_mwm_train_single_level_env.sh",
+            ROOT / "scripts" / "run_mwm_single_level_benchmark.sh",
+        ]
+        for script in scripts:
+            text = script.read_text(encoding="utf-8")
+
+            self.assertIn("SLURM_JOB_ID", text, script)
+            self.assertIn("must run inside a Slurm allocation", text, script)
 
 
 if __name__ == "__main__":
