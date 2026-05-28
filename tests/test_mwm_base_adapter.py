@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 import unittest
 from unittest import mock
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
+from mwm.adapters.registry import adapter_for_family, adapter_for_target, family_for_target, register_adapter
+from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 
 
 class AdapterPolicyTests(unittest.TestCase):
@@ -135,3 +139,40 @@ class AdapterPolicyTests(unittest.TestCase):
         for name in lewm.__all__:
             self.assertIn(name, adapters.__all__)
             self.assertIs(getattr(adapters, name), getattr(lewm, name))
+
+
+class ConfigResolverTests(unittest.TestCase):
+    def test_load_stable_wm_config_from_directory(self) -> None:
+        with self.subTest("directory config"):
+            import tempfile
+
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                payload = {"_target_": "stable_worldmodel.wm.lewm.LeWM", "predictor": {"input_dim": 4}}
+                (root / "config.json").write_text(json.dumps(payload), encoding="utf-8")
+
+                loaded, path = load_stable_wm_config(root)
+
+                self.assertEqual(loaded, payload)
+                self.assertEqual(path, root / "config.json")
+                self.assertEqual(stable_config_sha256(path), stable_config_sha256(path))
+
+    def test_root_target_reads_root_target(self) -> None:
+        self.assertEqual(root_target({"_target_": "stable_worldmodel.wm.lewm.LeWM"}), "stable_worldmodel.wm.lewm.LeWM")
+        with self.assertRaisesRegex(ValueError, "root _target_"):
+            root_target({"_target_": ""})
+
+    def test_family_detection_from_target(self) -> None:
+        self.assertEqual(family_for_target("stable_worldmodel.wm.lewm.LeWM"), "lewm")
+        self.assertEqual(family_for_target("stable_worldmodel.wm.prejepa.PreJEPA"), "prejepa")
+        self.assertEqual(family_for_target("stable_worldmodel.wm.pldm.PLDM"), "pldm")
+        with self.assertRaisesRegex(ValueError, "Unsupported Stable-WM target"):
+            family_for_target("example.Unknown")
+
+    def test_registry_returns_registered_adapter(self) -> None:
+        class DummyAdapter:
+            family = "dummy"
+
+        register_adapter(DummyAdapter())
+        self.assertEqual(adapter_for_family("dummy").family, "dummy")
+        self.assertEqual(adapter_for_target("dummy").family, "dummy")
