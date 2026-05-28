@@ -1404,6 +1404,15 @@ Commit only if Step 1-3 required changes after the previous task commits.
 - Runtime artifacts under `checkpoints_mwm/`, `rollouts/`, and `logs/` are ignored by git.
 - Configs and verifier code changed only if gates reveal incorrect parameters.
 
+- [ ] **Step 0: PARCC/Betty Slurm preflight before GPU or long-running jobs**
+
+Before running any GPU-backed or long-running empirical command, do not execute it directly on a login node. First inspect the current PARCC documentation:
+
+- Login/auth reference: `https://parcc.upenn.edu/training/getting-started/logging-in/`
+- Slurm, GPU partitions, `sbatch`/`srun`, and monitoring reference: `https://parcc.upenn.edu/training/slurm/`
+
+Then update this plan or add a checked-in launch script with the exact `sbatch` or `srun` command/script that will run the gate, including partition, GPU, CPU, memory, wall-time, conda env activation, working directory, output log path, and the Python command. Only after that plan/script update should the job be submitted. Use `squeue`/`sacct` or the documented monitoring command to track the job instead of leaving long processes running in the current terminal.
+
 - [ ] **Step 1: Prepare upstream Le-WM checkpoints and data**
 
 Run:
