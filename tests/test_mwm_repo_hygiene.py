@@ -155,18 +155,28 @@ class MWMRepoHygieneTests(unittest.TestCase):
         bench_cfg = yaml.safe_load((ROOT / "configs" / "benchmark_mwm_paper_parity.yaml").read_text(encoding="utf-8"))
 
         self.assertEqual(train_cfg["data"]["path"], "data/upstream/tworoom.lance")
-        self.assertEqual(train_cfg["data"]["keys_to_load"], ["pixels", "action", "proprio", "pos_agent", "pos_target"])
-        self.assertEqual(train_cfg["data"]["keys_to_cache"], ["action", "proprio", "pos_agent", "pos_target"])
+        self.assertEqual(train_cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
+        self.assertEqual(train_cfg["data"]["keys_to_cache"], ["action", "proprio"])
         self.assertEqual(train_cfg["train"]["backend"], "stable_worldmodel_lewm")
         self.assertEqual(train_cfg["model"]["K"], [192])
         self.assertEqual(eval_cfg["data"]["path"], "data/upstream/tworoom.lance")
-        self.assertEqual(eval_cfg["data"]["keys_to_cache"], ["action", "proprio", "pos_agent", "pos_target"])
+        self.assertEqual(eval_cfg["data"]["keys_to_cache"], ["action", "proprio"])
         self.assertEqual(eval_cfg["eval"]["episodes"], 50)
-        self.assertEqual(eval_cfg["eval"]["goal_offset"], 100)
-        self.assertEqual(eval_cfg["eval"]["budget"], 150)
-        self.assertEqual(eval_cfg["planner"]["n_iter"], 10)
+        self.assertEqual(eval_cfg["eval"]["goal_offset"], 25)
+        self.assertEqual(eval_cfg["eval"]["budget"], 50)
+        self.assertEqual(eval_cfg["planner"]["n_iter"], 30)
         self.assertEqual(eval_cfg["planner"]["topk"], 30)
         self.assertEqual(bench_cfg["gate"]["env_ids"], ["swm/PushT-v1", "swm/TwoRoom-v1"])
+
+    def test_tworoom_official_schema_uses_future_proprio_as_eval_goal(self) -> None:
+        spec_id, callables = eval_callables_for_env(
+            "swm/TwoRoom-v1",
+            {"pixels", "action", "proprio", "pos_agent", "pos_target"},
+        )
+
+        self.assertEqual(spec_id, "point_state_goal_state")
+        self.assertEqual(callables[0]["args"]["state"]["value"], "proprio")
+        self.assertEqual(callables[1]["args"]["goal_state"]["value"], "goal_proprio")
 
     def test_tworoom_pos_schema_uses_future_agent_position_as_eval_goal(self) -> None:
         spec_id, callables = eval_callables_for_env(

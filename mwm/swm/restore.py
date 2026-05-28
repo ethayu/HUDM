@@ -85,6 +85,15 @@ RESTORE_SPECS: tuple[RestoreSpec, ...] = (
     RestoreSpec(
         spec_id="point_state_goal_state",
         env_ids=("swm/TwoRoom-v1",),
+        required_columns=("proprio",),
+        eval_callables=(
+            {"method": "_set_state", "args": {"state": {"value": "proprio", "in_dataset": True}}},
+            {"method": "_set_goal_state", "args": {"goal_state": {"value": "goal_proprio", "in_dataset": True}}},
+        ),
+    ),
+    RestoreSpec(
+        spec_id="point_state_goal_state",
+        env_ids=("swm/TwoRoom-v1",),
         required_columns=("pos_agent", "pos_target"),
         eval_callables=(
             {"method": "_set_state", "args": {"state": {"value": "pos_agent", "in_dataset": True}}},
