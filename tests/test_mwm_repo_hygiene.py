@@ -206,6 +206,14 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(callables[0]["args"]["state"]["value"], "pos_agent")
         self.assertEqual(callables[1]["args"]["goal_state"]["value"], "goal_pos_agent")
 
+    def test_local_tworoom_train_configs_match_available_lance_columns(self) -> None:
+        for name in ("train_mwm_lewm_tworoom.yaml", "train_mwm_scheduled_tworoom.yaml"):
+            cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
+
+            self.assertEqual(cfg["data"]["path"], "data/tworoom_swm.lance")
+            self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
+            self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio"])
+
     def test_paper_parity_eval_config_tracks_upstream_eval_protocol(self) -> None:
         cfg = yaml.safe_load((ROOT / "configs" / "eval_mwm_paper_pusht.yaml").read_text(encoding="utf-8"))
 
