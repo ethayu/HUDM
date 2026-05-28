@@ -1494,6 +1494,12 @@ sbatch --parsable scripts/slurm_mwm_paper_reference.sbatch
 
 Paper reference details: `scripts/slurm_mwm_paper_reference.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `1-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_paper_reference_%j.out` and `logs/mwm_paper_reference_%j.err`, and runs `scripts/run_mwm_paper_reference.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
 
+Paper reference result recorded from Slurm job `6173856`:
+
+- `rollouts/mwm_paper_reference/summary.json` has Push-T upstream Le-WM converted `98.0`, Push-T raw Stable-WM reference `98.0`, Two-Room upstream Le-WM converted `86.0`, and Two-Room raw Stable-WM reference `86.0`, all over 50 episodes.
+- `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/benchmark_mwm_paper_reference.yaml` exits nonzero because Push-T upstream and reference agree with each other but both miss the fixed paper target `96.0` by more than the configured `1.0` percentage point tolerance. This is recorded as a data/checkpoint/protocol target mismatch per Step 3, not as an MWM evaluator discrepancy.
+- The full goal must not be marked complete until this paper-target mismatch is resolved or the completion criterion is explicitly revised.
+
 Monitor with:
 
 ```bash
