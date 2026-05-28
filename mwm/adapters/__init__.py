@@ -20,4 +20,4 @@ else:
         globals()[_name] = getattr(_lewm, _name)
         if _name not in __all__:
             __all__.append(_name)
-    del _lewm, _name
+    del _lewm
