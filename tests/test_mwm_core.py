@@ -67,6 +67,22 @@ class FakeCostLeWMObject(FakeLeWMObject):
         return action_candidates.square().sum(dim=(2, 3))
 
 
+class AssertingImageNetCostLeWMObject(FakeLeWMObject):
+    def __init__(self) -> None:
+        super().__init__()
+        self.saw_normalized_pixels = False
+
+    def get_cost(self, info_dict: dict, action_candidates: torch.Tensor) -> torch.Tensor:
+        pixels = info_dict["pixels"]
+        goal = info_dict["goal"]
+        if float(pixels.min().detach().cpu().item()) > -1.5:
+            raise AssertionError("reference policy passed unnormalized pixels to the Stable-WM source model")
+        if float(goal.min().detach().cpu().item()) > -1.5:
+            raise AssertionError("reference policy passed unnormalized goals to the Stable-WM source model")
+        self.saw_normalized_pixels = True
+        return action_candidates.square().sum(dim=(2, 3))
+
+
 class FakeGoalEmbCostLeWMObject(FakeLeWMObject):
     def encode(self, info_dict: dict) -> dict:
         pixels = info_dict["pixels"]
@@ -722,6 +738,54 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(policy.solver.topk, 4)
         self.assertEqual(policy.solver.n_steps, 7)
         self.assertEqual(policy.cfg.horizon, 5)
+
+    def test_reference_eval_policy_normalizes_imagenet_source_inputs(self) -> None:
+        source = AssertingImageNetCostLeWMObject()
+        model = mwm_from_lewm_object(
+            source,
+            source_checkpoint="fake.pt",
+            D=4,
+            K=(4,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(8, 8),
+            normalize_imagenet=True,
+        )
+        cfg = OmegaConf.create(
+            {
+                "eval": {"num_envs": 1, "seed": 11},
+                "planner": {
+                    "horizon": 2,
+                    "receding_horizon": 1,
+                    "action_block": 1,
+                    "batch_size": "auto",
+                    "pop_size": 3,
+                    "topk": 2,
+                    "elite_frac": 0.1,
+                    "n_iter": 1,
+                    "init_std": 1.0,
+                    "seed": 19,
+                    "warm_start": False,
+                },
+            }
+        )
+        policy = _build_stable_wm_reference_policy(model, model.metadata, cfg, torch.device("cpu"), process={})
+        policy.set_env(
+            SimpleNamespace(
+                num_envs=1,
+                action_space=Box(low=-1.0, high=1.0, shape=(1, 2), dtype=np.float32),
+                single_action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            )
+        )
+
+        policy.get_action(
+            {
+                "pixels": np.zeros((1, 1, 8, 8, 3), dtype=np.uint8),
+                "goal": np.zeros((1, 1, 8, 8, 3), dtype=np.uint8),
+            }
+        )
+
+        self.assertTrue(source.saw_normalized_pixels)
 
     def test_scheduled_cem_matches_stable_worldmodel_cem_for_fixed_fidelity(self) -> None:
         model = FakeCEMParityCostModel()

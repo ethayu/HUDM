@@ -24,7 +24,12 @@ from mwm.data.manifest import (
     write_manifest,
 )
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from mwm.eval.policy import MWMWorldModelPolicy, model_accounting, mwm_image_input_transform
+from mwm.eval.policy import (
+    MWMWorldModelPolicy,
+    imagenet_image_input_transform,
+    model_accounting,
+    mwm_image_input_transform,
+)
 from mwm.eval.reference import build_stable_wm_reference_policy
 from mwm.swm.envs import make_swm_world, parse_env_kwargs, parse_image_shape, validate_continuous_box_action_space
 from mwm.swm.restore import eval_callables_for_env
@@ -398,7 +403,12 @@ def _build_stable_wm_reference_policy(
         "device": device,
         "seed": int(cfg.planner.seed if cfg.planner.get("seed", None) is not None else cfg.eval.seed),
     }
-    image_transform = {"pixels": mwm_image_input_transform, "goal": mwm_image_input_transform}
+    preprocessing_spec = metadata.get("preprocessing_spec", {})
+    use_imagenet = bool(metadata.get("normalize_imagenet", False)) or (
+        isinstance(preprocessing_spec, dict) and preprocessing_spec.get("image") == "imagenet"
+    )
+    image_fn = imagenet_image_input_transform if use_imagenet else mwm_image_input_transform
+    image_transform = {"pixels": image_fn, "goal": image_fn}
     return build_stable_wm_reference_policy(source_model, plan_cfg, cem_kwargs=cem_kwargs, process=process, transform=image_transform)
 
 

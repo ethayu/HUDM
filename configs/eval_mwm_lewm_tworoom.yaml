@@ -1,0 +1,51 @@
+checkpoint:
+  run_dir: checkpoints_mwm/upstream_lewm_tworoom
+  epoch: null
+env_id: swm/TwoRoom-v1
+data:
+  path: data/tworoom_swm.lance
+  format: lance
+  split_ratio: 0.8
+  pixels_key: pixels
+  action_key: action
+  keys_to_cache: [action, proprio, state]
+  action_preprocessing: auto
+eval:
+  episodes: 6
+  goal_offset: 100
+  seed: 0
+  budget: 150
+  num_envs: 16
+  output_path: rollouts/tworoom_mwm_eval.json
+  manifest_path: null
+  write_manifest_path: rollouts/tworoom_mwm_manifest.json
+  save_video: false
+  video_path: rollouts/tworoom_mwm_videos
+env:
+  max_episode_steps: 150
+  goal_conditioned: true
+  kwargs: {}
+restore:
+  import_path: null
+planner:
+  horizon: 5
+  receding_horizon: 5
+  action_block: 5
+  batch_size: auto
+  pop_size: 300
+  topk: 30
+  elite_frac: 0.1
+  n_iter: 10
+  init_std: 1.0
+  seed: ${eval.seed}
+  warm_start: true
+  clamp_actions: false
+  std_unbiased: true
+  scheduler:
+    policy: linear_cem
+    start_level: coarsest
+    end_level: finest
+    rollout_level:
+      mode: fixed
+      level: base
+device: auto

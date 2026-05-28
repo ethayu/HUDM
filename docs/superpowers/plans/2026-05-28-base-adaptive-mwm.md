@@ -1413,6 +1413,37 @@ Before running any GPU-backed or long-running empirical command, do not execute 
 
 Then update this plan or add a checked-in launch script with the exact `sbatch` or `srun` command/script that will run the gate, including partition, GPU, CPU, memory, wall-time, conda env activation, working directory, output log path, and the Python command. Only after that plan/script update should the job be submitted. Use `squeue`/`sacct` or the documented monitoring command to track the job instead of leaving long processes running in the current terminal.
 
+PARCC docs inspected on 2026-05-28:
+
+- Login/auth: Betty requires PARCC login through `login.betty.parcc.upenn.edu`; current control shell is `login02`, so GPU and long work must be submitted through Slurm, not run directly here.
+- Slurm: `sbatch` submits background jobs, `squeue`/`scontrol` monitor active jobs, and `sacct` reports completed resource usage.
+- Local `sinfo` confirmed `dgx-b200` exposes `gpu:B200` and `b200-mig90` exposes `gpu:90gb`, both with a 7 day partition limit.
+
+Exact launch path to use:
+
+```bash
+cd "$(git rev-parse --show-toplevel)"
+scripts/submit_mwm_gates.sh
+```
+
+The launcher submits:
+
+```bash
+sbatch --parsable scripts/slurm_mwm_paper_parity.sbatch
+sbatch --parsable --dependency=afterok:${paper_id} scripts/slurm_mwm_v1_gate.sbatch
+```
+
+Paper-parity job details: `scripts/slurm_mwm_paper_parity.sbatch` uses partition `dgx-b200`, GRES `gpu:B200:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `4-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_paper_parity_%j.out` and `logs/mwm_paper_parity_%j.err`, and runs `scripts/run_mwm_paper_parity.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
+Full MWM gate details: `scripts/slurm_mwm_v1_gate.sbatch` uses partition `b200-mig90`, GRES `gpu:90gb:1`, `ntasks=1`, `cpus-per-task=16`, memory `128G`, wall time `7-00:00:00`, working directory `SLURM_SUBMIT_DIR` / repository root, logs `logs/mwm_v1_gate_%j.out` and `logs/mwm_v1_gate_%j.err`, and runs `scripts/run_mwm_v1_gate.sh` with `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python`.
+
+Monitor with:
+
+```bash
+squeue -j "${paper_id},${v1_id}" -o '%.18i %.30j %.8T %.10M %.9l %.20R'
+sacct -j "${paper_id},${v1_id}" --format=JobID,State,Elapsed,MaxRSS,MaxVMSize,AllocCPUS,ReqMem
+```
+
 - [ ] **Step 1: Prepare upstream Le-WM checkpoints and data**
 
 Run:

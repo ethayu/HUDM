@@ -1,0 +1,50 @@
+checkpoint:
+  run_dir: checkpoints_mwm/upstream_lewm_pusht
+  epoch: null
+env_id: swm/PushT-v1
+data:
+  path: data/pusht_swm.lance
+  format: lance
+  split_ratio: 0.8
+  pixels_key: pixels
+  action_key: action
+  keys_to_cache: [action, proprio, state]
+  action_preprocessing: auto
+eval:
+  episodes: 6
+  goal_offset: 25
+  seed: 0
+  budget: 50
+  num_envs: 4
+  output_path: rollouts/pusht_mwm_eval.json
+  manifest_path: null
+  write_manifest_path: rollouts/pusht_mwm_manifest.json
+  save_video: false
+  video_path: rollouts/pusht_mwm_videos
+env:
+  max_episode_steps: 100
+  goal_conditioned: true
+  kwargs: {}
+restore:
+  import_path: null
+planner:
+  horizon: 5
+  receding_horizon: 5
+  action_block: 5
+  batch_size: auto
+  pop_size: 300
+  elite_frac: 0.1
+  n_iter: 30
+  init_std: 1.0
+  seed: ${eval.seed}
+  warm_start: true
+  clamp_actions: false
+  std_unbiased: true
+  scheduler:
+    policy: linear_cem
+    start_level: coarsest
+    end_level: finest
+    rollout_level:
+      mode: fixed
+      level: base
+device: auto
