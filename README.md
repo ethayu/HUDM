@@ -55,6 +55,8 @@ scripts/submit_mwm_gates.sh
 - `mwm.checkpoints` reads and writes strict canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`.
 - `mwm.planning.scheduled_cem` is the active evaluator/planner path.
 - `mwm.data.stable_wm` is Lance-only data glue for Stable-WM datasets and immutable eval manifests.
+- `docs/mwm_adapter_contract.md` is the checklist for implementing another
+  base adapter such as PreJEPA, DINO-WM, or PLDM.
 
 ## Base-Adaptive MWM
 

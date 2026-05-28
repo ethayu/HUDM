@@ -526,7 +526,8 @@ reviewer should confirm no required functionality was accidentally lost.
 
 ## Suggested Review Order
 
-1. Start with `README.md`, this guide, and `configs/benchmark_mwm.yaml`.
+1. Start with `README.md`, `docs/mwm_adapter_contract.md`, this guide, and
+   `configs/benchmark_mwm.yaml`.
 2. Review the data/checkpoint boundaries: `mwm/data/stable_wm.py`,
    `mwm/data/manifest.py`, `mwm/checkpoints.py`, and `verify_mwm_benchmark.py`.
 3. Review the model/planner path: `mwm/models/world_model.py`,
