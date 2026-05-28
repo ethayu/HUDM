@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 import unittest
 from unittest import mock
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
+import mwm.adapters.registry as adapter_registry
 from mwm.adapters.registry import adapter_for_family, adapter_for_target, family_for_target, register_adapter
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 
@@ -155,7 +157,24 @@ class ConfigResolverTests(unittest.TestCase):
 
                 self.assertEqual(loaded, payload)
                 self.assertEqual(path, root / "config.json")
-                self.assertEqual(stable_config_sha256(path), stable_config_sha256(path))
+                self.assertEqual(stable_config_sha256(path), hashlib.sha256((root / "config.json").read_bytes()).hexdigest())
+
+    def test_load_stable_wm_config_rejects_non_object_json_and_directories(self) -> None:
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "config.json").write_text(json.dumps(["not", "a", "mapping"]), encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "JSON object"):
+                load_stable_wm_config(root)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "config.json").mkdir()
+
+            with self.assertRaises(FileNotFoundError):
+                load_stable_wm_config(root)
 
     def test_root_target_reads_root_target(self) -> None:
         self.assertEqual(root_target({"_target_": "stable_worldmodel.wm.lewm.LeWM"}), "stable_worldmodel.wm.lewm.LeWM")
@@ -173,6 +192,11 @@ class ConfigResolverTests(unittest.TestCase):
         class DummyAdapter:
             family = "dummy"
 
-        register_adapter(DummyAdapter())
-        self.assertEqual(adapter_for_family("dummy").family, "dummy")
-        self.assertEqual(adapter_for_target("dummy").family, "dummy")
+        original_adapters = dict(adapter_registry._ADAPTERS)
+        try:
+            register_adapter(DummyAdapter())
+            self.assertEqual(adapter_for_family("dummy").family, "dummy")
+            self.assertEqual(adapter_for_target("dummy").family, "dummy")
+        finally:
+            adapter_registry._ADAPTERS.clear()
+            adapter_registry._ADAPTERS.update(original_adapters)

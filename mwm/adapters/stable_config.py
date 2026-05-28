@@ -15,11 +15,13 @@ def load_stable_wm_config(path: str | Path) -> tuple[dict[str, Any], Path]:
     config_path = Path(path)
     if config_path.name != "config.json":
         config_path = config_path / "config.json"
-    if not config_path.exists():
+    if not config_path.is_file():
         raise FileNotFoundError(config_path)
 
     with config_path.open("r", encoding="utf-8") as handle:
         config = json.load(handle)
+    if not isinstance(config, dict):
+        raise ValueError(f"Stable-WM config.json must contain a JSON object: {config_path}")
     return config, config_path
 
 
