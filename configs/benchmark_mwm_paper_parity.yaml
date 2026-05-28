@@ -7,6 +7,8 @@ gate:
   roles: [upstream_lewm_converted, retrained_lewm_single]
 paper_targets:
   enabled: true
+  # PushT 96.0 is reported in the paper as a 3-training-seed mean with 2.83 pp
+  # variation; TwoRoom 87.0 is the Figure 6 reported value. Keep these strict.
   source: https://arxiv.org/pdf/2603.19312v1#page=7
   tolerance_pp: 1.0
   single_level_tolerance_pp: 5.0

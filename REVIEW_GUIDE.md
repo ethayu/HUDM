@@ -120,17 +120,15 @@ python benchmark_mwm.py configs/benchmark_mwm_paper_parity.yaml
 python verify_mwm_benchmark.py configs/benchmark_mwm_paper_parity.yaml
 ```
 
-In this path, `planner.batch_size: auto` is an execution batching choice and
-defaults to `eval.num_envs`; it is not treated as a performance-matching
-hyperparameter. It can affect exact RNG grouping, but not the method being
-evaluated. Do not change it to `1` just because the upstream implementation
-YAML uses that as a solver chunking default. The parity-relevant Le-WM
-evaluation settings are the paper protocol and official eval profile:
+In this path, `planner.batch_size: 1` is locked to the upstream CEM solver
+chunking default so RNG grouping matches the official Le-WM evaluation path as
+closely as possible. The parity-relevant Le-WM evaluation settings are the
+paper protocol and official eval profile:
 `horizon: 5`, `receding_horizon: 5`, `action_block: 5`,
 `pop_size: 300`, `topk: 30`, `init_std: 1.0`, `n_iter: 30`,
 `goal_offset: 25`, `budget: 50`, `episodes: 50`, ImageNet image size 224, and
-standardized non-pixel columns. These values match the upstream Le-WM PushT eval
-config (`config/eval/pusht.yaml`) and CEM solver config
+standardized non-pixel columns. These values match the upstream Le-WM eval
+configs and CEM solver config
 (`config/eval/solver/cem.yaml`) in https://github.com/lucas-maes/le-wm.
 
 The retrained Le-WM paper-parity config intentionally follows the paper
@@ -315,8 +313,9 @@ scripts/run_mwm_v1_gate.sh
   official upstream Lance dataset, 50 episodes, Stable-WM start/goal sampling,
   standardized action planning, and fixed finest-level CEM.
 - `configs/eval_mwm_paper_tworoom.yaml`: TwoRoom paper-parity eval config using
-  the official upstream Lance dataset, 50 episodes, goal offset 100, budget 150,
-  CEM `n_iter: 10`, standardized action planning, and fixed finest-level CEM.
+  the official upstream Lance dataset, 50 episodes, goal offset 25, budget 50,
+  CEM `batch_size: 1`, CEM `n_iter: 30`, standardized action planning, and
+  fixed finest-level CEM.
 - `configs/benchmark_mwm.yaml`: The required benchmark matrix. Defines output
   directory, gate envs/seeds/roles, and 18 runs with checkpoint overrides for
   upstream converted, retrained single, and scheduled roles.
@@ -528,9 +527,11 @@ Each per-run directory contains:
 - `rollouts/mwm_paper_parity/summary.json`, `.csv`, `metrics.jsonl`,
   `per_env_summary.csv`, `review.html`, and `plots/*.png`: Same artifact schema
   as the full benchmark, but for the paper-parity sanity matrix.
-- Current completed PushT parity evidence before the TwoRoom extension:
-  converted upstream Le-WM and exact from-scratch single-level Le-WM both reached
-  96.0% over 50 episodes on the shared seed-42 manifest.
+- Current paper-parity investigation evidence is recorded in
+  `docs/superpowers/paper-parity-investigation-2026-05-28.md`. The strict
+  PushT target gate is intentionally still incomplete: the converted evaluator
+  and Stable-WM reference path reached 98.0%, while the raw upstream Le-WM
+  evaluator reached 92.0% on the same seed-42 protocol.
 - After rerunning `scripts/run_mwm_paper_parity.sh`, this directory should
   contain four cells: PushT/TwoRoom x upstream converted/retrained single.
 
