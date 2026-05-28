@@ -80,4 +80,11 @@ The benchmark matrix is PushT and TwoRoom, seeds `0,1,2`, with:
 - `retrained_lewm_single`: exact Le-WM single-level training with `K=[192]`, exported as a canonical MWM checkpoint.
 - `mwm_scheduled`: this repo's multi-fidelity training with `K=[48,96,144]`.
 
+## Training Resources
+
+Current validation uses single-GPU Slurm jobs. `train_mwm.py` pins Lightning to
+`devices=1`, and the checked-in Slurm scripts request one B200 GPU per training
+or benchmark job. Multi-GPU/DDP training is deferred for this research branch so
+paper-parity comparisons stay on the same training path being validated here.
+
 Generated datasets, checkpoints, rollouts, logs, and caches are intentionally ignored by git. See `REVIEW_GUIDE.md` for the code-review map and acceptance checks.
