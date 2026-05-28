@@ -34,6 +34,27 @@ TwoRoom is within the 87.0 +/- 1.0 pp gate. PushT is not: both the MWM
 converted path and Stable-WM reference path are 2.0 pp above the paper mean, and
 the raw official evaluator is 4.0 pp below the paper mean.
 
+## Raw-HDF5 vs Lance Diagnostic
+
+Slurm job `6169579` ran `scripts/slurm_lewm_reference_matrix.sbatch`, which
+uses the same Stable-WM `WorldModelPolicy`, `CEMSolver`, released PushT
+checkpoint, seed-42 manifest, action/stat preprocessing, and environment setup
+across four cells:
+
+- Raw HDF5 without the MWM reference goal-embedding wrapper: 92.0%, failed
+  episode indices `[14, 15, 47, 48]`.
+- Raw HDF5 with the goal-embedding wrapper: 92.0%, failed episode indices
+  `[14, 15, 47, 48]`.
+- Stable-WM Lance without the goal-embedding wrapper: 98.0%, failed episode
+  index `[23]`.
+- Stable-WM Lance with the goal-embedding wrapper: 98.0%, failed episode index
+  `[23]`.
+
+This isolates the discrepancy to the dataset representation: raw HDF5 pixels
+reproduce the official Le-WM `eval.py` result, while JPEG-decoded Lance pixels
+reproduce the in-repo paper-reference result. The goal-embedding wrapper is not
+the cause of the 92.0 vs 98.0 split.
+
 ## Inputs Checked
 
 - Official Le-WM repo used for the raw evaluator:
@@ -65,10 +86,11 @@ mean differences around 0.10-0.12.
 ## Interpretation
 
 The current evidence does not prove a bug in the MWM evaluator alone. The
-Stable-WM reference path agrees with the converted MWM evaluator at 98.0%, while
-the raw official Le-WM evaluator gives 92.0% on the same seed-42 protocol. The
-paper's 96.0% PushT target is a three-training-seed mean, not a guaranteed score
-for the released checkpoint on a single seed-42 evaluation.
+Stable-WM Lance reference path agrees with the converted MWM evaluator at
+98.0%, while the raw official Le-WM evaluator and raw-HDF5 Stable-WM policy path
+give 92.0% on the same seed-42 protocol. The paper's 96.0% PushT target is a
+three-training-seed mean, not a guaranteed score for the released checkpoint on
+a single seed-42 evaluation.
 
 Do not mark the full implementation complete until the PushT target mismatch is
 resolved by a corrected checkpoint/data/protocol choice, an accepted target
