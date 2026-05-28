@@ -199,15 +199,91 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
                 _validate_gate_matrix(cfg, resolved)
 
     def test_benchmark_verifier_static_only_accepts_paper_parity_config(self) -> None:
-        report = verify_benchmark_static("configs/benchmark_mwm_paper_parity.yaml")
+        report = verify_benchmark_static("configs/benchmark_mwm_paper_parity.yaml", check_checkpoints=False)
 
         self.assertEqual(report["runs"], 4)
         self.assertEqual(report["paper_targets"]["tolerance_pp"], 1.0)
         self.assertEqual(report["paper_targets"]["single_level_tolerance_pp"], 5.0)
 
-        reference_report = verify_benchmark_static("configs/benchmark_mwm_paper_reference.yaml")
+        reference_report = verify_benchmark_static("configs/benchmark_mwm_paper_reference.yaml", check_checkpoints=False)
         self.assertEqual(reference_report["runs"], 4)
         self.assertIn(("swm/PushT-v1", 42, "stable_wm_reference"), reference_report["expected_cells"])
+
+    def test_benchmark_static_verifier_rejects_stale_scheduled_checkpoint_levels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            checkpoint = root / "checkpoint"
+            checkpoint.mkdir()
+            config_path = checkpoint / CONFIG_FILENAME
+            weights_path = checkpoint / WEIGHTS_FILENAME
+            metadata_path = checkpoint / METADATA_FILENAME
+            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+            config_path.write_text(
+                json.dumps(
+                    {
+                        "target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config",
+                        "kwargs": {
+                            "action_dim": 10,
+                            "action_block": 5,
+                            "K": [48, 96, 144, 192],
+                            "source_config_sha256": "abc",
+                            "component_policy": policy,
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            weights_path.write_bytes(b"weights")
+            metadata_path.write_text(
+                json.dumps(
+                    {
+                        "format": CHECKPOINT_FORMAT,
+                        "action_dim": 2,
+                        "action_block": 5,
+                        "action_spec": {"dim": 10, "base_dim": 2, "block": 5},
+                        "adapter_family": "lewm",
+                        "fresh_init": True,
+                        "source_config_sha256": "abc",
+                        "component_policy": policy,
+                        "training_backend": "stable_worldmodel_lewm",
+                        "architecture_version": LEWM_BASE_ADAPTER_ARCH,
+                        "levels": [48, 96, 144, 192],
+                        "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
+                        "artifacts": {
+                            "config": {"path": CONFIG_FILENAME, "sha256": file_sha256(config_path)},
+                            "weights": {"path": WEIGHTS_FILENAME, "sha256": file_sha256(weights_path)},
+                        },
+                    }
+                ),
+                encoding="utf-8",
+            )
+            eval_cfg = root / "eval.yaml"
+            eval_cfg.write_text(
+                f"""
+env_id: swm/PushT-v1
+checkpoint: {{run_dir: {checkpoint}, epoch: null}}
+data: {{path: data/pusht_swm.lance, format: lance}}
+eval: {{seed: 0}}
+planner: {{scheduler: {{policy: fixed, level: finest, rollout_level: base}}}}
+""",
+                encoding="utf-8",
+            )
+            bench_cfg = root / "benchmark.yaml"
+            bench_cfg.write_text(
+                f"""
+output_dir: {root / "out"}
+require_shared_manifests: false
+gate: {{enabled: true, env_ids: [swm/PushT-v1], seeds: [0], roles: [mwm_scheduled]}}
+runs:
+  - name: scheduled
+    role: mwm_scheduled
+    config: {eval_cfg}
+""",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "scheduled MWM checkpoint must be K=\\[48,96,144\\]"):
+                verify_benchmark_static(str(bench_cfg))
 
     def test_benchmark_role_filter_runs_upstream_gate_first(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -263,7 +339,11 @@ runs:
             summary = json.loads((root / "out" / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(calls, ["checkpoints_mwm/upstream"])
             self.assertEqual([row["role"] for row in summary["runs"]], ["upstream_lewm_converted"])
-            static_report = verify_benchmark_static(str(bench_cfg), roles=["upstream_lewm_converted"])
+            static_report = verify_benchmark_static(
+                str(bench_cfg),
+                roles=["upstream_lewm_converted"],
+                check_checkpoints=False,
+            )
             self.assertEqual(static_report["expected_cells"], [("swm/PushT-v1", 0, "upstream_lewm_converted")])
 
     def test_benchmark_failure_writes_traceback_log(self) -> None:

@@ -541,9 +541,15 @@ def verify_benchmark_output(
     }
 
 
-def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml", *, roles: Any = None) -> dict[str, Any]:
+def verify_benchmark_static(
+    cfg_path: str | Path = "configs/benchmark_mwm.yaml",
+    *,
+    roles: Any = None,
+    check_checkpoints: bool = True,
+) -> dict[str, Any]:
     cfg = OmegaConf.merge(BENCHMARK_DEFAULTS, OmegaConf.load(str(cfg_path)))
     resolved = _load_expected(cfg, roles=roles)
+    errors: list[str] = []
     targets = cfg.get("paper_targets", {})
     paper_targets: dict[str, Any] = {}
     if bool(targets.get("enabled", False)):
@@ -564,12 +570,36 @@ def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
             ),
             "success_rate": {str(key): float(value) for key, value in success_rate.items()},
         }
+
+    checked_checkpoints: set[str] = set()
+    if check_checkpoints:
+        for run, run_cfg in resolved:
+            checkpoint_ref = OmegaConf.select(run_cfg, "checkpoint.run_dir")
+            role = _role(run, run_cfg)
+            if checkpoint_ref is None:
+                errors.append(f"static benchmark run {run.get('name', '<unnamed>')} missing checkpoint.run_dir")
+                continue
+            checkpoint_dir = Path(str(checkpoint_ref))
+            checkpoint_metadata = _validate_checkpoint_metadata(checkpoint_dir, errors)
+            if checkpoint_metadata:
+                _validate_role_checkpoint_contract(
+                    {"role": role, "checkpoint_run_dir": str(checkpoint_dir)},
+                    checkpoint_metadata,
+                    errors,
+                )
+                checked_checkpoints.add(str(checkpoint_dir))
+    errors = list(dict.fromkeys(errors))
+    if errors:
+        raise ValueError("Benchmark static verification failed:\n- " + "\n- ".join(errors))
+
     return {
         "config": str(cfg_path),
         "output_dir": str(cfg.output_dir),
         "runs": len(resolved),
         "expected_cells": sorted(_expected_cells(cfg)),
         "paper_targets": paper_targets,
+        "checkpoint_contracts": sorted(checked_checkpoints),
+        "check_checkpoints": bool(check_checkpoints),
         "static_only": True,
     }
 
@@ -588,7 +618,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Verify MWM benchmark artifacts.")
     parser.add_argument("config", nargs="?", default="configs/benchmark_mwm.yaml", help="Benchmark YAML config")
-    parser.add_argument("--static-only", action="store_true", help="Only validate the config matrix")
+    parser.add_argument("--static-only", action="store_true", help="Validate the config matrix and input checkpoint contracts")
     parser.add_argument("--roles", nargs="+", help="Optional role filter, e.g. upstream_lewm_converted")
     parser.add_argument(
         "--single-level-only",
