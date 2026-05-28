@@ -215,12 +215,10 @@ scripts/run_mwm_v1_gate.sh
 - `mwm/__init__.py`: Public package marker; exports `MWMWorldModel`.
 - `mwm/adapters/__init__.py`: Re-exports adapter base classes and component
   dataclass.
-- `mwm/adapters/lewm.py`: Stable public facade for Le-WM builders and
-  adapter registration. Checkpoint config targets intentionally keep using this
-  module.
-- `mwm/adapters/lewm_stable.py`: Stable-WM `config.json` adapter, component
-  policy validation, fresh architecture instantiation, and proportional
-  per-level head construction from source configs or trusted upstream objects.
+- `mwm/adapters/lewm.py`: Stable-WM Le-WM `config.json` adapter, component
+  policy validation, fresh architecture instantiation, proportional per-level
+  head construction from source configs or trusted upstream objects, and adapter
+  registration. Checkpoint config targets intentionally keep using this module.
 - `mwm/models/world_model.py`: Shared MWM model shell, transition package,
   preprocessing helper, matryoshka loss aggregation, rollout, and fidelity-aware
   cost path used by Le-WM and future base adapters.
@@ -534,8 +532,7 @@ reviewer should confirm no required functionality was accidentally lost.
 3. Review the model/planner path: `mwm/models/world_model.py`,
    `mwm/fidelity.py`, `mwm/planning/scheduled_cem.py`, and `mwm/eval/policy.py`.
 4. Review the Le-WM adapter/conversion path: `mwm/adapters/lewm.py`,
-   `mwm/adapters/lewm_stable.py`, `mwm/models/world_model.py`, and
-   `prepare_upstream_lewm.py`.
+   `mwm/models/world_model.py`, and `prepare_upstream_lewm.py`.
 5. Review orchestration: `collect_mwm_data.py`, `train_mwm.py`, `eval_mwm.py`,
    `benchmark_mwm.py`, and the shell/SLURM scripts.
 6. Review tests and generated artifacts last, checking whether the tests cover

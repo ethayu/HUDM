@@ -392,25 +392,25 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_lewm_adapter_keeps_generic_model_logic_in_world_model(self) -> None:
         adapter_dir = ROOT / "mwm" / "adapters"
-        self.assertTrue((adapter_dir / "lewm_stable.py").is_file())
         self.assertFalse((adapter_dir / "lewm_common.py").exists())
         self.assertFalse((adapter_dir / "lewm_model.py").exists())
         self.assertFalse((adapter_dir / "lewm_import.py").exists())
+        self.assertFalse((adapter_dir / "lewm_stable.py").exists())
         self.assertFalse((ROOT / "mwm" / "adapters" / "lewm_direct.py").exists())
 
-        facade_lines = (ROOT / "mwm" / "adapters" / "lewm.py").read_text(encoding="utf-8").splitlines()
-        self.assertLessEqual(len(facade_lines), 80)
-        facade_text = "\n".join(facade_lines)
-        self.assertNotIn("lewm_direct", facade_text)
-        self.assertNotIn("lewm_model", facade_text)
-        self.assertNotIn("lewm_import", facade_text)
-        self.assertNotIn("build_lewm_matryoshka_model", facade_text)
-        self.assertNotIn("MWMLeWMAdapterConfig", facade_text)
+        lewm_text = (adapter_dir / "lewm.py").read_text(encoding="utf-8")
+        self.assertIn("class LeWMStableWMAdapter", lewm_text)
+        self.assertIn("build_mwm_lewm_from_stable_config", lewm_text)
+        self.assertNotIn("lewm_direct", lewm_text)
+        self.assertNotIn("lewm_model", lewm_text)
+        self.assertNotIn("lewm_import", lewm_text)
+        self.assertNotIn("build_lewm_matryoshka_model", lewm_text)
+        self.assertNotIn("MWMLeWMAdapterConfig", lewm_text)
 
         world_model_text = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")
         self.assertIn("class MatryoshkaWorldModel", world_model_text)
         self.assertIn("class TransitionPackage", world_model_text)
-        for path in (adapter_dir / "lewm.py", adapter_dir / "lewm_stable.py", ROOT / "mwm" / "models" / "world_model.py"):
+        for path in (adapter_dir / "lewm.py", ROOT / "mwm" / "models" / "world_model.py"):
             text = path.read_text(encoding="utf-8")
             self.assertNotIn("source_model", text, path)
             self.assertNotIn("delegated_source_cost", text, path)

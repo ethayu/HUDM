@@ -277,6 +277,21 @@ class LeWMStableConfigTests(unittest.TestCase):
                 component_policy=ComponentPolicy(shared=("latent_producer", "transition"), per_level=(), reconstructor=()),
             )
 
+    def test_resolve_spec_requires_base_latent_dimension_not_level_fallback(self) -> None:
+        adapter = LeWMStableWMAdapter()
+        source_config = self._lewm_config()
+        source_config["predictor"].pop("input_dim")
+        source_config["predictor"].pop("output_dim")
+
+        with self.assertRaisesRegex(ValueError, "base latent dimension D"):
+            adapter.resolve_spec(
+                source_config=source_config,
+                source_config_sha256="abc",
+                training_recipe={},
+                levels=(2,),
+                component_policy=None,
+            )
+
     def test_build_rejects_runtime_action_dim_mismatch(self) -> None:
         bad_config = self._lewm_config()
         bad_config["action_encoder"] = {

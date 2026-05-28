@@ -62,7 +62,7 @@ def _payload(role: str, env_id: str, seed: int, output_path: Path) -> dict:
     return payload
 
 
-def _lewm_stable_config() -> dict:
+def _lewm_source_config() -> dict:
     return {
         "_target_": "stable_worldmodel.wm.lewm.LeWM",
         "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": 4},
@@ -82,7 +82,7 @@ class MWMArtifactTests(unittest.TestCase):
     def test_base_adaptive_checkpoint_metadata_persisted_from_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = build_mwm_lewm_from_stable_config(
-                source_config=_lewm_stable_config(),
+                source_config=_lewm_source_config(),
                 source_config_sha256="abc",
                 training_recipe={"history_size": 2, "num_preds": 1, "loss_scope": {"regularizers": "shared_latent"}},
                 K=(4,),

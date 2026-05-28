@@ -47,9 +47,9 @@ scripts/submit_mwm_gates.sh
 
 - `mwm.models.world_model.MWMWorldModel` is the runtime model contract, and
   `MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
-- `mwm.adapters.lewm` is the stable public facade for Le-WM builders.
-- `mwm.adapters.lewm_stable` derives Le-WM components from Stable-WM configs or
-  trusted upstream objects, then returns the normal `MatryoshkaWorldModel`.
+- `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs or trusted
+  upstream objects, registers the Le-WM adapter, then returns the normal
+  `MatryoshkaWorldModel`.
   `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
   multi-`K` training encodes once and aggregates requested prefix losses only.
 - `mwm.checkpoints` reads and writes strict canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`.

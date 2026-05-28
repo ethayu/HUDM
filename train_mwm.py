@@ -174,6 +174,7 @@ def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> tor
         training_recipe=recipe,
         K=tuple(int(k) for k in model_cfg["K"]),
         action_dim=int(model_cfg["action_dim"]),
+        expected_D=int(model_cfg["D"]) if "D" in model_cfg else None,
         action_block=int(model_cfg.get("action_block", 1)),
         image_shape=tuple(int(x) for x in model_cfg["image_shape"]),
         normalize_imagenet=bool(model_cfg.get("normalize_imagenet", True)),

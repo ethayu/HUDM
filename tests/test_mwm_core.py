@@ -743,6 +743,7 @@ class MWMCoreTests(unittest.TestCase):
                 }
             )
             model_cfg = {
+                "D": 4,
                 "K": (4,),
                 "action_dim": 2,
                 "action_block": 1,
@@ -758,6 +759,37 @@ class MWMCoreTests(unittest.TestCase):
             self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
             self.assertEqual(model.metadata["loss_scope"]["regularizers"], "shared_latent")
             self.assertEqual(model.mwm_config["target"], "mwm.adapters.lewm.build_mwm_lewm_from_stable_config")
+
+    def test_train_entrypoint_rejects_configured_d_mismatch_with_base_config(self) -> None:
+        source_config = _lewm_source_config(D=4, action_dim=2, predictor_heads=1, predictor_dim_head=2, predictor_mlp_dim=8)
+        with tempfile.TemporaryDirectory() as tmp:
+            checkpoint_dir = Path(tmp)
+            (checkpoint_dir / "config.json").write_text(json.dumps(source_config), encoding="utf-8")
+            cfg = OmegaConf.create(
+                {
+                    "base": {"family": "lewm", "checkpoint": str(checkpoint_dir)},
+                    "mwm": {
+                        "component_policy": {
+                            "shared": ["latent_producer"],
+                            "per_level": ["transition"],
+                            "reconstructor": [],
+                        }
+                    },
+                    "model": {"history_size": 2, "num_preds": 1},
+                    "loss": {},
+                }
+            )
+            model_cfg = {
+                "D": 8,
+                "K": (4,),
+                "action_dim": 2,
+                "action_block": 1,
+                "image_shape": (8, 8),
+                "normalize_imagenet": False,
+            }
+
+            with self.assertRaisesRegex(ValueError, "configured D=8.*base latent dimension D=4"):
+                _build_trainable_model_from_base(cfg, model_cfg)
 
     def test_k_equals_d_lewm_init_forward_grad_and_step_match_direct_backend(self) -> None:
         cfg = OmegaConf.create(
