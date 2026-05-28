@@ -7,8 +7,8 @@ data:
   pixels_key: pixels
   action_key: action
   frameskip: 5
-  keys_to_load: [pixels, action, proprio, state]
-  keys_to_cache: [action, proprio, state]
+  keys_to_load: [pixels, action, proprio, pos_agent, pos_target]
+  keys_to_cache: [action, proprio, pos_agent, pos_target]
 model:
   encoder: stable_vit
   D: 192

@@ -14,7 +14,7 @@ from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 from stable_worldmodel.solver import CEMSolver
 
-from eval_mwm import _build_mwm_policy, _build_stable_wm_reference_policy
+from eval_mwm import _available_stat_keys_for_action_process, _build_mwm_policy, _build_stable_wm_reference_policy
 from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, LeWMObjectImporter, build_mwm_lewm, mwm_from_lewm_object
 from mwm.checkpoints import CHECKPOINT_FORMAT, load_world_model_from_checkpoint, save_world_checkpoint
 from mwm.data.stable_wm import MWMTrainSampleTransform
@@ -786,6 +786,21 @@ class MWMCoreTests(unittest.TestCase):
         )
 
         self.assertTrue(source.saw_normalized_pixels)
+
+    def test_eval_action_process_stats_skip_missing_optional_columns(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "data": {
+                    "pixels_key": "pixels",
+                    "action_key": "action",
+                    "keys_to_cache": ["action", "proprio", "state"],
+                }
+            }
+        )
+
+        keys = _available_stat_keys_for_action_process(cfg, ["episode_idx", "action", "proprio", "pos_agent"])
+
+        self.assertEqual(keys, ["action", "proprio"])
 
     def test_scheduled_cem_matches_stable_worldmodel_cem_for_fixed_fidelity(self) -> None:
         model = FakeCEMParityCostModel()

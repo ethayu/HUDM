@@ -153,9 +153,12 @@ class MWMRepoHygieneTests(unittest.TestCase):
         bench_cfg = yaml.safe_load((ROOT / "configs" / "benchmark_mwm_paper_parity.yaml").read_text(encoding="utf-8"))
 
         self.assertEqual(train_cfg["data"]["path"], "data/upstream/tworoom.lance")
+        self.assertEqual(train_cfg["data"]["keys_to_load"], ["pixels", "action", "proprio", "pos_agent", "pos_target"])
+        self.assertEqual(train_cfg["data"]["keys_to_cache"], ["action", "proprio", "pos_agent", "pos_target"])
         self.assertEqual(train_cfg["train"]["backend"], "stable_worldmodel_lewm")
         self.assertEqual(train_cfg["model"]["K"], [192])
         self.assertEqual(eval_cfg["data"]["path"], "data/upstream/tworoom.lance")
+        self.assertEqual(eval_cfg["data"]["keys_to_cache"], ["action", "proprio", "pos_agent", "pos_target"])
         self.assertEqual(eval_cfg["eval"]["episodes"], 50)
         self.assertEqual(eval_cfg["eval"]["goal_offset"], 100)
         self.assertEqual(eval_cfg["eval"]["budget"], 150)

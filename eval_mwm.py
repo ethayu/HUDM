@@ -151,6 +151,11 @@ def _stat_keys_for_action_process(cfg: Any) -> list[str]:
     return [k for k in keys if k != str(cfg.data.get("pixels_key", "pixels"))]
 
 
+def _available_stat_keys_for_action_process(cfg: Any, columns: Any) -> list[str]:
+    available = {str(column) for column in columns}
+    return [key for key in _stat_keys_for_action_process(cfg) if key in available]
+
+
 def _fit_standard_scaler(dataset: Any, key: str) -> Any:
     from sklearn import preprocessing
 
@@ -629,7 +634,7 @@ def main(cfg_path: str) -> None:
             format="lance",
             frameskip=1,
             num_steps=2,
-            keys_to_load=_stat_keys_for_action_process(cfg),
+            keys_to_load=_available_stat_keys_for_action_process(cfg, dataset.column_names),
         )
         try:
             process = _build_eval_process(stats_dataset, model, metadata, cfg)

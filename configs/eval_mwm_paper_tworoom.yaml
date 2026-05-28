@@ -8,7 +8,7 @@ data:
   split_ratio: 0.9
   pixels_key: pixels
   action_key: action
-  keys_to_cache: [action, proprio, state]
+  keys_to_cache: [action, proprio, pos_agent, pos_target]
   action_preprocessing: standard_scaler
 eval:
   episodes: 50
