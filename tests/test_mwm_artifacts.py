@@ -96,7 +96,17 @@ class MWMArtifactTests(unittest.TestCase):
             self.assertIn("training_recipe", metadata)
 
     def test_base_adaptive_checkpoint_contract_requires_metadata(self) -> None:
-        config = {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"}
+        config = {
+            "target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config",
+            "kwargs": {
+                "source_config_sha256": "abc",
+                "component_policy": {
+                    "shared": ["latent_producer"],
+                    "per_level": ["transition"],
+                    "reconstructor": [],
+                },
+            },
+        }
         valid_metadata = {
             "adapter_family": "lewm",
             "source_config_sha256": "abc",
@@ -108,7 +118,10 @@ class MWMArtifactTests(unittest.TestCase):
             ("adapter_family", {**valid_metadata, "adapter_family": "other"}),
             ("fresh_init", {**valid_metadata, "fresh_init": False}),
             ("source_config_sha256", {k: v for k, v in valid_metadata.items() if k != "source_config_sha256"}),
+            ("source_config_sha256", {**valid_metadata, "source_config_sha256": "wrong"}),
             ("component_policy", {k: v for k, v in valid_metadata.items() if k != "component_policy"}),
+            ("component_policy", {**valid_metadata, "component_policy": "not-a-policy"}),
+            ("shared latent producer", {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"]}}),
         ]
         for expected, metadata in invalid_cases:
             with self.subTest(expected=expected):

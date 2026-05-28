@@ -126,14 +126,34 @@ def validate_checkpoint_contract(config: dict[str, Any], metadata: dict[str, Any
 
     target = _checkpoint_model_target(config, metadata)
     if target.endswith("build_mwm_lewm_from_stable_config"):
+        from mwm.adapters.base import ComponentPolicy, validate_component_policy
+        from mwm.adapters.lewm import LeWMStableWMAdapter
+
         if metadata.get("adapter_family") != "lewm":
             raise ValueError("Base-adaptive Le-WM checkpoints require metadata adapter_family='lewm'.")
         if metadata.get("fresh_init") is not True:
             raise ValueError("Base-adaptive Le-WM checkpoints require metadata fresh_init=True.")
         if not metadata.get("source_config_sha256"):
             raise ValueError("Base-adaptive Le-WM checkpoints require nonempty metadata source_config_sha256.")
-        if not metadata.get("component_policy"):
+        component_policy = metadata.get("component_policy")
+        if not component_policy:
             raise ValueError("Base-adaptive Le-WM checkpoints require metadata component_policy.")
+        if not isinstance(component_policy, dict):
+            raise ValueError("Base-adaptive Le-WM metadata component_policy must be a mapping.")
+        adapter = LeWMStableWMAdapter()
+        policy = ComponentPolicy.from_mapping(component_policy)
+        validate_component_policy(adapter.component_groups(), policy)
+        if policy != adapter.default_policy():
+            raise ValueError("Base-adaptive Le-WM metadata component_policy is not supported.")
+
+        kwargs = config.get("kwargs", {})
+        if isinstance(kwargs, dict):
+            expected_sha = kwargs.get("source_config_sha256")
+            if expected_sha and str(metadata.get("source_config_sha256")) != str(expected_sha):
+                raise ValueError("Base-adaptive Le-WM metadata source_config_sha256 does not match config.")
+            expected_policy = kwargs.get("component_policy")
+            if isinstance(expected_policy, dict) and policy != ComponentPolicy.from_mapping(expected_policy):
+                raise ValueError("Base-adaptive Le-WM metadata component_policy does not match config.")
         return
     if target.endswith("build_mwm_lewm_from_object"):
         if len(metadata.get("levels", [])) != 1:
