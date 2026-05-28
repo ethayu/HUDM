@@ -626,6 +626,13 @@ class LeWMStableWMAdapter:
     def default_policy(self) -> ComponentPolicy:
         return ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
 
+    def _validate_supported_policy(self, policy: ComponentPolicy) -> None:
+        expected = self.default_policy()
+        if policy != expected:
+            raise ValueError(
+                "Le-WM Stable-WM adapter only supports shared latent_producer and per-level transition policies."
+            )
+
     def resolve_spec(
         self,
         *,
@@ -638,6 +645,7 @@ class LeWMStableWMAdapter:
         policy = component_policy or self.default_policy()
         groups = self.component_groups()
         validate_component_policy(groups, policy)
+        self._validate_supported_policy(policy)
         source_copy = copy.deepcopy(source_config)
         recipe_copy = copy.deepcopy(training_recipe)
         d_value = (
@@ -758,6 +766,20 @@ def _build_transition_head_from_stable_config(
     return LeWMTransitionPackage(action_encoder=action_encoder, predictor=predictor, pred_proj=pred_proj), arch
 
 
+def _validate_action_dim_from_source_config(source_config: dict[str, Any], action_dim: int) -> None:
+    action_cfg = source_config.get("action_encoder", {})
+    if not isinstance(action_cfg, dict):
+        return
+    for key in ("input_dim", "action_dim"):
+        if key not in action_cfg:
+            continue
+        expected = int(action_cfg[key])
+        if expected != int(action_dim):
+            raise ValueError(
+                f"Stable-WM action_encoder {key}={expected} does not match runtime action_dim={int(action_dim)}."
+            )
+
+
 def _build_lewm_from_base_spec(
     spec: StableWMBaseSpec,
     *,
@@ -767,6 +789,7 @@ def _build_lewm_from_base_spec(
     normalize_imagenet: bool,
 ) -> LeWMMatryoshkaWorldModel:
     source_config = copy.deepcopy(spec.source_config)
+    _validate_action_dim_from_source_config(source_config, int(action_dim))
     encoder = _instantiate_module(source_config["encoder"])
     projector = _instantiate_module(source_config.get("projector", {"_target_": "torch.nn.Identity"}))
     transitions: list[LeWMTransitionPackage] = []

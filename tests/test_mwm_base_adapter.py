@@ -6,6 +6,8 @@ from pathlib import Path
 import unittest
 from unittest import mock
 
+import torch
+
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
 from mwm.adapters.lewm import LeWMStableWMAdapter, LeWMMatryoshkaWorldModel, build_mwm_lewm_from_stable_config
 import mwm.adapters.registry as adapter_registry
@@ -236,7 +238,7 @@ class LeWMStableConfigTests(unittest.TestCase):
         model = build_mwm_lewm_from_stable_config(
             source_config=self._lewm_config(),
             source_config_sha256="abc",
-            training_recipe={"loss": {"sigreg_weight": 0.0}},
+            training_recipe={"history_size": 2, "num_preds": 1, "loss": {"sigreg_weight": 0.0}},
             K=(4,),
             action_dim=2,
             action_block=1,
@@ -247,6 +249,8 @@ class LeWMStableConfigTests(unittest.TestCase):
         self.assertEqual(model.metadata["adapter_family"], "lewm")
         self.assertTrue(model.metadata["fresh_init"])
         self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
+        out = model.training_loss({"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)})
+        self.assertIn("loss", out)
 
     def test_resolve_spec_requires_shared_latent_producer(self) -> None:
         adapter = LeWMStableWMAdapter()
@@ -258,6 +262,38 @@ class LeWMStableConfigTests(unittest.TestCase):
                 training_recipe={},
                 levels=(4,),
                 component_policy=ComponentPolicy(shared=(), per_level=("transition",), reconstructor=()),
+            )
+
+    def test_resolve_spec_rejects_unsupported_non_default_policy(self) -> None:
+        adapter = LeWMStableWMAdapter()
+
+        with self.assertRaisesRegex(ValueError, "only supports"):
+            adapter.resolve_spec(
+                source_config=self._lewm_config(),
+                source_config_sha256="abc",
+                training_recipe={},
+                levels=(2, 4),
+                component_policy=ComponentPolicy(shared=("latent_producer", "transition"), per_level=(), reconstructor=()),
+            )
+
+    def test_build_rejects_runtime_action_dim_mismatch(self) -> None:
+        bad_config = self._lewm_config()
+        bad_config["action_encoder"] = {
+            "_target_": "tests.test_mwm_core.FakeLeWMActionEncoder",
+            "action_dim": 3,
+            "out_dim": 4,
+        }
+
+        with self.assertRaisesRegex(ValueError, "action_dim"):
+            build_mwm_lewm_from_stable_config(
+                source_config=bad_config,
+                source_config_sha256="abc",
+                training_recipe={},
+                K=(4,),
+                action_dim=2,
+                action_block=1,
+                image_shape=(8, 8),
+                normalize_imagenet=False,
             )
 
     def test_config_driven_transition_widths_scale_per_level(self) -> None:
