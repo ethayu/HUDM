@@ -121,6 +121,27 @@ def _checkpoint_model_target(config: dict[str, Any], metadata: dict[str, Any]) -
     return str(model_meta.get("target", "")) if isinstance(model_meta, dict) else ""
 
 
+def _exact_component_policy(value: Any, *, label: str) -> dict[str, list[str]]:
+    if not isinstance(value, dict):
+        raise ValueError(f"Base-adaptive Le-WM {label} component_policy must be a mapping.")
+    expected_keys = {"shared", "per_level", "reconstructor"}
+    actual_keys = set(value)
+    missing = sorted(expected_keys - actual_keys)
+    unknown = sorted(actual_keys - expected_keys)
+    if missing or unknown:
+        raise ValueError(
+            f"Base-adaptive Le-WM {label} component_policy must define exactly "
+            f"{sorted(expected_keys)}; missing={missing}, unknown={unknown}."
+        )
+    normalized: dict[str, list[str]] = {}
+    for key in sorted(expected_keys):
+        raw = value[key]
+        if isinstance(raw, (str, bytes)) or not isinstance(raw, list):
+            raise ValueError(f"Base-adaptive Le-WM {label} component_policy.{key} must be a list.")
+        normalized[key] = [str(item) for item in raw]
+    return normalized
+
+
 def validate_checkpoint_contract(config: dict[str, Any], metadata: dict[str, Any]) -> None:
     """Reject stale trainable MWM checkpoints before model instantiation."""
 
@@ -138,10 +159,9 @@ def validate_checkpoint_contract(config: dict[str, Any], metadata: dict[str, Any
         component_policy = metadata.get("component_policy")
         if not component_policy:
             raise ValueError("Base-adaptive Le-WM checkpoints require metadata component_policy.")
-        if not isinstance(component_policy, dict):
-            raise ValueError("Base-adaptive Le-WM metadata component_policy must be a mapping.")
+        exact_policy = _exact_component_policy(component_policy, label="metadata")
         adapter = LeWMStableWMAdapter()
-        policy = ComponentPolicy.from_mapping(component_policy)
+        policy = ComponentPolicy.from_mapping(exact_policy)
         validate_component_policy(adapter.component_groups(), policy)
         if policy != adapter.default_policy():
             raise ValueError("Base-adaptive Le-WM metadata component_policy is not supported.")
@@ -152,8 +172,10 @@ def validate_checkpoint_contract(config: dict[str, Any], metadata: dict[str, Any
             if expected_sha and str(metadata.get("source_config_sha256")) != str(expected_sha):
                 raise ValueError("Base-adaptive Le-WM metadata source_config_sha256 does not match config.")
             expected_policy = kwargs.get("component_policy")
-            if isinstance(expected_policy, dict) and policy != ComponentPolicy.from_mapping(expected_policy):
-                raise ValueError("Base-adaptive Le-WM metadata component_policy does not match config.")
+            if expected_policy is not None:
+                expected_exact = _exact_component_policy(expected_policy, label="config")
+                if exact_policy != expected_exact:
+                    raise ValueError("Base-adaptive Le-WM metadata component_policy does not match config.")
         return
     if target.endswith("build_mwm_lewm_from_object"):
         if len(metadata.get("levels", [])) != 1:

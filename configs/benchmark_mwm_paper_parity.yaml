@@ -1,0 +1,48 @@
+output_dir: rollouts/mwm_paper_parity
+require_shared_manifests: true
+gate:
+  enabled: true
+  env_ids: [swm/PushT-v1, swm/TwoRoom-v1]
+  seeds: [42]
+  roles: [upstream_lewm_converted, retrained_lewm_single]
+paper_targets:
+  enabled: true
+  source: https://arxiv.org/pdf/2603.19312v1#page=7
+  tolerance_pp: 1.0
+  single_level_tolerance_pp: 5.0
+  success_rate:
+    swm/PushT-v1: 96.0
+    swm/TwoRoom-v1: 87.0
+runs:
+  - name: pusht_seed42_upstream_lewm_converted
+    role: upstream_lewm_converted
+    manifest_group: pusht_paper_seed42
+    config: configs/eval_mwm_paper_pusht.yaml
+    overrides:
+      checkpoint:
+        run_dir: checkpoints_mwm/upstream_lewm_pusht
+  - name: pusht_seed42_retrained_lewm_single
+    role: retrained_lewm_single
+    manifest_group: pusht_paper_seed42
+    config: configs/eval_mwm_paper_pusht.yaml
+    overrides:
+      checkpoint:
+        run_dir: checkpoints_mwm/retrained_lewm_single_pusht_upstream
+      eval:
+        output_path: rollouts/mwm_paper_parity/pusht_retrained/eval.json
+  - name: tworoom_seed42_upstream_lewm_converted
+    role: upstream_lewm_converted
+    manifest_group: tworoom_paper_seed42
+    config: configs/eval_mwm_paper_tworoom.yaml
+    overrides:
+      checkpoint:
+        run_dir: checkpoints_mwm/upstream_lewm_tworoom
+  - name: tworoom_seed42_retrained_lewm_single
+    role: retrained_lewm_single
+    manifest_group: tworoom_paper_seed42
+    config: configs/eval_mwm_paper_tworoom.yaml
+    overrides:
+      checkpoint:
+        run_dir: checkpoints_mwm/retrained_lewm_single_tworoom_upstream
+      eval:
+        output_path: rollouts/mwm_paper_parity/tworoom_retrained/eval.json

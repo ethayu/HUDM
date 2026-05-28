@@ -19,6 +19,7 @@ from mwm.checkpoints import (
     validate_checkpoint_contract,
 )
 from mwm.data.manifest import load_manifest, manifest_file_sha256
+from mwm.eval.reference import REFERENCE_ROLE, needs_reference_evaluator
 
 
 REQUIRED_PLOTS = {
@@ -114,13 +115,16 @@ def _validate_paper_targets(cfg: Any, rows: list[dict[str, Any]], errors: list[s
         errors.append("paper_targets.success_rate must be a mapping")
         return
     expected = dict(OmegaConf.to_container(expected, resolve=True) if OmegaConf.is_config(expected) else expected)
-    upstream_tol = float(targets.get("upstream_tolerance_pp", 0.0))
-    match_tol = float(targets.get("retrained_match_tolerance_pp", upstream_tol))
+    upstream_tol = float(targets.get("tolerance_pp", targets.get("upstream_tolerance_pp", 1.0)))
+    match_tol = float(targets.get("single_level_tolerance_pp", targets.get("retrained_match_tolerance_pp", 5.0)))
     for env_id, target in sorted((str(k), float(v)) for k, v in expected.items()):
         upstream_rows = [
             row
             for row in rows
             if str(row.get("env_id", "")) == env_id and str(row.get("role", "")) == "upstream_lewm_converted"
+        ]
+        reference_rows = [
+            row for row in rows if str(row.get("env_id", "")) == env_id and str(row.get("role", "")) == REFERENCE_ROLE
         ]
         retrained_rows = [
             row
@@ -128,15 +132,30 @@ def _validate_paper_targets(cfg: Any, rows: list[dict[str, Any]], errors: list[s
             if str(row.get("env_id", "")) == env_id and str(row.get("role", "")) == "retrained_lewm_single"
         ]
         upstream = _mean_success(upstream_rows)
+        reference = _mean_success(reference_rows)
         retrained = _mean_success(retrained_rows)
         if upstream is None:
             errors.append(f"paper target check missing upstream_lewm_converted rows for {env_id}")
             continue
-        if abs(upstream - target) > upstream_tol:
-            errors.append(
-                f"paper target check failed for {env_id}: upstream success {upstream:.2f} "
-                f"differs from paper target {target:.2f} by more than {upstream_tol:.2f} pp"
-            )
+        if needs_reference_evaluator(upstream, target, upstream_tol):
+            if reference is None:
+                errors.append(
+                    f"paper target check failed for {env_id}: upstream success {upstream:.2f} "
+                    f"differs from paper target {target:.2f} by more than {upstream_tol:.2f} pp; "
+                    f"run {REFERENCE_ROLE} fallback before accepting MWM results"
+                )
+            elif not needs_reference_evaluator(reference, target, upstream_tol):
+                errors.append(
+                    f"MWM evaluator discrepancy for {env_id}: upstream success {upstream:.2f} "
+                    f"misses paper target {target:.2f} by more than {upstream_tol:.2f} pp while "
+                    f"{REFERENCE_ROLE} success {reference:.2f} is within tolerance; correct evaluator/solver parameters"
+                )
+            else:
+                errors.append(
+                    f"paper target investigation required for {env_id}: MWM evaluator upstream success {upstream:.2f} "
+                    f"and {REFERENCE_ROLE} success {reference:.2f} both miss paper target {target:.2f}; "
+                    "check data/checkpoint/protocol mismatch"
+                )
         if retrained is None:
             errors.append(f"paper target check missing retrained_lewm_single rows for {env_id}")
             continue
@@ -145,6 +164,13 @@ def _validate_paper_targets(cfg: Any, rows: list[dict[str, Any]], errors: list[s
                 f"single-level match check failed for {env_id}: retrained success {retrained:.2f} "
                 f"differs from upstream {upstream:.2f} by more than {match_tol:.2f} pp"
             )
+
+
+def validate_paper_targets(rows: list[dict[str, Any]], cfg: Any) -> list[str]:
+    config = OmegaConf.create(cfg) if isinstance(cfg, dict) else cfg
+    errors: list[str] = []
+    _validate_paper_targets(config, rows, errors)
+    return errors
 
 
 def _has_resolved_ref(ref: Any) -> bool:

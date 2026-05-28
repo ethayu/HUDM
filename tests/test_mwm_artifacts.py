@@ -24,7 +24,12 @@ from mwm.checkpoints import (
 )
 from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256
 from mwm.data.stable_wm import StartGoalPair, write_dataset_metadata
-from verify_mwm_benchmark import _validate_checkpoint_metadata, _validate_paper_targets, _validate_role_checkpoint_contract
+from verify_mwm_benchmark import (
+    _validate_checkpoint_metadata,
+    _validate_paper_targets,
+    _validate_role_checkpoint_contract,
+    validate_paper_targets,
+)
 from verify_mwm_data import verify_data_configs
 
 
@@ -122,7 +127,23 @@ class MWMArtifactTests(unittest.TestCase):
             ("source_config_sha256", {**valid_metadata, "source_config_sha256": "wrong"}),
             ("component_policy", {k: v for k, v in valid_metadata.items() if k != "component_policy"}),
             ("component_policy", {**valid_metadata, "component_policy": "not-a-policy"}),
-            ("shared latent producer", {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"]}}),
+            ("missing=.*per_level", {**valid_metadata, "component_policy": {"shared": ["latent_producer"], "reconstructor": []}}),
+            (
+                "unknown=.*extra",
+                {
+                    **valid_metadata,
+                    "component_policy": {
+                        "shared": ["latent_producer"],
+                        "per_level": ["transition"],
+                        "reconstructor": [],
+                        "extra": [],
+                    },
+                },
+            ),
+            (
+                "shared latent producer",
+                {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"], "reconstructor": []}},
+            ),
         ]
         for expected, metadata in invalid_cases:
             with self.subTest(expected=expected):
@@ -276,6 +297,25 @@ runs:
         rows[1]["success_rate"] = 70.0
         _validate_paper_targets(cfg, rows, errors)
         self.assertTrue(any("single-level match check failed" in error for error in errors), errors)
+
+    def test_paper_target_gate_requires_reference_when_mwm_misses_by_more_than_one_point(self) -> None:
+        rows = [
+            {"env_id": "swm/PushT-v1", "role": "upstream_lewm_converted", "success_rate": 94.0},
+            {"env_id": "swm/PushT-v1", "role": "stable_wm_reference", "success_rate": 96.0},
+            {"env_id": "swm/PushT-v1", "role": "retrained_lewm_single", "success_rate": 95.0},
+        ]
+        cfg = {
+            "paper_targets": {
+                "enabled": True,
+                "tolerance_pp": 1.0,
+                "single_level_tolerance_pp": 5.0,
+                "success_rate": {"swm/PushT-v1": 96.0},
+            }
+        }
+
+        errors = validate_paper_targets(rows, cfg)
+
+        self.assertTrue(any("MWM evaluator" in error for error in errors), errors)
 
     def test_role_checkpoint_contract_rejects_generic_single_level_backend(self) -> None:
         row = {"role": "retrained_lewm_single", "checkpoint_run_dir": "checkpoints_mwm/retrained"}
