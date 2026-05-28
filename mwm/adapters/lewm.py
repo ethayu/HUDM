@@ -732,8 +732,8 @@ def _build_transition_head_from_stable_config(
         source_config.get("pred_proj", {"_target_": "torch.nn.Identity"}),
         int(k),
         int(D),
-        width_keys=("input_dim", "output_dim", "hidden_dim"),
-        scaled_keys=(),
+        width_keys=("input_dim", "output_dim"),
+        scaled_keys=("hidden_dim",),
     )
 
     predictor = _instantiate_module(predictor_config)
@@ -775,6 +775,15 @@ def _build_lewm_from_base_spec(
         transition, arch = _build_transition_head_from_stable_config(int(k), int(spec.D), source_config)
         transitions.append(transition)
         head_architectures.append(arch)
+    loss_recipe = spec.training_recipe.get("loss", {}) if isinstance(spec.training_recipe.get("loss", {}), dict) else {}
+    predictor_config = source_config.get("predictor", {}) if isinstance(source_config.get("predictor", {}), dict) else {}
+    history_size = int(
+        spec.training_recipe.get(
+            "history_size",
+            loss_recipe.get("history_size", predictor_config.get("num_frames", source_config.get("history_size", 3))),
+        )
+    )
+    num_preds = int(spec.training_recipe.get("num_preds", loss_recipe.get("num_preds", source_config.get("num_preds", 1))))
 
     metadata = {
         "adapter": "lewm",
@@ -806,8 +815,8 @@ def _build_lewm_from_base_spec(
         action_block=int(action_block),
         image_shape=tuple(int(x) for x in image_shape),
         normalize_imagenet=bool(normalize_imagenet),
-        history_size=int(spec.training_recipe.get("loss", {}).get("history_size", source_config.get("history_size", 3))),
-        num_preds=int(spec.training_recipe.get("loss", {}).get("num_preds", source_config.get("num_preds", 1))),
+        history_size=history_size,
+        num_preds=num_preds,
         head_architectures=head_architectures,
         metadata=metadata,
     )

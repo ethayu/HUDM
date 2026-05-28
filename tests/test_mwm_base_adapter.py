@@ -216,7 +216,13 @@ class LeWMStableConfigTests(unittest.TestCase):
             },
             "action_encoder": {"_target_": "tests.test_mwm_core.FakeLeWMActionEncoder", "action_dim": 2, "out_dim": 4},
             "projector": {"_target_": "torch.nn.Identity"},
-            "pred_proj": {"_target_": "torch.nn.Identity"},
+            "pred_proj": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "input_dim": 4,
+                "output_dim": 4,
+                "hidden_dim": 16,
+                "norm_fn": {"_target_": "torch.nn.BatchNorm1d", "_partial_": True},
+            },
         }
 
     def test_lewm_adapter_declares_groups(self) -> None:
@@ -271,3 +277,23 @@ class LeWMStableConfigTests(unittest.TestCase):
         self.assertEqual(model.transitions[0].action_encoder.proj.out_features, 2)
         self.assertEqual(model.transitions[1].action_encoder.proj.out_features, 4)
         self.assertEqual([h["predictor_input_dim"] for h in model.metadata["head_architectures"]], [2, 4])
+        self.assertEqual([h["pred_proj_hidden_dim"] for h in model.metadata["head_architectures"]], [8, 16])
+        self.assertEqual(model.transitions[0].pred_proj.net[0].out_features, 8)
+        self.assertEqual(model.transitions[1].pred_proj.net[0].out_features, 16)
+
+    def test_k_equals_d_preserves_base_internal_widths_and_top_level_recipe_shape(self) -> None:
+        model = build_mwm_lewm_from_stable_config(
+            source_config=self._lewm_config(),
+            source_config_sha256="abc",
+            training_recipe={"history_size": 5, "num_preds": 2},
+            K=(4,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+        )
+
+        self.assertEqual(model.history_size, 5)
+        self.assertEqual(model.num_preds, 2)
+        self.assertEqual(model.metadata["head_architectures"][0]["pred_proj_hidden_dim"], 16)
+        self.assertEqual(model.transitions[0].pred_proj.net[0].out_features, 16)
