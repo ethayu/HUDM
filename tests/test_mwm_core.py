@@ -14,10 +14,11 @@ from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 from stable_worldmodel.solver import CEMSolver
 
-from eval_mwm import _build_mwm_policy
-from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, LeWMObjectImporter, build_mwm_lewm
+from eval_mwm import _build_mwm_policy, _build_stable_wm_reference_policy
+from mwm.adapters.lewm import LeWMMatryoshkaWorldModel, LeWMObjectImporter, build_mwm_lewm, mwm_from_lewm_object
 from mwm.checkpoints import CHECKPOINT_FORMAT, load_world_model_from_checkpoint, save_world_checkpoint
 from mwm.data.stable_wm import MWMTrainSampleTransform
+from mwm.eval import build_stable_wm_reference_policy as exported_reference_policy_builder
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
 from mwm.models.world_model import MWMWorldModel, mwm_prediction_loss
@@ -679,6 +680,48 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(policy.solver.batch_size, 7)
         self.assertEqual(policy.solver.num_samples, 300)
         self.assertEqual(policy.solver.topk, 30)
+
+    def test_reference_eval_policy_uses_stable_wm_solver_and_source_model(self) -> None:
+        source = FakeCostLeWMObject()
+        model = mwm_from_lewm_object(
+            source,
+            source_checkpoint="fake.pt",
+            D=4,
+            K=(4,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(8, 8),
+            normalize_imagenet=False,
+        )
+        cfg = OmegaConf.create(
+            {
+                "eval": {"num_envs": 3, "seed": 11},
+                "planner": {
+                    "horizon": 5,
+                    "receding_horizon": 2,
+                    "action_block": 1,
+                    "batch_size": "auto",
+                    "pop_size": 13,
+                    "topk": 4,
+                    "elite_frac": 0.1,
+                    "n_iter": 7,
+                    "init_std": 1.5,
+                    "seed": 19,
+                    "warm_start": True,
+                },
+            }
+        )
+
+        policy = _build_stable_wm_reference_policy(model, {"action_block": 1}, cfg, torch.device("cpu"), process={})
+
+        self.assertIs(policy.solver.model, source)
+        self.assertNotIsInstance(policy, MWMWorldModelPolicy)
+        self.assertTrue(callable(exported_reference_policy_builder))
+        self.assertEqual(policy.solver.batch_size, 3)
+        self.assertEqual(policy.solver.num_samples, 13)
+        self.assertEqual(policy.solver.topk, 4)
+        self.assertEqual(policy.solver.n_steps, 7)
+        self.assertEqual(policy.cfg.horizon, 5)
 
     def test_scheduled_cem_matches_stable_worldmodel_cem_for_fixed_fidelity(self) -> None:
         model = FakeCEMParityCostModel()

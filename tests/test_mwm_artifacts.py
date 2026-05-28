@@ -29,6 +29,7 @@ from verify_mwm_benchmark import (
     _validate_paper_targets,
     _validate_role_checkpoint_contract,
     validate_paper_targets,
+    verify_benchmark_static,
 )
 from verify_mwm_data import verify_data_configs
 
@@ -195,6 +196,13 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
             resolved = [(run, _merged_run_config(run)[1]) for run in cfg.runs]
             with self.assertRaisesRegex(ValueError, "duplicate cells"):
                 _validate_gate_matrix(cfg, resolved)
+
+    def test_benchmark_verifier_static_only_accepts_paper_parity_config(self) -> None:
+        report = verify_benchmark_static("configs/benchmark_mwm_paper_parity.yaml")
+
+        self.assertEqual(report["runs"], 4)
+        self.assertEqual(report["paper_targets"]["tolerance_pp"], 1.0)
+        self.assertEqual(report["paper_targets"]["single_level_tolerance_pp"], 5.0)
 
     def test_benchmark_failure_writes_traceback_log(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

@@ -464,12 +464,46 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml")
     }
 
 
-def main(cfg_path: str) -> None:
-    report = verify_benchmark_output(cfg_path)
+def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml") -> dict[str, Any]:
+    cfg = OmegaConf.merge(BENCHMARK_DEFAULTS, OmegaConf.load(str(cfg_path)))
+    resolved = _load_expected(cfg)
+    targets = cfg.get("paper_targets", {})
+    paper_targets: dict[str, Any] = {}
+    if bool(targets.get("enabled", False)):
+        success_rate = targets.get("success_rate", {})
+        if not isinstance(success_rate, dict) and not OmegaConf.is_config(success_rate):
+            raise ValueError("paper_targets.success_rate must be a mapping")
+        success_rate = dict(
+            OmegaConf.to_container(success_rate, resolve=True) if OmegaConf.is_config(success_rate) else success_rate
+        )
+        gate_envs = [str(env) for env in cfg.get("gate", {}).get("env_ids", [])]
+        missing_targets = sorted(env for env in gate_envs if env not in {str(key) for key in success_rate})
+        if missing_targets:
+            raise ValueError(f"paper_targets.success_rate missing gate envs: {missing_targets}")
+        paper_targets = {
+            "tolerance_pp": float(targets.get("tolerance_pp", targets.get("upstream_tolerance_pp", 1.0))),
+            "single_level_tolerance_pp": float(
+                targets.get("single_level_tolerance_pp", targets.get("retrained_match_tolerance_pp", 5.0))
+            ),
+            "success_rate": {str(key): float(value) for key, value in success_rate.items()},
+        }
+    return {
+        "config": str(cfg_path),
+        "output_dir": str(cfg.output_dir),
+        "runs": len(resolved),
+        "expected_cells": sorted(_expected_cells(cfg)),
+        "paper_targets": paper_targets,
+        "static_only": True,
+    }
+
+
+def main(cfg_path: str, *, static_only: bool = False) -> None:
+    report = verify_benchmark_static(cfg_path) if static_only else verify_benchmark_output(cfg_path)
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
     import sys
 
-    main(sys.argv[1] if len(sys.argv) > 1 else "configs/benchmark_mwm.yaml")
+    args = [arg for arg in sys.argv[1:] if arg != "--static-only"]
+    main(args[0] if args else "configs/benchmark_mwm.yaml", static_only="--static-only" in sys.argv[1:])
