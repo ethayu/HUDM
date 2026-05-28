@@ -1,5 +1,17 @@
 seed: 3072
 env_id: swm/TwoRoom-v1
+base:
+  family: lewm
+  checkpoint: models--quentinll--lewm-tworooms
+mwm:
+  component_policy:
+    shared: [latent_producer]
+    per_level: [transition]
+    reconstructor: []
+  loss_terms:
+    regularizers: shared_latent
+    reconstructor_detach_encoder: true
+    reconstructor_contributes_to_encoder_loss: false
 data:
   path: data/upstream/tworoom.lance
   format: lance

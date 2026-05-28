@@ -135,6 +135,22 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["train"]["batch_size"], 128, name)
             self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
 
+    def test_paper_parity_train_configs_use_base_adaptive_resolver(self) -> None:
+        expected_checkpoints = {
+            "train_mwm_lewm_pusht_upstream.yaml": "models--quentinll--lewm-pusht",
+            "train_mwm_lewm_tworoom_upstream.yaml": "models--quentinll--lewm-tworooms",
+        }
+        for name, checkpoint in expected_checkpoints.items():
+            cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
+
+            self.assertEqual(cfg["base"], {"family": "lewm", "checkpoint": checkpoint}, name)
+            self.assertEqual(cfg["mwm"]["component_policy"]["shared"], ["latent_producer"], name)
+            self.assertEqual(cfg["mwm"]["component_policy"]["per_level"], ["transition"], name)
+            self.assertEqual(cfg["mwm"]["component_policy"]["reconstructor"], [], name)
+            self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
+            self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_detach_encoder"], True, name)
+            self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_contributes_to_encoder_loss"], False, name)
+
     def test_scheduled_configs_use_lewm_base_adapter_training_recipe(self) -> None:
         for name in ("train_mwm_scheduled_pusht.yaml", "train_mwm_scheduled_tworoom.yaml"):
             cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))

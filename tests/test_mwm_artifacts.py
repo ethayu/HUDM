@@ -29,6 +29,7 @@ from verify_mwm_benchmark import (
     _validate_paper_targets,
     _validate_role_checkpoint_contract,
     validate_paper_targets,
+    validate_single_level_matches,
     verify_benchmark_static,
 )
 from verify_mwm_data import verify_data_configs
@@ -404,6 +405,42 @@ runs:
         errors = validate_paper_targets(rows, cfg)
 
         self.assertTrue(any("MWM evaluator" in error for error in errors), errors)
+
+    def test_single_level_match_gate_is_independent_from_paper_target(self) -> None:
+        cfg = {
+            "paper_targets": {
+                "enabled": True,
+                "tolerance_pp": 1.0,
+                "single_level_tolerance_pp": 5.0,
+                "success_rate": {"swm/PushT-v1": 96.0, "swm/TwoRoom-v1": 87.0},
+            }
+        }
+        rows = [
+            {"env_id": "swm/PushT-v1", "role": "upstream_lewm_converted", "success_rate": 92.0},
+            {"env_id": "swm/PushT-v1", "role": "retrained_lewm_single", "success_rate": 96.0},
+            {"env_id": "swm/TwoRoom-v1", "role": "upstream_lewm_converted", "success_rate": 86.0},
+            {"env_id": "swm/TwoRoom-v1", "role": "retrained_lewm_single", "success_rate": 84.0},
+        ]
+
+        self.assertEqual(validate_single_level_matches(rows, cfg), [])
+
+        rows[1]["success_rate"] = 80.0
+        errors = validate_single_level_matches(rows, cfg)
+        self.assertTrue(any("single-level match check failed" in error for error in errors), errors)
+
+    def test_single_level_match_gate_requires_both_roles(self) -> None:
+        cfg = {
+            "paper_targets": {
+                "enabled": True,
+                "single_level_tolerance_pp": 5.0,
+                "success_rate": {"swm/PushT-v1": 96.0},
+            }
+        }
+        rows = [{"env_id": "swm/PushT-v1", "role": "upstream_lewm_converted", "success_rate": 92.0}]
+
+        errors = validate_single_level_matches(rows, cfg)
+
+        self.assertTrue(any("missing retrained_lewm_single rows" in error for error in errors), errors)
 
     def test_role_checkpoint_contract_rejects_generic_single_level_backend(self) -> None:
         row = {"role": "retrained_lewm_single", "checkpoint_run_dir": "checkpoints_mwm/retrained"}

@@ -184,10 +184,57 @@ def _validate_paper_targets(cfg: Any, rows: list[dict[str, Any]], errors: list[s
             )
 
 
+def _single_level_env_ids(cfg: Any, targets: Any) -> list[str]:
+    expected = targets.get("success_rate", {})
+    if isinstance(expected, dict) or OmegaConf.is_config(expected):
+        expected = dict(OmegaConf.to_container(expected, resolve=True) if OmegaConf.is_config(expected) else expected)
+        if expected:
+            return sorted(str(env_id) for env_id in expected)
+    return sorted(str(env_id) for env_id in cfg.get("gate", {}).get("env_ids", []))
+
+
+def _validate_single_level_matches(cfg: Any, rows: list[dict[str, Any]], errors: list[str]) -> None:
+    targets = cfg.get("paper_targets", {})
+    match_tol = float(targets.get("single_level_tolerance_pp", targets.get("retrained_match_tolerance_pp", 5.0)))
+    for env_id in _single_level_env_ids(cfg, targets):
+        upstream = _mean_success(
+            [
+                row
+                for row in rows
+                if str(row.get("env_id", "")) == env_id and str(row.get("role", "")) == "upstream_lewm_converted"
+            ]
+        )
+        retrained = _mean_success(
+            [
+                row
+                for row in rows
+                if str(row.get("env_id", "")) == env_id and str(row.get("role", "")) == "retrained_lewm_single"
+            ]
+        )
+        if upstream is None:
+            errors.append(f"single-level match check missing upstream_lewm_converted rows for {env_id}")
+        if retrained is None:
+            errors.append(f"single-level match check missing retrained_lewm_single rows for {env_id}")
+        if upstream is None or retrained is None:
+            continue
+        if abs(retrained - upstream) > match_tol:
+            errors.append(
+                f"single-level match check failed for {env_id}: retrained success {retrained:.2f} "
+                f"differs from upstream {upstream:.2f} by more than {match_tol:.2f} pp"
+            )
+
+
 def validate_paper_targets(rows: list[dict[str, Any]], cfg: Any) -> list[str]:
     config = OmegaConf.create(cfg) if isinstance(cfg, dict) else cfg
     errors: list[str] = []
     _validate_paper_targets(config, rows, errors)
+    return errors
+
+
+def validate_single_level_matches(rows: list[dict[str, Any]], cfg: Any) -> list[str]:
+    config = OmegaConf.create(cfg) if isinstance(cfg, dict) else cfg
+    errors: list[str] = []
+    _validate_single_level_matches(config, rows, errors)
     return errors
 
 
@@ -321,7 +368,12 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
             errors.append(f"scheduled MWM checkpoint missing corrected architecture version: {checkpoint_dir}")
 
 
-def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml", *, roles: Any = None) -> dict[str, Any]:
+def verify_benchmark_output(
+    cfg_path: str | Path = "configs/benchmark_mwm.yaml",
+    *,
+    roles: Any = None,
+    single_level_only: bool = False,
+) -> dict[str, Any]:
     cfg = OmegaConf.merge(BENCHMARK_DEFAULTS, OmegaConf.load(str(cfg_path)))
     resolved = _load_expected(cfg, roles=roles)
     output_dir = Path(str(cfg.output_dir))
@@ -363,7 +415,10 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
         errors.append(f"missing benchmark cells: {missing}")
     if extra:
         errors.append(f"unexpected benchmark cells: {extra}")
-    _validate_paper_targets(cfg, rows, errors)
+    if single_level_only:
+        _validate_single_level_matches(cfg, rows, errors)
+    else:
+        _validate_paper_targets(cfg, rows, errors)
 
     manifest_by_cell: dict[tuple[str, int, str], str] = {}
     manifest_by_env_seed: dict[tuple[str, int], set[str]] = {}
@@ -480,6 +535,7 @@ def verify_benchmark_output(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
         "runs": len(rows),
         "cells": sorted(manifest_by_cell),
         "plots": sorted(required_plots),
+        "single_level_only": bool(single_level_only),
     }
 
 
@@ -516,8 +572,12 @@ def verify_benchmark_static(cfg_path: str | Path = "configs/benchmark_mwm.yaml",
     }
 
 
-def main(cfg_path: str, *, static_only: bool = False, roles: Any = None) -> None:
-    report = verify_benchmark_static(cfg_path, roles=roles) if static_only else verify_benchmark_output(cfg_path, roles=roles)
+def main(cfg_path: str, *, static_only: bool = False, roles: Any = None, single_level_only: bool = False) -> None:
+    report = (
+        verify_benchmark_static(cfg_path, roles=roles)
+        if static_only
+        else verify_benchmark_output(cfg_path, roles=roles, single_level_only=single_level_only)
+    )
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
@@ -528,5 +588,10 @@ if __name__ == "__main__":
     parser.add_argument("config", nargs="?", default="configs/benchmark_mwm.yaml", help="Benchmark YAML config")
     parser.add_argument("--static-only", action="store_true", help="Only validate the config matrix")
     parser.add_argument("--roles", nargs="+", help="Optional role filter, e.g. upstream_lewm_converted")
+    parser.add_argument(
+        "--single-level-only",
+        action="store_true",
+        help="Validate retrained K=[D] MWM against upstream without applying paper-target thresholds",
+    )
     args = parser.parse_args()
-    main(args.config, static_only=args.static_only, roles=args.roles)
+    main(args.config, static_only=args.static_only, roles=args.roles, single_level_only=args.single_level_only)
