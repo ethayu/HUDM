@@ -82,9 +82,11 @@ The benchmark matrix is PushT and TwoRoom, seeds `0,1,2`, with:
 
 ## Training Resources
 
-Current validation uses single-GPU Slurm jobs. `train_mwm.py` pins Lightning to
-`devices=1`, and the checked-in Slurm scripts request one B200 GPU per training
-or benchmark job. Multi-GPU/DDP training is deferred for this research branch so
-paper-parity comparisons stay on the same training path being validated here.
+Current validation uses single-GPU Slurm jobs. The checked-in Slurm scripts
+request one B200 GPU per training or benchmark job, and the training defaults
+keep Lightning at `train.devices: 1` so paper-parity comparisons stay on the
+same path being validated here. Multi-GPU/DDP is opt-in through train config
+keys such as `devices`, `strategy`, `num_nodes`, `sync_batchnorm`, and
+`use_distributed_sampler`; no current parity job uses those knobs.
 
 Generated datasets, checkpoints, rollouts, logs, and caches are intentionally ignored by git. See `REVIEW_GUIDE.md` for the code-review map and acceptance checks.

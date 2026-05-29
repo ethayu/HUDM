@@ -44,6 +44,12 @@ DEFAULTS = {
         "horizon": 16,
         "num_workers": 0,
         "no_cuda": False,
+        "devices": 1,
+        "cpu_devices": 1,
+        "strategy": "auto",
+        "num_nodes": 1,
+        "sync_batchnorm": False,
+        "use_distributed_sampler": True,
         "checkpoint_dir": "checkpoints_mwm",
         "run_name": "mwm_lewm",
         "backend": "stable_worldmodel_lewm",
@@ -102,6 +108,48 @@ def _as_container(value: Any) -> Any:
     if hasattr(value, "__dict__"):
         return {k: _as_container(v) for k, v in vars(value).items()}
     return value
+
+
+def _coerce_lightning_devices(value: Any) -> int | str | list[int]:
+    if value is None:
+        return 1
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.lower() == "auto":
+            return "auto"
+        if "," in stripped:
+            devices = [int(part.strip()) for part in stripped.split(",") if part.strip()]
+            if not devices:
+                raise ValueError("train.devices must specify at least one device.")
+            return devices
+        value = int(stripped)
+    if isinstance(value, (list, tuple)):
+        devices = [int(device) for device in value]
+        if not devices:
+            raise ValueError("train.devices must specify at least one device.")
+        return devices
+    devices_int = int(value)
+    if devices_int < 1:
+        raise ValueError(f"train.devices must be positive, got {devices_int}.")
+    return devices_int
+
+
+def _resolve_lightning_trainer_runtime(cfg: Any) -> dict[str, Any]:
+    use_cuda = not bool(cfg.train.no_cuda) and torch.cuda.is_available()
+    accelerator = "gpu" if use_cuda else "cpu"
+    devices_key = "devices" if use_cuda else "cpu_devices"
+    devices = _coerce_lightning_devices(cfg.train.get(devices_key, 1))
+    num_nodes = int(cfg.train.get("num_nodes", 1))
+    if num_nodes < 1:
+        raise ValueError(f"train.num_nodes must be positive, got {num_nodes}.")
+    return {
+        "accelerator": accelerator,
+        "devices": devices,
+        "strategy": str(cfg.train.get("strategy", "auto") or "auto"),
+        "num_nodes": num_nodes,
+        "sync_batchnorm": bool(cfg.train.get("sync_batchnorm", False)),
+        "use_distributed_sampler": bool(cfg.train.get("use_distributed_sampler", True)),
+    }
 
 
 def _resolve_lewm_base_adapter_model_cfg(cfg: Any, dataset: Any) -> dict[str, Any]:
@@ -325,9 +373,9 @@ def _run_lewm_base_adapter_training(
     }
     trainer_root = _prepare_trainer_root(run_dir, cfg)
     checkpoint_cb = _lewm_base_adapter_checkpoint_callback(cfg)
+    trainer_runtime = _resolve_lightning_trainer_runtime(cfg)
     trainer = pl.Trainer(
-        accelerator="cpu" if bool(cfg.train.no_cuda) or not torch.cuda.is_available() else "gpu",
-        devices=1,
+        **trainer_runtime,
         precision=cfg.train.get("precision", "bf16"),
         max_epochs=int(cfg.schedule.max_epochs),
         gradient_clip_val=float(cfg.train.get("gradient_clip_val", 1.0)),

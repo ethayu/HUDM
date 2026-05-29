@@ -38,6 +38,7 @@ from train_mwm import (
     _build_trainable_model_from_base,
     _lewm_base_adapter_checkpoint_callback,
     _load_lewm_base_adapter_lightning_state,
+    _resolve_lightning_trainer_runtime,
 )
 from train_mwm import _prepare_trainer_root
 from train_mwm import main as train_mwm_main
@@ -1287,6 +1288,49 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(callback._every_n_train_steps, 1000)
         self.assertEqual(callback._every_n_epochs, 0)
         self.assertTrue(callback.save_last)
+
+    def test_lightning_runtime_defaults_to_single_gpu_when_cuda_available(self) -> None:
+        cfg = OmegaConf.create({"train": {"no_cuda": False}})
+        with unittest.mock.patch("torch.cuda.is_available", return_value=True):
+            runtime = _resolve_lightning_trainer_runtime(cfg)
+
+        self.assertEqual(runtime["accelerator"], "gpu")
+        self.assertEqual(runtime["devices"], 1)
+        self.assertEqual(runtime["strategy"], "auto")
+        self.assertEqual(runtime["num_nodes"], 1)
+        self.assertFalse(runtime["sync_batchnorm"])
+        self.assertTrue(runtime["use_distributed_sampler"])
+
+    def test_lightning_runtime_allows_opt_in_multi_gpu(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "train": {
+                    "no_cuda": False,
+                    "devices": 4,
+                    "strategy": "ddp",
+                    "num_nodes": 2,
+                    "sync_batchnorm": True,
+                    "use_distributed_sampler": False,
+                }
+            }
+        )
+        with unittest.mock.patch("torch.cuda.is_available", return_value=True):
+            runtime = _resolve_lightning_trainer_runtime(cfg)
+
+        self.assertEqual(runtime["accelerator"], "gpu")
+        self.assertEqual(runtime["devices"], 4)
+        self.assertEqual(runtime["strategy"], "ddp")
+        self.assertEqual(runtime["num_nodes"], 2)
+        self.assertTrue(runtime["sync_batchnorm"])
+        self.assertFalse(runtime["use_distributed_sampler"])
+
+    def test_lightning_runtime_uses_cpu_devices_when_cuda_disabled(self) -> None:
+        cfg = OmegaConf.create({"train": {"no_cuda": True, "devices": 4, "cpu_devices": 1}})
+        with unittest.mock.patch("torch.cuda.is_available", return_value=True):
+            runtime = _resolve_lightning_trainer_runtime(cfg)
+
+        self.assertEqual(runtime["accelerator"], "cpu")
+        self.assertEqual(runtime["devices"], 1)
 
     def test_lewm_base_adapter_lightning_state_loader_strips_model_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
