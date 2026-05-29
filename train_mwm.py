@@ -248,7 +248,7 @@ class _ZScoreScaler:
         arr = np.asarray(values).reshape(-1, np.asarray(values).shape[-1])
         arr = arr[~np.isnan(arr).any(axis=1)]
         self.mean = arr.mean(axis=0, keepdims=True)
-        self.std = arr.std(axis=0, keepdims=True)
+        self.std = arr.std(axis=0, keepdims=True, ddof=1)
         return self
 
     def __call__(self, values: Any) -> Any:

@@ -44,6 +44,7 @@ from train_mwm import (
     _lewm_base_adapter_checkpoint_callback,
     _load_lewm_base_adapter_lightning_state,
     _resolve_lightning_trainer_runtime,
+    _ZScoreScaler,
 )
 from train_mwm import _prepare_trainer_root
 from train_mwm import main as train_mwm_main
@@ -880,7 +881,7 @@ class MWMCoreTests(unittest.TestCase):
         def direct_loss() -> torch.Tensor:
             output = direct.encode(dict(batch))
             pred = direct.predict(output["emb"][:, :2], output["act_emb"][:, :2])
-            return (pred - output["emb"][:, 1:].detach()).pow(2).mean()
+            return (pred - output["emb"][:, 1:]).pow(2).mean()
 
         direct.train()
         mwm.train()
@@ -893,12 +894,20 @@ class MWMCoreTests(unittest.TestCase):
         d_loss.backward()
         m_loss.backward()
         self.assertTrue(torch.equal(direct.predictor.pos_embedding.grad, mwm.transitions[0].predictor.pos_embedding.grad))
+        self.assertTrue(torch.equal(direct.projector.net[0].weight.grad, mwm.projector.net[0].weight.grad))
 
         d_opt = torch.optim.AdamW(direct.parameters(), lr=1e-4, weight_decay=1e-3)
         m_opt = torch.optim.AdamW(mwm.parameters(), lr=1e-4, weight_decay=1e-3)
         d_opt.step()
         m_opt.step()
         self.assertTrue(torch.allclose(direct.predictor.pos_embedding, mwm.transitions[0].predictor.pos_embedding))
+
+    def test_lewm_column_scaler_matches_reference_sample_std(self) -> None:
+        values = np.array([[1.0, 3.0], [3.0, 7.0], [np.nan, 1.0]], dtype=np.float32)
+        scaler = _ZScoreScaler().fit(values)
+
+        self.assertTrue(np.allclose(scaler.mean, np.array([[2.0, 5.0]], dtype=np.float32)))
+        self.assertTrue(np.allclose(scaler.std, np.array([[np.sqrt(2.0), np.sqrt(8.0)]], dtype=np.float32)))
 
     def test_train_transform_preserves_frameskip_action_blocks(self) -> None:
         transform = MWMTrainSampleTransform(normalize_pixels=False)

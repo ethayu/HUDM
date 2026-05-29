@@ -132,19 +132,18 @@ configs and CEM solver config
 (`config/eval/solver/cem.yaml`) in https://github.com/lucas-maes/le-wm.
 
 The retrained Le-WM paper-parity config intentionally follows the paper
-protocol first, using upstream code only to confirm implementation semantics:
-10 training epochs, Stable-WM Lance loading,
+protocol first, using upstream code to confirm implementation semantics:
+100 training epochs, Stable-WM Lance loading,
 `num_steps = history_size + num_preds`, `frameskip: 5`, ImageNet image
 preprocessing, z-score normalization for non-pixel columns, a
 Stable-Pretraining random clip split, AdamW with warmup-cosine scheduling,
 `bf16` precision, and the upstream Le-WM prediction/SIGReg loss. The released
-training YAML currently says `max_epochs: 100`; that is treated as a repo
-default, not the paper-parity target.
+training YAML uses `max_epochs: 100`; that is treated as the paper-parity
+training recipe for `K=[D]` identity checks.
 The config uses upstream's `num_workers: 6`; worker compatibility is checked
 with a file-backed loader probe because stdin-launched multiprocessing probes can
-fail for reasons unrelated to the training script. It sets `pin_memory: false`
-in this environment because pinned memory is a throughput-only setting and can
-put non-picklable locks on Lightning's spawned-worker path. Exact training uses
+fail for reasons unrelated to the training script. It sets `pin_memory: true`
+to match the upstream loader recipe. Exact training uses
 a minimal prebuilt-loader LightningDataModule so Stable-Pretraining does not
 attach trainer state to Lance-backed datasets before worker spawn.
 The paper-parity eval config uses `eval.sampling: stable_worldmodel`, matching

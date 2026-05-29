@@ -124,9 +124,10 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["train"]["num_workers"], 6)
         self.assertEqual(cfg["train"]["prefetch_factor"], 3)
         self.assertEqual(cfg["train"]["drop_last"], True)
+        self.assertEqual(cfg["train"]["pin_memory"], True)
         self.assertEqual(cfg["train"]["precision"], "bf16")
         self.assertEqual(cfg["train"]["gradient_clip_val"], 1.0)
-        self.assertEqual(cfg["schedule"]["max_epochs"], 10)
+        self.assertEqual(cfg["schedule"]["max_epochs"], 100)
 
         self.assertEqual(cfg["optim"]["lr"], 5e-5)
         self.assertEqual(cfg["optim"]["weight_decay"], 1e-3)
@@ -151,7 +152,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["model"]["num_preds"], 1, name)
             self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
             self.assertEqual(cfg["train"]["batch_size"], 128, name)
-            self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
+            self.assertEqual(cfg["train"]["pin_memory"], True, name)
+            self.assertEqual(cfg["schedule"]["max_epochs"], 100, name)
 
     def test_train_configs_do_not_override_base_architecture_knobs(self) -> None:
         forbidden_model_keys = {
@@ -211,8 +213,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
             self.assertEqual(cfg["train"]["batch_size"], 128, name)
             self.assertEqual(cfg["train"]["num_workers"], 6, name)
+            self.assertEqual(cfg["train"]["pin_memory"], True, name)
             self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
-            self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
+            self.assertEqual(cfg["schedule"]["max_epochs"], 100, name)
 
     def test_paper_parity_tworoom_configs_exist_and_use_paper_eval_profile(self) -> None:
         train_cfg = yaml.safe_load((ROOT / "configs" / "train_mwm_lewm_tworoom_upstream.yaml").read_text(encoding="utf-8"))

@@ -411,7 +411,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
                 emb[:, : self.history_size, :k],
                 actions[:, : self.history_size],
             )
-            tgt_emb = emb[:, self.num_preds :, :k].detach()
+            tgt_emb = emb[:, self.num_preds :, :k]
             pred_losses.append((pred_emb - tgt_emb).pow(2).mean())
 
         return matryoshka_base_loss(
