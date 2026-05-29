@@ -525,6 +525,7 @@ runs:
     def test_role_checkpoint_contract_rejects_direct_target_and_wrong_backend(self) -> None:
         row = {"role": "retrained_lewm_single", "checkpoint_run_dir": "checkpoints_mwm/retrained"}
         metadata = {
+            "D": 192,
             "levels": [192],
             "training_backend": "stable_pretraining",
             "model": {"target": "mwm.adapters.lewm.build_mwm_lewm"},
@@ -546,17 +547,19 @@ runs:
         metadatas = [
             {
                 "role": "upstream_lewm_converted",
-                "levels": [192],
+                "levels": [128],
                 "architecture_version": LEWM_BASE_ADAPTER_ARCH,
-                "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_upstream_object"},
+                "model": {"D": 128, "target": "mwm.adapters.lewm.build_mwm_lewm_from_upstream_object"},
             },
             {
-                "levels": [192],
+                "D": 128,
+                "levels": [128],
                 "training_backend": "stable_worldmodel_lewm",
                 "architecture_version": LEWM_BASE_ADAPTER_ARCH,
                 "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
             },
             {
+                "D": 192,
                 "levels": [48, 96, 144],
                 "training_backend": "stable_worldmodel_lewm",
                 "architecture_version": LEWM_BASE_ADAPTER_ARCH,

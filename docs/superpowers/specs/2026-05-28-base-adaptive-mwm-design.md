@@ -58,7 +58,7 @@ The framework exposes a common top-level policy schema:
 
 ```yaml
 mwm:
-  K: [48, 96, 144, 192]
+  K: [48, 96, 144]
   component_policy:
     shared: [latent_producer]
     per_level: [transition]

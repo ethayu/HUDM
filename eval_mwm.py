@@ -130,8 +130,6 @@ def _uses_standardized_action_space(model: Any, metadata: dict[str, Any], cfg: A
     normalized = dataset_meta.get("normalized_columns", []) if isinstance(dataset_meta, dict) else []
     if "action" in {str(x) for x in normalized}:
         return True
-    if str(metadata.get("role", "")) == "upstream_lewm_converted":
-        return True
     return False
 
 

@@ -15,7 +15,12 @@ from stable_worldmodel.policy import PlanConfig
 from stable_worldmodel.solver import CEMSolver
 from stable_worldmodel.wm.lewm.lewm import LeWM as StableLeWM
 
-from eval_mwm import _available_stat_keys_for_action_process, _build_mwm_policy, _build_stable_wm_reference_policy
+from eval_mwm import (
+    _available_stat_keys_for_action_process,
+    _build_mwm_policy,
+    _build_stable_wm_reference_policy,
+    _uses_standardized_action_space,
+)
 from mwm.adapters.lewm import (
     build_mwm_lewm_from_stable_config,
     build_mwm_lewm_from_upstream_object,
@@ -1043,6 +1048,24 @@ class MWMCoreTests(unittest.TestCase):
             self.assertEqual(policy.solver.topk, 4)
             self.assertEqual(policy.solver.n_steps, 7)
             self.assertEqual(policy.cfg.horizon, 5)
+
+    def test_action_preprocessing_is_metadata_driven_not_upstream_role_driven(self) -> None:
+        cfg = OmegaConf.create({"eval": {"action_preprocessing": "auto"}, "data": {"action_preprocessing": "auto"}})
+
+        self.assertFalse(
+            _uses_standardized_action_space(
+                object(),
+                {"role": "upstream_lewm_converted"},
+                cfg,
+            )
+        )
+        self.assertTrue(
+            _uses_standardized_action_space(
+                object(),
+                {"role": "upstream_lewm_converted", "action_preprocessing": "standard_scaler"},
+                cfg,
+            )
+        )
 
     def test_mwm_and_reference_policies_share_action_block_recipe(self) -> None:
         cfg = OmegaConf.create(

@@ -333,6 +333,31 @@ def _validate_checkpoint_metadata(checkpoint_dir: Path, errors: list[str]) -> di
     return metadata
 
 
+def _checkpoint_full_latent_dim(metadata: dict[str, Any], checkpoint_dir: Path, errors: list[str]) -> int | None:
+    model_meta = metadata.get("model", {})
+    model_kwargs = model_meta.get("kwargs", {}) if isinstance(model_meta, dict) else {}
+    candidates = [
+        metadata.get("D"),
+        model_meta.get("D") if isinstance(model_meta, dict) else None,
+        model_kwargs.get("D") if isinstance(model_kwargs, dict) else None,
+        model_kwargs.get("expected_D") if isinstance(model_kwargs, dict) else None,
+    ]
+    dims: list[int] = []
+    for idx, value in enumerate(candidates):
+        if value is None:
+            continue
+        dim = _to_int(value, label=f"{checkpoint_dir} D candidate {idx}", errors=errors)
+        if dim is not None:
+            dims.append(dim)
+    if not dims:
+        errors.append(f"MWM checkpoint missing full latent dimension D: {checkpoint_dir}")
+        return None
+    if len(set(dims)) != 1:
+        errors.append(f"MWM checkpoint has inconsistent full latent dimension D values {dims}: {checkpoint_dir}")
+        return None
+    return dims[0]
+
+
 def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, Any], errors: list[str]) -> None:
     role = str(row.get("role", ""))
     checkpoint_dir = Path(str(row.get("checkpoint_run_dir", "")))
@@ -341,18 +366,19 @@ def _validate_role_checkpoint_contract(row: dict[str, Any], metadata: dict[str, 
     target = str(model_meta.get("target", "")) if isinstance(model_meta, dict) else ""
     backend = str(metadata.get("training_backend", ""))
     trainable_lewm_targets = ("build_mwm_lewm_from_stable_config",)
+    d = _checkpoint_full_latent_dim(metadata, checkpoint_dir, errors)
     if role == "upstream_lewm_converted":
         if metadata.get("role") != "upstream_lewm_converted":
             errors.append(f"upstream role checkpoint missing upstream_lewm_converted metadata role: {checkpoint_dir}")
-        if levels != [192]:
-            errors.append(f"upstream role checkpoint must be single-fidelity K=[192], got {levels}: {checkpoint_dir}")
+        if d is not None and levels != [d]:
+            errors.append(f"upstream role checkpoint must be single-fidelity K=[D={d}], got {levels}: {checkpoint_dir}")
         if not target.endswith("build_mwm_lewm_from_upstream_object"):
             errors.append(f"upstream role checkpoint must load through the normal converted Le-WM MWM target: {checkpoint_dir}")
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
             errors.append(f"upstream role checkpoint missing corrected architecture version: {checkpoint_dir}")
     elif role == "retrained_lewm_single":
-        if levels != [192]:
-            errors.append(f"retrained single checkpoint must be K=[192], got {levels}: {checkpoint_dir}")
+        if d is not None and levels != [d]:
+            errors.append(f"retrained single checkpoint must be K=[D={d}], got {levels}: {checkpoint_dir}")
         if backend != "stable_worldmodel_lewm":
             errors.append(
                 f"retrained single checkpoint must use the Le-WM base-adapter backend, got {backend!r}: {checkpoint_dir}"
