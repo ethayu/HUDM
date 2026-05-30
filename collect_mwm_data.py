@@ -5,6 +5,7 @@ from typing import Any
 
 from omegaconf import OmegaConf
 
+from mwm.config_cli import load_config
 from mwm.data.stable_wm import write_dataset_metadata
 from mwm.swm.envs import (
     import_object,
@@ -61,8 +62,8 @@ def _build_policy(import_path: str | None, seed: int):
     return RandomPolicy(seed=int(seed))
 
 
-def main(cfg_path: str) -> None:
-    cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
+def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
+    cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     env_id = str(cfg.env_id)
     image_shape = parse_image_shape(cfg.image_shape)
     restore_import_path = None if cfg.get("restore", None) is None else cfg.restore.get("import_path", None)
@@ -116,9 +117,10 @@ def main(cfg_path: str) -> None:
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if len(sys.argv) != 2:
-        print("Usage: python collect_mwm_data.py configs/collect/mwm_pusht.yaml")
-        raise SystemExit(1)
-    main(sys.argv[1])
+    parser = argparse.ArgumentParser(description="Collect an MWM dataset.")
+    parser.add_argument("config", help="Collection YAML config")
+    parser.add_argument("--set", action="append", default=[], help="OmegaConf dotlist override, e.g. seed=1")
+    args = parser.parse_args()
+    main(args.config, overrides=args.set)

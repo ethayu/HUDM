@@ -14,6 +14,7 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 
+from mwm.config_cli import load_config
 from mwm.dependency_refs import dependency_refs
 from mwm.data.stable_wm import load_dataset_metadata
 from mwm.swm.restore import validate_restore_columns
@@ -528,8 +529,8 @@ def export_lewm_base_adapter_lightning_checkpoint(
     print(f"Exported Le-WM base-adapter Lightning checkpoint to canonical MWM checkpoint: {run_dir}")
 
 
-def main(cfg_path: str) -> None:
-    cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
+def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
+    cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
     torch.manual_seed(int(cfg.seed))
     backend = str(cfg.train.backend).lower()
@@ -554,24 +555,23 @@ def main(cfg_path: str) -> None:
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if len(sys.argv) == 2:
-        main(sys.argv[1])
-    elif len(sys.argv) in {4, 6} and sys.argv[2] == "--export-from-lightning":
-        output = None
-        if len(sys.argv) == 6:
-            if sys.argv[4] != "--output-dir":
-                print(
-                    "Usage: python train_mwm.py CONFIG --export-from-lightning CHECKPOINT "
-                    "[--output-dir OUTPUT_DIR]"
-                )
-                raise SystemExit(1)
-            output = sys.argv[5]
-        export_lewm_base_adapter_lightning_checkpoint(sys.argv[1], sys.argv[3], output_dir=output)
-    else:
-        print(
-            "Usage: python train_mwm.py CONFIG\n"
-            "   or: python train_mwm.py CONFIG --export-from-lightning CHECKPOINT [--output-dir OUTPUT_DIR]"
+    parser = argparse.ArgumentParser(description="Train an MWM checkpoint.")
+    parser.add_argument("config", help="Training YAML config")
+    parser.add_argument("--set", action="append", default=[], help="OmegaConf dotlist override, e.g. train.batch_size=16")
+    parser.add_argument("--export-from-lightning", metavar="CHECKPOINT", help="Export a Lightning checkpoint")
+    parser.add_argument("--output-dir", help="Output directory for --export-from-lightning")
+    args = parser.parse_args()
+    if args.export_from_lightning:
+        if args.set:
+            parser.error("--set is only supported for training, not --export-from-lightning")
+        export_lewm_base_adapter_lightning_checkpoint(
+            args.config,
+            args.export_from_lightning,
+            output_dir=args.output_dir,
         )
-        raise SystemExit(1)
+    else:
+        if args.output_dir:
+            parser.error("--output-dir requires --export-from-lightning")
+        main(args.config, overrides=args.set)

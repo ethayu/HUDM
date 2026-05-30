@@ -8,6 +8,7 @@ import torch
 from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 
+from mwm.config_cli import load_config
 from mwm.dependency_refs import dependency_refs
 from mwm.benchmark.artifacts import write_json
 from mwm.checkpoints import CHECKPOINT_FORMAT, load_world_model_from_checkpoint
@@ -544,8 +545,8 @@ def _combine_policy_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]
     return _combine_mwm_diagnostics(batches)
 
 
-def main(cfg_path: str) -> None:
-    cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
+def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
+    cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     device = _device(str(cfg.device))
     data_format = str(cfg.data.get("format", "lance")).lower()
     if data_format != "lance":
@@ -643,9 +644,10 @@ def main(cfg_path: str) -> None:
 
 
 if __name__ == "__main__":
-    import sys
+    import argparse
 
-    if len(sys.argv) != 2:
-        print("Usage: python eval_mwm.py configs/eval/paper_pusht.yaml")
-        raise SystemExit(1)
-    main(sys.argv[1])
+    parser = argparse.ArgumentParser(description="Evaluate an MWM checkpoint.")
+    parser.add_argument("config", help="Evaluation YAML config")
+    parser.add_argument("--set", action="append", default=[], help="OmegaConf dotlist override, e.g. eval.seed=1")
+    args = parser.parse_args()
+    main(args.config, overrides=args.set)

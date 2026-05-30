@@ -22,6 +22,7 @@ from mwm.benchmark.artifacts import (
     write_review_html,
     write_summary_csv,
 )
+from mwm.config_cli import load_config
 from eval_mwm import main as run_eval_mwm
 
 
@@ -201,8 +202,8 @@ def _episode_trace_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return rows
 
 
-def main(cfg_path: str, *, roles: Any = None) -> None:
-    cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path))
+def main(cfg_path: str, *, roles: Any = None, overrides: list[str] | None = None) -> None:
+    cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     _require_no_legacy_fields(cfg)
     output_dir = Path(str(cfg.output_dir))
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -307,5 +308,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run an MWM benchmark matrix.")
     parser.add_argument("config", help="Benchmark YAML config")
     parser.add_argument("--roles", nargs="+", help="Optional role filter, e.g. upstream_lewm_converted")
+    parser.add_argument("--set", action="append", default=[], help="OmegaConf dotlist override, e.g. seed=1")
     args = parser.parse_args()
-    main(args.config, roles=args.roles)
+    main(args.config, roles=args.roles, overrides=args.set)

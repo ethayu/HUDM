@@ -295,6 +295,18 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
         self.assertEqual(hits, [])
 
+    def test_desktop_entrypoints_accept_set_overrides(self) -> None:
+        entrypoints = [
+            ROOT / "collect_mwm_data.py",
+            ROOT / "train_mwm.py",
+            ROOT / "eval_mwm.py",
+            ROOT / "benchmark_mwm.py",
+        ]
+        for path in entrypoints:
+            text = path.read_text(encoding="utf-8")
+            self.assertIn("load_config", text, path)
+            self.assertIn('"--set"', text, path)
+
     def test_upstream_data_prep_is_lance_only(self) -> None:
         text = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
         forbidden = [
