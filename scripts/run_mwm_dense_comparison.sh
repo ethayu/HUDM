@@ -12,7 +12,19 @@ fi
 cd "$ROOT"
 
 "$PY" verify_mwm_data.py --paper-parity
-"$PY" benchmark_mwm.py configs/benchmark/dense_pusht.yaml
-"$PY" verify_mwm_benchmark.py configs/benchmark/dense_pusht.yaml
-"$PY" benchmark_mwm.py configs/benchmark/dense_tworoom.yaml
-"$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml
+
+status=0
+run_step() {
+  echo "+ $*"
+  if ! "$@"; then
+    status=1
+    echo "WARNING: command failed; continuing so remaining benchmark environments still run: $*" >&2
+  fi
+}
+
+run_step "$PY" benchmark_mwm.py configs/benchmark/dense_pusht.yaml
+run_step "$PY" verify_mwm_benchmark.py configs/benchmark/dense_pusht.yaml
+run_step "$PY" benchmark_mwm.py configs/benchmark/dense_tworoom.yaml
+run_step "$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml
+
+exit "$status"

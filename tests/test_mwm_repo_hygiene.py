@@ -242,6 +242,22 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertIsNotNone(work_line, script)
             self.assertLess(guard_line, work_line, script)
 
+    def test_benchmark_comparison_scripts_finish_all_envs_before_reporting_failure(self) -> None:
+        scripts = [
+            ROOT / "scripts" / "run_mwm_identity_parity.sh",
+            ROOT / "scripts" / "run_mwm_scheduled_comparison.sh",
+            ROOT / "scripts" / "run_mwm_dense_comparison.sh",
+        ]
+        for script in scripts:
+            text = script.read_text(encoding="utf-8")
+            self.assertIn("status=0", text, script)
+            self.assertIn("run_step()", text, script)
+            self.assertIn('exit "$status"', text, script)
+            for line in text.splitlines():
+                stripped = line.strip()
+                if "benchmark_mwm.py" in stripped or "verify_mwm_benchmark.py" in stripped:
+                    self.assertTrue(stripped.startswith("run_step "), f"{script}: {stripped}")
+
     def test_slurm_mwm_scripts_refuse_direct_bash_before_gpu_or_work(self) -> None:
         risk_tokens = (
             "nvidia-smi",
