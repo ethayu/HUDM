@@ -1,0 +1,12 @@
+output_dir: rollouts/local_benchmark_pusht_smoke
+title: Local PushT Smoke Benchmark
+env_id: swm/PushT-v1
+seed: 42
+eval_config: configs/local/eval_pusht_smoke.yaml
+manifest:
+  group: local_pusht_smoke
+  path: rollouts/manifests/local_pusht_smoke.json
+runs:
+  - name: upstream_smoke
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_pusht
