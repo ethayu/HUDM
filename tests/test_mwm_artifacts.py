@@ -383,6 +383,56 @@ runs:
 
         self.assertTrue(any("dense MWM checkpoint must be K=[6,12,48,96,144,192]" in error for error in errors), errors)
 
+    def test_benchmark_static_cli_can_skip_checkpoint_contracts(self) -> None:
+        import subprocess
+        import sys
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            eval_cfg = root / "eval.yaml"
+            eval_cfg.write_text(
+                """
+env_id: swm/PushT-v1
+checkpoint: {run_dir: missing_checkpoint, epoch: null}
+data: {path: data/upstream/pusht_expert_train.lance, format: lance}
+eval: {seed: 0}
+planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+""",
+                encoding="utf-8",
+            )
+            bench_cfg = root / "benchmark.yaml"
+            bench_cfg.write_text(
+                f"""
+output_dir: {root / "out"}
+env_id: swm/PushT-v1
+seed: 0
+eval_config: {eval_cfg}
+manifest: {{group: local_static, path: {root / "manifest.json"}}}
+runs:
+  - name: missing_checkpoint_run
+    role: upstream_lewm_converted
+    checkpoint: {root / "missing_checkpoint"}
+""",
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    "verify_mwm_benchmark.py",
+                    str(bench_cfg),
+                    "--static-only",
+                    "--no-checkpoints",
+                ],
+                cwd=Path(__file__).resolve().parents[1],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('"check_checkpoints": false', result.stdout.lower())
+
     def test_benchmark_role_filter_runs_upstream_first(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
