@@ -26,11 +26,9 @@ from mwm.data.manifest import (
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
 from mwm.eval.policy import (
     MWMWorldModelPolicy,
-    imagenet_image_input_transform,
     model_accounting,
     mwm_image_input_transform,
 )
-from mwm.eval.reference import build_stable_wm_reference_policy
 from mwm.swm.envs import make_swm_world, parse_env_kwargs, parse_image_shape, validate_continuous_box_action_space
 from mwm.swm.restore import eval_callables_for_env
 
@@ -56,7 +54,6 @@ DEFAULTS = {
         "manifest_path": None,
         "write_manifest_path": None,
         "sampling": "mwm",
-        "reference_policy": False,
         "save_video": False,
         "video_path": "rollouts/mwm_eval_videos",
     },
@@ -360,65 +357,6 @@ def _build_mwm_policy(
     return MWMWorldModelPolicy(model=model, solver=solver, config=plan_cfg, process=process, transform=image_transform)
 
 
-def _build_stable_wm_reference_policy(
-    model: Any,
-    metadata: dict[str, Any],
-    cfg: Any,
-    device: torch.device,
-    process: dict[str, Any],
-) -> Any:
-    del model
-    upstream = metadata.get("upstream", {})
-    checkpoint = upstream.get("object_checkpoint") if isinstance(upstream, dict) else None
-    if not checkpoint:
-        model_meta = metadata.get("model", {})
-        kwargs = model_meta.get("kwargs", {}) if isinstance(model_meta, dict) else {}
-        checkpoint = kwargs.get("object_checkpoint") if isinstance(kwargs, dict) else None
-    if not checkpoint:
-        raise TypeError("Stable-WM reference evaluation requires metadata.upstream.object_checkpoint.")
-    reference_model = torch.load(str(checkpoint), map_location=device, weights_only=False)
-    if not isinstance(reference_model, torch.nn.Module):
-        raise TypeError(f"Expected torch.nn.Module in reference checkpoint {checkpoint!r}, got {type(reference_model).__name__}.")
-    reference_model.to(device)
-    reference_model.eval()
-    configured_action_block = int(metadata.get("action_block", metadata.get("model", {}).get("action_block", 1)))
-    action_block = int(cfg.planner.get("action_block", configured_action_block))
-    raw_batch_size = cfg.planner.get("batch_size", "auto")
-    planner_batch_size = (
-        int(cfg.eval.num_envs)
-        if raw_batch_size is None or str(raw_batch_size).lower() == "auto"
-        else int(raw_batch_size)
-    )
-    raw_topk = cfg.planner.get("topk", None)
-    topk = (
-        max(1, int(raw_topk))
-        if raw_topk is not None
-        else max(1, int(round(int(cfg.planner.pop_size) * float(cfg.planner.elite_frac))))
-    )
-    plan_cfg = PlanConfig(
-        horizon=int(cfg.planner.horizon),
-        receding_horizon=int(cfg.planner.receding_horizon),
-        action_block=action_block,
-        warm_start=bool(cfg.planner.warm_start),
-    )
-    cem_kwargs = {
-        "batch_size": max(1, planner_batch_size),
-        "num_samples": int(cfg.planner.pop_size),
-        "var_scale": float(cfg.planner.init_std),
-        "n_steps": int(cfg.planner.n_iter),
-        "topk": topk,
-        "device": device,
-        "seed": int(cfg.planner.seed if cfg.planner.get("seed", None) is not None else cfg.eval.seed),
-    }
-    preprocessing_spec = metadata.get("preprocessing_spec", {})
-    use_imagenet = bool(metadata.get("normalize_imagenet", False)) or (
-        isinstance(preprocessing_spec, dict) and preprocessing_spec.get("image") == "imagenet"
-    )
-    image_fn = imagenet_image_input_transform if use_imagenet else mwm_image_input_transform
-    image_transform = {"pixels": image_fn, "goal": image_fn}
-    return build_stable_wm_reference_policy(reference_model, plan_cfg, cem_kwargs=cem_kwargs, process=process, transform=image_transform)
-
-
 def _manifest_row_to_pair(row: dict[str, Any]) -> StartGoalPair:
     return StartGoalPair(
         episode=int(row["episode"]),
@@ -511,10 +449,7 @@ def _run_batch(
             metadata["action_dim"] = int(low.shape[0])
         if low.shape[0] != int(metadata["action_dim"]):
             raise ValueError(f"Env action_dim={low.shape[0]} does not match checkpoint action_dim={metadata['action_dim']}.")
-        if bool(cfg.eval.get("reference_policy", False)):
-            policy = _build_stable_wm_reference_policy(model, metadata, cfg, device, process)
-        else:
-            policy = _build_mwm_policy(model, metadata, cfg, device, world.envs.single_action_space, process)
+        policy = _build_mwm_policy(model, metadata, cfg, device, world.envs.single_action_space, process)
         world.set_policy(policy)
         if hasattr(policy, "reset_trace"):
             policy.reset_trace()
@@ -711,6 +646,6 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 2:
-        print("Usage: python eval_mwm.py configs/eval_mwm.yaml")
+        print("Usage: python eval_mwm.py configs/eval/paper_pusht.yaml")
         raise SystemExit(1)
     main(sys.argv[1])

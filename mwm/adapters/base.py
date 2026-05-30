@@ -82,7 +82,7 @@ class StableWMBaseAdapter(Protocol):
     ) -> StableWMBaseSpec:
         raise NotImplementedError
 
-    def build_model(self, spec: StableWMBaseSpec) -> nn.Module:
+    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> nn.Module:
         raise NotImplementedError
 
 

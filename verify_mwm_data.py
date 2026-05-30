@@ -10,19 +10,21 @@ from mwm.data.stable_wm import dataset_metadata_path, load_dataset_metadata
 
 
 DEFAULT_CONFIGS = [
-    "configs/train_mwm_lewm_pusht.yaml",
-    "configs/train_mwm_lewm_tworoom.yaml",
-    "configs/train_mwm_scheduled_pusht.yaml",
-    "configs/train_mwm_scheduled_tworoom.yaml",
-    "configs/eval_mwm_lewm_pusht.yaml",
-    "configs/eval_mwm_lewm_tworoom.yaml",
+    "configs/train/mwm_lewm_pusht.yaml",
+    "configs/train/mwm_lewm_tworoom.yaml",
+    "configs/train/mwm_scheduled_pusht.yaml",
+    "configs/train/mwm_scheduled_tworoom.yaml",
+    "configs/train/mwm_dense_pusht.yaml",
+    "configs/train/mwm_dense_tworoom.yaml",
+    "configs/eval/mwm_lewm_pusht.yaml",
+    "configs/eval/mwm_lewm_tworoom.yaml",
 ]
 
 PAPER_PARITY_CONFIGS = [
-    "configs/train_mwm_lewm_pusht_upstream.yaml",
-    "configs/train_mwm_lewm_tworoom_upstream.yaml",
-    "configs/eval_mwm_paper_pusht.yaml",
-    "configs/eval_mwm_paper_tworoom.yaml",
+    "configs/train/mwm_lewm_pusht_upstream.yaml",
+    "configs/train/mwm_lewm_tworoom_upstream.yaml",
+    "configs/eval/paper_pusht.yaml",
+    "configs/eval/paper_tworoom.yaml",
 ]
 
 

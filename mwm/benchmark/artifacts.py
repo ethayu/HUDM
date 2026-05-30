@@ -151,8 +151,9 @@ def _seconds(value: Any) -> str:
 def _role_label(role: str) -> str:
     labels = {
         "upstream_lewm_converted": "Upstream Le-WM",
-        "retrained_lewm_single": "Retrained Le-WM",
+        "retrained_lewm_identity": "Retrained Le-WM",
         "mwm_scheduled": "MWM scheduled",
+        "mwm_dense": "MWM dense",
     }
     return labels.get(str(role), str(role))
 
@@ -162,7 +163,7 @@ def _env_label(env_id: str) -> str:
 
 
 def _sorted_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
-    role_order = {"upstream_lewm_converted": 0, "retrained_lewm_single": 1, "mwm_scheduled": 2}
+    role_order = {"upstream_lewm_converted": 0, "retrained_lewm_identity": 1, "mwm_scheduled": 2, "mwm_dense": 3}
     return sorted(
         rows,
         key=lambda r: (
@@ -206,7 +207,7 @@ def _row_index(rows: Iterable[dict[str, Any]]) -> dict[tuple[str, int, str], dic
 
 
 def _comparison_roles(rows: Iterable[dict[str, Any]]) -> list[str]:
-    role_order = {"retrained_lewm_single": 0, "mwm_scheduled": 1}
+    role_order = {"retrained_lewm_identity": 0, "mwm_scheduled": 1, "mwm_dense": 2}
     roles = {
         str(row.get("role", ""))
         for row in rows
@@ -285,7 +286,7 @@ def _outcome_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def _gate_cards(rows: list[dict[str, Any]], plots: list[str], expected_cells: int | None = None) -> tuple[str, list[str]]:
+def _benchmark_status_cards(rows: list[dict[str, Any]], plots: list[str], expected_cells: int | None = None) -> tuple[str, list[str]]:
     envs = sorted({str(row.get("env_id", "")) for row in rows})
     seeds = sorted({int(row.get("seed", 0)) for row in rows})
     roles = sorted({str(row.get("role", "")) for row in rows})
@@ -330,7 +331,7 @@ def write_review_html(
     base_dir = out.parent.resolve()
     rows = _sorted_rows(rows)
     plots = plots or sorted(str(p) for p in (out.parent / "plots").glob("*.png"))
-    gate_html, warnings = _gate_cards(rows, plots, expected_cells=expected_cells)
+    status_html, warnings = _benchmark_status_cards(rows, plots, expected_cells=expected_cells)
     warning_html = "".join(f"<li>{html.escape(w)}</li>" for w in warnings) or "<li>No structural warnings detected.</li>"
 
     outcome_html = []
@@ -450,10 +451,10 @@ def write_review_html(
 <body>
 <main>
   <h1>{html.escape(title)}</h1>
-  <p class="lede">Static benchmark review for converted upstream Le-WM, retrained single-fidelity Le-WM, and scheduled MWM.</p>
+  <p class="lede">Static benchmark review for converted upstream Le-WM, retrained identity-parity Le-WM, and scheduled MWM.</p>
 
-  <h2>Gate Status</h2>
-  <section class="cards">{gate_html}</section>
+  <h2>Benchmark Status</h2>
+  <section class="cards">{status_html}</section>
   <section class="panel">
     <strong>Review warnings</strong>
     <ul class="warnings">{warning_html}</ul>
@@ -491,7 +492,7 @@ def write_review_html(
   <h2>Review Notes</h2>
   <section class="panel">
     <ul class="notes">
-      <li>Confirm the Gate Status has no structural blockers before interpreting model quality.</li>
+      <li>Confirm the Benchmark Status has no structural blockers before interpreting model quality.</li>
       <li>Use paired seed deltas before drawing conclusions from aggregate means.</li>
       <li>Investigate runs with slow wall-time, unexpected compute, or zero-success patterns via the drilldown links.</li>
       <li>Record whether this is a quick smoke-scale benchmark or a final report-scale benchmark.</li>
@@ -561,11 +562,12 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
     root.mkdir(parents=True, exist_ok=True)
     rows = _sorted_rows(rows)
     plots: list[str] = []
-    role_order = {"upstream_lewm_converted": 0, "retrained_lewm_single": 1, "mwm_scheduled": 2}
+    role_order = {"upstream_lewm_converted": 0, "retrained_lewm_identity": 1, "mwm_scheduled": 2, "mwm_dense": 3}
     colors = {
         "upstream_lewm_converted": "#2f6fbb",
-        "retrained_lewm_single": "#7a5fb4",
+        "retrained_lewm_identity": "#7a5fb4",
         "mwm_scheduled": "#d76f1f",
+        "mwm_dense": "#b279a2",
     }
 
     def _save(fig: Any, name: str) -> None:

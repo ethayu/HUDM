@@ -64,7 +64,7 @@ DEFAULTS = {
     },
     "optim": {"lr": 3e-4},
     "loss": {"rollout_weight": 1.0, "recon_weight": 0.0, "sigreg_weight": 0.0},
-    "schedule": {"max_epochs": 30, "patience": 5, "min_delta": 1e-3},
+    "schedule": {"max_epochs": 30},
 }
 
 
@@ -186,7 +186,7 @@ def _stable_checkpoint_config_path(checkpoint: str) -> Path:
 
 def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torch.nn.Module:
     from mwm.adapters.base import ComponentPolicy
-    from mwm.adapters.lewm import build_mwm_lewm_from_stable_config
+    from mwm.adapters.builder import build_mwm_from_stable_config
     from mwm.adapters.registry import family_for_target
     from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 
@@ -216,7 +216,8 @@ def _build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> tor
         "action_preprocessing": "standard_scaler",
         "loss_scope": dict(mwm_cfg.get("loss_terms", {"regularizers": "shared_latent"})),
     }
-    return build_mwm_lewm_from_stable_config(
+    return build_mwm_from_stable_config(
+        family=configured_family,
         source_config=source_config,
         source_config_sha256=stable_config_sha256(loaded_path),
         training_recipe=recipe,
@@ -442,6 +443,8 @@ def _lewm_base_adapter_checkpoint_callback(cfg: Any) -> ModelCheckpoint:
 
 
 def _prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[str, Any], dict[str, Any]]:
+    from mwm.adapters.builder import STABLE_CONFIG_TARGET
+
     tr_ds, va_ds, base_ds = _load_lewm_base_adapter_train_valid_datasets(cfg)
     restore_import_path = None if cfg.get("restore", None) is None else cfg.restore.get("import_path", None)
     restore_spec = validate_restore_columns(str(cfg.env_id), _base_dataset(base_ds).column_names, import_path=restore_import_path)
@@ -471,7 +474,7 @@ def _prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[st
             "split": "stable_pretraining_random_split",
             "normalized_columns": list(cfg.data.get("keys_to_load", ["pixels", "action", "proprio", "state"])),
         },
-        "model": {"target": "mwm.adapters.lewm.build_mwm_lewm_from_stable_config"},
+        "model": {"target": STABLE_CONFIG_TARGET},
     }
     for key in ("action_low", "action_high"):
         if key in dataset_meta:

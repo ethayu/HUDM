@@ -150,7 +150,7 @@ Paper-parity targets for the initial scope:
 - Push-T upstream Le-WM: 96.0 percent success.
 - Two-Room upstream Le-WM: 87.0 percent success.
 
-Fresh single-level `K=[D]` MWM trained from scratch must match upstream Le-WM performance within 5 percentage points on the same Push-T and Two-Room paper-parity setup.
+Fresh identity-parity `K=[D]` MWM trained from scratch must match upstream Le-WM performance within 5 percentage points on the same Push-T and Two-Room paper-parity setup.
 
 ## Implementation Deliverables
 
@@ -177,16 +177,16 @@ Unit tests:
 - Shared regularizers are applied once by default.
 - Reconstructor loss detaches the encoder by default.
 
-Empirical gates:
+Empirical checks:
 
 - Upstream Le-WM paper-parity evaluator validation passes for Push-T.
 - Upstream Le-WM paper-parity evaluator validation passes for Two-Room.
-- Fresh single-level `K=[D]` MWM trained from scratch matches upstream Le-WM on Push-T within 5 percentage points.
-- Fresh single-level `K=[D]` MWM trained from scratch matches upstream Le-WM on Two-Room within 5 percentage points.
+- Fresh identity-parity `K=[D]` MWM trained from scratch matches upstream Le-WM on Push-T within 5 percentage points.
+- Fresh identity-parity `K=[D]` MWM trained from scratch matches upstream Le-WM on Two-Room within 5 percentage points.
 - Scheduled multi-level MWM runs through the validated evaluator and emits fidelity/compute diagnostics.
 
 ## Completion Criteria
 
-Implementation is complete only when the framework deliverables, unit tests, evaluator validation ladder, fresh single-level equivalence gates, and scheduled multi-level run all pass for the initial Push-T and Two-Room Le-WM scope.
+Implementation is complete only when the framework deliverables, unit tests, evaluator validation ladder, fresh identity-parity checks, and scheduled multi-level run all pass for the initial Push-T and Two-Room Le-WM scope.
 
 If upstream evaluator validation fails and the Stable-WM reference evaluator resolves the discrepancy, the corrected evaluator parameters must be committed before any MWM training result is accepted.

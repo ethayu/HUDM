@@ -6,20 +6,18 @@ owns matryoshka aggregation, checkpoint loading, and fidelity-aware evaluation.
 
 ## Adapter Module
 
-Create one adapter module per base family, for example `mwm/adapters/lewm.py` or
-`mwm/adapters/prejepa.py`.
+Create one adapter module per completed base family, for example
+`mwm/adapters/lewm.py`.
 
 Each module should:
 
 - define a `StableWMBaseAdapter` implementation;
 - register it with `register_adapter(...)`;
-- expose an importable checkpoint builder such as
-  `build_mwm_<family>_from_stable_config`;
-- avoid delegating runtime behavior to a `source_model` object.
+- avoid delegating runtime behavior to a source object.
 
-Checkpoint `config.json` files store the builder import target. Prefer stable
-targets under the family module, such as
-`mwm.adapters.lewm.build_mwm_lewm_from_stable_config`.
+Canonical checkpoint `config.json` files store generic builder import targets:
+`mwm.adapters.builder.build_mwm_from_stable_config`. The checkpoint kwargs carry
+`family`, so adding a new adapter does not churn checkpoint/config targets.
 
 Adapters are construction code, not new model semantics. They should answer:
 
@@ -94,14 +92,14 @@ The returned model must expose:
 - `mwm_config`, an importable checkpoint builder config;
 - normal `state_dict` loading with no hidden source-object delegation.
 
-## Builder Function
+## Generic Builder
 
-Each completed adapter needs a checkpoint-stable builder function. The Le-WM
-one is the template:
+Completed adapters are instantiated by the shared builders:
 
 ```python
-def build_mwm_<family>_from_stable_config(
+def build_mwm_from_stable_config(
     *,
+    family: str | None,
     source_config: dict[str, Any],
     source_config_sha256: str,
     training_recipe: dict[str, Any],
@@ -116,18 +114,18 @@ def build_mwm_<family>_from_stable_config(
     ...
 ```
 
-This function should:
+The shared builder:
 
-- create the family adapter;
+- detects or validates the Stable-WM family from `source_config`;
 - turn a mapping policy into `ComponentPolicy`;
-- call `resolve_spec`;
+- dispatch to the registered adapter's `resolve_spec`;
 - reject `expected_D` mismatches against config-derived `D`;
 - call `adapter.build_model(...)`;
-- set `model.mwm_config["target"]` to this builder's import path.
+- set `model.mwm_config["target"]` to
+  `mwm.adapters.builder.build_mwm_from_stable_config`.
 
-The builder is what canonical checkpoint `config.json` points at during load.
-Changing its import path causes checkpoint/config target churn, so keep the
-target under the stable family module once the adapter is real.
+Adapters should not export family-named builder facades. The generic builder is
+the public construction API.
 
 ## Generic Runtime Pieces
 
@@ -171,7 +169,8 @@ To make a new family trainable:
 - add the family to the Stable-WM registry mapping in `mwm/adapters/registry.py`;
 - add a train config with `base.family`, source checkpoint, data path, `D`, `K`,
   and the base training recipe;
-- route `train_mwm.py` to the new builder for that family and its dataset shape;
+- route `train_mwm.py` to the generic builder for that family and its dataset
+  shape;
 - export canonical checkpoints with `config.json`, `weights.pt`, and
   `world_metadata.json`;
 - teach `verify_mwm_benchmark.py` the expected checkpoint contract for the new
@@ -182,10 +181,10 @@ Inference should remain base-aligned. Preserve the base action preprocessing,
 frameskip/action block, image preprocessing, rollout horizon semantics, and
 planner-facing action shape.
 
-## PreJEPA/DINO-WM TODO
+## Adding PreJEPA/DINO-WM
 
-`mwm/adapters/prejepa.py` is currently only a policy stub. To complete it,
-identify from the Stable-WM PreJEPA config:
+Do not add a placeholder adapter. First identify from the Stable-WM PreJEPA
+config/model:
 
 - latent producer components: the modules that create the one shared latent
   space consumed by all levels;
@@ -209,16 +208,15 @@ identify from the Stable-WM PreJEPA config:
 Then implement:
 
 - `resolve_spec` with no `max(K)` fallback for `D`;
-- `build_mwm_prejepa_from_stable_config`;
 - a model path that applies the exact base recipe at each level and aggregates
   the per-level losses;
-- canonical metadata and `mwm_config` fields matching the builder;
+- canonical metadata and `mwm_config` fields matching the generic builder;
 - checkpoint contract tests;
 - `K=D` identity tests for architecture, loss keys, optimizer path, and
   inference recipe;
-- a single-level benchmark check before using scheduled `K<D` results.
+- an identity-parity `K=[D]` benchmark check before using scheduled `K<D` results.
 
-Do not fill in `prejepa.py` by guessing component names from Le-WM. The first
-step is to inspect the actual Stable-WM PreJEPA config/model and write down the
-component map above. After that, the adapter implementation should be mostly
-mechanical.
+Do not fill in a PreJEPA adapter by guessing component names from Le-WM. The
+first step is to inspect the actual Stable-WM PreJEPA config/model and write
+down the component map above. After that, the adapter implementation should be
+mostly mechanical.

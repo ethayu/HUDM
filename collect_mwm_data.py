@@ -119,6 +119,6 @@ if __name__ == "__main__":
     import sys
 
     if len(sys.argv) != 2:
-        print("Usage: python collect_mwm_data.py configs/collect_mwm_pusht.yaml")
+        print("Usage: python collect_mwm_data.py configs/collect/mwm_pusht.yaml")
         raise SystemExit(1)
     main(sys.argv[1])

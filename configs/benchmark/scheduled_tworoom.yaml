@@ -1,0 +1,22 @@
+output_dir: rollouts/mwm_scheduled_tworoom
+title: Scheduled MWM vs Upstream Le-WM on TwoRoom
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/tworoom_paper_seed42.yaml
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_tworoom
+  - name: scheduled
+    role: mwm_scheduled
+    checkpoint: checkpoints_mwm/mwm_scheduled_tworoom
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: coarsest
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base

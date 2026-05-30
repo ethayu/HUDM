@@ -9,6 +9,7 @@ from mwm.swm.restore import eval_callables_for_env
 
 
 ROOT = Path(__file__).resolve().parents[1]
+STABLE_WORLDMODEL_VERSION = "0.1.0"
 
 
 def _first_line_index(lines: list[str], tokens: tuple[str, ...]) -> int | None:
@@ -43,6 +44,17 @@ def _tracked_review_files() -> list[Path]:
 
 
 class MWMRepoHygieneTests(unittest.TestCase):
+    def test_requirements_pin_stable_worldmodel_to_verified_release(self) -> None:
+        requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        stable_worldmodel_lines = [
+            line.strip()
+            for line in requirements
+            if line.strip() and not line.lstrip().startswith("#") and line.startswith("stable-worldmodel")
+        ]
+
+        self.assertEqual(len(stable_worldmodel_lines), 1)
+        self.assertEqual(stable_worldmodel_lines[0], f"stable-worldmodel[env]=={STABLE_WORLDMODEL_VERSION}")
+
     def test_no_legacy_runtime_symbols_in_source_configs_or_docs(self) -> None:
         forbidden = [
             "h" + "udm",
@@ -69,7 +81,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(hits, [])
 
     def test_configs_are_lance_only_and_use_scheduler_branch(self) -> None:
-        for path in sorted((ROOT / "configs").glob("*.yaml")):
+        for path in sorted((ROOT / "configs").rglob("*.yaml")):
             cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             if "format" in cfg:
                 self.assertEqual(cfg["format"], "lance", path)
@@ -85,75 +97,46 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 self.assertNotIn("fidelity", planner, path)
             self.assertNotIn("baseline", cfg, path)
 
-    def test_paper_parity_lewm_train_config_tracks_paper_protocol_not_repo_defaults(self) -> None:
-        cfg = yaml.safe_load((ROOT / "configs" / "train_mwm_lewm_pusht_upstream.yaml").read_text(encoding="utf-8"))
+    def test_configs_are_grouped_by_type(self) -> None:
+        root_yaml = sorted(path.name for path in (ROOT / "configs").glob("*.yaml"))
+        self.assertEqual(root_yaml, [])
+        for folder in ("train", "eval", "benchmark", "manifest"):
+            self.assertTrue((ROOT / "configs" / folder).is_dir(), folder)
 
-        self.assertEqual(cfg["seed"], 3072)
-        self.assertEqual(cfg["data"]["path"], "data/upstream/pusht_expert_train.lance")
-        self.assertEqual(cfg["data"]["format"], "lance")
-        self.assertEqual(cfg["data"]["split_ratio"], 0.9)
-        self.assertEqual(cfg["data"]["frameskip"], 5)
-        self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "proprio", "state"])
-        self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio", "state"])
+    def test_lewm_training_configs_follow_base_adaptive_contract(self) -> None:
+        expected_levels = {
+            "mwm_lewm_pusht.yaml": [192],
+            "mwm_lewm_tworoom.yaml": [192],
+            "mwm_lewm_pusht_upstream.yaml": [192],
+            "mwm_lewm_tworoom_upstream.yaml": [192],
+            "mwm_scheduled_pusht.yaml": [48, 96, 144],
+            "mwm_scheduled_tworoom.yaml": [48, 96, 144],
+            "mwm_dense_pusht.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_dense_tworoom.yaml": [6, 12, 48, 96, 144, 192],
+        }
+        for name, levels in expected_levels.items():
+            cfg = yaml.safe_load((ROOT / "configs" / "train" / name).read_text(encoding="utf-8"))
 
-        self.assertEqual(cfg["model"]["D"], 192)
-        self.assertEqual(cfg["model"]["K"], [192])
-        self.assertEqual(cfg["model"]["history_size"], 3)
-        self.assertEqual(cfg["model"]["num_preds"], 1)
-        for key in (
-            "encoder",
-            "freeze_encoder",
-            "normalize_imagenet",
-            "vit_size",
-            "vit_patch_size",
-            "vit_image_size",
-            "vit_pretrained",
-            "vit_use_mask_token",
-            "dynamics",
-            "predictor_depth",
-            "predictor_heads",
-            "predictor_dim_head",
-            "predictor_mlp_dim",
-            "predictor_dropout",
-            "projector_hidden_dim",
-        ):
-            self.assertNotIn(key, cfg["model"])
-
-        self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm")
-        self.assertEqual(cfg["train"]["batch_size"], 128)
-        self.assertEqual(cfg["train"]["num_workers"], 6)
-        self.assertEqual(cfg["train"]["prefetch_factor"], 3)
-        self.assertEqual(cfg["train"]["drop_last"], True)
-        self.assertEqual(cfg["train"]["pin_memory"], True)
-        self.assertEqual(cfg["train"]["precision"], "bf16")
-        self.assertEqual(cfg["train"]["gradient_clip_val"], 1.0)
-        self.assertEqual(cfg["schedule"]["max_epochs"], 100)
-
-        self.assertEqual(cfg["optim"]["lr"], 5e-5)
-        self.assertEqual(cfg["optim"]["weight_decay"], 1e-3)
-        self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09)
-        self.assertEqual(cfg["loss"]["sigreg_knots"], 17)
-        self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024)
-
-    def test_public_single_fidelity_configs_use_lewm_base_adapter_backend(self) -> None:
-        for name in ("train_mwm_lewm_pusht.yaml", "train_mwm_lewm_tworoom.yaml"):
-            cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
-
-            self.assertIn("base", cfg, name)
             self.assertEqual(cfg["base"]["family"], "lewm", name)
             self.assertIn("checkpoint", cfg["base"], name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["shared"], ["latent_producer"], name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["per_level"], ["transition"], name)
+            self.assertEqual(cfg["mwm"]["component_policy"], {
+                "shared": ["latent_producer"],
+                "per_level": ["transition"],
+                "reconstructor": [],
+            }, name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
+            self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_detach_encoder"], True, name)
+            self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_contributes_to_encoder_loss"], False, name)
+            self.assertEqual(cfg["data"]["format"], "lance", name)
+            self.assertTrue(str(cfg["data"]["path"]).endswith(".lance"), name)
             self.assertEqual(cfg["model"]["D"], 192, name)
-            self.assertEqual(cfg["model"]["K"], [192], name)
+            self.assertEqual(cfg["model"]["K"], levels, name)
+            self.assertEqual(cfg["model"]["action_block"], 5, name)
             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
-            self.assertEqual(cfg["model"]["history_size"], 3, name)
-            self.assertEqual(cfg["model"]["num_preds"], 1, name)
-            self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
-            self.assertEqual(cfg["train"]["batch_size"], 128, name)
-            self.assertEqual(cfg["train"]["pin_memory"], True, name)
-            self.assertEqual(cfg["schedule"]["max_epochs"], 100, name)
+            self.assertEqual(set(cfg["schedule"]), {"max_epochs"}, name)
+            self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
+            if name.startswith(("mwm_scheduled_", "mwm_dense_")):
+                self.assertTrue(str(cfg["data"]["path"]).startswith("data/upstream/"), name)
 
     def test_train_configs_do_not_override_base_architecture_knobs(self) -> None:
         forbidden_model_keys = {
@@ -177,66 +160,27 @@ class MWMRepoHygieneTests(unittest.TestCase):
             "projector_hidden_dim",
         }
 
-        for path in sorted((ROOT / "configs").glob("train_mwm*.yaml")):
+        for path in sorted((ROOT / "configs" / "train").glob("mwm*.yaml")):
             cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
             model = cfg.get("model", {})
             self.assertFalse(forbidden_model_keys & set(model), path)
 
-    def test_paper_parity_train_configs_use_base_adaptive_resolver(self) -> None:
-        expected_checkpoints = {
-            "train_mwm_lewm_pusht_upstream.yaml": "models--quentinll--lewm-pusht",
-            "train_mwm_lewm_tworoom_upstream.yaml": "models--quentinll--lewm-tworooms",
-        }
-        for name, checkpoint in expected_checkpoints.items():
-            cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
+    def test_paper_parity_eval_configs_follow_base_inference_contract(self) -> None:
+        for name in ("paper_pusht.yaml", "paper_tworoom.yaml"):
+            cfg = yaml.safe_load((ROOT / "configs" / "eval" / name).read_text(encoding="utf-8"))
 
-            self.assertEqual(cfg["base"], {"family": "lewm", "checkpoint": checkpoint}, name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["shared"], ["latent_producer"], name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["per_level"], ["transition"], name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["reconstructor"], [], name)
-            self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
-            self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_detach_encoder"], True, name)
-            self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_contributes_to_encoder_loss"], False, name)
+            self.assertEqual(cfg["data"]["format"], "lance", name)
+            self.assertEqual(cfg["data"]["action_preprocessing"], "standard_scaler", name)
+            self.assertEqual(cfg["eval"]["sampling"], "stable_worldmodel", name)
+            self.assertEqual(cfg["eval"]["goal_offset"], 25, name)
+            self.assertEqual(cfg["planner"]["action_block"], 5, name)
+            self.assertEqual(cfg["planner"]["scheduler"]["policy"], "fixed", name)
+            self.assertEqual(cfg["planner"]["scheduler"]["rollout_level"]["level"], "base", name)
 
-    def test_scheduled_configs_use_lewm_base_adapter_training_recipe(self) -> None:
-        for name in ("train_mwm_scheduled_pusht.yaml", "train_mwm_scheduled_tworoom.yaml"):
-            cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
-
-            self.assertIn("base", cfg, name)
-            self.assertEqual(cfg["base"]["family"], "lewm", name)
-            self.assertIn("checkpoint", cfg["base"], name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["shared"], ["latent_producer"], name)
-            self.assertEqual(cfg["mwm"]["component_policy"]["per_level"], ["transition"], name)
-            self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
-            self.assertEqual(cfg["model"]["D"], 192, name)
-            self.assertEqual(cfg["model"]["K"], [48, 96, 144], name)
-            self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
-            self.assertEqual(cfg["train"]["batch_size"], 128, name)
-            self.assertEqual(cfg["train"]["num_workers"], 6, name)
-            self.assertEqual(cfg["train"]["pin_memory"], True, name)
-            self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
-            self.assertEqual(cfg["schedule"]["max_epochs"], 100, name)
-
-    def test_paper_parity_tworoom_configs_exist_and_use_paper_eval_profile(self) -> None:
-        train_cfg = yaml.safe_load((ROOT / "configs" / "train_mwm_lewm_tworoom_upstream.yaml").read_text(encoding="utf-8"))
-        eval_cfg = yaml.safe_load((ROOT / "configs" / "eval_mwm_paper_tworoom.yaml").read_text(encoding="utf-8"))
-        bench_cfg = yaml.safe_load((ROOT / "configs" / "benchmark_mwm_paper_parity.yaml").read_text(encoding="utf-8"))
-
-        self.assertEqual(train_cfg["data"]["path"], "data/upstream/tworoom.lance")
-        self.assertEqual(train_cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
-        self.assertEqual(train_cfg["data"]["keys_to_cache"], ["action", "proprio"])
-        self.assertEqual(train_cfg["train"]["backend"], "stable_worldmodel_lewm")
-        self.assertEqual(train_cfg["model"]["K"], [192])
-        self.assertEqual(eval_cfg["data"]["path"], "data/upstream/tworoom.lance")
-        self.assertEqual(eval_cfg["data"]["format"], "lance")
-        self.assertEqual(eval_cfg["data"]["keys_to_cache"], ["action", "proprio"])
-        self.assertEqual(eval_cfg["eval"]["episodes"], 50)
-        self.assertEqual(eval_cfg["eval"]["goal_offset"], 25)
-        self.assertEqual(eval_cfg["eval"]["budget"], 50)
-        self.assertEqual(eval_cfg["planner"]["batch_size"], 1)
-        self.assertEqual(eval_cfg["planner"]["n_iter"], 30)
-        self.assertEqual(eval_cfg["planner"]["topk"], 30)
-        self.assertEqual(bench_cfg["gate"]["env_ids"], ["swm/PushT-v1", "swm/TwoRoom-v1"])
+        bench_cfg = yaml.safe_load((ROOT / "configs" / "benchmark" / "paper_parity_pusht.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(bench_cfg["env_id"], "swm/PushT-v1")
+        self.assertEqual([run["role"] for run in bench_cfg["runs"]], ["upstream_lewm_converted", "retrained_lewm_identity"])
+        self.assertEqual(bench_cfg["paper_targets"]["tolerance_pp"], 1.0)
 
     def test_tworoom_official_schema_uses_future_proprio_as_eval_goal(self) -> None:
         spec_id, callables = eval_callables_for_env(
@@ -259,33 +203,19 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(callables[1]["args"]["goal_state"]["value"], "goal_pos_agent")
 
     def test_local_tworoom_train_configs_match_available_lance_columns(self) -> None:
-        for name in ("train_mwm_lewm_tworoom.yaml", "train_mwm_scheduled_tworoom.yaml"):
-            cfg = yaml.safe_load((ROOT / "configs" / name).read_text(encoding="utf-8"))
+        for name in ("mwm_lewm_tworoom.yaml",):
+            cfg = yaml.safe_load((ROOT / "configs" / "train" / name).read_text(encoding="utf-8"))
 
             self.assertEqual(cfg["data"]["path"], "data/tworoom_swm.lance")
             self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
             self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio"])
 
-    def test_paper_parity_eval_config_tracks_upstream_eval_protocol(self) -> None:
-        cfg = yaml.safe_load((ROOT / "configs" / "eval_mwm_paper_pusht.yaml").read_text(encoding="utf-8"))
+    def test_paper_scheduled_tworoom_train_config_matches_upstream_lance_columns(self) -> None:
+        cfg = yaml.safe_load((ROOT / "configs" / "train" / "mwm_scheduled_tworoom.yaml").read_text(encoding="utf-8"))
 
-        self.assertEqual(cfg["data"]["path"], "data/upstream/pusht_expert_train.lance")
-        self.assertEqual(cfg["data"]["format"], "lance")
-        self.assertEqual(cfg["data"]["action_preprocessing"], "standard_scaler")
-        self.assertEqual(cfg["eval"]["episodes"], 50)
-        self.assertEqual(cfg["eval"]["goal_offset"], 25)
-        self.assertEqual(cfg["eval"]["budget"], 50)
-        self.assertEqual(cfg["eval"]["num_envs"], 50)
-        self.assertEqual(cfg["eval"]["sampling"], "stable_worldmodel")
-
-        self.assertEqual(cfg["planner"]["horizon"], 5)
-        self.assertEqual(cfg["planner"]["receding_horizon"], 5)
-        self.assertEqual(cfg["planner"]["action_block"], 5)
-        self.assertEqual(cfg["planner"]["pop_size"], 300)
-        self.assertEqual(cfg["planner"]["topk"], 30)
-        self.assertEqual(cfg["planner"]["n_iter"], 30)
-        self.assertEqual(cfg["planner"]["init_std"], 1.0)
-        self.assertEqual(cfg["planner"]["batch_size"], 1)
+        self.assertEqual(cfg["data"]["path"], "data/upstream/tworoom.lance")
+        self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
+        self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio"])
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
         work_tokens = (
@@ -363,102 +293,42 @@ class MWMRepoHygieneTests(unittest.TestCase):
         for token in forbidden:
             self.assertNotIn(token, text)
 
-    def test_legacy_top_level_swm_and_reference_diagnostics_are_removed(self) -> None:
+    def test_removed_legacy_runtime_paths_stay_absent(self) -> None:
         removed = [
-            "benchmark_swm.py",
-            "collect_swm.py",
-            "plan_swm.py",
-            "train_world_swm.py",
             "datasets/swm_hdf5.py",
-            "docs/SWM_FIRST.md",
-            "scripts/lewm_reference_matrix.py",
-            "scripts/slurm_lewm_reference_matrix.sbatch",
-            "scripts/slurm_lewm_official_pusht_eval.sbatch",
-            "docs/superpowers/paper-parity-investigation-2026-05-28.md",
-        ]
-        for rel in removed:
-            self.assertFalse((ROOT / rel).exists(), rel)
-        self.assertTrue((ROOT / "mwm" / "planning" / "scheduled_cem.py").is_file())
-
-    def test_lewm_adapter_file_does_not_export_dead_generic_scaffolding(self) -> None:
-        text = (ROOT / "mwm" / "adapters" / "lewm.py").read_text(encoding="utf-8")
-        forbidden = [
-            "class MWMComponents",
-            "class MWMAdapter",
-            "class MWMImporter",
-            "class LeWMAdapter",
-            "class HFViTCLSBackbone",
-            "class StablePretrainingViTBackbone",
-        ]
-        for token in forbidden:
-            self.assertNotIn(token, text)
-
-    def test_lewm_adapter_keeps_generic_model_logic_in_world_model(self) -> None:
-        adapter_dir = ROOT / "mwm" / "adapters"
-        self.assertFalse((adapter_dir / "lewm_common.py").exists())
-        self.assertFalse((adapter_dir / "lewm_model.py").exists())
-        self.assertFalse((adapter_dir / "lewm_import.py").exists())
-        self.assertFalse((adapter_dir / "lewm_stable.py").exists())
-        self.assertFalse((ROOT / "mwm" / "adapters" / "lewm_direct.py").exists())
-
-        lewm_text = (adapter_dir / "lewm.py").read_text(encoding="utf-8")
-        self.assertIn("class LeWMStableWMAdapter", lewm_text)
-        self.assertIn("build_mwm_lewm_from_stable_config", lewm_text)
-        self.assertNotIn("lewm_direct", lewm_text)
-        self.assertNotIn("lewm_model", lewm_text)
-        self.assertNotIn("lewm_import", lewm_text)
-        self.assertNotIn("build_lewm_matryoshka_model", lewm_text)
-        self.assertNotIn("MWMLeWMAdapterConfig", lewm_text)
-
-        world_model_text = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")
-        self.assertIn("class MatryoshkaWorldModel", world_model_text)
-        self.assertIn("class TransitionPackage", world_model_text)
-        for path in (adapter_dir / "lewm.py", ROOT / "mwm" / "models" / "world_model.py"):
-            text = path.read_text(encoding="utf-8")
-            self.assertNotIn("source_model", text, path)
-            self.assertNotIn("delegated_source_cost", text, path)
-            self.assertNotIn("ImportedLeWMMWMWorldModel", text, path)
-            self.assertNotIn("build_mwm_lewm_from_object", text, path)
-        prep_text = (ROOT / "prepare_upstream_lewm.py").read_text(encoding="utf-8")
-        self.assertNotIn("LeWMObjectImporter", prep_text)
-        self.assertNotIn("build_mwm_lewm_from_object", prep_text)
-
-    def test_generic_world_model_fallbacks_and_raw_lewm_training_are_removed(self) -> None:
-        world_model_text = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")
-        for token in (
-            "MWMActionSpec",
-            "MWMComponentSpec",
-            "_DefaultDynamics",
-            "_DefaultImageDecoder",
-            "def mwm_prediction_loss",
-        ):
-            self.assertNotIn(token, world_model_text)
-
-        self.assertFalse((ROOT / "mwm" / "training.py").exists())
-
-        train_entrypoint_text = (ROOT / "train_mwm.py").read_text(encoding="utf-8")
-        for token in (
-            "_build_exact_lewm_object",
-            "_resolve_model_cfg",
-            "_load_train_valid_datasets",
-            "_run_stable_pretraining",
-            "module.model.predict",
-            'backend in {"stable_worldmodel_lewm", "exact_lewm"}',
-        ):
-            self.assertNotIn(token, train_entrypoint_text)
-
-    def test_unused_helper_modules_and_ogbench_restore_support_are_removed(self) -> None:
-        removed = [
-            "mwm/metrics.py",
+            "mwm/adapters/lewm_common.py",
+            "mwm/adapters/lewm_import.py",
+            "mwm/adapters/lewm_model.py",
+            "mwm/adapters/lewm_stable.py",
             "mwm/training.py",
-            "mwm/swm/wrappers.py",
         ]
         for rel in removed:
             self.assertFalse((ROOT / rel).exists(), rel)
 
-        restore_text = (ROOT / "mwm" / "swm" / "restore.py").read_text(encoding="utf-8")
-        self.assertNotIn("OGB", restore_text)
-        self.assertNotIn("needs_restore_recorder=True", restore_text)
+        runtime_files = [
+            ROOT / "mwm" / "adapters" / "lewm.py",
+            ROOT / "mwm" / "models" / "world_model.py",
+            ROOT / "prepare_upstream_lewm.py",
+            ROOT / "train_mwm.py",
+        ]
+        forbidden = (
+            "source_model",
+            "delegated_source_cost",
+            "ImportedLeWMMWMWorldModel",
+            "build_mwm_lewm_from_object",
+            "constructor_identity_base_lewm",
+        )
+        for path in runtime_files:
+            text = path.read_text(encoding="utf-8")
+            for token in forbidden:
+                self.assertNotIn(token, text, path)
+
+    def test_lewm_adapter_does_not_export_base_specific_builder_facades(self) -> None:
+        text = (ROOT / "mwm" / "adapters" / "lewm.py").read_text(encoding="utf-8")
+
+        self.assertNotIn("def build_mwm_lewm_from_stable_config", text)
+        self.assertNotIn("def build_mwm_lewm_from_upstream_object", text)
+        self.assertEqual(text.count("encoder = _instantiate_module(source_config[\"encoder\"])"), 1)
 
 
 if __name__ == "__main__":

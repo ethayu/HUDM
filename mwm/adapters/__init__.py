@@ -1,16 +1,22 @@
 from importlib import import_module
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseAdapter, StableWMBaseSpec, validate_component_policy
+from mwm.adapters.builder import (
+    STABLE_CONFIG_TARGET,
+    build_mwm_from_stable_config,
+)
 from mwm.adapters.registry import adapter_for_family, adapter_for_target, family_for_target, register_adapter
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 
 __all__ = [
     "ComponentGroup",
     "ComponentPolicy",
+    "STABLE_CONFIG_TARGET",
     "StableWMBaseAdapter",
     "StableWMBaseSpec",
     "adapter_for_family",
     "adapter_for_target",
+    "build_mwm_from_stable_config",
     "family_for_target",
     "load_stable_wm_config",
     "register_adapter",
@@ -30,12 +36,3 @@ else:
         if _name not in __all__:
             __all__.append(_name)
     del _lewm
-
-for _optional_module in ("mwm.adapters.prejepa", "mwm.adapters.pldm"):
-    _module = import_module(_optional_module)
-    for _name in getattr(_module, "__all__", ()):
-        globals()[_name] = getattr(_module, _name)
-        if _name not in __all__:
-            __all__.append(_name)
-    del _module
-del _optional_module

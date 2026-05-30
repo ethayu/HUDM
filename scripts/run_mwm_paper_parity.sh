@@ -15,13 +15,14 @@ cd "$ROOT"
 "$PY" prepare_upstream_lewm_data.py
 "$PY" verify_mwm_data.py --paper-parity
 
-"$PY" benchmark_mwm.py configs/benchmark_mwm_paper_parity.yaml --roles upstream_lewm_converted
-if ! "$PY" verify_mwm_benchmark.py configs/benchmark_mwm_paper_parity.yaml --roles upstream_lewm_converted; then
-  "$PY" benchmark_mwm.py configs/benchmark_mwm_paper_reference.yaml
-  "$PY" verify_mwm_benchmark.py configs/benchmark_mwm_paper_reference.yaml
-fi
+"$PY" benchmark_mwm.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted
+"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted
+"$PY" benchmark_mwm.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
+"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
 
-"$PY" train_mwm.py configs/train_mwm_lewm_pusht_upstream.yaml
-"$PY" train_mwm.py configs/train_mwm_lewm_tworoom_upstream.yaml
-"$PY" benchmark_mwm.py configs/benchmark_mwm_paper_parity.yaml --roles upstream_lewm_converted retrained_lewm_single
-"$PY" verify_mwm_benchmark.py configs/benchmark_mwm_paper_parity.yaml --roles upstream_lewm_converted retrained_lewm_single
+"$PY" train_mwm.py configs/train/mwm_lewm_pusht_upstream.yaml
+"$PY" train_mwm.py configs/train/mwm_lewm_tworoom_upstream.yaml
+"$PY" benchmark_mwm.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" benchmark_mwm.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity

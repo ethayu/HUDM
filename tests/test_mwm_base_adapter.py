@@ -4,14 +4,13 @@ import hashlib
 import json
 from pathlib import Path
 import unittest
-from unittest import mock
 
 import torch
 
-from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
-from mwm.adapters.lewm import LeWMStableWMAdapter, build_mwm_lewm_from_stable_config
-import mwm.adapters.registry as adapter_registry
-from mwm.adapters.registry import adapter_for_family, adapter_for_target, family_for_target, register_adapter
+from mwm.adapters.base import ComponentGroup, ComponentPolicy, validate_component_policy
+from mwm.adapters.builder import build_mwm_from_stable_config
+from mwm.adapters.lewm import LeWMStableWMAdapter
+from mwm.adapters.registry import family_for_target
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 from mwm.models.world_model import MatryoshkaWorldModel
 
@@ -45,45 +44,6 @@ class AdapterPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unknown component group"):
             validate_component_policy(groups, policy)
 
-    def test_base_spec_stores_fresh_init_and_loss_scope(self) -> None:
-        groups = {
-            "latent_producer": ComponentGroup(name="latent_producer", components=("encoder",), latent_producer=True),
-            "transition": ComponentGroup(name="transition", components=("predictor",)),
-        }
-        policy = ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
-        spec = StableWMBaseSpec(
-            family="lewm",
-            source_config={"_target_": "stable_worldmodel.wm.lewm.LeWM"},
-            source_config_sha256="abc123",
-            training_recipe={"loss": {"sigreg_weight": 0.09}},
-            component_groups=groups,
-            component_policy=policy,
-            levels=(4,),
-            D=4,
-            fresh_init=True,
-            loss_scope={"regularizers": "shared_latent"},
-        )
-
-        self.assertTrue(spec.fresh_init)
-        self.assertEqual(spec.component_policy.shared, ("latent_producer",))
-        self.assertEqual(spec.loss_scope["regularizers"], "shared_latent")
-        self.assertEqual(
-            spec.metadata(),
-            {
-                "adapter_family": "lewm",
-                "source_config_sha256": "abc123",
-                "component_policy": {
-                    "shared": ["latent_producer"],
-                    "per_level": ["transition"],
-                    "reconstructor": [],
-                },
-                "levels": [4],
-                "D": 4,
-                "fresh_init": True,
-                "loss_scope": {"regularizers": "shared_latent"},
-            },
-        )
-
     def test_component_policy_from_mapping_and_as_dict(self) -> None:
         self.assertEqual(
             ComponentPolicy.from_mapping(None).as_dict(),
@@ -110,41 +70,14 @@ class AdapterPolicyTests(unittest.TestCase):
             },
         )
 
-    def test_adapter_package_exports_base_api_without_lewm_module(self) -> None:
+    def test_adapter_package_exports_public_builder_api(self) -> None:
         import importlib
-        import sys
 
-        class BlockLeWMImport:
-            def find_spec(self, fullname, path=None, target=None):
-                del path, target
-                if fullname == "mwm.adapters.lewm":
-                    raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
-                return None
-
-        original_modules = dict(sys.modules)
-        sys.modules.pop("mwm.adapters", None)
-        sys.modules.pop("mwm.adapters.lewm", None)
-        try:
-            with mock.patch.object(sys, "meta_path", [BlockLeWMImport(), *sys.meta_path]):
-                adapters = importlib.import_module("mwm.adapters")
-        finally:
-            sys.modules.clear()
-            sys.modules.update(original_modules)
+        adapters = importlib.import_module("mwm.adapters")
 
         self.assertEqual(adapters.ComponentPolicy().as_dict()["shared"], ["latent_producer"])
-        self.assertIn("ComponentPolicy", adapters.__all__)
-
-    def test_adapter_package_reexports_available_lewm_public_api(self) -> None:
-        import importlib
-        import sys
-
-        sys.modules.pop("mwm.adapters", None)
-        adapters = importlib.import_module("mwm.adapters")
-        lewm = importlib.import_module("mwm.adapters.lewm")
-
-        for name in lewm.__all__:
-            self.assertIn(name, adapters.__all__)
-            self.assertIs(getattr(adapters, name), getattr(lewm, name))
+        self.assertIs(adapters.build_mwm_from_stable_config, build_mwm_from_stable_config)
+        self.assertIs(adapters.LeWMStableWMAdapter, LeWMStableWMAdapter)
 
 
 class ConfigResolverTests(unittest.TestCase):
@@ -192,19 +125,6 @@ class ConfigResolverTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Unsupported Stable-WM target"):
             family_for_target("example.Unknown")
 
-    def test_registry_returns_registered_adapter(self) -> None:
-        class DummyAdapter:
-            family = "dummy"
-
-        original_adapters = dict(adapter_registry._ADAPTERS)
-        try:
-            register_adapter(DummyAdapter())
-            self.assertEqual(adapter_for_family("dummy").family, "dummy")
-            self.assertEqual(adapter_for_target("dummy").family, "dummy")
-        finally:
-            adapter_registry._ADAPTERS.clear()
-            adapter_registry._ADAPTERS.update(original_adapters)
-
 
 class LeWMStableConfigTests(unittest.TestCase):
     def _lewm_config(self) -> dict:
@@ -228,15 +148,9 @@ class LeWMStableConfigTests(unittest.TestCase):
             },
         }
 
-    def test_lewm_adapter_declares_groups(self) -> None:
-        adapter = LeWMStableWMAdapter()
-        groups = adapter.component_groups()
-        self.assertEqual(groups["latent_producer"].components, ("encoder", "projector"))
-        self.assertTrue(groups["latent_producer"].latent_producer)
-        self.assertEqual(groups["transition"].components, ("action_encoder", "predictor", "pred_proj"))
-
-    def test_build_from_stable_config_fresh_initializes_without_weights(self) -> None:
-        model = build_mwm_lewm_from_stable_config(
+    def test_generic_builder_dispatches_lewm_adapter_and_exports_generic_target(self) -> None:
+        model = build_mwm_from_stable_config(
+            family="lewm",
             source_config=self._lewm_config(),
             source_config_sha256="abc",
             training_recipe={"history_size": 2, "num_preds": 1, "loss": {"sigreg_weight": 0.0}},
@@ -246,10 +160,17 @@ class LeWMStableConfigTests(unittest.TestCase):
             image_shape=(8, 8),
             normalize_imagenet=False,
         )
+
         self.assertIsInstance(model, MatryoshkaWorldModel)
         self.assertEqual(model.metadata["adapter_family"], "lewm")
         self.assertTrue(model.metadata["fresh_init"])
         self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
+        self.assertEqual(model.mwm_config["target"], "mwm.adapters.builder.build_mwm_from_stable_config")
+        self.assertEqual(model.mwm_config["kwargs"]["family"], "lewm")
+        self.assertEqual(model.mwm_config["kwargs"]["K"], [4])
+        self.assertIs(model.encoder, model.encoder)
+        self.assertEqual(len(model.transitions), 1)
+        self.assertFalse(hasattr(model, "reconstructor"))
         out = model.training_loss({"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)})
         self.assertIn("loss", out)
 
@@ -301,7 +222,8 @@ class LeWMStableConfigTests(unittest.TestCase):
         }
 
         with self.assertRaisesRegex(ValueError, "action_dim"):
-            build_mwm_lewm_from_stable_config(
+            build_mwm_from_stable_config(
+                family="lewm",
                 source_config=bad_config,
                 source_config_sha256="abc",
                 training_recipe={},
@@ -313,7 +235,8 @@ class LeWMStableConfigTests(unittest.TestCase):
             )
 
     def test_config_driven_transition_widths_scale_per_level(self) -> None:
-        model = build_mwm_lewm_from_stable_config(
+        model = build_mwm_from_stable_config(
+            family="lewm",
             source_config=self._lewm_config(),
             source_config_sha256="abc",
             training_recipe={},
@@ -334,7 +257,8 @@ class LeWMStableConfigTests(unittest.TestCase):
         self.assertEqual(model.transitions[1].pred_proj.net[0].out_features, 16)
 
     def test_k_equals_d_preserves_base_internal_widths_and_top_level_recipe_shape(self) -> None:
-        model = build_mwm_lewm_from_stable_config(
+        model = build_mwm_from_stable_config(
+            family="lewm",
             source_config=self._lewm_config(),
             source_config_sha256="abc",
             training_recipe={"history_size": 5, "num_preds": 2},
@@ -352,34 +276,21 @@ class LeWMStableConfigTests(unittest.TestCase):
 
 
 class UnsupportedAdapterTests(unittest.TestCase):
-    def test_prejepa_adapter_declares_groups_but_requires_recipe(self) -> None:
-        from mwm.adapters.prejepa import PreJEPAStableWMAdapter
-
-        adapter = PreJEPAStableWMAdapter()
-        groups = adapter.component_groups()
-        self.assertEqual(groups["latent_producer"].components, ("backbone",))
-        self.assertEqual(groups["transition"].components, ("predictor", "extra_encoders"))
-        with self.assertRaisesRegex(NotImplementedError, "training recipe"):
-            adapter.resolve_spec(
-                source_config={"_target_": "stable_worldmodel.wm.prejepa.PreJEPA"},
-                source_config_sha256="abc",
-                training_recipe={},
-                levels=(4,),
-                component_policy=None,
-            )
-
-    def test_pldm_adapter_declares_groups_but_requires_recipe(self) -> None:
-        from mwm.adapters.pldm import PLDMStableWMAdapter
-
-        adapter = PLDMStableWMAdapter()
-        groups = adapter.component_groups()
-        self.assertEqual(groups["latent_producer"].components, ("encoder", "projector"))
-        self.assertEqual(groups["transition"].components, ("action_encoder", "predictor", "pred_proj"))
-        with self.assertRaisesRegex(NotImplementedError, "training recipe"):
-            adapter.resolve_spec(
-                source_config={"_target_": "stable_worldmodel.wm.pldm.PLDM"},
-                source_config_sha256="abc",
-                training_recipe={},
-                levels=(4,),
-                component_policy=None,
-            )
+    def test_generic_builder_dispatches_unsupported_adapters_without_lewm_special_case(self) -> None:
+        cases = (
+            ("prejepa", "stable_worldmodel.wm.prejepa.PreJEPA"),
+            ("pldm", "stable_worldmodel.wm.pldm.PLDM"),
+        )
+        for family, target in cases:
+            with self.subTest(family=family):
+                with self.assertRaisesRegex(ValueError, "Unsupported Stable-WM target family"):
+                    build_mwm_from_stable_config(
+                        family=family,
+                        source_config={"_target_": target},
+                        source_config_sha256="abc",
+                        training_recipe={},
+                        K=(4,),
+                        action_dim=2,
+                        image_shape=(8, 8),
+                        normalize_imagenet=False,
+                    )

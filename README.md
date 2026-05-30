@@ -7,28 +7,28 @@ The review story is intentionally narrow: every evaluated checkpoint is loaded a
 ## Quick Start
 
 ```bash
-python collect_mwm_data.py configs/collect_mwm_pusht.yaml
-python collect_mwm_data.py configs/collect_mwm_tworoom.yaml
+python collect_mwm_data.py configs/collect/mwm_pusht.yaml
+python collect_mwm_data.py configs/collect/mwm_tworoom.yaml
 python verify_mwm_data.py
 python prepare_upstream_lewm.py
-python train_mwm.py configs/train_mwm_lewm_pusht.yaml
-python train_mwm.py configs/train_mwm_lewm_tworoom.yaml
-python train_mwm.py configs/train_mwm_scheduled_pusht.yaml
-python train_mwm.py configs/train_mwm_scheduled_tworoom.yaml
-python benchmark_mwm.py configs/benchmark_mwm.yaml
-python verify_mwm_benchmark.py configs/benchmark_mwm.yaml
+python train_mwm.py configs/train/mwm_lewm_pusht.yaml
+python train_mwm.py configs/train/mwm_lewm_tworoom.yaml
+python train_mwm.py configs/train/mwm_scheduled_pusht.yaml
+python train_mwm.py configs/train/mwm_scheduled_tworoom.yaml
+python benchmark_mwm.py configs/benchmark/scheduled_pusht.yaml
+python verify_mwm_benchmark.py configs/benchmark/scheduled_pusht.yaml
 ```
 
-The full gate is:
+The upstream paper-parity sanity check is:
 
 ```bash
-scripts/run_mwm_v1_gate.sh
+scripts/run_mwm_paper_parity.sh
 ```
 
-To rerun only the benchmark matrix from existing canonical checkpoints:
+To rerun only the scheduled-MWM comparisons from existing canonical checkpoints:
 
 ```bash
-scripts/run_mwm_benchmark_gate.sh
+scripts/run_mwm_scheduled_comparison.sh
 ```
 
 To rerun the paper-parity evaluator sanity check:
@@ -37,19 +37,18 @@ To rerun the paper-parity evaluator sanity check:
 scripts/run_mwm_paper_parity.sh
 ```
 
-On Betty/PARCC, submit the paper-parity gate first and the full MWM gate after it:
+On Betty/PARCC, submit true scheduled-MWM training as split one-GPU jobs with a dependent comparison benchmark:
 
 ```bash
-scripts/submit_mwm_gates.sh
+scripts/submit_mwm_scheduled_split.sh
 ```
 
 ## Architecture
 
 - `mwm.models.world_model.MWMWorldModel` is the runtime model contract, and
   `MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
-- `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs or trusted
-  upstream objects, registers the Le-WM adapter, then returns the normal
-  `MatryoshkaWorldModel`.
+- `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs,
+  registers the Le-WM adapter, then returns the normal `MatryoshkaWorldModel`.
   `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
   multi-`K` training encodes once and aggregates requested prefix losses only.
 - `mwm.checkpoints` reads and writes strict canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`.
@@ -68,17 +67,17 @@ shared or duplicated. Le-WM is implemented first: `encoder + projector` are the
 shared latent producer, while `action_encoder + predictor + pred_proj` are
 fresh per-`K` transition tails.
 
-PreJEPA/DINO-WM and PLDM currently expose component-group declarations only.
-They fail explicitly until an explicit Stable-WM training recipe artifact is
-available, so unknown bases cannot silently fall through to generic MWM dynamics.
+Additional bases should be added as real adapters after inspecting their
+Stable-WM config/model. There are no placeholder runtime adapters.
 
 ## Benchmark Roles
 
-The benchmark matrix is PushT and TwoRoom, seeds `0,1,2`, with:
+The active scheduled-MWM comparison is PushT and TwoRoom on the shared paper-parity seed `42`, with:
 
-- `upstream_lewm_converted`: upstream Le-WM imported into a canonical single-fidelity MWM checkpoint.
-- `retrained_lewm_single`: exact Le-WM single-level training with `K=[192]`, exported as a canonical MWM checkpoint.
+- `upstream_lewm_converted`: upstream Le-WM imported into a canonical identity-parity `K=[192]` MWM checkpoint.
 - `mwm_scheduled`: this repo's multi-fidelity training with `K=[48,96,144]`.
+
+The separate paper-parity check still uses `retrained_lewm_identity` for the `K=[D]` sanity check.
 
 ## Training Resources
 

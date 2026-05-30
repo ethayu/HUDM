@@ -1,0 +1,22 @@
+output_dir: rollouts/mwm_dense_tworoom
+title: Dense-Level MWM vs Upstream Le-WM on TwoRoom
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/tworoom_paper_seed42.yaml
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_tworoom
+  - name: dense
+    role: mwm_dense
+    checkpoint: checkpoints_mwm/mwm_dense_tworoom
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: coarsest
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base
