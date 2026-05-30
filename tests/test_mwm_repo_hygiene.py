@@ -307,6 +307,15 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertIn("load_config", text, path)
             self.assertIn('"--set"', text, path)
 
+    def test_docs_describe_local_and_slurm_workflows_separately(self) -> None:
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        review = (ROOT / "REVIEW_GUIDE.md").read_text(encoding="utf-8")
+        for text in (readme, review):
+            self.assertIn("Local Desktop Workflow", text)
+            self.assertIn("Slurm", text)
+            self.assertIn("scripts/local_verify.sh", text)
+            self.assertIn("scripts/local_benchmark_smoke.sh", text)
+
     def test_upstream_data_prep_is_lance_only(self) -> None:
         text = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
         forbidden = [

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make HUDM/MWM usable on a regular desktop for install checks, static validation, tiny smoke data/eval/benchmark runs, and optional CPU training smoke tests without weakening the existing Slurm-safe cluster workflow.
+**Goal:** Make the MWM repo usable on a regular desktop for install checks, static validation, tiny smoke data/eval/benchmark runs, and optional CPU training smoke tests without weakening the existing Slurm-safe cluster workflow.
 
 **Architecture:** Keep cluster scripts Slurm-guarded and add separate local entrypoints/configs. Add a small shared config-loading helper so local scripts can override config values without proliferating near-duplicate YAMLs. Treat full paper-scale training/benchmarking as GPU/cluster work; local workflow is for smoke, debugging, and contributor confidence.
 

@@ -43,6 +43,35 @@ On Betty/PARCC, submit true scheduled-MWM training as split one-GPU jobs with a 
 scripts/submit_mwm_scheduled_split.sh
 ```
 
+## Local Desktop Workflow
+
+Local machines are supported for syntax checks, tests, static benchmark
+validation, and tiny smoke runs. Full paper-scale training and benchmark runs
+remain GPU-oriented and should use the Slurm scripts on PARCC/Betty.
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+scripts/local_verify.sh
+```
+
+For a tiny local benchmark after preparing or copying
+`data/upstream/pusht_expert_train.lance` and
+`checkpoints_mwm/upstream_lewm_pusht`:
+
+```bash
+scripts/local_benchmark_smoke.sh
+```
+
+Optional CPU training smoke is deliberately opt-in because it can be slow:
+
+```bash
+RUN_CPU_TRAIN_SMOKE=1 scripts/local_train_smoke.sh
+```
+
+Use `MWM_PYTHON=/path/to/python` if your Python is not named `python`.
+
 ## Architecture
 
 - `mwm.models.world_model.MWMWorldModel` is the runtime model contract, and

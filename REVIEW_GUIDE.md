@@ -45,6 +45,19 @@ Use the conda `mwm` environment:
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/benchmark/scheduled_pusht.yaml --static-only --roles upstream_lewm_converted mwm_scheduled
 ```
 
+### Local Desktop Workflow
+
+Use local scripts when reviewing on a desktop or laptop without Slurm:
+
+```bash
+scripts/local_verify.sh
+scripts/local_benchmark_smoke.sh
+```
+
+These scripts do not require `SLURM_JOB_ID` and default to
+`${MWM_PYTHON:-python}`. They are smoke workflows only; do not treat CPU smoke
+numbers as paper-scale benchmark evidence.
+
 Before launching GPU work on PARCC/Betty, submit through Slurm. The identity
 parity split jobs are:
 
