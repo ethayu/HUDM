@@ -1,0 +1,4138 @@
+{
+  "artifact_root": "/vast/projects/dineshj/lab/ethanyu/code/HUDM",
+  "configs": {
+    "pusht": {
+      "benchmark_config": {
+        "data": {
+          "env_id": "swm/PushT-v1",
+          "eval_config": "configs/eval/paper_pusht.yaml",
+          "manifest": {
+            "config": "configs/manifest/pusht_paper_seed42.yaml"
+          },
+          "output_dir": "rollouts/mwm_paper_parity_pusht",
+          "paper_targets": {
+            "enabled": true,
+            "retrained_match_tolerance_pp": 5.0,
+            "source": "https://arxiv.org/pdf/2603.19312v1#page=7",
+            "success_rate": {
+              "swm/PushT-v1": 96.0
+            },
+            "tolerance_pp": 1.0
+          },
+          "runs": [
+            {
+              "checkpoint": "checkpoints_mwm/upstream_lewm_pusht",
+              "name": "upstream",
+              "role": "upstream_lewm_converted"
+            },
+            {
+              "checkpoint": "checkpoints_mwm/retrained_lewm_identity_pusht_upstream",
+              "name": "retrained_identity",
+              "role": "retrained_lewm_identity"
+            }
+          ],
+          "seed": 42,
+          "title": "Paper-Parity Le-WM Identity Check on PushT"
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta/configs/benchmark/paper_parity_pusht.yaml",
+        "sha256": "404ef13b00c787b5c44bbb5545fcf9ca468f89be45cf9928a46843b699d4bd20"
+      },
+      "eval_config": {
+        "data": {
+          "checkpoint": {
+            "epoch": null,
+            "run_dir": "checkpoints_mwm/upstream_lewm_pusht"
+          },
+          "data": {
+            "action_key": "action",
+            "action_preprocessing": "standard_scaler",
+            "format": "lance",
+            "keys_to_cache": [
+              "action",
+              "proprio",
+              "state"
+            ],
+            "path": "data/upstream/pusht_expert_train.lance",
+            "pixels_key": "pixels",
+            "split_ratio": 0.9
+          },
+          "device": "auto",
+          "env": {
+            "goal_conditioned": true,
+            "kwargs": {},
+            "max_episode_steps": 100
+          },
+          "env_id": "swm/PushT-v1",
+          "eval": {
+            "budget": 50,
+            "episodes": 50,
+            "goal_offset": 25,
+            "manifest_path": null,
+            "num_envs": 50,
+            "output_path": "rollouts/mwm_paper_parity/pusht_upstream/eval.json",
+            "sampling": "stable_worldmodel",
+            "save_video": false,
+            "seed": 42,
+            "video_path": "rollouts/mwm_paper_parity/pusht_videos",
+            "write_manifest_path": "rollouts/mwm_paper_parity/pusht_seed42_manifest.json"
+          },
+          "planner": {
+            "action_block": 5,
+            "batch_size": 1,
+            "clamp_actions": false,
+            "elite_frac": 0.1,
+            "horizon": 5,
+            "init_std": 1.0,
+            "n_iter": 30,
+            "pop_size": 300,
+            "receding_horizon": 5,
+            "scheduler": {
+              "level": "finest",
+              "policy": "fixed",
+              "rollout_level": {
+                "level": "base",
+                "mode": "fixed"
+              }
+            },
+            "seed": 42,
+            "std_unbiased": true,
+            "topk": 30,
+            "warm_start": true
+          },
+          "restore": {
+            "import_path": null
+          }
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta/configs/eval/paper_pusht.yaml",
+        "sha256": "59bab7e06dfea2df1d0b57f839cc4545fdba25bf2e2cf9dc64a55f316936a39f"
+      },
+      "resolved_configs": [
+        {
+          "data": {
+            "checkpoint": {
+              "epoch": null,
+              "run_dir": "checkpoints_mwm/upstream_lewm_pusht"
+            },
+            "data": {
+              "action_key": "action",
+              "action_preprocessing": "standard_scaler",
+              "format": "lance",
+              "keys_to_cache": [
+                "action",
+                "proprio",
+                "state"
+              ],
+              "path": "data/upstream/pusht_expert_train.lance",
+              "pixels_key": "pixels",
+              "split_ratio": 0.9
+            },
+            "device": "auto",
+            "env": {
+              "goal_conditioned": true,
+              "kwargs": {},
+              "max_episode_steps": 100
+            },
+            "env_id": "swm/PushT-v1",
+            "eval": {
+              "budget": 50,
+              "episodes": 50,
+              "goal_offset": 25,
+              "manifest_path": "rollouts/manifests/pusht_paper_seed42.json",
+              "num_envs": 50,
+              "output_path": "rollouts/mwm_paper_parity_pusht/000_upstream/eval.json",
+              "sampling": "stable_worldmodel",
+              "save_video": false,
+              "seed": 42,
+              "video_path": "rollouts/mwm_paper_parity_pusht/000_upstream/videos",
+              "write_manifest_path": null
+            },
+            "planner": {
+              "action_block": 5,
+              "batch_size": 1,
+              "clamp_actions": false,
+              "elite_frac": 0.1,
+              "horizon": 5,
+              "init_std": 1.0,
+              "n_iter": 30,
+              "pop_size": 300,
+              "receding_horizon": 5,
+              "scheduler": {
+                "level": "finest",
+                "policy": "fixed",
+                "rollout_level": {
+                  "level": "base",
+                  "mode": "fixed"
+                }
+              },
+              "seed": 42,
+              "std_unbiased": true,
+              "topk": 30,
+              "warm_start": true
+            },
+            "restore": {
+              "import_path": null
+            }
+          },
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_pusht/000_upstream/resolved_config.yaml",
+          "sha256": "256b3578ef4918768c792ee36c75a0bedbb330b0ee65568ba9fdb6983415d188"
+        },
+        {
+          "data": {
+            "checkpoint": {
+              "epoch": null,
+              "run_dir": "checkpoints_mwm/retrained_lewm_identity_pusht_upstream"
+            },
+            "data": {
+              "action_key": "action",
+              "action_preprocessing": "standard_scaler",
+              "format": "lance",
+              "keys_to_cache": [
+                "action",
+                "proprio",
+                "state"
+              ],
+              "path": "data/upstream/pusht_expert_train.lance",
+              "pixels_key": "pixels",
+              "split_ratio": 0.9
+            },
+            "device": "auto",
+            "env": {
+              "goal_conditioned": true,
+              "kwargs": {},
+              "max_episode_steps": 100
+            },
+            "env_id": "swm/PushT-v1",
+            "eval": {
+              "budget": 50,
+              "episodes": 50,
+              "goal_offset": 25,
+              "manifest_path": "rollouts/manifests/pusht_paper_seed42.json",
+              "num_envs": 50,
+              "output_path": "rollouts/mwm_paper_parity_pusht/001_retrained_identity/eval.json",
+              "sampling": "stable_worldmodel",
+              "save_video": false,
+              "seed": 42,
+              "video_path": "rollouts/mwm_paper_parity_pusht/001_retrained_identity/videos",
+              "write_manifest_path": null
+            },
+            "planner": {
+              "action_block": 5,
+              "batch_size": 1,
+              "clamp_actions": false,
+              "elite_frac": 0.1,
+              "horizon": 5,
+              "init_std": 1.0,
+              "n_iter": 30,
+              "pop_size": 300,
+              "receding_horizon": 5,
+              "scheduler": {
+                "level": "finest",
+                "policy": "fixed",
+                "rollout_level": {
+                  "level": "base",
+                  "mode": "fixed"
+                }
+              },
+              "seed": 42,
+              "std_unbiased": true,
+              "topk": 30,
+              "warm_start": true
+            },
+            "restore": {
+              "import_path": null
+            }
+          },
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_pusht/001_retrained_identity/resolved_config.yaml",
+          "sha256": "72d040a7222f7c92e6bb0ed823846805bb7da50973d7aa7d7c3023cfe7cc05ae"
+        }
+      ],
+      "train_config": {
+        "data": {
+          "base": {
+            "checkpoint": "models--quentinll--lewm-pusht",
+            "family": "lewm"
+          },
+          "data": {
+            "action_key": "action",
+            "format": "lance",
+            "frameskip": 5,
+            "keys_to_cache": [
+              "action",
+              "proprio",
+              "state"
+            ],
+            "keys_to_load": [
+              "pixels",
+              "action",
+              "proprio",
+              "state"
+            ],
+            "path": "data/upstream/pusht_expert_train.lance",
+            "pixels_key": "pixels",
+            "split_ratio": 0.9
+          },
+          "env_id": "swm/PushT-v1",
+          "loss": {
+            "history_size": 3,
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "model": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": "auto",
+            "history_size": 3,
+            "image_shape": "auto",
+            "num_preds": 1
+          },
+          "mwm": {
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "loss_terms": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            }
+          },
+          "optim": {
+            "lr": 5e-05,
+            "weight_decay": 0.001
+          },
+          "schedule": {
+            "max_epochs": 10
+          },
+          "seed": 3072,
+          "train": {
+            "backend": "stable_worldmodel_lewm",
+            "batch_size": 128,
+            "checkpoint_dir": "checkpoints_mwm",
+            "checkpoint_every_n_train_steps": 1000,
+            "clean_trainer_root": true,
+            "drop_last": true,
+            "gradient_clip_val": 1.0,
+            "horizon": 4,
+            "limit_train_batches": 1.0,
+            "limit_val_batches": 1.0,
+            "matmul_precision": "high",
+            "no_cuda": false,
+            "num_workers": 6,
+            "pin_memory": true,
+            "precision": "bf16",
+            "prefetch_factor": 3,
+            "run_name": "retrained_lewm_identity_pusht_upstream",
+            "slurm_auto_requeue": false,
+            "timestamp_run_dir": false
+          }
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta/configs/train/mwm_lewm_pusht_upstream.yaml",
+        "sha256": "deaf48d20637ad85c6824b1761bd29be3f9ab906cf9471b0965d5cf8d30c24a6"
+      }
+    },
+    "tworoom": {
+      "benchmark_config": {
+        "data": {
+          "env_id": "swm/TwoRoom-v1",
+          "eval_config": "configs/eval/paper_tworoom.yaml",
+          "manifest": {
+            "config": "configs/manifest/tworoom_paper_seed42.yaml"
+          },
+          "output_dir": "rollouts/mwm_paper_parity_tworoom",
+          "paper_targets": {
+            "enabled": true,
+            "retrained_match_tolerance_pp": 5.0,
+            "source": "https://arxiv.org/pdf/2603.19312v1#page=7",
+            "success_rate": {
+              "swm/TwoRoom-v1": 87.0
+            },
+            "tolerance_pp": 1.0
+          },
+          "runs": [
+            {
+              "checkpoint": "checkpoints_mwm/upstream_lewm_tworoom",
+              "name": "upstream",
+              "role": "upstream_lewm_converted"
+            },
+            {
+              "checkpoint": "checkpoints_mwm/retrained_lewm_identity_tworoom_upstream",
+              "name": "retrained_identity",
+              "role": "retrained_lewm_identity"
+            }
+          ],
+          "seed": 42,
+          "title": "Paper-Parity Le-WM Identity Check on TwoRoom"
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta/configs/benchmark/paper_parity_tworoom.yaml",
+        "sha256": "e263c17330e4fc9e2e271c6f7dcdd70b30db70fed3b55649d387e09e05871ab3"
+      },
+      "eval_config": {
+        "data": {
+          "checkpoint": {
+            "epoch": null,
+            "run_dir": "checkpoints_mwm/upstream_lewm_tworoom"
+          },
+          "data": {
+            "action_key": "action",
+            "action_preprocessing": "standard_scaler",
+            "format": "lance",
+            "keys_to_cache": [
+              "action",
+              "proprio"
+            ],
+            "path": "data/upstream/tworoom.lance",
+            "pixels_key": "pixels",
+            "split_ratio": 0.9
+          },
+          "device": "auto",
+          "env": {
+            "goal_conditioned": true,
+            "kwargs": {},
+            "max_episode_steps": 100
+          },
+          "env_id": "swm/TwoRoom-v1",
+          "eval": {
+            "budget": 50,
+            "episodes": 50,
+            "goal_offset": 25,
+            "manifest_path": null,
+            "num_envs": 50,
+            "output_path": "rollouts/mwm_paper_parity/tworoom_upstream/eval.json",
+            "sampling": "stable_worldmodel",
+            "save_video": false,
+            "seed": 42,
+            "video_path": "rollouts/mwm_paper_parity/tworoom_videos",
+            "write_manifest_path": "rollouts/mwm_paper_parity/tworoom_seed42_manifest.json"
+          },
+          "planner": {
+            "action_block": 5,
+            "batch_size": 1,
+            "clamp_actions": false,
+            "elite_frac": 0.1,
+            "horizon": 5,
+            "init_std": 1.0,
+            "n_iter": 30,
+            "pop_size": 300,
+            "receding_horizon": 5,
+            "scheduler": {
+              "level": "finest",
+              "policy": "fixed",
+              "rollout_level": {
+                "level": "base",
+                "mode": "fixed"
+              }
+            },
+            "seed": 42,
+            "std_unbiased": true,
+            "topk": 30,
+            "warm_start": true
+          },
+          "restore": {
+            "import_path": null
+          }
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta/configs/eval/paper_tworoom.yaml",
+        "sha256": "c3f4844ce75443265ac2df991748813ea07bab0175028712cf431fc8c02994f9"
+      },
+      "resolved_configs": [
+        {
+          "data": {
+            "checkpoint": {
+              "epoch": null,
+              "run_dir": "checkpoints_mwm/upstream_lewm_tworoom"
+            },
+            "data": {
+              "action_key": "action",
+              "action_preprocessing": "standard_scaler",
+              "format": "lance",
+              "keys_to_cache": [
+                "action",
+                "proprio"
+              ],
+              "path": "data/upstream/tworoom.lance",
+              "pixels_key": "pixels",
+              "split_ratio": 0.9
+            },
+            "device": "auto",
+            "env": {
+              "goal_conditioned": true,
+              "kwargs": {},
+              "max_episode_steps": 100
+            },
+            "env_id": "swm/TwoRoom-v1",
+            "eval": {
+              "budget": 50,
+              "episodes": 50,
+              "goal_offset": 25,
+              "manifest_path": "rollouts/manifests/tworoom_paper_seed42.json",
+              "num_envs": 50,
+              "output_path": "rollouts/mwm_paper_parity_tworoom/000_upstream/eval.json",
+              "sampling": "stable_worldmodel",
+              "save_video": false,
+              "seed": 42,
+              "video_path": "rollouts/mwm_paper_parity_tworoom/000_upstream/videos",
+              "write_manifest_path": null
+            },
+            "planner": {
+              "action_block": 5,
+              "batch_size": 1,
+              "clamp_actions": false,
+              "elite_frac": 0.1,
+              "horizon": 5,
+              "init_std": 1.0,
+              "n_iter": 30,
+              "pop_size": 300,
+              "receding_horizon": 5,
+              "scheduler": {
+                "level": "finest",
+                "policy": "fixed",
+                "rollout_level": {
+                  "level": "base",
+                  "mode": "fixed"
+                }
+              },
+              "seed": 42,
+              "std_unbiased": true,
+              "topk": 30,
+              "warm_start": true
+            },
+            "restore": {
+              "import_path": null
+            }
+          },
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_tworoom/000_upstream/resolved_config.yaml",
+          "sha256": "cd6980cf467da60d20ef8e9cd0b69305ab3d33f6ec16b865b0de332f93124296"
+        },
+        {
+          "data": {
+            "checkpoint": {
+              "epoch": null,
+              "run_dir": "checkpoints_mwm/retrained_lewm_identity_tworoom_upstream"
+            },
+            "data": {
+              "action_key": "action",
+              "action_preprocessing": "standard_scaler",
+              "format": "lance",
+              "keys_to_cache": [
+                "action",
+                "proprio"
+              ],
+              "path": "data/upstream/tworoom.lance",
+              "pixels_key": "pixels",
+              "split_ratio": 0.9
+            },
+            "device": "auto",
+            "env": {
+              "goal_conditioned": true,
+              "kwargs": {},
+              "max_episode_steps": 100
+            },
+            "env_id": "swm/TwoRoom-v1",
+            "eval": {
+              "budget": 50,
+              "episodes": 50,
+              "goal_offset": 25,
+              "manifest_path": "rollouts/manifests/tworoom_paper_seed42.json",
+              "num_envs": 50,
+              "output_path": "rollouts/mwm_paper_parity_tworoom/001_retrained_identity/eval.json",
+              "sampling": "stable_worldmodel",
+              "save_video": false,
+              "seed": 42,
+              "video_path": "rollouts/mwm_paper_parity_tworoom/001_retrained_identity/videos",
+              "write_manifest_path": null
+            },
+            "planner": {
+              "action_block": 5,
+              "batch_size": 1,
+              "clamp_actions": false,
+              "elite_frac": 0.1,
+              "horizon": 5,
+              "init_std": 1.0,
+              "n_iter": 30,
+              "pop_size": 300,
+              "receding_horizon": 5,
+              "scheduler": {
+                "level": "finest",
+                "policy": "fixed",
+                "rollout_level": {
+                  "level": "base",
+                  "mode": "fixed"
+                }
+              },
+              "seed": 42,
+              "std_unbiased": true,
+              "topk": 30,
+              "warm_start": true
+            },
+            "restore": {
+              "import_path": null
+            }
+          },
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_tworoom/001_retrained_identity/resolved_config.yaml",
+          "sha256": "e619d1e0dc4e010bfbd9ea5f2e84a39497050e54afd2475734ca3c60731146de"
+        }
+      ],
+      "train_config": {
+        "data": {
+          "base": {
+            "checkpoint": "models--quentinll--lewm-tworooms",
+            "family": "lewm"
+          },
+          "data": {
+            "action_key": "action",
+            "format": "lance",
+            "frameskip": 5,
+            "keys_to_cache": [
+              "action",
+              "proprio"
+            ],
+            "keys_to_load": [
+              "pixels",
+              "action",
+              "proprio"
+            ],
+            "path": "data/upstream/tworoom.lance",
+            "pixels_key": "pixels",
+            "split_ratio": 0.9
+          },
+          "env_id": "swm/TwoRoom-v1",
+          "loss": {
+            "history_size": 3,
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "model": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": "auto",
+            "history_size": 3,
+            "image_shape": "auto",
+            "num_preds": 1
+          },
+          "mwm": {
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "loss_terms": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            }
+          },
+          "optim": {
+            "lr": 5e-05,
+            "weight_decay": 0.001
+          },
+          "schedule": {
+            "max_epochs": 10
+          },
+          "seed": 3072,
+          "train": {
+            "backend": "stable_worldmodel_lewm",
+            "batch_size": 128,
+            "checkpoint_dir": "checkpoints_mwm",
+            "checkpoint_every_n_train_steps": 1000,
+            "clean_trainer_root": true,
+            "drop_last": true,
+            "gradient_clip_val": 1.0,
+            "horizon": 4,
+            "limit_train_batches": 1.0,
+            "limit_val_batches": 1.0,
+            "matmul_precision": "high",
+            "no_cuda": false,
+            "num_workers": 6,
+            "pin_memory": true,
+            "precision": "bf16",
+            "prefetch_factor": 3,
+            "run_name": "retrained_lewm_identity_tworoom_upstream",
+            "slurm_auto_requeue": false,
+            "timestamp_run_dir": false
+          }
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta/configs/train/mwm_lewm_tworoom_upstream.yaml",
+        "sha256": "76430420da57c3823a093b306b4d8fe8a532cb805258a2cfaf693073f0f3634f"
+      }
+    }
+  },
+  "datasets": {
+    "pusht": {
+      "columns": [
+        {
+          "name": "episode_idx",
+          "type": "int32"
+        },
+        {
+          "name": "step_idx",
+          "type": "int32"
+        },
+        {
+          "name": "action",
+          "type": "fixed_size_list<item: float>[2]"
+        },
+        {
+          "name": "pixels",
+          "type": "binary"
+        },
+        {
+          "name": "proprio",
+          "type": "fixed_size_list<item: float>[4]"
+        },
+        {
+          "name": "state",
+          "type": "fixed_size_list<item: float>[7]"
+        }
+      ],
+      "episode_lengths": {
+        "episode_count": 18685,
+        "length_max": 246,
+        "length_mean": 125.05945945945946,
+        "length_min": 49,
+        "length_quantiles": {
+          "0.0": 49.0,
+          "0.05": 68.0,
+          "0.25": 99.0,
+          "0.5": 123.0,
+          "0.75": 148.0,
+          "0.95": 186.0,
+          "1.0": 246.0
+        },
+        "length_std": 36.36276280244304,
+        "random_split_train_count_0_9": 1783548,
+        "random_split_val_count_0_1": 198173,
+        "train_clip_count_before_split": 1981721
+      },
+      "metadata_path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/data/upstream/pusht_expert_train.lance.metadata.json",
+      "numeric_columns": {
+        "action": {
+          "max": [
+            2.0426697731018066,
+            1.7920565605163574
+          ],
+          "mean": [
+            -0.007812564379916172,
+            0.006860687229453032
+          ],
+          "min": [
+            -1.4947075843811035,
+            -1.4655311107635498
+          ],
+          "quantiles": {
+            "0.0": [
+              -1.4947075843811035,
+              -1.4655311107635498
+            ],
+            "0.01": [
+              -0.5513196259737014,
+              -0.53118294775486
+            ],
+            "0.05": [
+              -0.33891284465789795,
+              -0.3434406444430351
+            ],
+            "0.25": [
+              -0.12108242325484753,
+              -0.1092675793915987
+            ],
+            "0.5": [
+              -0.00763920764438808,
+              0.0022502316860482097
+            ],
+            "0.75": [
+              0.09746640734374523,
+              0.12636081129312515
+            ],
+            "0.95": [
+              0.34221063554286957,
+              0.3493010997772217
+            ],
+            "0.99": [
+              0.5902576446533196,
+              0.5303609937429424
+            ],
+            "1.0": [
+              2.0426697731018066,
+              1.7920565605163574
+            ]
+          },
+          "shape": [
+            2336736,
+            2
+          ],
+          "std_population": [
+            0.20846744284501714,
+            0.20674862637362224
+          ],
+          "std_sample": [
+            0.20846748745157725,
+            0.20674867061240074
+          ],
+          "valid_rows": 2336736
+        },
+        "proprio": {
+          "max": [
+            666.1377563476562,
+            723.6395263671875,
+            762.6093139648438,
+            669.1609497070312
+          ],
+          "mean": [
+            228.81245369927169,
+            292.23052136298617,
+            -2.9210027281011395,
+            2.548780001444025
+          ],
+          "min": [
+            -153.00656127929688,
+            -90.59517669677734,
+            -558.1359252929688,
+            -546.04541015625
+          ],
+          "quantiles": {
+            "0.0": [
+              -153.00656127929688,
+              -90.59517669677734,
+              -558.1359252929688,
+              -546.04541015625
+            ],
+            "0.01": [
+              38.09093456268311,
+              75.4899227142334,
+              -205.16303405761718,
+              -197.6120491027832
+            ],
+            "0.05": [
+              72.7933578491211,
+              127.32283592224121,
+              -126.06344032287598,
+              -127.7347583770752
+            ],
+            "0.25": [
+              143.77337646484375,
+              216.84217834472656,
+              -44.93046283721924,
+              -40.51893901824951
+            ],
+            "0.5": [
+              225.4661102294922,
+              294.3044128417969,
+              -2.2702834606170654,
+              0.24904559552669525
+            ],
+            "0.75": [
+              306.6811294555664,
+              370.14871978759766,
+              36.06003189086914,
+              46.86912441253662
+            ],
+            "0.95": [
+              405.0,
+              445.11602783203125,
+              127.25957298278809,
+              129.93599700927734
+            ],
+            "0.99": [
+              449.0,
+              481.7817825317381,
+              219.61415710449202,
+              197.35445556640616
+            ],
+            "1.0": [
+              666.1377563476562,
+              723.6395263671875,
+              762.6093139648438,
+              669.1609497070312
+            ]
+          },
+          "shape": [
+            2336736,
+            4
+          ],
+          "std_population": [
+            103.37358807129279,
+            98.92548714281784,
+            77.50031831485578,
+            76.86427067235248
+          ],
+          "std_sample": [
+            103.37361019052689,
+            98.92550831027512,
+            77.50033489788937,
+            76.86428711928858
+          ],
+          "valid_rows": 2336736
+        },
+        "state": {
+          "max": [
+            666.1377563476562,
+            723.6395263671875,
+            507.5936584472656,
+            538.77490234375,
+            6.283172607421875,
+            762.6093139648438,
+            669.1609497070312
+          ],
+          "mean": [
+            228.81245369927169,
+            292.23052136298617,
+            243.6124968389013,
+            275.25068937003124,
+            2.124715466746899,
+            -2.9210027281011395,
+            2.548780001444025
+          ],
+          "min": [
+            -153.00656127929688,
+            -90.59517669677734,
+            -32.84192657470703,
+            -1.8579233884811401,
+            1.375850843032822e-06,
+            -558.1359252929688,
+            -546.04541015625
+          ],
+          "quantiles": {
+            "0.0": [
+              -153.00656127929688,
+              -90.59517669677734,
+              -32.84192657470703,
+              -1.8579233884811401,
+              1.375850843032822e-06,
+              -558.1359252929688,
+              -546.04541015625
+            ],
+            "0.01": [
+              38.09093456268311,
+              75.4899227142334,
+              72.28087615966797,
+              119.51517486572266,
+              0.08220002204179765,
+              -205.16303405761718,
+              -197.6120491027832
+            ],
+            "0.05": [
+              72.7933578491211,
+              127.32283592224121,
+              120.09066772460938,
+              156.89570999145508,
+              0.28460580110549927,
+              -126.06344032287598,
+              -127.7347583770752
+            ],
+            "0.25": [
+              143.77337646484375,
+              216.84217834472656,
+              195.86911010742188,
+              230.29766845703125,
+              0.7381720542907715,
+              -44.93046283721924,
+              -40.51893901824951
+            ],
+            "0.5": [
+              225.4661102294922,
+              294.3044128417969,
+              245.7933578491211,
+              267.4712829589844,
+              1.0508172512054443,
+              -2.2702834606170654,
+              0.24904559552669525
+            ],
+            "0.75": [
+              306.6811294555664,
+              370.14871978759766,
+              289.0508117675781,
+              319.3814697265625,
+              3.39646577835083,
+              36.06003189086914,
+              46.86912441253662
+            ],
+            "0.95": [
+              405.0,
+              445.11602783203125,
+              362.37042236328125,
+              413.2902526855469,
+              5.91856849193573,
+              127.25957298278809,
+              129.93599700927734
+            ],
+            "0.99": [
+              449.0,
+              481.7817825317381,
+              404.36997528076125,
+              458.0929260253906,
+              6.199580192565918,
+              219.61415710449202,
+              197.35445556640616
+            ],
+            "1.0": [
+              666.1377563476562,
+              723.6395263671875,
+              507.5936584472656,
+              538.77490234375,
+              6.283172607421875,
+              762.6093139648438,
+              669.1609497070312
+            ]
+          },
+          "shape": [
+            2336736,
+            7
+          ],
+          "std_population": [
+            103.37358807129279,
+            98.92548714281784,
+            71.61788439508972,
+            73.3817644038044,
+            1.9151641088726212,
+            77.50031831485578,
+            76.86427067235248
+          ],
+          "std_sample": [
+            103.37361019052689,
+            98.92550831027512,
+            71.61789971943688,
+            73.38178010557559,
+            1.9151645186674642,
+            77.50033489788937,
+            76.86428711928858
+          ],
+          "valid_rows": 2336736
+        }
+      },
+      "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/data/upstream/pusht_expert_train.lance",
+      "pixel_sample": {
+        "all_shapes_same": true,
+        "dtype": "uint8",
+        "max": 255,
+        "mean": 248.343327736368,
+        "min": 53,
+        "sample_count": 32,
+        "shape_first": [
+          224,
+          224,
+          3
+        ],
+        "std_population": 22.67434610003953
+      },
+      "row_count": 2336736,
+      "sidecar_metadata": {
+        "action_dim": 2,
+        "action_high": [
+          1.0,
+          1.0
+        ],
+        "action_low": [
+          -1.0,
+          -1.0
+        ],
+        "dataset": {
+          "action_key": "action",
+          "pixels_key": "pixels"
+        },
+        "env_id": "swm/PushT-v1",
+        "format": "swm_lance",
+        "image_shape": [
+          224,
+          224
+        ],
+        "restore_spec": "pusht_state_goal_state",
+        "source": {
+          "artifact": "pusht_expert_train.lance",
+          "format": "lance",
+          "standard": "paper_parity"
+        }
+      }
+    },
+    "tworoom": {
+      "columns": [
+        {
+          "name": "episode_idx",
+          "type": "int32"
+        },
+        {
+          "name": "step_idx",
+          "type": "int32"
+        },
+        {
+          "name": "action",
+          "type": "fixed_size_list<item: float>[2]"
+        },
+        {
+          "name": "distance_to_target",
+          "type": "fixed_size_list<item: float>[1]"
+        },
+        {
+          "name": "ep_idx",
+          "type": "fixed_size_list<item: float>[1]"
+        },
+        {
+          "name": "id",
+          "type": "fixed_size_list<item: float>[1]"
+        },
+        {
+          "name": "observation",
+          "type": "fixed_size_list<item: float>[10]"
+        },
+        {
+          "name": "pixels",
+          "type": "binary"
+        },
+        {
+          "name": "pos_agent",
+          "type": "fixed_size_list<item: float>[2]"
+        },
+        {
+          "name": "pos_target",
+          "type": "fixed_size_list<item: float>[2]"
+        },
+        {
+          "name": "proprio",
+          "type": "fixed_size_list<item: float>[2]"
+        },
+        {
+          "name": "render_time",
+          "type": "fixed_size_list<item: float>[1]"
+        },
+        {
+          "name": "reward",
+          "type": "fixed_size_list<item: float>[1]"
+        },
+        {
+          "name": "terminated",
+          "type": "fixed_size_list<item: float>[1]"
+        },
+        {
+          "name": "truncated",
+          "type": "fixed_size_list<item: float>[1]"
+        }
+      ],
+      "episode_lengths": {
+        "episode_count": 10000,
+        "length_max": 101,
+        "length_mean": 92.0809,
+        "length_min": 31,
+        "length_quantiles": {
+          "0.0": 31.0,
+          "0.05": 59.0,
+          "0.25": 86.0,
+          "0.5": 101.0,
+          "0.75": 101.0,
+          "0.95": 101.0,
+          "1.0": 101.0
+        },
+        "length_std": 14.513350929058387,
+        "random_split_train_count_0_9": 657728,
+        "random_split_val_count_0_1": 73081,
+        "train_clip_count_before_split": 730809
+      },
+      "metadata_path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/data/upstream/tworoom.lance.metadata.json",
+      "numeric_columns": {
+        "action": {
+          "max": [
+            1.0,
+            1.0
+          ],
+          "mean": [
+            0.0030934159554243212,
+            -0.05298253984909538
+          ],
+          "min": [
+            -1.0,
+            -1.0
+          ],
+          "quantiles": {
+            "0.0": [
+              -1.0,
+              -1.0
+            ],
+            "0.01": [
+              -1.0,
+              -1.0
+            ],
+            "0.05": [
+              -1.0,
+              -1.0
+            ],
+            "0.25": [
+              -1.0,
+              -1.0
+            ],
+            "0.5": [
+              0.009131550788879395,
+              -0.14692240953445435
+            ],
+            "0.75": [
+              1.0,
+              1.0
+            ],
+            "0.95": [
+              1.0,
+              1.0
+            ],
+            "0.99": [
+              1.0,
+              1.0
+            ],
+            "1.0": [
+              1.0,
+              1.0
+            ]
+          },
+          "shape": [
+            920809,
+            2
+          ],
+          "std_population": [
+            0.867547357428919,
+            0.8686383074906906
+          ],
+          "std_sample": [
+            0.867547833680291,
+            0.8686387843409538
+          ],
+          "valid_rows": 910809
+        },
+        "distance_to_target": {
+          "max": [
+            258.8200988769531
+          ],
+          "mean": [
+            103.09944727858881
+          ],
+          "min": [
+            7.1003098487854
+          ],
+          "quantiles": {
+            "0.0": [
+              7.1003098487854
+            ],
+            "0.01": [
+              19.537902603149416
+            ],
+            "0.05": [
+              33.59588394165039
+            ],
+            "0.25": [
+              73.07244110107422
+            ],
+            "0.5": [
+              104.2060546875
+            ],
+            "0.75": [
+              132.6451873779297
+            ],
+            "0.95": [
+              169.71183166503906
+            ],
+            "0.99": [
+              194.33726562500001
+            ],
+            "1.0": [
+              258.8200988769531
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            41.20097919518127
+          ],
+          "std_sample": [
+            41.20100156736309
+          ],
+          "valid_rows": 920809
+        },
+        "ep_idx": {
+          "max": [
+            9999.0
+          ],
+          "mean": [
+            5006.438862999818
+          ],
+          "min": [
+            0.0
+          ],
+          "quantiles": {
+            "0.0": [
+              0.0
+            ],
+            "0.01": [
+              100.0
+            ],
+            "0.05": [
+              502.0
+            ],
+            "0.25": [
+              2508.0
+            ],
+            "0.5": [
+              5008.0
+            ],
+            "0.75": [
+              7511.0
+            ],
+            "0.95": [
+              9505.0
+            ],
+            "0.99": [
+              9900.0
+            ],
+            "1.0": [
+              9999.0
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            2887.7796919461352
+          ],
+          "std_sample": [
+            2887.781260014021
+          ],
+          "valid_rows": 920809
+        },
+        "id": {
+          "max": [
+            9.223037235564118e+18
+          ],
+          "mean": [
+            4.632935714356423e+18
+          ],
+          "min": [
+            1745858437578752.0
+          ],
+          "quantiles": {
+            "0.0": [
+              1745858437578752.0
+            ],
+            "0.01": [
+              8.871498904030413e+16
+            ],
+            "0.05": [
+              4.5565356146897715e+17
+            ],
+            "0.25": [
+              2.326560557060063e+18
+            ],
+            "0.5": [
+              4.632748263169065e+18
+            ],
+            "0.75": [
+              6.947850259800261e+18
+            ],
+            "0.95": [
+              8.784635011534946e+18
+            ],
+            "0.99": [
+              9.142012574445863e+18
+            ],
+            "1.0": [
+              9.223037235564118e+18
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            2.677971395275996e+18
+          ],
+          "std_sample": [
+            2.677972849417722e+18
+          ],
+          "valid_rows": 920809
+        },
+        "observation": {
+          "max": [
+            208.9813232421875,
+            208.96578979492188,
+            208.99363708496094,
+            208.99826049804688,
+            112.0,
+            49.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "mean": [
+            111.80260428514062,
+            84.99372289594642,
+            112.28147806565384,
+            124.13647376480357,
+            112.0,
+            49.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "min": [
+            14.027800559997559,
+            14.024847030639648,
+            14.003860473632812,
+            14.023238182067871,
+            112.0,
+            49.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "quantiles": {
+            "0.0": [
+              14.027800559997559,
+              14.024847030639648,
+              14.003860473632812,
+              14.023238182067871,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.01": [
+              29.52776954650879,
+              25.103877563476562,
+              15.43301773071289,
+              16.118896484375,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.05": [
+              49.500597381591795,
+              36.6174201965332,
+              21.336599349975586,
+              26.005077362060547,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.25": [
+              86.99662780761719,
+              56.30437469482422,
+              51.9820556640625,
+              80.88372039794922,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.5": [
+              111.53949737548828,
+              75.46752166748047,
+              125.33207702636719,
+              131.8652801513672,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.75": [
+              136.72943115234375,
+              108.4744644165039,
+              172.0601806640625,
+              170.7394561767578,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.95": [
+              173.81255798339842,
+              161.038720703125,
+              202.1016845703125,
+              201.18386840820312,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "0.99": [
+              193.55945129394533,
+              188.66628967285186,
+              207.58482360839844,
+              207.2836151123047,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ],
+            "1.0": [
+              208.9813232421875,
+              208.96578979492188,
+              208.99363708496094,
+              208.99826049804688,
+              112.0,
+              49.0,
+              0.0,
+              0.0,
+              0.0,
+              0.0
+            ]
+          },
+          "shape": [
+            920809,
+            10
+          ],
+          "std_population": [
+            36.875735788165215,
+            38.19356090888056,
+            63.12504062005197,
+            55.25914332918152,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "std_sample": [
+            36.87575581173461,
+            38.1935816480306,
+            63.125074897025826,
+            55.25917333496357,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0
+          ],
+          "valid_rows": 920809
+        },
+        "pos_agent": {
+          "max": [
+            208.9813232421875,
+            208.96578979492188
+          ],
+          "mean": [
+            111.80260428514062,
+            84.99372289594642
+          ],
+          "min": [
+            14.027800559997559,
+            14.024847030639648
+          ],
+          "quantiles": {
+            "0.0": [
+              14.027800559997559,
+              14.024847030639648
+            ],
+            "0.01": [
+              29.52776954650879,
+              25.103877563476562
+            ],
+            "0.05": [
+              49.500597381591795,
+              36.6174201965332
+            ],
+            "0.25": [
+              86.99662780761719,
+              56.30437469482422
+            ],
+            "0.5": [
+              111.53949737548828,
+              75.46752166748047
+            ],
+            "0.75": [
+              136.72943115234375,
+              108.4744644165039
+            ],
+            "0.95": [
+              173.81255798339842,
+              161.038720703125
+            ],
+            "0.99": [
+              193.55945129394533,
+              188.66628967285186
+            ],
+            "1.0": [
+              208.9813232421875,
+              208.96578979492188
+            ]
+          },
+          "shape": [
+            920809,
+            2
+          ],
+          "std_population": [
+            36.875735788165215,
+            38.19356090888056
+          ],
+          "std_sample": [
+            36.87575581173461,
+            38.1935816480306
+          ],
+          "valid_rows": 920809
+        },
+        "pos_target": {
+          "max": [
+            208.99363708496094,
+            208.99826049804688
+          ],
+          "mean": [
+            112.28147806565384,
+            124.13647376480357
+          ],
+          "min": [
+            14.003860473632812,
+            14.023238182067871
+          ],
+          "quantiles": {
+            "0.0": [
+              14.003860473632812,
+              14.023238182067871
+            ],
+            "0.01": [
+              15.43301773071289,
+              16.118896484375
+            ],
+            "0.05": [
+              21.336599349975586,
+              26.005077362060547
+            ],
+            "0.25": [
+              51.9820556640625,
+              80.88372039794922
+            ],
+            "0.5": [
+              125.33207702636719,
+              131.8652801513672
+            ],
+            "0.75": [
+              172.0601806640625,
+              170.7394561767578
+            ],
+            "0.95": [
+              202.1016845703125,
+              201.18386840820312
+            ],
+            "0.99": [
+              207.58482360839844,
+              207.2836151123047
+            ],
+            "1.0": [
+              208.99363708496094,
+              208.99826049804688
+            ]
+          },
+          "shape": [
+            920809,
+            2
+          ],
+          "std_population": [
+            63.12504062005197,
+            55.25914332918152
+          ],
+          "std_sample": [
+            63.125074897025826,
+            55.25917333496357
+          ],
+          "valid_rows": 920809
+        },
+        "proprio": {
+          "max": [
+            208.9813232421875,
+            208.96578979492188
+          ],
+          "mean": [
+            111.80260428514062,
+            84.99372289594642
+          ],
+          "min": [
+            14.027800559997559,
+            14.024847030639648
+          ],
+          "quantiles": {
+            "0.0": [
+              14.027800559997559,
+              14.024847030639648
+            ],
+            "0.01": [
+              29.52776954650879,
+              25.103877563476562
+            ],
+            "0.05": [
+              49.500597381591795,
+              36.6174201965332
+            ],
+            "0.25": [
+              86.99662780761719,
+              56.30437469482422
+            ],
+            "0.5": [
+              111.53949737548828,
+              75.46752166748047
+            ],
+            "0.75": [
+              136.72943115234375,
+              108.4744644165039
+            ],
+            "0.95": [
+              173.81255798339842,
+              161.038720703125
+            ],
+            "0.99": [
+              193.55945129394533,
+              188.66628967285186
+            ],
+            "1.0": [
+              208.9813232421875,
+              208.96578979492188
+            ]
+          },
+          "shape": [
+            920809,
+            2
+          ],
+          "std_population": [
+            36.875735788165215,
+            38.19356090888056
+          ],
+          "std_sample": [
+            36.87575581173461,
+            38.1935816480306
+          ],
+          "valid_rows": 920809
+        },
+        "render_time": {
+          "max": [
+            0.01748061180114746
+          ],
+          "mean": [
+            0.0011496972440591627
+          ],
+          "min": [
+            0.0010380744934082031
+          ],
+          "quantiles": {
+            "0.0": [
+              0.0010380744934082031
+            ],
+            "0.01": [
+              0.001085519790649414
+            ],
+            "0.05": [
+              0.0011005401611328125
+            ],
+            "0.25": [
+              0.0011272430419921875
+            ],
+            "0.5": [
+              0.001148223876953125
+            ],
+            "0.75": [
+              0.0011675357818603516
+            ],
+            "0.95": [
+              0.001196146011352539
+            ],
+            "0.99": [
+              0.0012238025665283203
+            ],
+            "1.0": [
+              0.01748061180114746
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            9.197057767680005e-05
+          ],
+          "std_sample": [
+            9.197062761693561e-05
+          ],
+          "valid_rows": 920809
+        },
+        "reward": {
+          "max": [
+            0.0
+          ],
+          "mean": [
+            0.0
+          ],
+          "min": [
+            0.0
+          ],
+          "quantiles": {
+            "0.0": [
+              0.0
+            ],
+            "0.01": [
+              0.0
+            ],
+            "0.05": [
+              0.0
+            ],
+            "0.25": [
+              0.0
+            ],
+            "0.5": [
+              0.0
+            ],
+            "0.75": [
+              0.0
+            ],
+            "0.95": [
+              0.0
+            ],
+            "0.99": [
+              0.0
+            ],
+            "1.0": [
+              0.0
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            0.0
+          ],
+          "std_sample": [
+            0.0
+          ],
+          "valid_rows": 910809
+        },
+        "terminated": {
+          "max": [
+            1.0
+          ],
+          "mean": [
+            0.004382016248755171
+          ],
+          "min": [
+            0.0
+          ],
+          "quantiles": {
+            "0.0": [
+              0.0
+            ],
+            "0.01": [
+              0.0
+            ],
+            "0.05": [
+              0.0
+            ],
+            "0.25": [
+              0.0
+            ],
+            "0.5": [
+              0.0
+            ],
+            "0.75": [
+              0.0
+            ],
+            "0.95": [
+              0.0
+            ],
+            "0.99": [
+              0.0
+            ],
+            "1.0": [
+              1.0
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            0.06605160242076506
+          ],
+          "std_sample": [
+            0.06605163828686554
+          ],
+          "valid_rows": 920809
+        },
+        "truncated": {
+          "max": [
+            1.0
+          ],
+          "mean": [
+            0.00657682537855299
+          ],
+          "min": [
+            0.0
+          ],
+          "quantiles": {
+            "0.0": [
+              0.0
+            ],
+            "0.01": [
+              0.0
+            ],
+            "0.05": [
+              0.0
+            ],
+            "0.25": [
+              0.0
+            ],
+            "0.5": [
+              0.0
+            ],
+            "0.75": [
+              0.0
+            ],
+            "0.95": [
+              0.0
+            ],
+            "0.99": [
+              0.0
+            ],
+            "1.0": [
+              1.0
+            ]
+          },
+          "shape": [
+            920809,
+            1
+          ],
+          "std_population": [
+            0.08083050628625935
+          ],
+          "std_sample": [
+            0.0808305501773226
+          ],
+          "valid_rows": 920809
+        }
+      },
+      "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/data/upstream/tworoom.lance",
+      "pixel_sample": {
+        "all_shapes_same": true,
+        "dtype": "uint8",
+        "max": 255,
+        "mean": 225.60154942103796,
+        "min": 0,
+        "sample_count": 32,
+        "shape_first": [
+          224,
+          224,
+          3
+        ],
+        "std_population": 80.49760211691978
+      },
+      "row_count": 920809,
+      "sidecar_metadata": {
+        "action_dim": 2,
+        "action_high": [
+          1.0,
+          1.0
+        ],
+        "action_low": [
+          -1.0,
+          -1.0
+        ],
+        "dataset": {
+          "action_key": "action",
+          "pixels_key": "pixels"
+        },
+        "env_id": "swm/TwoRoom-v1",
+        "format": "swm_lance",
+        "image_shape": [
+          224,
+          224
+        ],
+        "restore_spec": "point_state_goal_state",
+        "source": {
+          "artifact": "tworoom.lance",
+          "format": "lance",
+          "standard": "paper_parity"
+        }
+      }
+    }
+  },
+  "repo_root": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta",
+  "rollouts": {
+    "pusht": {
+      "rows": [
+        {
+          "bits_used_total": "16312320000",
+          "checkpoint_epoch": "0",
+          "checkpoint_run_dir": "checkpoints_mwm/upstream_lewm_pusht",
+          "config_sha256": "256b3578ef4918768c792ee36c75a0bedbb330b0ee65568ba9fdb6983415d188",
+          "env_id": "swm/PushT-v1",
+          "episodes": "50",
+          "goal_offset": "25",
+          "manifest_file_sha256": "8c66a751ec011817d1c2e356750a896fa0019805d963db415f7df048143616e4",
+          "manifest_sha256": "12efc949078d751eec6e6321ca42bff158555df987a95d91108ebee10e6f9310",
+          "name": "upstream",
+          "output_json": "rollouts/mwm_paper_parity_pusht/000_upstream/eval.json",
+          "plan_time_total_sec": "20.556812256982084",
+          "plans": "2",
+          "role": "upstream_lewm_converted",
+          "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+          "schedule_level_counts": "{\"0\": 1770}",
+          "seed": "42",
+          "steps": "50",
+          "success_rate": "98.0",
+          "wall_time_sec": "79.42858356703073"
+        },
+        {
+          "bits_used_total": "16035840000",
+          "checkpoint_epoch": "0",
+          "checkpoint_run_dir": "checkpoints_mwm/retrained_lewm_identity_pusht_upstream",
+          "config_sha256": "72d040a7222f7c92e6bb0ed823846805bb7da50973d7aa7d7c3023cfe7cc05ae",
+          "env_id": "swm/PushT-v1",
+          "episodes": "50",
+          "goal_offset": "25",
+          "manifest_file_sha256": "8c66a751ec011817d1c2e356750a896fa0019805d963db415f7df048143616e4",
+          "manifest_sha256": "12efc949078d751eec6e6321ca42bff158555df987a95d91108ebee10e6f9310",
+          "name": "retrained_identity",
+          "output_json": "rollouts/mwm_paper_parity_pusht/001_retrained_identity/eval.json",
+          "plan_time_total_sec": "19.6984103799914",
+          "plans": "2",
+          "role": "retrained_lewm_identity",
+          "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+          "schedule_level_counts": "{\"0\": 1740}",
+          "seed": "42",
+          "steps": "50",
+          "success_rate": "92.0",
+          "wall_time_sec": "51.15504193195375"
+        }
+      ],
+      "summary_csv": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_pusht/summary.csv"
+    },
+    "tworoom": {
+      "rows": [
+        {
+          "bits_used_total": "16312320000",
+          "checkpoint_epoch": "0",
+          "checkpoint_run_dir": "checkpoints_mwm/upstream_lewm_tworoom",
+          "config_sha256": "cd6980cf467da60d20ef8e9cd0b69305ab3d33f6ec16b865b0de332f93124296",
+          "env_id": "swm/TwoRoom-v1",
+          "episodes": "50",
+          "goal_offset": "25",
+          "manifest_file_sha256": "a917f25b4da1613e9a4ea30510853cbc63efd3f8f47f50f3b37d76fdd2824156",
+          "manifest_sha256": "6d96d9ae3d596bdee4a732942f4df9099adc97aee555b09f8b0737e697e04e11",
+          "name": "upstream",
+          "output_json": "rollouts/mwm_paper_parity_tworoom/000_upstream/eval.json",
+          "plan_time_total_sec": "20.529434047988616",
+          "plans": "2",
+          "role": "upstream_lewm_converted",
+          "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+          "schedule_level_counts": "{\"0\": 1770}",
+          "seed": "42",
+          "steps": "50",
+          "success_rate": "86.0",
+          "wall_time_sec": "58.327936529007275"
+        },
+        {
+          "bits_used_total": "15482880000",
+          "checkpoint_epoch": "0",
+          "checkpoint_run_dir": "checkpoints_mwm/retrained_lewm_identity_tworoom_upstream",
+          "config_sha256": "e619d1e0dc4e010bfbd9ea5f2e84a39497050e54afd2475734ca3c60731146de",
+          "env_id": "swm/TwoRoom-v1",
+          "episodes": "50",
+          "goal_offset": "25",
+          "manifest_file_sha256": "a917f25b4da1613e9a4ea30510853cbc63efd3f8f47f50f3b37d76fdd2824156",
+          "manifest_sha256": "6d96d9ae3d596bdee4a732942f4df9099adc97aee555b09f8b0737e697e04e11",
+          "name": "retrained_identity",
+          "output_json": "rollouts/mwm_paper_parity_tworoom/001_retrained_identity/eval.json",
+          "plan_time_total_sec": "19.02716686599888",
+          "plans": "2",
+          "role": "retrained_lewm_identity",
+          "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+          "schedule_level_counts": "{\"0\": 1680}",
+          "seed": "42",
+          "steps": "50",
+          "success_rate": "90.0",
+          "wall_time_sec": "28.41781961999368"
+        }
+      ],
+      "summary_csv": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_tworoom/summary.csv"
+    }
+  },
+  "static": {
+    "pusht": {
+      "config_comparison": [
+        {
+          "field": "target",
+          "identity": "mwm.adapters.builder.build_mwm_from_stable_config",
+          "same": true,
+          "upstream": "mwm.adapters.builder.build_mwm_from_stable_config"
+        },
+        {
+          "field": "kwargs.family",
+          "identity": "lewm",
+          "same": true,
+          "upstream": "lewm"
+        },
+        {
+          "field": "kwargs.K",
+          "identity": [
+            192
+          ],
+          "same": true,
+          "upstream": [
+            192
+          ]
+        },
+        {
+          "field": "kwargs.expected_D",
+          "identity": 192,
+          "same": true,
+          "upstream": 192
+        },
+        {
+          "field": "kwargs.action_dim",
+          "identity": 10,
+          "same": true,
+          "upstream": 10
+        },
+        {
+          "field": "kwargs.action_block",
+          "identity": 5,
+          "same": true,
+          "upstream": 5
+        },
+        {
+          "field": "kwargs.image_shape",
+          "identity": [
+            224,
+            224
+          ],
+          "same": true,
+          "upstream": [
+            224,
+            224
+          ]
+        },
+        {
+          "field": "kwargs.normalize_imagenet",
+          "identity": true,
+          "same": true,
+          "upstream": true
+        },
+        {
+          "field": "kwargs.component_policy",
+          "identity": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "same": true,
+          "upstream": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          }
+        },
+        {
+          "field": "kwargs.source_config_sha256",
+          "identity": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+          "same": true,
+          "upstream": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09"
+        },
+        {
+          "field": "kwargs.training_recipe",
+          "identity": {
+            "action_preprocessing": "standard_scaler",
+            "history_size": 3,
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "same": false,
+          "upstream": {
+            "history_size": 3,
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1
+          }
+        }
+      ],
+      "metadata_comparison": [
+        {
+          "field": "role",
+          "identity": null,
+          "same": false,
+          "upstream": "upstream_lewm_converted"
+        },
+        {
+          "field": "fresh_init",
+          "identity": true,
+          "same": false,
+          "upstream": false
+        },
+        {
+          "field": "adapter_family",
+          "identity": "lewm",
+          "same": true,
+          "upstream": "lewm"
+        },
+        {
+          "field": "architecture_version",
+          "identity": "lewm_base_adapter_v1",
+          "same": true,
+          "upstream": "lewm_base_adapter_v1"
+        },
+        {
+          "field": "training_backend",
+          "identity": "stable_worldmodel_lewm",
+          "same": false,
+          "upstream": null
+        },
+        {
+          "field": "levels",
+          "identity": [
+            192
+          ],
+          "same": true,
+          "upstream": [
+            192
+          ]
+        },
+        {
+          "field": "D",
+          "identity": 192,
+          "same": false,
+          "upstream": null
+        },
+        {
+          "field": "action_dim",
+          "identity": 2,
+          "same": true,
+          "upstream": 2
+        },
+        {
+          "field": "action_block",
+          "identity": 5,
+          "same": true,
+          "upstream": 5
+        },
+        {
+          "field": "image_shape",
+          "identity": [
+            224,
+            224
+          ],
+          "same": true,
+          "upstream": [
+            224,
+            224
+          ]
+        },
+        {
+          "field": "restore_spec",
+          "identity": "pusht_state_goal_state",
+          "same": true,
+          "upstream": "pusht_state_goal_state"
+        },
+        {
+          "field": "source_config_sha256",
+          "identity": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+          "same": true,
+          "upstream": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09"
+        },
+        {
+          "field": "component_policy",
+          "identity": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "same": true,
+          "upstream": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          }
+        },
+        {
+          "field": "loss_scope",
+          "identity": {
+            "reconstructor_contributes_to_encoder_loss": false,
+            "reconstructor_detach_encoder": true,
+            "regularizers": "shared_latent"
+          },
+          "same": false,
+          "upstream": {
+            "regularizers": "shared_latent"
+          }
+        },
+        {
+          "field": "training_recipe",
+          "identity": {
+            "action_preprocessing": "standard_scaler",
+            "history_size": 3,
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "same": false,
+          "upstream": {
+            "history_size": 3,
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1
+          }
+        },
+        {
+          "field": "dataset",
+          "identity": {
+            "action_key": "action",
+            "normalized_columns": [
+              "pixels",
+              "action",
+              "proprio",
+              "state"
+            ],
+            "path": "data/upstream/pusht_expert_train.lance",
+            "pixels_key": "pixels",
+            "split": "stable_pretraining_random_split"
+          },
+          "same": false,
+          "upstream": {
+            "action_key": "action",
+            "pixels_key": "pixels"
+          }
+        },
+        {
+          "field": "action_preprocessing",
+          "identity": "standard_scaler",
+          "same": true,
+          "upstream": "standard_scaler"
+        },
+        {
+          "field": "epoch",
+          "identity": 10,
+          "same": false,
+          "upstream": null
+        },
+        {
+          "field": "last_checkpoint",
+          "identity": "logs/mwm_training/retrained_lewm_identity_pusht_upstream/checkpoints/last.ckpt",
+          "same": false,
+          "upstream": null
+        }
+      ],
+      "roles": {
+        "retrained_lewm_identity": {
+          "config": {
+            "kwargs": {
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "component_policy": {
+                "per_level": [
+                  "transition"
+                ],
+                "reconstructor": [],
+                "shared": [
+                  "latent_producer"
+                ]
+              },
+              "expected_D": 192,
+              "family": "lewm",
+              "image_shape": [
+                224,
+                224
+              ],
+              "normalize_imagenet": true,
+              "source_config": {
+                "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                "action_encoder": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                  "emb_dim": 192,
+                  "input_dim": 10
+                },
+                "encoder": {
+                  "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                  "image_size": 224,
+                  "patch_size": 14,
+                  "pretrained": false,
+                  "size": "tiny",
+                  "use_mask_token": false
+                },
+                "pred_proj": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                },
+                "predictor": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                  "depth": 6,
+                  "dim_head": 64,
+                  "dropout": 0.1,
+                  "emb_dropout": 0.0,
+                  "heads": 16,
+                  "hidden_dim": 192,
+                  "input_dim": 192,
+                  "mlp_dim": 2048,
+                  "num_frames": 3,
+                  "output_dim": 192
+                },
+                "projector": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                }
+              },
+              "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+              "training_recipe": {
+                "action_preprocessing": "standard_scaler",
+                "history_size": 3,
+                "loss_scope": {
+                  "reconstructor_contributes_to_encoder_loss": false,
+                  "reconstructor_detach_encoder": true,
+                  "regularizers": "shared_latent"
+                },
+                "num_preds": 1,
+                "recon_weight": 0.0,
+                "rollout_weight": 1.0,
+                "sigreg_knots": 17,
+                "sigreg_num_proj": 1024,
+                "sigreg_weight": 0.09
+              }
+            },
+            "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+          },
+          "config_sha256": "adb01498c3eb31caef0110e6a43a77fb13a197f7363b5f141ad3e2e7beff1856",
+          "metadata": {
+            "D": 192,
+            "action_block": 5,
+            "action_dim": 2,
+            "action_high": [
+              1.0,
+              1.0
+            ],
+            "action_low": [
+              -1.0,
+              -1.0
+            ],
+            "action_preprocessing": "standard_scaler",
+            "action_spec": {
+              "base_dim": 2,
+              "block": 5,
+              "dim": 10
+            },
+            "adapter": "lewm",
+            "adapter_family": "lewm",
+            "architecture_version": "lewm_base_adapter_v1",
+            "artifacts": {
+              "config": {
+                "path": "config.json",
+                "sha256": "adb01498c3eb31caef0110e6a43a77fb13a197f7363b5f141ad3e2e7beff1856"
+              },
+              "weights": {
+                "path": "weights.pt",
+                "sha256": "f5308c8e2dbac32dc487878fb36c8428b5bb8685c55295f7cf7fbe86ce196c94"
+              }
+            },
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "dataset": {
+              "action_key": "action",
+              "normalized_columns": [
+                "pixels",
+                "action",
+                "proprio",
+                "state"
+              ],
+              "path": "data/upstream/pusht_expert_train.lance",
+              "pixels_key": "pixels",
+              "split": "stable_pretraining_random_split"
+            },
+            "dependencies": {
+              "local_repo": {
+                "commit_id": "136d0023451356a9ca07d0f7c3a08807ac407df2",
+                "diff_sha256": "4bf6f9869304f82c3f2c0be6949599ea3235ab23537ba6441dcf8eb0776a205c",
+                "dirty": true
+              },
+              "stable-pretraining": {
+                "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+                "version": "0.1.6"
+              },
+              "stable-worldmodel": {
+                "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+                "version": "0.1.0"
+              },
+              "torch": {
+                "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+                "version": "2.11.0"
+              }
+            },
+            "env_id": "swm/PushT-v1",
+            "epoch": 10,
+            "format": "mwm_world_v1",
+            "fresh_init": true,
+            "head_architectures": [
+              {
+                "K": 192,
+                "action_encoder_emb_dim": 192,
+                "action_encoder_hidden_dim": null,
+                "action_encoder_out_dim": null,
+                "pred_proj_hidden_dim": 2048,
+                "pred_proj_input_dim": 192,
+                "pred_proj_output_dim": 192,
+                "predictor_dim_head": 64,
+                "predictor_heads": 16,
+                "predictor_hidden_dim": 192,
+                "predictor_input_dim": 192,
+                "predictor_mlp_dim": 2048,
+                "predictor_output_dim": 192
+              }
+            ],
+            "image_shape": [
+              224,
+              224
+            ],
+            "last_checkpoint": "logs/mwm_training/retrained_lewm_identity_pusht_upstream/checkpoints/last.ckpt",
+            "levels": [
+              192
+            ],
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "model": {
+              "kwargs": {
+                "K": [
+                  192
+                ],
+                "action_block": 5,
+                "action_dim": 10,
+                "component_policy": {
+                  "per_level": [
+                    "transition"
+                  ],
+                  "reconstructor": [],
+                  "shared": [
+                    "latent_producer"
+                  ]
+                },
+                "expected_D": 192,
+                "family": "lewm",
+                "image_shape": [
+                  224,
+                  224
+                ],
+                "normalize_imagenet": true,
+                "source_config": {
+                  "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                  "action_encoder": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                    "emb_dim": 192,
+                    "input_dim": 10
+                  },
+                  "encoder": {
+                    "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                    "image_size": 224,
+                    "patch_size": 14,
+                    "pretrained": false,
+                    "size": "tiny",
+                    "use_mask_token": false
+                  },
+                  "pred_proj": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                    "hidden_dim": 2048,
+                    "input_dim": 192,
+                    "norm_fn": {
+                      "_partial_": true,
+                      "_target_": "torch.nn.BatchNorm1d"
+                    },
+                    "output_dim": 192
+                  },
+                  "predictor": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                    "depth": 6,
+                    "dim_head": 64,
+                    "dropout": 0.1,
+                    "emb_dropout": 0.0,
+                    "heads": 16,
+                    "hidden_dim": 192,
+                    "input_dim": 192,
+                    "mlp_dim": 2048,
+                    "num_frames": 3,
+                    "output_dim": 192
+                  },
+                  "projector": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                    "hidden_dim": 2048,
+                    "input_dim": 192,
+                    "norm_fn": {
+                      "_partial_": true,
+                      "_target_": "torch.nn.BatchNorm1d"
+                    },
+                    "output_dim": 192
+                  }
+                },
+                "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+                "training_recipe": {
+                  "action_preprocessing": "standard_scaler",
+                  "history_size": 3,
+                  "loss_scope": {
+                    "reconstructor_contributes_to_encoder_loss": false,
+                    "reconstructor_detach_encoder": true,
+                    "regularizers": "shared_latent"
+                  },
+                  "num_preds": 1,
+                  "recon_weight": 0.0,
+                  "rollout_weight": 1.0,
+                  "sigreg_knots": 17,
+                  "sigreg_num_proj": 1024,
+                  "sigreg_weight": 0.09
+                }
+              },
+              "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+            },
+            "normalize_imagenet": true,
+            "preprocessing_spec": {
+              "image": "imagenet",
+              "image_shape": [
+                224,
+                224
+              ],
+              "layout": "BCHW"
+            },
+            "restore_spec": "pusht_state_goal_state",
+            "source_config": {
+              "_target_": "stable_worldmodel.wm.lewm.LeWM",
+              "action_encoder": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                "emb_dim": 192,
+                "input_dim": 10
+              },
+              "encoder": {
+                "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                "image_size": 224,
+                "patch_size": 14,
+                "pretrained": false,
+                "size": "tiny",
+                "use_mask_token": false
+              },
+              "pred_proj": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              },
+              "predictor": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                "depth": 6,
+                "dim_head": 64,
+                "dropout": 0.1,
+                "emb_dropout": 0.0,
+                "heads": 16,
+                "hidden_dim": 192,
+                "input_dim": 192,
+                "mlp_dim": 2048,
+                "num_frames": 3,
+                "output_dim": 192
+              },
+              "projector": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              }
+            },
+            "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+            "training_backend": "stable_worldmodel_lewm",
+            "training_recipe": {
+              "action_preprocessing": "standard_scaler",
+              "history_size": 3,
+              "loss_scope": {
+                "reconstructor_contributes_to_encoder_loss": false,
+                "reconstructor_detach_encoder": true,
+                "regularizers": "shared_latent"
+              },
+              "num_preds": 1,
+              "recon_weight": 0.0,
+              "rollout_weight": 1.0,
+              "sigreg_knots": 17,
+              "sigreg_num_proj": 1024,
+              "sigreg_weight": 0.09
+            },
+            "weights": "weights.pt"
+          },
+          "metadata_sha256": "5c2dd5938b9db9b0fbd729fba56459831dbdd6db2c884d4feaddcc75e2834c54",
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/checkpoints_mwm/retrained_lewm_identity_pusht_upstream"
+        },
+        "upstream_lewm_converted": {
+          "config": {
+            "kwargs": {
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "component_policy": {
+                "per_level": [
+                  "transition"
+                ],
+                "reconstructor": [],
+                "shared": [
+                  "latent_producer"
+                ]
+              },
+              "expected_D": 192,
+              "family": "lewm",
+              "image_shape": [
+                224,
+                224
+              ],
+              "normalize_imagenet": true,
+              "source_config": {
+                "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                "action_encoder": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                  "emb_dim": 192,
+                  "input_dim": 10
+                },
+                "encoder": {
+                  "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                  "image_size": 224,
+                  "patch_size": 14,
+                  "pretrained": false,
+                  "size": "tiny",
+                  "use_mask_token": false
+                },
+                "pred_proj": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                },
+                "predictor": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                  "depth": 6,
+                  "dim_head": 64,
+                  "dropout": 0.1,
+                  "emb_dropout": 0.0,
+                  "heads": 16,
+                  "hidden_dim": 192,
+                  "input_dim": 192,
+                  "mlp_dim": 2048,
+                  "num_frames": 3,
+                  "output_dim": 192
+                },
+                "projector": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                }
+              },
+              "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+              "training_recipe": {
+                "history_size": 3,
+                "loss_scope": {
+                  "regularizers": "shared_latent"
+                },
+                "num_preds": 1
+              }
+            },
+            "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+          },
+          "config_sha256": "970139fc4a7a1d12cb2d3c970ed316e9e59d9767b0593c5f03d8b018dc90c911",
+          "metadata": {
+            "action_block": 5,
+            "action_dim": 2,
+            "action_preprocessing": "standard_scaler",
+            "action_spec": {
+              "base_dim": 2,
+              "block": 5,
+              "dim": 10
+            },
+            "adapter_family": "lewm",
+            "architecture_version": "lewm_base_adapter_v1",
+            "artifacts": {
+              "config": {
+                "path": "config.json",
+                "sha256": "970139fc4a7a1d12cb2d3c970ed316e9e59d9767b0593c5f03d8b018dc90c911"
+              },
+              "weights": {
+                "path": "weights.pt",
+                "sha256": "f900533bc36164475063cf1939c55bccbde1aaf1b35a5811301413b81689ed93"
+              }
+            },
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "dataset": {
+              "action_key": "action",
+              "pixels_key": "pixels"
+            },
+            "dependencies": {
+              "local_repo": {
+                "commit_id": "136d0023451356a9ca07d0f7c3a08807ac407df2",
+                "diff_sha256": "9241417cbade56ee7b48662144242f5485679f1d78355ac9b595c574a7e273af",
+                "dirty": true
+              },
+              "stable-pretraining": {
+                "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+                "version": "0.1.6"
+              },
+              "stable-worldmodel": {
+                "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+                "version": "0.1.0"
+              },
+              "torch": {
+                "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+                "version": "2.11.0"
+              }
+            },
+            "env_id": "swm/PushT-v1",
+            "format": "mwm_world_v1",
+            "fresh_init": false,
+            "head_architectures": [
+              {
+                "K": 192,
+                "action_encoder_emb_dim": 192,
+                "action_encoder_hidden_dim": null,
+                "action_encoder_out_dim": null,
+                "pred_proj_hidden_dim": 2048,
+                "pred_proj_input_dim": 192,
+                "pred_proj_output_dim": 192,
+                "predictor_dim_head": 64,
+                "predictor_heads": 16,
+                "predictor_hidden_dim": 192,
+                "predictor_input_dim": 192,
+                "predictor_mlp_dim": 2048,
+                "predictor_output_dim": 192
+              }
+            ],
+            "image_shape": [
+              224,
+              224
+            ],
+            "levels": [
+              192
+            ],
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "model": {
+              "D": 192,
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+            },
+            "preprocessing_spec": {
+              "image": "imagenet",
+              "image_shape": [
+                224,
+                224
+              ],
+              "layout": "BCHW"
+            },
+            "restore_spec": "pusht_state_goal_state",
+            "role": "upstream_lewm_converted",
+            "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+            "source_history_size": 3,
+            "training_recipe": {
+              "history_size": 3,
+              "loss_scope": {
+                "regularizers": "shared_latent"
+              },
+              "num_preds": 1
+            },
+            "upstream": {
+              "repo": "quentinll/lewm-pusht",
+              "source": "quentinll/lewm-pusht",
+              "source_config": "/vast/home/e/ethanyu/.stable_worldmodel/checkpoints/models--quentinll--lewm-pusht/config.json"
+            },
+            "weights": "weights.pt"
+          },
+          "metadata_sha256": "445863e44301c880b112f88bb32b5b54c4b99a0706ad6e7668c3e2360b327903",
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/checkpoints_mwm/upstream_lewm_pusht"
+        }
+      }
+    },
+    "tworoom": {
+      "config_comparison": [
+        {
+          "field": "target",
+          "identity": "mwm.adapters.builder.build_mwm_from_stable_config",
+          "same": true,
+          "upstream": "mwm.adapters.builder.build_mwm_from_stable_config"
+        },
+        {
+          "field": "kwargs.family",
+          "identity": "lewm",
+          "same": true,
+          "upstream": "lewm"
+        },
+        {
+          "field": "kwargs.K",
+          "identity": [
+            192
+          ],
+          "same": true,
+          "upstream": [
+            192
+          ]
+        },
+        {
+          "field": "kwargs.expected_D",
+          "identity": 192,
+          "same": true,
+          "upstream": 192
+        },
+        {
+          "field": "kwargs.action_dim",
+          "identity": 10,
+          "same": true,
+          "upstream": 10
+        },
+        {
+          "field": "kwargs.action_block",
+          "identity": 5,
+          "same": true,
+          "upstream": 5
+        },
+        {
+          "field": "kwargs.image_shape",
+          "identity": [
+            224,
+            224
+          ],
+          "same": true,
+          "upstream": [
+            224,
+            224
+          ]
+        },
+        {
+          "field": "kwargs.normalize_imagenet",
+          "identity": true,
+          "same": true,
+          "upstream": true
+        },
+        {
+          "field": "kwargs.component_policy",
+          "identity": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "same": true,
+          "upstream": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          }
+        },
+        {
+          "field": "kwargs.source_config_sha256",
+          "identity": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+          "same": true,
+          "upstream": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09"
+        },
+        {
+          "field": "kwargs.training_recipe",
+          "identity": {
+            "action_preprocessing": "standard_scaler",
+            "history_size": 3,
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "same": false,
+          "upstream": {
+            "history_size": 3,
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1
+          }
+        }
+      ],
+      "metadata_comparison": [
+        {
+          "field": "role",
+          "identity": null,
+          "same": false,
+          "upstream": "upstream_lewm_converted"
+        },
+        {
+          "field": "fresh_init",
+          "identity": true,
+          "same": false,
+          "upstream": false
+        },
+        {
+          "field": "adapter_family",
+          "identity": "lewm",
+          "same": true,
+          "upstream": "lewm"
+        },
+        {
+          "field": "architecture_version",
+          "identity": "lewm_base_adapter_v1",
+          "same": true,
+          "upstream": "lewm_base_adapter_v1"
+        },
+        {
+          "field": "training_backend",
+          "identity": "stable_worldmodel_lewm",
+          "same": false,
+          "upstream": null
+        },
+        {
+          "field": "levels",
+          "identity": [
+            192
+          ],
+          "same": true,
+          "upstream": [
+            192
+          ]
+        },
+        {
+          "field": "D",
+          "identity": 192,
+          "same": false,
+          "upstream": null
+        },
+        {
+          "field": "action_dim",
+          "identity": 2,
+          "same": true,
+          "upstream": 2
+        },
+        {
+          "field": "action_block",
+          "identity": 5,
+          "same": true,
+          "upstream": 5
+        },
+        {
+          "field": "image_shape",
+          "identity": [
+            224,
+            224
+          ],
+          "same": true,
+          "upstream": [
+            224,
+            224
+          ]
+        },
+        {
+          "field": "restore_spec",
+          "identity": "point_state_goal_state",
+          "same": true,
+          "upstream": "point_state_goal_state"
+        },
+        {
+          "field": "source_config_sha256",
+          "identity": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+          "same": true,
+          "upstream": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09"
+        },
+        {
+          "field": "component_policy",
+          "identity": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "same": true,
+          "upstream": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          }
+        },
+        {
+          "field": "loss_scope",
+          "identity": {
+            "reconstructor_contributes_to_encoder_loss": false,
+            "reconstructor_detach_encoder": true,
+            "regularizers": "shared_latent"
+          },
+          "same": false,
+          "upstream": {
+            "regularizers": "shared_latent"
+          }
+        },
+        {
+          "field": "training_recipe",
+          "identity": {
+            "action_preprocessing": "standard_scaler",
+            "history_size": 3,
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "same": false,
+          "upstream": {
+            "history_size": 3,
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1
+          }
+        },
+        {
+          "field": "dataset",
+          "identity": {
+            "action_key": "action",
+            "normalized_columns": [
+              "pixels",
+              "action",
+              "proprio"
+            ],
+            "path": "data/upstream/tworoom.lance",
+            "pixels_key": "pixels",
+            "split": "stable_pretraining_random_split"
+          },
+          "same": false,
+          "upstream": {
+            "action_key": "action",
+            "pixels_key": "pixels"
+          }
+        },
+        {
+          "field": "action_preprocessing",
+          "identity": "standard_scaler",
+          "same": true,
+          "upstream": "standard_scaler"
+        },
+        {
+          "field": "epoch",
+          "identity": 10,
+          "same": false,
+          "upstream": null
+        },
+        {
+          "field": "last_checkpoint",
+          "identity": "logs/mwm_training/retrained_lewm_identity_tworoom_upstream/checkpoints/last.ckpt",
+          "same": false,
+          "upstream": null
+        }
+      ],
+      "roles": {
+        "retrained_lewm_identity": {
+          "config": {
+            "kwargs": {
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "component_policy": {
+                "per_level": [
+                  "transition"
+                ],
+                "reconstructor": [],
+                "shared": [
+                  "latent_producer"
+                ]
+              },
+              "expected_D": 192,
+              "family": "lewm",
+              "image_shape": [
+                224,
+                224
+              ],
+              "normalize_imagenet": true,
+              "source_config": {
+                "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                "action_encoder": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                  "emb_dim": 192,
+                  "input_dim": 10
+                },
+                "encoder": {
+                  "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                  "image_size": 224,
+                  "patch_size": 14,
+                  "pretrained": false,
+                  "size": "tiny",
+                  "use_mask_token": false
+                },
+                "pred_proj": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                },
+                "predictor": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                  "depth": 6,
+                  "dim_head": 64,
+                  "dropout": 0.1,
+                  "emb_dropout": 0.0,
+                  "heads": 16,
+                  "hidden_dim": 192,
+                  "input_dim": 192,
+                  "mlp_dim": 2048,
+                  "num_frames": 3,
+                  "output_dim": 192
+                },
+                "projector": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                }
+              },
+              "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+              "training_recipe": {
+                "action_preprocessing": "standard_scaler",
+                "history_size": 3,
+                "loss_scope": {
+                  "reconstructor_contributes_to_encoder_loss": false,
+                  "reconstructor_detach_encoder": true,
+                  "regularizers": "shared_latent"
+                },
+                "num_preds": 1,
+                "recon_weight": 0.0,
+                "rollout_weight": 1.0,
+                "sigreg_knots": 17,
+                "sigreg_num_proj": 1024,
+                "sigreg_weight": 0.09
+              }
+            },
+            "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+          },
+          "config_sha256": "adb01498c3eb31caef0110e6a43a77fb13a197f7363b5f141ad3e2e7beff1856",
+          "metadata": {
+            "D": 192,
+            "action_block": 5,
+            "action_dim": 2,
+            "action_high": [
+              1.0,
+              1.0
+            ],
+            "action_low": [
+              -1.0,
+              -1.0
+            ],
+            "action_preprocessing": "standard_scaler",
+            "action_spec": {
+              "base_dim": 2,
+              "block": 5,
+              "dim": 10
+            },
+            "adapter": "lewm",
+            "adapter_family": "lewm",
+            "architecture_version": "lewm_base_adapter_v1",
+            "artifacts": {
+              "config": {
+                "path": "config.json",
+                "sha256": "adb01498c3eb31caef0110e6a43a77fb13a197f7363b5f141ad3e2e7beff1856"
+              },
+              "weights": {
+                "path": "weights.pt",
+                "sha256": "c480f574554995abf9e94c174754f5dc03300a94a5a2755313dc48c3a90d42df"
+              }
+            },
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "dataset": {
+              "action_key": "action",
+              "normalized_columns": [
+                "pixels",
+                "action",
+                "proprio"
+              ],
+              "path": "data/upstream/tworoom.lance",
+              "pixels_key": "pixels",
+              "split": "stable_pretraining_random_split"
+            },
+            "dependencies": {
+              "local_repo": {
+                "commit_id": "136d0023451356a9ca07d0f7c3a08807ac407df2",
+                "diff_sha256": "4bf6f9869304f82c3f2c0be6949599ea3235ab23537ba6441dcf8eb0776a205c",
+                "dirty": true
+              },
+              "stable-pretraining": {
+                "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+                "version": "0.1.6"
+              },
+              "stable-worldmodel": {
+                "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+                "version": "0.1.0"
+              },
+              "torch": {
+                "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+                "version": "2.11.0"
+              }
+            },
+            "env_id": "swm/TwoRoom-v1",
+            "epoch": 10,
+            "format": "mwm_world_v1",
+            "fresh_init": true,
+            "head_architectures": [
+              {
+                "K": 192,
+                "action_encoder_emb_dim": 192,
+                "action_encoder_hidden_dim": null,
+                "action_encoder_out_dim": null,
+                "pred_proj_hidden_dim": 2048,
+                "pred_proj_input_dim": 192,
+                "pred_proj_output_dim": 192,
+                "predictor_dim_head": 64,
+                "predictor_heads": 16,
+                "predictor_hidden_dim": 192,
+                "predictor_input_dim": 192,
+                "predictor_mlp_dim": 2048,
+                "predictor_output_dim": 192
+              }
+            ],
+            "image_shape": [
+              224,
+              224
+            ],
+            "last_checkpoint": "logs/mwm_training/retrained_lewm_identity_tworoom_upstream/checkpoints/last.ckpt",
+            "levels": [
+              192
+            ],
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "model": {
+              "kwargs": {
+                "K": [
+                  192
+                ],
+                "action_block": 5,
+                "action_dim": 10,
+                "component_policy": {
+                  "per_level": [
+                    "transition"
+                  ],
+                  "reconstructor": [],
+                  "shared": [
+                    "latent_producer"
+                  ]
+                },
+                "expected_D": 192,
+                "family": "lewm",
+                "image_shape": [
+                  224,
+                  224
+                ],
+                "normalize_imagenet": true,
+                "source_config": {
+                  "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                  "action_encoder": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                    "emb_dim": 192,
+                    "input_dim": 10
+                  },
+                  "encoder": {
+                    "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                    "image_size": 224,
+                    "patch_size": 14,
+                    "pretrained": false,
+                    "size": "tiny",
+                    "use_mask_token": false
+                  },
+                  "pred_proj": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                    "hidden_dim": 2048,
+                    "input_dim": 192,
+                    "norm_fn": {
+                      "_partial_": true,
+                      "_target_": "torch.nn.BatchNorm1d"
+                    },
+                    "output_dim": 192
+                  },
+                  "predictor": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                    "depth": 6,
+                    "dim_head": 64,
+                    "dropout": 0.1,
+                    "emb_dropout": 0.0,
+                    "heads": 16,
+                    "hidden_dim": 192,
+                    "input_dim": 192,
+                    "mlp_dim": 2048,
+                    "num_frames": 3,
+                    "output_dim": 192
+                  },
+                  "projector": {
+                    "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                    "hidden_dim": 2048,
+                    "input_dim": 192,
+                    "norm_fn": {
+                      "_partial_": true,
+                      "_target_": "torch.nn.BatchNorm1d"
+                    },
+                    "output_dim": 192
+                  }
+                },
+                "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+                "training_recipe": {
+                  "action_preprocessing": "standard_scaler",
+                  "history_size": 3,
+                  "loss_scope": {
+                    "reconstructor_contributes_to_encoder_loss": false,
+                    "reconstructor_detach_encoder": true,
+                    "regularizers": "shared_latent"
+                  },
+                  "num_preds": 1,
+                  "recon_weight": 0.0,
+                  "rollout_weight": 1.0,
+                  "sigreg_knots": 17,
+                  "sigreg_num_proj": 1024,
+                  "sigreg_weight": 0.09
+                }
+              },
+              "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+            },
+            "normalize_imagenet": true,
+            "preprocessing_spec": {
+              "image": "imagenet",
+              "image_shape": [
+                224,
+                224
+              ],
+              "layout": "BCHW"
+            },
+            "restore_spec": "point_state_goal_state",
+            "source_config": {
+              "_target_": "stable_worldmodel.wm.lewm.LeWM",
+              "action_encoder": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                "emb_dim": 192,
+                "input_dim": 10
+              },
+              "encoder": {
+                "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                "image_size": 224,
+                "patch_size": 14,
+                "pretrained": false,
+                "size": "tiny",
+                "use_mask_token": false
+              },
+              "pred_proj": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              },
+              "predictor": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                "depth": 6,
+                "dim_head": 64,
+                "dropout": 0.1,
+                "emb_dropout": 0.0,
+                "heads": 16,
+                "hidden_dim": 192,
+                "input_dim": 192,
+                "mlp_dim": 2048,
+                "num_frames": 3,
+                "output_dim": 192
+              },
+              "projector": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              }
+            },
+            "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+            "training_backend": "stable_worldmodel_lewm",
+            "training_recipe": {
+              "action_preprocessing": "standard_scaler",
+              "history_size": 3,
+              "loss_scope": {
+                "reconstructor_contributes_to_encoder_loss": false,
+                "reconstructor_detach_encoder": true,
+                "regularizers": "shared_latent"
+              },
+              "num_preds": 1,
+              "recon_weight": 0.0,
+              "rollout_weight": 1.0,
+              "sigreg_knots": 17,
+              "sigreg_num_proj": 1024,
+              "sigreg_weight": 0.09
+            },
+            "weights": "weights.pt"
+          },
+          "metadata_sha256": "6eb934bce4d0ac80c2c33f62851a523cd69a7dc40baff66ae5bd58cdfc5849d5",
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/checkpoints_mwm/retrained_lewm_identity_tworoom_upstream"
+        },
+        "upstream_lewm_converted": {
+          "config": {
+            "kwargs": {
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "component_policy": {
+                "per_level": [
+                  "transition"
+                ],
+                "reconstructor": [],
+                "shared": [
+                  "latent_producer"
+                ]
+              },
+              "expected_D": 192,
+              "family": "lewm",
+              "image_shape": [
+                224,
+                224
+              ],
+              "normalize_imagenet": true,
+              "source_config": {
+                "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                "action_encoder": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                  "emb_dim": 192,
+                  "input_dim": 10
+                },
+                "encoder": {
+                  "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                  "image_size": 224,
+                  "patch_size": 14,
+                  "pretrained": false,
+                  "size": "tiny",
+                  "use_mask_token": false
+                },
+                "pred_proj": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                },
+                "predictor": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                  "depth": 6,
+                  "dim_head": 64,
+                  "dropout": 0.1,
+                  "emb_dropout": 0.0,
+                  "heads": 16,
+                  "hidden_dim": 192,
+                  "input_dim": 192,
+                  "mlp_dim": 2048,
+                  "num_frames": 3,
+                  "output_dim": 192
+                },
+                "projector": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                }
+              },
+              "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+              "training_recipe": {
+                "history_size": 3,
+                "loss_scope": {
+                  "regularizers": "shared_latent"
+                },
+                "num_preds": 1
+              }
+            },
+            "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+          },
+          "config_sha256": "970139fc4a7a1d12cb2d3c970ed316e9e59d9767b0593c5f03d8b018dc90c911",
+          "metadata": {
+            "action_block": 5,
+            "action_dim": 2,
+            "action_preprocessing": "standard_scaler",
+            "action_spec": {
+              "base_dim": 2,
+              "block": 5,
+              "dim": 10
+            },
+            "adapter_family": "lewm",
+            "architecture_version": "lewm_base_adapter_v1",
+            "artifacts": {
+              "config": {
+                "path": "config.json",
+                "sha256": "970139fc4a7a1d12cb2d3c970ed316e9e59d9767b0593c5f03d8b018dc90c911"
+              },
+              "weights": {
+                "path": "weights.pt",
+                "sha256": "ab3b34c0f3a9d7f4bcd4bd22060fc2bc02effeafbeb907b1927740bb9360485a"
+              }
+            },
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "dataset": {
+              "action_key": "action",
+              "pixels_key": "pixels"
+            },
+            "dependencies": {
+              "local_repo": {
+                "commit_id": "136d0023451356a9ca07d0f7c3a08807ac407df2",
+                "diff_sha256": "9241417cbade56ee7b48662144242f5485679f1d78355ac9b595c574a7e273af",
+                "dirty": true
+              },
+              "stable-pretraining": {
+                "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+                "version": "0.1.6"
+              },
+              "stable-worldmodel": {
+                "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+                "version": "0.1.0"
+              },
+              "torch": {
+                "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+                "version": "2.11.0"
+              }
+            },
+            "env_id": "swm/TwoRoom-v1",
+            "format": "mwm_world_v1",
+            "fresh_init": false,
+            "head_architectures": [
+              {
+                "K": 192,
+                "action_encoder_emb_dim": 192,
+                "action_encoder_hidden_dim": null,
+                "action_encoder_out_dim": null,
+                "pred_proj_hidden_dim": 2048,
+                "pred_proj_input_dim": 192,
+                "pred_proj_output_dim": 192,
+                "predictor_dim_head": 64,
+                "predictor_heads": 16,
+                "predictor_hidden_dim": 192,
+                "predictor_input_dim": 192,
+                "predictor_mlp_dim": 2048,
+                "predictor_output_dim": 192
+              }
+            ],
+            "image_shape": [
+              224,
+              224
+            ],
+            "levels": [
+              192
+            ],
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "model": {
+              "D": 192,
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+            },
+            "preprocessing_spec": {
+              "image": "imagenet",
+              "image_shape": [
+                224,
+                224
+              ],
+              "layout": "BCHW"
+            },
+            "restore_spec": "point_state_goal_state",
+            "role": "upstream_lewm_converted",
+            "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+            "source_history_size": 3,
+            "training_recipe": {
+              "history_size": 3,
+              "loss_scope": {
+                "regularizers": "shared_latent"
+              },
+              "num_preds": 1
+            },
+            "upstream": {
+              "repo": "quentinll/lewm-tworooms",
+              "source": "quentinll/lewm-tworooms",
+              "source_config": "/vast/home/e/ethanyu/.stable_worldmodel/checkpoints/models--quentinll--lewm-tworooms/config.json"
+            },
+            "weights": "weights.pt"
+          },
+          "metadata_sha256": "8b6ab94456ecac75f6fc62f28001a9ea022a5d3ca03dbd67f8c0935cfadeda86",
+          "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/checkpoints_mwm/upstream_lewm_tworoom"
+        }
+      }
+    }
+  },
+  "training": {
+    "pusht": {
+      "lightning_checkpoint": {
+        "epoch": 9,
+        "exists": true,
+        "global_step": 139000,
+        "hparams": {
+          "data": {
+            "action_key": "action",
+            "format": "lance",
+            "frameskip": 5,
+            "keys_to_cache": [
+              "action",
+              "proprio",
+              "state"
+            ],
+            "keys_to_load": [
+              "pixels",
+              "action",
+              "proprio",
+              "state"
+            ],
+            "path": "data/upstream/pusht_expert_train.lance",
+            "pixels_key": "pixels",
+            "split_ratio": 0.9
+          },
+          "env_id": "swm/PushT-v1",
+          "loss": {
+            "history_size": 3,
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "model": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": "auto",
+            "history_size": 3,
+            "image_shape": "auto",
+            "num_preds": 1
+          },
+          "optim": {
+            "lr": 5e-05,
+            "weight_decay": 0.001
+          },
+          "schedule": {
+            "max_epochs": 10
+          },
+          "seed": 3072,
+          "train": {
+            "backend": "stable_worldmodel_lewm",
+            "batch_size": 128,
+            "checkpoint_dir": "checkpoints_mwm",
+            "checkpoint_every_n_train_steps": 1000,
+            "clean_trainer_root": true,
+            "cpu_devices": 1,
+            "devices": 1,
+            "drop_last": true,
+            "gradient_clip_val": 1.0,
+            "horizon": 4,
+            "limit_train_batches": 1.0,
+            "limit_val_batches": 1.0,
+            "matmul_precision": "high",
+            "no_cuda": false,
+            "num_nodes": 1,
+            "num_workers": 6,
+            "pin_memory": true,
+            "precision": "bf16",
+            "prefetch_factor": 3,
+            "run_name": "retrained_lewm_identity_pusht_upstream",
+            "slurm_auto_requeue": false,
+            "strategy": "auto",
+            "sync_batchnorm": false,
+            "timestamp_run_dir": false,
+            "use_distributed_sampler": true
+          }
+        },
+        "lr_schedulers": [
+          {
+            "_get_lr_called_within_step": false,
+            "_is_initial": false,
+            "_last_lr": [
+              7.061127301116744e-10
+            ],
+            "_step_count": 139001,
+            "base_lrs": [
+              5e-05
+            ],
+            "eta_min": 0.0,
+            "last_epoch": 139000,
+            "max_steps": 139330,
+            "warmup_start_lr": 0.0,
+            "warmup_steps": 1393
+          }
+        ],
+        "optimizer_states": 1,
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_training/retrained_lewm_identity_pusht_upstream/checkpoints/last.ckpt",
+        "pytorch_lightning_version": "2.6.1",
+        "state_dict_keys": 306
+      },
+      "log": {
+        "exact_training_complete": true,
+        "exists": true,
+        "max_epochs_reached": true,
+        "metric_count": {
+          "fit/loss": 10,
+          "fit/pred_loss": 10,
+          "fit/pred_loss_l0": 10,
+          "fit/rollout_loss": 10,
+          "fit/sigreg_loss": 10,
+          "validate/loss": 11,
+          "validate/loss_epoch": 11,
+          "validate/pred_loss": 11,
+          "validate/pred_loss_epoch": 11,
+          "validate/pred_loss_l0": 11,
+          "validate/pred_loss_l0_epoch": 11,
+          "validate/rollout_loss": 11,
+          "validate/rollout_loss_epoch": 11,
+          "validate/sigreg_loss": 11,
+          "validate/sigreg_loss_epoch": 11
+        },
+        "metric_last": {
+          "fit/loss": 0.08405739068984985,
+          "fit/pred_loss": 0.007397233508527279,
+          "fit/pred_loss_l0": 0.007397233508527279,
+          "fit/rollout_loss": 0.007397233508527279,
+          "fit/sigreg_loss": 0.8515625,
+          "validate/loss": 0.12297240644693375,
+          "validate/loss_epoch": 0.12297240644693375,
+          "validate/pred_loss": 0.003396380692720413,
+          "validate/pred_loss_epoch": 0.003396380692720413,
+          "validate/pred_loss_l0": 0.003396380692720413,
+          "validate/pred_loss_l0_epoch": 0.003396380692720413,
+          "validate/rollout_loss": 0.003396380692720413,
+          "validate/rollout_loss_epoch": 0.003396380692720413,
+          "validate/sigreg_loss": 1.3286446332931519,
+          "validate/sigreg_loss_epoch": 1.3286446332931519
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_train_pusht_identity_6192391.out"
+      }
+    },
+    "tworoom": {
+      "lightning_checkpoint": {
+        "epoch": 9,
+        "exists": true,
+        "global_step": 51000,
+        "hparams": {
+          "data": {
+            "action_key": "action",
+            "format": "lance",
+            "frameskip": 5,
+            "keys_to_cache": [
+              "action",
+              "proprio"
+            ],
+            "keys_to_load": [
+              "pixels",
+              "action",
+              "proprio"
+            ],
+            "path": "data/upstream/tworoom.lance",
+            "pixels_key": "pixels",
+            "split_ratio": 0.9
+          },
+          "env_id": "swm/TwoRoom-v1",
+          "loss": {
+            "history_size": 3,
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "model": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": "auto",
+            "history_size": 3,
+            "image_shape": "auto",
+            "num_preds": 1
+          },
+          "optim": {
+            "lr": 5e-05,
+            "weight_decay": 0.001
+          },
+          "schedule": {
+            "max_epochs": 10
+          },
+          "seed": 3072,
+          "train": {
+            "backend": "stable_worldmodel_lewm",
+            "batch_size": 128,
+            "checkpoint_dir": "checkpoints_mwm",
+            "checkpoint_every_n_train_steps": 1000,
+            "clean_trainer_root": true,
+            "cpu_devices": 1,
+            "devices": 1,
+            "drop_last": true,
+            "gradient_clip_val": 1.0,
+            "horizon": 4,
+            "limit_train_batches": 1.0,
+            "limit_val_batches": 1.0,
+            "matmul_precision": "high",
+            "no_cuda": false,
+            "num_nodes": 1,
+            "num_workers": 6,
+            "pin_memory": true,
+            "precision": "bf16",
+            "prefetch_factor": 3,
+            "run_name": "retrained_lewm_identity_tworoom_upstream",
+            "slurm_auto_requeue": false,
+            "strategy": "auto",
+            "sync_batchnorm": false,
+            "timestamp_run_dir": false,
+            "use_distributed_sampler": true
+          }
+        },
+        "lr_schedulers": [
+          {
+            "_get_lr_called_within_step": false,
+            "_is_initial": false,
+            "_last_lr": [
+              6.884695989298195e-09
+            ],
+            "_step_count": 51001,
+            "base_lrs": [
+              5e-05
+            ],
+            "eta_min": 0.0,
+            "last_epoch": 51000,
+            "max_steps": 51380,
+            "warmup_start_lr": 0.0,
+            "warmup_steps": 513
+          }
+        ],
+        "optimizer_states": 1,
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_training/retrained_lewm_identity_tworoom_upstream/checkpoints/last.ckpt",
+        "pytorch_lightning_version": "2.6.1",
+        "state_dict_keys": 306
+      },
+      "log": {
+        "exact_training_complete": true,
+        "exists": true,
+        "max_epochs_reached": true,
+        "metric_count": {
+          "fit/loss": 10,
+          "fit/pred_loss": 10,
+          "fit/pred_loss_l0": 10,
+          "fit/rollout_loss": 10,
+          "fit/sigreg_loss": 10,
+          "validate/loss": 11,
+          "validate/loss_epoch": 11,
+          "validate/pred_loss": 11,
+          "validate/pred_loss_epoch": 11,
+          "validate/pred_loss_l0": 11,
+          "validate/pred_loss_l0_epoch": 11,
+          "validate/rollout_loss": 11,
+          "validate/rollout_loss_epoch": 11,
+          "validate/sigreg_loss": 11,
+          "validate/sigreg_loss_epoch": 11
+        },
+        "metric_last": {
+          "fit/loss": 0.1453637331724167,
+          "fit/pred_loss": 0.01645747758448124,
+          "fit/pred_loss_l0": 0.01645747758448124,
+          "fit/rollout_loss": 0.01645747758448124,
+          "fit/sigreg_loss": 1.4375,
+          "validate/loss": 0.15898269414901733,
+          "validate/loss_epoch": 0.15898269414901733,
+          "validate/pred_loss": 0.007543545216321945,
+          "validate/pred_loss_epoch": 0.007543545216321945,
+          "validate/pred_loss_l0": 0.007543545216321945,
+          "validate/pred_loss_l0_epoch": 0.007543545216321945,
+          "validate/rollout_loss": 0.007543545216321945,
+          "validate/rollout_loss_epoch": 0.007543545216321945,
+          "validate/sigreg_loss": 1.6825405359268188,
+          "validate/sigreg_loss_epoch": 1.6825405359268188
+        },
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_train_tworoom_identity_6192392.out"
+      }
+    }
+  }
+}
