@@ -61,6 +61,44 @@ Current queue status at submission check:
 6384263|mwm_dense_highk_conv|PENDING|0:00|4-00:00:00|(ReqNodeNotAvail, Reserved for maintenance)
 ```
 
+## Pending Debug
+
+The pending reason is not a bad checkpoint/config/script request. `scontrol show job -dd 6384263` shows:
+
+```text
+JobState=PENDING Reason=ReqNodeNotAvail,_Reserved_for_maintenance
+StartTime=2026-06-09T20:00:00
+Partition=b200-mig90
+QOS=mig
+ReqNodeList=(null)
+SchedNodeList=dgx029
+ReqTRES=cpu=16,mem=128G,node=1,billing=571,gres/gpu=1,gres/gpu:90gb=1
+```
+
+`b200-mig90` has one node:
+
+```text
+PartitionName=b200-mig90
+Nodes=dgx029
+AllowQos=normal,mig,wharton,mig-max,maxwall
+TRES=cpu=224,mem=1857524M,node=1,billing=8098,gres/gpu=16,gres/gpu:90gb=16
+```
+
+The blocking reservation is:
+
+```text
+ReservationName=scheduled-maintenance-2026-06-09
+StartTime=2026-06-09T08:00:00
+EndTime=2026-06-09T20:00:00
+Nodes=...dgx[001-029]...
+Flags=MAINT,SPEC_NODES,ALL_NODES
+State=INACTIVE
+```
+
+Interpretation: the job requests a 4-day walltime and cannot fit safely before the June 9 maintenance reservation on the only `b200-mig90` node. Slurm therefore schedules it for `2026-06-09T20:00:00`, immediately after maintenance. The job's QOS/account/partition/GRES look valid.
+
+I also tested `dgx-b200` as a possible alternative. A 4-day full-B200 test-only submission also starts at `2026-06-09T20:00:00`, so switching to full B200 does not improve the safe 4-day start time. Shorter walltimes can produce earlier hypothetical starts, but they risk killing the convergence run before canonical export.
+
 Expected output checkpoint root:
 
 ```text

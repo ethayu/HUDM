@@ -39,7 +39,32 @@
   ],
   "queue_status": {
     "state": "PENDING",
-    "reason": "ReqNodeNotAvail, Reserved for maintenance"
+    "reason": "ReqNodeNotAvail, Reserved for maintenance",
+    "start_time": "2026-06-09T20:00:00",
+    "sched_node_list": "dgx029"
+  },
+  "pending_debug": {
+    "root_cause": "The 4-day walltime cannot fit before the June 9 maintenance reservation on the only b200-mig90 node.",
+    "job_request_valid": true,
+    "job_reason": "ReqNodeNotAvail,_Reserved_for_maintenance",
+    "reservation": {
+      "name": "scheduled-maintenance-2026-06-09",
+      "start": "2026-06-09T08:00:00",
+      "end": "2026-06-09T20:00:00",
+      "nodes": "dgx[001-029] included",
+      "flags": ["MAINT", "SPEC_NODES", "ALL_NODES"]
+    },
+    "partition": {
+      "name": "b200-mig90",
+      "nodes": ["dgx029"],
+      "allow_qos": ["normal", "mig", "wharton", "mig-max", "maxwall"]
+    },
+    "alternative_checked": {
+      "partition": "dgx-b200",
+      "gres": "gpu:B200:1",
+      "four_day_test_only_start": "2026-06-09T20:00:00",
+      "interpretation": "Switching to full B200 does not improve the safe 4-day start time."
+    }
   },
   "slurm": {
     "partition": "b200-mig90",
