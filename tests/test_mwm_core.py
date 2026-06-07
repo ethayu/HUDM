@@ -34,10 +34,13 @@ from mwm.models.world_model import (
 )
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
 from train_mwm import (
+    _AllLevelPlateauEarlyStopping,
     _build_trainable_model_from_base,
     _lewm_base_adapter_checkpoint_callback,
     _load_lewm_base_adapter_lightning_state,
     _resolve_lightning_trainer_runtime,
+    _resolve_lewm_base_adapter_total_steps,
+    _select_lewm_base_adapter_export_checkpoint,
     _ZScoreScaler,
 )
 from train_mwm import _prepare_trainer_root
@@ -931,6 +934,80 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(callback._every_n_train_steps, 1000)
         self.assertEqual(callback._every_n_epochs, 0)
         self.assertTrue(callback.save_last)
+
+    def test_lewm_base_adapter_checkpoint_callback_can_monitor_validation_metric(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "train": {
+                    "checkpoint_every_n_train_steps": 0,
+                    "checkpoint_monitor": "validate/pred_loss_epoch",
+                    "checkpoint_mode": "min",
+                    "save_top_k": 2,
+                }
+            }
+        )
+        callback = _lewm_base_adapter_checkpoint_callback(cfg)
+
+        self.assertEqual(callback.monitor, "validate/pred_loss_epoch")
+        self.assertEqual(callback.mode, "min")
+        self.assertEqual(callback.save_top_k, 2)
+        self.assertTrue(callback.save_last)
+
+    def test_select_lewm_base_adapter_export_checkpoint_prefers_best_when_requested(self) -> None:
+        cfg = OmegaConf.create({"train": {"export_checkpoint": "best"}})
+        callback = SimpleNamespace(best_model_path="best.ckpt", last_model_path="last.ckpt")
+
+        self.assertEqual(_select_lewm_base_adapter_export_checkpoint(callback, cfg), "best.ckpt")
+
+    def test_lewm_base_adapter_total_steps_can_decouple_lr_horizon_from_train_epochs(self) -> None:
+        cfg = OmegaConf.create({"schedule": {"max_epochs": 80, "lr_max_epochs": 10}})
+        loader = [object()] * 7
+
+        self.assertEqual(_resolve_lewm_base_adapter_total_steps(cfg, loader), 70)
+
+    def test_all_level_plateau_stop_waits_until_no_level_improves(self) -> None:
+        callback = _AllLevelPlateauEarlyStopping(
+            metrics=["validate/pred_loss_l0", "validate/pred_loss_l1"],
+            patience=2,
+            warmup_epochs=1,
+            relative_min_delta=0.01,
+        )
+        trainer = SimpleNamespace(
+            callback_metrics={
+                "validate/pred_loss_l0": torch.tensor(1.0),
+                "validate/pred_loss_l1": torch.tensor(2.0),
+            },
+            current_epoch=0,
+            should_stop=False,
+            sanity_checking=False,
+        )
+
+        callback.on_validation_epoch_end(trainer, None)
+        self.assertFalse(trainer.should_stop)
+
+        trainer.current_epoch = 1
+        trainer.callback_metrics = {
+            "validate/pred_loss_l0": torch.tensor(0.995),
+            "validate/pred_loss_l1": torch.tensor(1.5),
+        }
+        callback.on_validation_epoch_end(trainer, None)
+        self.assertFalse(trainer.should_stop)
+
+        trainer.current_epoch = 2
+        trainer.callback_metrics = {
+            "validate/pred_loss_l0": torch.tensor(0.994),
+            "validate/pred_loss_l1": torch.tensor(1.49),
+        }
+        callback.on_validation_epoch_end(trainer, None)
+        self.assertFalse(trainer.should_stop)
+
+        trainer.current_epoch = 3
+        trainer.callback_metrics = {
+            "validate/pred_loss_l0": torch.tensor(0.993),
+            "validate/pred_loss_l1": torch.tensor(1.489),
+        }
+        callback.on_validation_epoch_end(trainer, None)
+        self.assertTrue(trainer.should_stop)
 
     def test_lightning_runtime_defaults_to_single_gpu_when_cuda_available(self) -> None:
         cfg = OmegaConf.create({"train": {"no_cuda": False}})

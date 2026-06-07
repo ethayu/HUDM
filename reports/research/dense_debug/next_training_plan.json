@@ -1,0 +1,46 @@
+{
+  "date": "2026-06-07",
+  "status": "prepared_not_launched",
+  "recommended_first_env": "tworoom",
+  "configs": {
+    "pusht": "configs/research/train_mwm_dense_pusht_highk_weighted_converge.yaml",
+    "tworoom": "configs/research/train_mwm_dense_tworoom_highk_weighted_converge.yaml"
+  },
+  "training_recipe": {
+    "K": [6, 12, 48, 96, 144, 192],
+    "level_weights": [0.25, 0.25, 0.5, 1.0, 2.0, 4.0],
+    "max_epochs": 80,
+    "lr_max_epochs": 80,
+    "checkpoint_monitor": "validate/pred_loss_epoch",
+    "checkpoint_mode": "min",
+    "save_top_k": 2,
+    "export_checkpoint": "best",
+    "convergence": {
+      "enabled": true,
+      "warmup_epochs": 20,
+      "patience": 8,
+      "min_delta": 0.000001,
+      "relative_min_delta": 0.005,
+      "metrics": [
+        "validate/pred_loss_l0",
+        "validate/pred_loss_l1",
+        "validate/pred_loss_l2",
+        "validate/pred_loss_l3",
+        "validate/pred_loss_l4",
+        "validate/pred_loss_l5"
+      ]
+    }
+  },
+  "exact_training_command": "DENSE_HIGHK_ENV=tworoom sbatch --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch",
+  "slurm": {
+    "partition": "b200-mig90",
+    "gres": "gpu:90gb:1",
+    "cpus_per_task": 16,
+    "mem": "128G",
+    "time": "4-00:00:00"
+  },
+  "blockers": [
+    "Training job not launched yet.",
+    "Efficient K-monotonicity array evaluator is still only present in the dense debug worktree and should be restored or recreated before post-training eval."
+  ]
+}
