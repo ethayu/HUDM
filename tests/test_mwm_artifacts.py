@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 import benchmark_mwm
+import numpy as np
 from omegaconf import OmegaConf
 
 from benchmark_mwm import DEFAULTS, _merged_run_config, _validate_benchmark_matrix
@@ -22,7 +23,7 @@ from mwm.checkpoints import (
     validate_checkpoint_contract,
 )
 from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256
-from mwm.data.stable_wm import StartGoalPair, write_dataset_metadata
+from mwm.data.stable_wm import StartGoalPair, sample_start_goal_pairs, write_dataset_metadata
 from verify_mwm_benchmark import (
     _required_plots_for_benchmark,
     _validate_checkpoint_metadata,
@@ -78,6 +79,22 @@ def _lewm_source_config() -> dict:
 
 
 class MWMArtifactTests(unittest.TestCase):
+    def test_stable_worldmodel_sampling_includes_last_valid_start(self) -> None:
+        class TinyDataset:
+            lengths = np.asarray([5], dtype=np.int64)
+            offsets = np.asarray([0], dtype=np.int64)
+
+        pairs = sample_start_goal_pairs(
+            TinyDataset(),
+            count=3,
+            goal_offset_steps=2,
+            seed=0,
+            mode="stable_worldmodel",
+        )
+
+        self.assertEqual([pair.start_step for pair in pairs], [0, 1, 2])
+        self.assertEqual([pair.goal_step for pair in pairs], [2, 3, 4])
+
     def test_base_adaptive_checkpoint_metadata_persisted_from_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = build_mwm_from_stable_config(

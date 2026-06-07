@@ -142,7 +142,7 @@ def sample_start_goal_pairs(
         if not valid_rows:
             raise ValueError(f"No valid start-goal pairs with goal_offset_steps={goal_offset_steps}.")
         rows = np.concatenate(valid_rows)
-        population = max(1, len(rows) - 1)
+        population = len(rows)
         replace = int(count) > population
         choices = rng.choice(population, size=int(count), replace=replace)
         return [_pair_from_row(int(row), offsets=offsets, goal_offset_steps=int(goal_offset_steps)) for row in np.sort(rows[choices])]
