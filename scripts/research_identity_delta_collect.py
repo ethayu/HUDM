@@ -116,7 +116,7 @@ def main() -> None:
             "upstream_only_failure_indices",
             "identity_only_failure_indices",
         ]
-        writer = csv.DictWriter(fh, fieldnames=fieldnames)
+        writer = csv.DictWriter(fh, fieldnames=fieldnames, lineterminator="\n")
         writer.writeheader()
         for row in payload["paired_results"]:
             writer.writerow({key: json.dumps(row[key]) if isinstance(row[key], list) else row[key] for key in fieldnames})
