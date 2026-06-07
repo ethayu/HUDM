@@ -1,0 +1,50 @@
+{
+  "date": "2026-06-07",
+  "conclusion": "The 80-epoch equal-weight run was worse for different reasons by environment: TwoRoom exported a final checkpoint after late validation collapse, while PushT improved supervised validation loss but lost high-K planner utility.",
+  "verified_causes": {
+    "tworoom": {
+      "cause": "late collapse plus save-last-only export",
+      "evidence": {
+        "best_validation_snapshot": 34,
+        "validation_snapshots": 45,
+        "best_validate_pred_loss": 0.0038750830572098494,
+        "final_validate_pred_loss": 0.1971805840730667,
+        "final_over_best_pred_loss": 50.88422136041682,
+        "best_validate_pred_loss_l5": 0.01429064478725195,
+        "final_validate_pred_loss_l5": 0.7793071269989014,
+        "final_over_best_l5": 54.532677748318726,
+        "exported_checkpoint": "reports/research/dense_debug/checkpoints_mwm/mwm_dense_tworoom_equal_long",
+        "exported_epoch": 44
+      }
+    },
+    "pusht": {
+      "cause": "high-K planner/objective mismatch, not ordinary validation-loss overtraining",
+      "evidence": {
+        "validation_snapshots": 81,
+        "best_validate_pred_loss": 0.0010876822052523494,
+        "final_validate_pred_loss": 0.0011033309856429696,
+        "final_over_best_pred_loss": 1.0143872726013659,
+        "canonical_validate_pred_loss": 0.0023411638103425503,
+        "canonical_k96_easy": 63.333333333333336,
+        "equal_long_k96_easy": 62.666666666666664,
+        "canonical_k192_easy": 89.33333333333333,
+        "equal_long_k192_easy": 65.33333333333333,
+        "canonical_k192_cost96_easy": 87.33333333333333,
+        "equal_long_k192_cost96_easy": 70.66666666666667,
+        "exported_checkpoint": "reports/research/dense_debug/checkpoints_mwm/mwm_dense_pusht_equal_long",
+        "exported_epoch": 80
+      }
+    }
+  },
+  "experiment_design_caveats": {
+    "not_a_clean_continuation": "Changing schedule.max_epochs from 10 to 80 also stretches LinearWarmupCosineAnnealingLR because total_steps=max_epochs*len(train_loader).",
+    "checkpoint_selection": "Training used ModelCheckpoint(save_last=True, save_top_k=0), so best validation checkpoints were not retained.",
+    "checkpoint_cadence_changed": "Equal-long configs changed checkpoint_every_n_train_steps from 1000 to 5000."
+  },
+  "next_actions": [
+    "Do not rerun equal-weight 80 epochs as-is.",
+    "For long training, save and export best checkpoints on a high-K-aware validation metric.",
+    "For a true continuation test, keep 10-epoch LR schedule semantics or resume from the 10-epoch checkpoint with an explicit continuation schedule.",
+    "Proceed with high-K-weighted training configs because PushT failure is localized to high-K planner utility."
+  ]
+}
