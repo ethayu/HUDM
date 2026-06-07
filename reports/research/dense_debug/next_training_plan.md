@@ -39,13 +39,26 @@ Before preparing the GPU command, I inspected PARCC Slurm guidance on 2026-06-07
 - Local `sinfo` confirms `b200-mig90` with `gpu:90gb` and a 7 day partition limit.
 - Local `parcc_free.py` showed `b200-mig90` with 15/16 GPUs free at inspection time.
 
-## Exact Next Command
+## Submitted Command
 
-Not launched yet.
+Submitted as Slurm job `6384263`.
 
 ```bash
 DENSE_HIGHK_ENV=tworoom \
-sbatch --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch
+sbatch --parsable --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch
+```
+
+Submit output:
+
+```text
+sbatch: lua: cli_filter: defaulting --qos=mig for partition 'b200-mig90' (acct=dineshj-lab)
+6384263
+```
+
+Current queue status at submission check:
+
+```text
+6384263|mwm_dense_highk_conv|PENDING|0:00|4-00:00:00|(ReqNodeNotAvail, Reserved for maintenance)
 ```
 
 Expected output checkpoint root:
@@ -58,5 +71,5 @@ After the checkpoint is exported, evaluate the newest timestamped checkpoint wit
 
 ## Blockers
 
-- No GPU job has been submitted from this plan yet.
+- Slurm job `6384263` is pending because the requested node class is currently reserved for maintenance.
 - The efficient K-monotonicity array evaluator from the dense debug worktree has not been merged into `multienv-support`; it should be restored or recreated before the post-training evaluation.

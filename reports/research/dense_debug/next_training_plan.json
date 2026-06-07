@@ -1,6 +1,6 @@
 {
   "date": "2026-06-07",
-  "status": "prepared_not_launched",
+  "status": "submitted_pending",
   "recommended_first_env": "tworoom",
   "configs": {
     "pusht": "configs/research/train_mwm_dense_pusht_highk_weighted_converge.yaml",
@@ -31,7 +31,16 @@
       ]
     }
   },
-  "exact_training_command": "DENSE_HIGHK_ENV=tworoom sbatch --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch",
+  "exact_training_command": "DENSE_HIGHK_ENV=tworoom sbatch --parsable --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch",
+  "job_id": "6384263",
+  "submit_output": [
+    "sbatch: lua: cli_filter: defaulting --qos=mig for partition 'b200-mig90' (acct=dineshj-lab)",
+    "6384263"
+  ],
+  "queue_status": {
+    "state": "PENDING",
+    "reason": "ReqNodeNotAvail, Reserved for maintenance"
+  },
   "slurm": {
     "partition": "b200-mig90",
     "gres": "gpu:90gb:1",
@@ -40,7 +49,7 @@
     "time": "4-00:00:00"
   },
   "blockers": [
-    "Training job not launched yet.",
+    "Slurm job 6384263 is pending because the requested node class is reserved for maintenance.",
     "Efficient K-monotonicity array evaluator is still only present in the dense debug worktree and should be restored or recreated before post-training eval."
   ]
 }
