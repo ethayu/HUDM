@@ -1,0 +1,371 @@
+{
+  "generated_at": "2026-06-07",
+  "branch": "codex/dense-mwm-performance-debug",
+  "base_sha": "98fb81042ad7fcfce4be963f3d5a5c97e1174d04",
+  "latest_analysis_sha_before_report_edit": "4a7489a2e73fe25a22d5f155f1d5e06cee7dbde3",
+  "runtime_python": "/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python",
+  "conclusion": "Dense benchmark underperformance is primarily caused by the coarsest-to-finest planner scheduler; fixed-finest dense is strong, and a K96-to-finest scheduler recovers performance without retraining.",
+  "current_observed": {
+    "pusht": {
+      "upstream_success": 98.0,
+      "dense_linear_cem_success": 60.0,
+      "scheduled_bad_success": 8.0
+    },
+    "tworoom": {
+      "upstream_success": 86.0,
+      "dense_linear_cem_success": 64.0,
+      "scheduled_bad_success": 30.0
+    }
+  },
+  "fixed_level_results": {
+    "pusht": {
+      "fixed_finest_k192": 96.0,
+      "fixed_k96": 74.0,
+      "fixed_coarsest_k6": 4.0
+    },
+    "tworoom": {
+      "fixed_finest_k192": 84.0,
+      "fixed_k96": 100.0,
+      "fixed_coarsest_k6": 34.0
+    }
+  },
+  "scheduler_ablation": {
+    "policy": "linear_cem",
+    "start_level": 3,
+    "end_level": "finest",
+    "rollout_level": {
+      "mode": "fixed",
+      "level": "base"
+    },
+    "results": {
+      "pusht": 94.0,
+      "tworoom": 100.0
+    },
+    "interpretation": "Starting CEM at K96 avoids weak low-K candidate selection and recovers the dense benchmark drop."
+  },
+  "current_scheduler_behavior": {
+    "n_iter": 30,
+    "sequence": [0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5],
+    "per_solve_counts": {
+      "0": 3,
+      "1": 6,
+      "2": 6,
+      "3": 6,
+      "4": 6,
+      "5": 3
+    },
+    "levels_to_k": {
+      "0": 6,
+      "1": 12,
+      "2": 48,
+      "3": 96,
+      "4": 144,
+      "5": 192
+    }
+  },
+  "checkpoint_audit": {
+    "levels": [6, 12, 48, 96, 144, 192],
+    "D": 192,
+    "adapter_family": "lewm",
+    "architecture_version": "lewm_base_adapter_v1",
+    "training_backend": "stable_worldmodel_lewm",
+    "stale_or_wrong_config_found": false,
+    "dirty_export_commit": "136d0023451356a9ca07d0f7c3a08807ac407df2",
+    "dirty_export_diff_sha256": "9929b0a877dddd85ec302819fbdd5cb6fee526ecb3d30cc1c8c4b39e1a813229"
+  },
+  "canonical_training_audit": {
+    "pusht": {
+      "log": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_train_pusht_dense_6196243.out",
+      "completed": true,
+      "max_epochs": 10,
+      "last_global_step": 139000,
+      "checkpoints_saved": 139,
+      "validate_pred_loss_epoch": 0.0023411638103425503,
+      "validate_pred_loss_l5_epoch": 0.00821012258529663
+    },
+    "tworoom": {
+      "log": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_train_tworoom_dense_6196244.out",
+      "completed": true,
+      "max_epochs": 10,
+      "last_global_step": 51000,
+      "checkpoints_saved": 51,
+      "validate_pred_loss_epoch": 0.0028840580489486456,
+      "validate_pred_loss_l5_epoch": 0.012756398878991604
+    }
+  },
+  "k_monotonicity": {
+    "canonical_dense": {
+      "easy_offset25_horizon5": {
+        "pusht": {
+          "k96": 63.333333333333336,
+          "k144": 84.66666666666667,
+          "k192": 89.33333333333333,
+          "k192_transition_cost96": 87.33333333333333
+        },
+        "tworoom": {
+          "k96": 100.0,
+          "k144": 93.33333333333333,
+          "k192": 86.0,
+          "k192_transition_cost96": 99.33333333333333
+        }
+      },
+      "all_condition_means": {
+        "pusht": {
+          "k96": 22.555555555555557,
+          "k144": 32.66666666666667,
+          "k192": 32.11111111111111,
+          "k192_transition_cost96": 32.77777777777778
+        },
+        "tworoom": {
+          "k96": 74.44444444444444,
+          "k144": 60.77777777777778,
+          "k192": 46.111111111111114,
+          "k192_transition_cost96": 79.0
+        }
+      },
+      "diagnostic_means": {
+        "pusht": {
+          "k192_minus_k96": 9.555555555555554,
+          "k192_cost96_minus_k192": 0.6666666666666673,
+          "k192_cost96_minus_k96": 10.222222222222221
+        },
+        "tworoom": {
+          "k192_minus_k96": -28.333333333333332,
+          "k192_cost96_minus_k192": 32.88888888888889,
+          "k192_cost96_minus_k96": 4.5555555555555545
+        }
+      },
+      "interpretation": "TwoRoom non-monotonicity is mainly caused by the extra 96 terminal-cost dimensions at K192, not by the K192 transition head or fixed CEM budget."
+    },
+    "equal_long_dense": {
+      "easy_offset25_horizon5": {
+        "pusht": {
+          "k96": 62.666666666666664,
+          "k144": 66.0,
+          "k192": 65.33333333333333,
+          "k192_transition_cost96": 70.66666666666667
+        },
+        "tworoom": {
+          "k96": 29.333333333333332,
+          "k144": 24.0,
+          "k192": 23.333333333333332,
+          "k192_transition_cost96": 20.666666666666668
+        }
+      },
+      "all_condition_means": {
+        "pusht": {
+          "k96": 23.88888888888889,
+          "k144": 26.555555555555554,
+          "k192": 24.11111111111111,
+          "k192_transition_cost96": 30.000000000000004
+        },
+        "tworoom": {
+          "k96": 13.888888888888888,
+          "k144": 12.777777777777779,
+          "k192": 11.888888888888888,
+          "k192_transition_cost96": 14.444444444444445
+        }
+      },
+      "diagnostic_means": {
+        "pusht": {
+          "k192_minus_k96": 0.22222222222222157,
+          "k192_cost96_minus_k192": 5.88888888888889,
+          "k192_cost96_minus_k96": 6.111111111111113
+        },
+        "tworoom": {
+          "k192_minus_k96": -2.0000000000000004,
+          "k192_cost96_minus_k192": 2.5555555555555554,
+          "k192_cost96_minus_k96": 0.5555555555555552
+        }
+      },
+      "interpretation": "Longer equal-weight training did not recover canonical dense fixed-finest behavior and was especially poor on TwoRoom."
+    }
+  },
+  "equal_long_training": {
+    "matryoshka_weights": "equal",
+    "max_epochs": 80,
+    "plateau_rule": "after 20-epoch warmup, stop when all validate/pred_loss_l0..l5 fail to improve by max(1e-6, 0.5%) for 8 validation epochs",
+    "checkpoint_dir": "reports/research/dense_debug/checkpoints_mwm",
+    "pusht": {
+      "job_id": 6234245,
+      "state": "COMPLETED",
+      "elapsed": "2-03:28:55",
+      "validation_snapshots": 81,
+      "final_validate_pred_loss_l3": 0.001162816071882844,
+      "final_validate_pred_loss_l4": 0.0019562803208827972,
+      "final_validate_pred_loss_l5": 0.003472692333161831
+    },
+    "tworoom": {
+      "job_id": 6234246,
+      "state": "COMPLETED",
+      "elapsed": "09:57:42",
+      "validation_snapshots": 45,
+      "final_validate_pred_loss_l3": 0.05547773092985153,
+      "final_validate_pred_loss_l4": 0.3447555899620056,
+      "final_validate_pred_loss_l5": 0.7793071269989014
+    },
+    "conclusion": "Longer equal-weight training was worse than canonical dense on evaluated fixed-K planning."
+  },
+  "identity_mwm": {
+    "checkpoints": {
+      "pusht": "checkpoints_mwm/retrained_lewm_identity_pusht_upstream",
+      "tworoom": "checkpoints_mwm/retrained_lewm_identity_tworoom_upstream"
+    },
+    "easy_offset25_horizon5": {
+      "pusht": 90.0,
+      "tworoom": 92.0
+    },
+    "all_condition_means": {
+      "pusht": 36.44444444444444,
+      "tworoom": 49.888888888888886
+    },
+    "interpretation": "Identity MWM is much stronger than the equal-long dense checkpoint in the same matrix, especially on TwoRoom."
+  },
+  "slurm_jobs": [
+    {
+      "job_id": "6200972",
+      "purpose": "fixed-level dense ladder",
+      "command": "sbatch scripts/research_dense_fixed_ladder.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6201098",
+      "purpose": "dense scheduler ablation",
+      "command": "sbatch scripts/research_dense_scheduler_ablation.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6203086",
+      "purpose": "superseded PushT K monotonicity attempt",
+      "command": "DENSE_K_ENV=pusht sbatch scripts/research_dense_k_monotonicity.sbatch",
+      "state": "CANCELLED"
+    },
+    {
+      "job_id": "6203087",
+      "purpose": "superseded TwoRoom K monotonicity attempt",
+      "command": "DENSE_K_ENV=tworoom sbatch scripts/research_dense_k_monotonicity.sbatch",
+      "state": "CANCELLED"
+    },
+    {
+      "job_id": "6206283",
+      "purpose": "corrected PushT K monotonicity matrix",
+      "command": "DENSE_K_ENV=pusht sbatch scripts/research_dense_k_monotonicity.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6206284",
+      "purpose": "corrected TwoRoom K monotonicity matrix",
+      "command": "DENSE_K_ENV=tworoom sbatch scripts/research_dense_k_monotonicity.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6234160",
+      "purpose": "superseded PushT equal-long training attempt",
+      "command": "DENSE_LONG_ENV=pusht sbatch scripts/research_train_dense_equal_long.sbatch",
+      "state": "CANCELLED"
+    },
+    {
+      "job_id": "6234159",
+      "purpose": "superseded TwoRoom equal-long training attempt",
+      "command": "DENSE_LONG_ENV=tworoom sbatch scripts/research_train_dense_equal_long.sbatch",
+      "state": "CANCELLED"
+    },
+    {
+      "job_id": "6234245",
+      "purpose": "PushT equal-long training",
+      "command": "DENSE_LONG_ENV=pusht sbatch scripts/research_train_dense_equal_long.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6234246",
+      "purpose": "TwoRoom equal-long training",
+      "command": "DENSE_LONG_ENV=tworoom sbatch scripts/research_train_dense_equal_long.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6234464",
+      "purpose": "initial dependent equal-long eval",
+      "command": "DENSE_LONG_EVAL_ENV=all sbatch --dependency=afterok:6234245:6234246 scripts/research_dense_equal_long_eval.sbatch",
+      "state": "FAILED",
+      "root_cause": "Wrapper checked for metadata.json instead of world_metadata.json."
+    },
+    {
+      "job_id": "6381687",
+      "purpose": "sequential equal-long eval resubmission",
+      "command": "DENSE_LONG_EVAL_ENV=all sbatch scripts/research_dense_equal_long_eval.sbatch",
+      "state": "CANCELLED",
+      "reason": "Replaced by 36-task array for efficiency."
+    },
+    {
+      "job_id": "6382857",
+      "purpose": "36-task equal-long K matrix eval array",
+      "command": "DENSE_LONG_EVAL_OUTPUT_ROOT=reports/research/dense_debug/rollouts/equal_long/k_monotonicity sbatch scripts/research_dense_equal_long_eval_array.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6382869",
+      "purpose": "equal-long K matrix summary",
+      "command": "DENSE_LONG_EVAL_OUTPUT_ROOT=reports/research/dense_debug/rollouts/equal_long/k_monotonicity DENSE_LONG_EVAL_SUMMARY_DIR=reports/research/dense_debug/equal_long_eval sbatch --dependency=afterok:6382857 scripts/research_dense_equal_long_eval_summary.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6383534",
+      "purpose": "36-task identity MWM matrix eval array",
+      "command": "IDENTITY_MWM_OUTPUT_ROOT=reports/research/dense_debug/rollouts/identity_mwm/matrix sbatch scripts/research_identity_mwm_eval_array.sbatch",
+      "state": "COMPLETED"
+    },
+    {
+      "job_id": "6383537",
+      "purpose": "identity MWM matrix summary",
+      "command": "IDENTITY_MWM_OUTPUT_ROOT=reports/research/dense_debug/rollouts/identity_mwm/matrix IDENTITY_MWM_SUMMARY_DIR=reports/research/dense_debug/identity_mwm_eval sbatch --dependency=afterok:6383534 scripts/research_identity_mwm_summary.sbatch",
+      "state": "COMPLETED"
+    }
+  ],
+  "slurm_docs_recorded_in": [
+    "reports/research/dense_debug/equal_long_training_slurm.md",
+    "reports/research/dense_debug/k_monotonicity_slurm.md",
+    "reports/research/dense_debug/identity_mwm_slurm.md"
+  ],
+  "parcc_docs_inspected": [
+    "https://parcc.upenn.edu/training/getting-started/looking-around/",
+    "https://parcc.upenn.edu/training/getting-started/zero-to-mnist/",
+    "https://parcc.upenn.edu/systems/betty/",
+    "https://parcc.upenn.edu/about/rates/"
+  ],
+  "artifacts": {
+    "human_report": "reports/research/dense_debug/report.md",
+    "machine_summary": "reports/research/dense_debug/summary.json",
+    "fixed_ladder_results": "reports/research/dense_debug/fixed_ladder_results.md",
+    "scheduler_diagnostics": "reports/research/dense_debug/scheduler_diagnostics.md",
+    "canonical_k_monotonicity_results": "reports/research/dense_debug/k_monotonicity_results.md",
+    "equal_long_k_monotonicity_results": "reports/research/dense_debug/equal_long_eval/k_monotonicity_results.md",
+    "identity_mwm_results": "reports/research/dense_debug/identity_mwm_eval/identity_mwm_results.md"
+  },
+  "next_experiments": {
+    "scheduler_validation": {
+      "description": "Run multi-seed benchmark with dense scheduler start_level=3, end_level=finest.",
+      "config_patch": {
+        "planner.scheduler.policy": "linear_cem",
+        "planner.scheduler.start_level": 3,
+        "planner.scheduler.end_level": "finest",
+        "planner.scheduler.rollout_level": {
+          "mode": "fixed",
+          "level": "base"
+        }
+      }
+    },
+    "high_k_weighted_training": {
+      "description": "Train TwoRoom dense with high-K-weighted matryoshka loss, then rerun K monotonicity matrix.",
+      "config": "configs/research/train_mwm_dense_tworoom_highk_weighted.yaml",
+      "level_weights": [0.25, 0.25, 0.5, 1.0, 2.0, 4.0],
+      "training_command": "sbatch --job-name=mwm_dense_tworoom_highk --output=logs/%x_%j.out --error=logs/%x_%j.err --partition=dgx-b200 --gres=gpu:B200:1 --ntasks=1 --cpus-per-task=16 --mem=128G --time=4-00:00:00 --wrap='cd \"$SLURM_SUBMIT_DIR\" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=/vast/projects/dineshj/lab/ethanyu/code/HUDM && [[ -e data ]] || ln -s \"$ARTIFACT_ROOT/data\" data && $MWM_PYTHON verify_mwm_data.py --paper-parity && $MWM_PYTHON train_mwm.py configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'",
+      "eval_command": "DENSE_K_ENV=tworoom DENSE_K_EXTRA_ARGS='--tworoom-checkpoint <new_checkpoint_dir> --output-root reports/research/dense_debug/rollouts/k_monotonicity_tworoom_highk' sbatch --export=ALL,DENSE_K_ENV,DENSE_K_EXTRA_ARGS scripts/research_dense_k_monotonicity.sbatch"
+    }
+  },
+  "blockers": [
+    "git fetch origin multienv-support failed earlier with SSH publickey permission denied; worktree used local origin/multienv-support at 98fb81042ad7fcfce4be963f3d5a5c97e1174d04.",
+    "Fresh worktree did not include all large data/checkpoint artifacts; Slurm jobs used symlinks to /vast/projects/dineshj/lab/ethanyu/code/HUDM for data/checkpoints_mwm and wrote outputs under reports/research/dense_debug.",
+    "Large rollout/checkpoint artifacts remain local and are intentionally not part of the compact report commit unless requested.",
+    "Dense checkpoint metadata records a dirty export; fixed-finest recovery makes this a provenance caveat, not the primary cause."
+  ]
+}
