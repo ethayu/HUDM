@@ -4,9 +4,12 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 import benchmark_mwm
 import numpy as np
+import torch
+import torch.nn as nn
 from omegaconf import OmegaConf
 
 from benchmark_mwm import DEFAULTS, _merged_run_config, _validate_benchmark_matrix
@@ -62,17 +65,45 @@ def _payload(role: str, env_id: str, seed: int, output_path: Path) -> dict:
     return payload
 
 
+class FakeLeWMEncoder(nn.Module):
+    def __init__(self, out_dim: int = 4) -> None:
+        super().__init__()
+        self.proj = nn.Linear(3, out_dim)
+
+    def forward(self, x: torch.Tensor, interpolate_pos_encoding: bool = False) -> SimpleNamespace:
+        del interpolate_pos_encoding
+        pooled = x.mean(dim=(-2, -1))
+        return SimpleNamespace(last_hidden_state=self.proj(pooled).unsqueeze(1))
+
+
+class FakeLeWMActionEncoder(nn.Module):
+    def __init__(self, action_dim: int = 2, out_dim: int = 4) -> None:
+        super().__init__()
+        self.proj = nn.Linear(action_dim, out_dim)
+
+    def forward(self, action: torch.Tensor) -> torch.Tensor:
+        return self.proj(action)
+
+
+class FakeLeWMPredictor(nn.Module):
+    def __init__(self, **_: object) -> None:
+        super().__init__()
+
+    def forward(self, z: torch.Tensor, action_emb: torch.Tensor) -> torch.Tensor:
+        return z + action_emb
+
+
 def _lewm_source_config() -> dict:
     return {
         "_target_": "stable_worldmodel.wm.lewm.LeWM",
-        "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": 4},
+        "encoder": {"_target_": "tests.test_mwm_artifacts.FakeLeWMEncoder", "out_dim": 4},
         "predictor": {
-            "_target_": "tests.test_mwm_core.FakeLeWMPredictor",
+            "_target_": "tests.test_mwm_artifacts.FakeLeWMPredictor",
             "input_dim": 4,
             "hidden_dim": 4,
             "output_dim": 4,
         },
-        "action_encoder": {"_target_": "tests.test_mwm_core.FakeLeWMActionEncoder", "action_dim": 2, "out_dim": 4},
+        "action_encoder": {"_target_": "tests.test_mwm_artifacts.FakeLeWMActionEncoder", "action_dim": 2, "out_dim": 4},
         "projector": {"_target_": "torch.nn.Identity"},
         "pred_proj": {"_target_": "torch.nn.Identity"},
     }
