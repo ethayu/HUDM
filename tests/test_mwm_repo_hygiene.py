@@ -26,6 +26,7 @@ def _tracked_review_files() -> list[Path]:
     skip_dirs = {
         ".git",
         ".pytest_cache",
+        ".worktrees",
         "__pycache__",
         "checkpoints",
         "checkpoints_mwm",

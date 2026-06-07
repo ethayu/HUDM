@@ -225,7 +225,7 @@ sbatch --job-name=mwm_dense_tworoom_highk \
   --cpus-per-task=16 \
   --mem=128G \
   --time=4-00:00:00 \
-  --wrap='cd "$SLURM_SUBMIT_DIR" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=/vast/projects/dineshj/lab/ethanyu/code/HUDM && [[ -e data ]] || ln -s "$ARTIFACT_ROOT/data" data && $MWM_PYTHON verify_mwm_data.py --paper-parity && $MWM_PYTHON train_mwm.py configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'
+  --wrap='cd "$SLURM_SUBMIT_DIR" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=${MWM_ARTIFACT_ROOT} && [[ -e data ]] || ln -s "$ARTIFACT_ROOT/data" data && $MWM_PYTHON verify_mwm_data.py --paper-parity && $MWM_PYTHON train_mwm.py configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'
 ```
 
 Then rerun the K matrix on the new checkpoint:
@@ -239,6 +239,6 @@ sbatch --export=ALL,DENSE_K_ENV,DENSE_K_EXTRA_ARGS scripts/research_dense_k_mono
 ## Blockers and Limitations
 
 - `git fetch origin multienv-support` failed earlier with SSH publickey permission denied; this worktree used the existing local `origin/multienv-support` at `98fb81042ad7fcfce4be963f3d5a5c97e1174d04`.
-- Fresh worktree did not include all large canonical artifacts, so Slurm jobs used symlinks to `/vast/projects/dineshj/lab/ethanyu/code/HUDM` for `data` and `checkpoints_mwm` while writing research outputs under `reports/research/dense_debug/`.
+- Fresh worktree did not include all large canonical artifacts, so Slurm jobs used symlinks to `${MWM_ARTIFACT_ROOT}` for `data` and `checkpoints_mwm` while writing research outputs under `reports/research/dense_debug/`.
 - Large rollout/checkpoint artifacts are present locally and intentionally not part of the compact report commit unless explicitly requested.
 - Dense checkpoint metadata records a dirty export; fixed-finest recovery makes that a provenance caveat, not the main explanation.
