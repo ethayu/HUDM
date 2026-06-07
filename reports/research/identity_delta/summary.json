@@ -1,0 +1,173 @@
+{
+  "branch": "codex/identity-upstream-delta",
+  "base_commit": "98fb81042ad7fcfce4be963f3d5a5c97e1174d04",
+  "worktree": "/vast/projects/dineshj/lab/ethanyu/code/HUDM-worktrees/identity-upstream-delta",
+  "artifact_root": "/vast/projects/dineshj/lab/ethanyu/code/HUDM",
+  "executive_answer": {
+    "primary_cause": "evaluator_manifest_variance",
+    "confidence": "high for the observed seed-42 delta; medium for broader upstream-vs-identity parity because only five 50-episode seeds were swept",
+    "summary": "The original PushT seed-42 delta is not stable. Across seeds 0,1,2,42,100, retrained identity averages 92.0 on PushT versus upstream 86.0, and 85.6 on TwoRoom versus upstream 84.4.",
+    "not_primary_causes": [
+      "code_mismatch",
+      "checkpoint_selection",
+      "training_recipe_convergence",
+      "paired_eval_config_mismatch"
+    ],
+    "remaining_caveats": [
+      "Converted upstream training provenance is not fully recoverable from the checkpoint metadata.",
+      "Identity training kept last checkpoints only; best-validation checkpoint comparison was not available.",
+      "Five seeds at 50 episodes are enough to reject the seed-42-only conclusion but not enough to set a tight production tolerance."
+    ]
+  },
+  "required_answers": {
+    "cause_bucket": "Evaluator/manifest variance is the primary bucket for the observed seed-42 PushT delta. Dataset representation contributes to upstream-paper mismatch; training recipe/convergence, checkpoint selection, and code mismatch are not supported as primary causes.",
+    "pusht_vs_tworoom": "PushT identity does not generally underperform upstream. Seed 42 is the only swept PushT seed with a negative identity-upstream delta. PushT upstream is highly manifest-sensitive, ranging from 74.0 to 98.0, while identity ranges from 86.0 to 96.0.",
+    "tolerance_recommendation": "Split the tolerance into upstream-paper calibration and identity-upstream paired checks. Do not use one 1 percentage point gate for both; 50-episode evals have 2 point resolution.",
+    "next_experiment": "Run a PushT-only paired sweep at 200 episodes over seeds 0,1,2,42,100 using: env MWM_SWEEP_ENVS=pusht MWM_SWEEP_EPISODES=200 MWM_SWEEP_SEEDS=\"0 1 2 42 100\" sbatch scripts/slurm_research_identity_seed_sweep.sbatch"
+  },
+  "seed_sweep": {
+    "job_id": 6201181,
+    "state": "COMPLETED",
+    "exit_code": "0:0",
+    "elapsed": "00:23:10",
+    "partition": "b200-mig90",
+    "gres": "gpu:90gb:1",
+    "episodes_per_cell": 50,
+    "seeds": [
+      0,
+      1,
+      2,
+      42,
+      100
+    ],
+    "env_summary": {
+      "pusht": {
+        "mean_upstream_success_rate": 86.0,
+        "mean_identity_success_rate": 92.0,
+        "mean_identity_minus_upstream": 6.0,
+        "population_std_identity_minus_upstream": 6.324555320336759,
+        "min_identity_minus_upstream": -6.0,
+        "max_identity_minus_upstream": 12.0
+      },
+      "tworoom": {
+        "mean_upstream_success_rate": 84.4,
+        "mean_identity_success_rate": 85.6,
+        "mean_identity_minus_upstream": 1.2,
+        "population_std_identity_minus_upstream": 4.664761515876241,
+        "min_identity_minus_upstream": -4.0,
+        "max_identity_minus_upstream": 8.0
+      }
+    },
+    "paired_results": [
+      {
+        "env": "pusht",
+        "seed": 0,
+        "upstream_success_rate": 84.0,
+        "identity_success_rate": 92.0,
+        "identity_minus_upstream": 8.0
+      },
+      {
+        "env": "pusht",
+        "seed": 1,
+        "upstream_success_rate": 88.0,
+        "identity_success_rate": 94.0,
+        "identity_minus_upstream": 6.0
+      },
+      {
+        "env": "pusht",
+        "seed": 2,
+        "upstream_success_rate": 86.0,
+        "identity_success_rate": 96.0,
+        "identity_minus_upstream": 10.0
+      },
+      {
+        "env": "pusht",
+        "seed": 42,
+        "upstream_success_rate": 98.0,
+        "identity_success_rate": 92.0,
+        "identity_minus_upstream": -6.0
+      },
+      {
+        "env": "pusht",
+        "seed": 100,
+        "upstream_success_rate": 74.0,
+        "identity_success_rate": 86.0,
+        "identity_minus_upstream": 12.0
+      },
+      {
+        "env": "tworoom",
+        "seed": 0,
+        "upstream_success_rate": 84.0,
+        "identity_success_rate": 80.0,
+        "identity_minus_upstream": -4.0
+      },
+      {
+        "env": "tworoom",
+        "seed": 1,
+        "upstream_success_rate": 92.0,
+        "identity_success_rate": 94.0,
+        "identity_minus_upstream": 2.0
+      },
+      {
+        "env": "tworoom",
+        "seed": 2,
+        "upstream_success_rate": 80.0,
+        "identity_success_rate": 88.0,
+        "identity_minus_upstream": 8.0
+      },
+      {
+        "env": "tworoom",
+        "seed": 42,
+        "upstream_success_rate": 86.0,
+        "identity_success_rate": 90.0,
+        "identity_minus_upstream": 4.0
+      },
+      {
+        "env": "tworoom",
+        "seed": 100,
+        "upstream_success_rate": 80.0,
+        "identity_success_rate": 76.0,
+        "identity_minus_upstream": -4.0
+      }
+    ]
+  },
+  "jobs": [
+    {
+      "job_id": 6201097,
+      "purpose": "initial identity seed sweep attempt",
+      "state": "FAILED",
+      "exit_code": "1:0",
+      "elapsed": "00:00:19",
+      "reason": "research wrapper used runs.0 dotlist overrides that OmegaConf could not merge into a list"
+    },
+    {
+      "job_id": 6201181,
+      "purpose": "corrected identity seed sweep",
+      "state": "COMPLETED",
+      "exit_code": "0:0",
+      "elapsed": "00:23:10"
+    },
+    {
+      "job_id": 6192391,
+      "purpose": "historical PushT identity training log audited",
+      "state": "completed historical log",
+      "evidence": "logs/mwm_train_pusht_identity_6192391.out/.err"
+    },
+    {
+      "job_id": 6192392,
+      "purpose": "historical TwoRoom identity training log audited",
+      "state": "completed historical log",
+      "evidence": "logs/mwm_train_tworoom_identity_6192392.out/.err"
+    }
+  ],
+  "artifacts": {
+    "report": "reports/research/identity_delta/report.md",
+    "summary": "reports/research/identity_delta/summary.json",
+    "dataset_audit": "reports/research/identity_delta/dataset_audit.md",
+    "static_audit": "reports/research/identity_delta/static_audit.md",
+    "audit_raw": "reports/research/identity_delta/audit_raw.json",
+    "seed_sweep_summary_csv": "reports/research/identity_delta/seed_sweep_summary.csv",
+    "seed_sweep_summary_json": "reports/research/identity_delta/seed_sweep_summary.json"
+  },
+  "blockers": []
+}
