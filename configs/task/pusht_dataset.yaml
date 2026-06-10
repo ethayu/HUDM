@@ -13,6 +13,6 @@ plan:
         zarr_path: "synthetic/pusht_synth_planning_translation_100_len15.zarr" #"/home/aurora/HUDM-mwm/synthetic/pusht_noise.zarr" #
         split: "train"
         split_ratio: null
-        trajectory_len: 15
+        trajectory_len: 45 #15
         seed: 45 #12 #45 #12 #10
         reconstruct_goal_state: 3
