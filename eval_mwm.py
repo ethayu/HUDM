@@ -335,6 +335,8 @@ def _build_mwm_policy(
         if raw_topk is not None
         else max(1, int(round(int(cfg.planner.pop_size) * float(cfg.planner.elite_frac))))
     )
+    raw_pop_schedule = cfg.planner.get("pop_schedule", None)
+    pop_schedule = OmegaConf.to_container(raw_pop_schedule, resolve=True) if raw_pop_schedule else None
     solver = MWMScheduledCEMSolver(
         model,
         batch_size=max(1, planner_batch_size),
@@ -347,6 +349,8 @@ def _build_mwm_policy(
         seed=int(cfg.planner.seed if cfg.planner.get("seed", None) is not None else cfg.eval.seed),
         clamp_actions=bool(cfg.planner.get("clamp_actions", False)),
         std_unbiased=bool(cfg.planner.get("std_unbiased", True)),
+        pop_schedule=pop_schedule,
+        elite_frac=float(cfg.planner.elite_frac) if pop_schedule is not None else None,
     )
     plan_cfg = PlanConfig(
         horizon=int(cfg.planner.horizon),

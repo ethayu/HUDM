@@ -210,6 +210,36 @@ def instantiate_from_config(config: dict[str, Any]) -> Any:
     return _import_object(str(target))(**kwargs)
 
 
+def _remap_hf_vit_encoder_keys(state_dict: dict[str, Any]) -> dict[str, Any]:
+    """Translate HF ViT encoder keys (encoder.encoder.layer.X.*) to custom ViT keys (encoder.layers.X.*)."""
+    import re
+    _HF_ATTN_MAP = {
+        "attention.attention.query": "attention.q_proj",
+        "attention.attention.key": "attention.k_proj",
+        "attention.attention.value": "attention.v_proj",
+        "attention.output.dense": "attention.o_proj",
+        "intermediate.dense": "mlp.fc1",
+        "output.dense": "mlp.fc2",
+    }
+    _hf_layer_re = re.compile(r"^(encoder\.encoder\.layer\.)(\d+)\.(.*)")
+
+    def _remap(key: str) -> str:
+        m = _hf_layer_re.match(key)
+        if not m:
+            return key
+        idx, rest = m.group(2), m.group(3)
+        for hf_pat, custom_pat in _HF_ATTN_MAP.items():
+            if rest.startswith(hf_pat + ".") or rest == hf_pat:
+                rest = custom_pat + rest[len(hf_pat):]
+                break
+        return f"encoder.layers.{idx}.{rest}"
+
+    needs_remap = any(_hf_layer_re.match(k) for k in state_dict)
+    if not needs_remap:
+        return state_dict
+    return {_remap(k): v for k, v in state_dict.items()}
+
+
 def load_world_model_from_checkpoint(
     run_dir: str | Path,
     epoch: int | None,
@@ -240,7 +270,9 @@ def load_world_model_from_checkpoint(
     config = _json_load(cfg_path)
     validate_checkpoint_contract(config, metadata)
     model = instantiate_from_config(config).to(device)
-    model.load_state_dict(torch.load(weights_path, map_location=device))
+    state_dict = torch.load(weights_path, map_location=device, weights_only=False)
+    state_dict = _remap_hf_vit_encoder_keys(state_dict)
+    model.load_state_dict(state_dict)
     model.eval()
     return model, metadata, 0
 

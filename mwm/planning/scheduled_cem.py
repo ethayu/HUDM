@@ -28,6 +28,8 @@ class MWMScheduledCEMSolver:
         clamp_actions: bool = False,
         std_unbiased: bool = True,
         callbacks: list[Any] | None = None,
+        pop_schedule: dict[str, Any] | None = None,
+        elite_frac: float | None = None,
     ) -> None:
         self.model = model
         self.batch_size = int(batch_size)
@@ -36,6 +38,8 @@ class MWMScheduledCEMSolver:
         self.n_steps = int(n_steps)
         self.topk = int(topk)
         self.scheduler_spec = scheduler
+        self.pop_schedule = dict(pop_schedule) if pop_schedule else None
+        self.elite_frac = float(elite_frac) if elite_frac is not None else None
         self.device = torch.device(device)
         self.torch_gen = torch.Generator(device=self.device).manual_seed(int(seed))
         self.clamp_actions = bool(clamp_actions)
@@ -108,7 +112,9 @@ class MWMScheduledCEMSolver:
             mean = torch.cat([mean, torch.zeros([n_envs, remaining, self.action_dim], dtype=self.dtype)], dim=1)
         return mean, var
 
-    def _expanded_infos(self, info_dict: dict[str, Any], start_idx: int, end_idx: int, current_bs: int) -> dict[str, Any]:
+    def _expanded_infos(
+        self, info_dict: dict[str, Any], start_idx: int, end_idx: int, current_bs: int, num_samples: int
+    ) -> dict[str, Any]:
         expanded: dict[str, Any] = {}
         for key, value in info_dict.items():
             value_batch = value[start_idx:end_idx]
@@ -117,13 +123,26 @@ class MWMScheduledCEMSolver:
                 expanded[key] = (
                     value_batch.to(device=self.device, dtype=target_dtype)
                     .unsqueeze(1)
-                    .expand(current_bs, self.num_samples, *value_batch.shape[1:])
+                    .expand(current_bs, num_samples, *value_batch.shape[1:])
                 )
             elif isinstance(value, np.ndarray):
-                expanded[key] = np.repeat(value_batch[:, None, ...], self.num_samples, axis=1)
+                expanded[key] = np.repeat(value_batch[:, None, ...], num_samples, axis=1)
             else:
                 expanded[key] = value_batch
         return expanded
+
+    def _resolve_num_samples(self, cem_progress: float) -> int:
+        if self.pop_schedule is None:
+            return self.num_samples
+        start = int(self.pop_schedule.get("start", self.num_samples))
+        end = int(self.pop_schedule.get("end", self.num_samples))
+        value = float(start) + (float(end) - float(start)) * max(0.0, min(1.0, float(cem_progress)))
+        return max(1, int(round(value)))
+
+    def _resolve_topk(self, num_samples: int) -> int:
+        if self.elite_frac is not None:
+            return max(1, min(num_samples, int(round(self.elite_frac * num_samples))))
+        return max(1, min(self.topk, num_samples))
 
     def _cost(self, infos: dict[str, Any], candidates: torch.Tensor, decision: FidelityDecision) -> torch.Tensor:
         if not hasattr(self.model, "get_cost_with_fidelity"):
@@ -147,7 +166,6 @@ class MWMScheduledCEMSolver:
             current_bs = end_idx - start_idx
             batch_mean = mean[start_idx:end_idx]
             batch_var = var[start_idx:end_idx]
-            expanded_infos = self._expanded_infos(info_dict, start_idx, end_idx, current_bs)
             final_batch_cost: list[float] | None = None
             for cb in self.callbacks:
                 cb.start_batch()
@@ -158,9 +176,12 @@ class MWMScheduledCEMSolver:
                     mpc_progress=0.0,
                     context={"batch_start": start_idx, "batch_end": end_idx},
                 )
+                current_num_samples = self._resolve_num_samples(decision.cem_progress)
+                current_topk = self._resolve_topk(current_num_samples)
+                expanded_infos = self._expanded_infos(info_dict, start_idx, end_idx, current_bs, current_num_samples)
                 candidates = torch.randn(
                     current_bs,
-                    self.num_samples,
+                    current_num_samples,
                     self.horizon,
                     self.action_dim,
                     generator=self.torch_gen,
@@ -176,10 +197,10 @@ class MWMScheduledCEMSolver:
                 cost_t0 = time.perf_counter()
                 costs = self._cost(expanded_infos, candidates, decision)
                 cost_time = time.perf_counter() - cost_t0
-                if costs.ndim != 2 or tuple(costs.shape) != (current_bs, self.num_samples):
-                    raise ValueError(f"Expected costs shape {(current_bs, self.num_samples)}, got {tuple(costs.shape)}")
-                topk_vals, topk_inds = torch.topk(costs, k=self.topk, dim=1, largest=False)
-                batch_indices = torch.arange(current_bs, device=self.device).unsqueeze(1).expand(-1, self.topk)
+                if costs.ndim != 2 or tuple(costs.shape) != (current_bs, current_num_samples):
+                    raise ValueError(f"Expected costs shape {(current_bs, current_num_samples)}, got {tuple(costs.shape)}")
+                topk_vals, topk_inds = torch.topk(costs, k=current_topk, dim=1, largest=False)
+                batch_indices = torch.arange(current_bs, device=self.device).unsqueeze(1).expand(-1, current_topk)
                 topk_candidates = candidates[batch_indices, topk_inds]
                 prev_mean = batch_mean
                 prev_var = batch_var
@@ -207,10 +228,10 @@ class MWMScheduledCEMSolver:
                     "rollout_level_indices": [int(x) for x in decision.rollout_level_indices],
                     "cost_time_sec": float(cost_time),
                     "cem_cost_calls": 1,
-                    "num_samples": int(self.num_samples),
+                    "num_samples": int(current_num_samples),
                     "horizon": int(self.horizon),
                     "action_dim": int(self.action_dim),
-                    "candidate_action_values": int(current_bs * self.num_samples * self.horizon * self.action_dim),
+                    "candidate_action_values": int(current_bs * current_num_samples * self.horizon * self.action_dim),
                 }
                 model_diag = getattr(self.model, "_last_cost_diagnostics", None)
                 if isinstance(model_diag, dict):
