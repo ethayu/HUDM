@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 
+import mwm.checkpoint_io as checkpoint_io
 from mwm.benchmark import matrix as benchmark_mwm
 from mwm.benchmark.config import DEFAULTS, merged_run_config, validate_benchmark_matrix
 from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
@@ -112,6 +113,41 @@ def _lewm_source_config() -> dict:
 
 
 class MWMArtifactTests(unittest.TestCase):
+    def test_hf_vit_encoder_keys_remap_to_custom_vit_layers(self) -> None:
+        self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
+        state = {
+            "encoder.encoder.layer.2.attention.attention.query.weight": torch.ones(1),
+            "encoder.encoder.layer.2.attention.attention.key.bias": torch.ones(1) * 2,
+            "encoder.encoder.layer.2.attention.attention.value.weight": torch.ones(1) * 3,
+            "encoder.encoder.layer.2.attention.output.dense.bias": torch.ones(1) * 4,
+            "encoder.encoder.layer.2.intermediate.dense.weight": torch.ones(1) * 5,
+            "encoder.encoder.layer.2.output.dense.bias": torch.ones(1) * 6,
+            "decoder.weight": torch.ones(1) * 7,
+        }
+
+        remapped = checkpoint_io.remap_hf_vit_encoder_keys(state)
+
+        self.assertEqual(
+            set(remapped),
+            {
+                "encoder.layers.2.attention.q_proj.weight",
+                "encoder.layers.2.attention.k_proj.bias",
+                "encoder.layers.2.attention.v_proj.weight",
+                "encoder.layers.2.attention.o_proj.bias",
+                "encoder.layers.2.mlp.fc1.weight",
+                "encoder.layers.2.mlp.fc2.bias",
+                "decoder.weight",
+            },
+        )
+        self.assertIs(remapped["encoder.layers.2.attention.q_proj.weight"], state["encoder.encoder.layer.2.attention.attention.query.weight"])
+        self.assertIs(remapped["decoder.weight"], state["decoder.weight"])
+
+    def test_hf_vit_encoder_key_remap_leaves_native_keys_unchanged(self) -> None:
+        self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
+        state = {"encoder.layers.0.attention.q_proj.weight": torch.ones(1)}
+
+        self.assertIs(checkpoint_io.remap_hf_vit_encoder_keys(state), state)
+
     def test_stable_worldmodel_sampling_includes_last_valid_start(self) -> None:
         class TinyDataset:
             lengths = np.asarray([5], dtype=np.int64)

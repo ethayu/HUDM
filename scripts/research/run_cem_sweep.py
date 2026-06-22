@@ -1,9 +1,16 @@
 """Run a CEM pop_size sweep across scheduler variants for one env."""
 from __future__ import annotations
+
 import argparse
 import json
 import sys
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from mwm.eval.runner import main as run_eval
 
 SCHEDULERS = {
     "coarsest": {
@@ -43,7 +50,7 @@ SCHEDULERS = {
         "planner.scheduler.rollout_level.mode": "fixed",
         "planner.scheduler.rollout_level.level": "base",
     },
-    # Individual fixed levels: K=[6,12,48,96,144,192] → indices 0-5
+    # Individual fixed levels: K=[6,12,48,96,144,192] -> indices 0-5
     "k6":  {"planner.scheduler.policy": "fixed", "planner.scheduler.level": "0",
              "planner.scheduler.rollout_level.mode": "fixed", "planner.scheduler.rollout_level.level": "base"},
     "k12": {"planner.scheduler.policy": "fixed", "planner.scheduler.level": "1",
@@ -60,8 +67,6 @@ SCHEDULERS = {
 
 
 def run_one(env: str, scheduler_name: str, pop_size: int, n_iter: int, args) -> dict:
-    from eval_mwm import main as run_eval
-
     subdir = getattr(args, "out_subdir", "")
     base = f"rollouts/cem_sweep/{subdir}/{env}" if subdir else f"rollouts/cem_sweep/{env}"
     out_path = Path(f"{base}/{scheduler_name}_pop{pop_size}_niter{n_iter}/eval.json")
@@ -111,7 +116,6 @@ def run_one(env: str, scheduler_name: str, pop_size: int, n_iter: int, args) -> 
 
 
 def main():
-    sys.path.insert(0, str(Path(__file__).parent))
     p = argparse.ArgumentParser()
     p.add_argument("--pusht-cfg", default="configs/eval/paper_pusht.yaml")
     p.add_argument("--tworoom-cfg", default="configs/eval/paper_tworoom.yaml")

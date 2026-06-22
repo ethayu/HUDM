@@ -373,6 +373,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_scripts_are_grouped_by_workflow_type(self) -> None:
         scripts_root = ROOT / "scripts"
+        self.assertFalse((ROOT / "run_cem_sweep.py").exists())
+        self.assertTrue((scripts_root / "research" / "run_cem_sweep.py").is_file())
         self.assertEqual(
             sorted(path.name for path in scripts_root.iterdir() if path.is_file()),
             ["README.md"],

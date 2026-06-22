@@ -804,6 +804,42 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(policy.solver.num_samples, 300)
         self.assertEqual(policy.solver.topk, 30)
 
+    def test_eval_policy_forwards_dynamic_pop_schedule_to_solver(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "eval": {"num_envs": 1},
+                "planner": {
+                    "horizon": 2,
+                    "receding_horizon": 1,
+                    "action_block": 1,
+                    "batch_size": "auto",
+                    "pop_size": 64,
+                    "topk": 8,
+                    "elite_frac": 0.25,
+                    "n_iter": 3,
+                    "init_std": 1.0,
+                    "seed": 42,
+                    "warm_start": False,
+                    "clamp_actions": False,
+                    "std_unbiased": True,
+                    "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+                    "pop_schedule": {"start": 64, "end": 16},
+                },
+            }
+        )
+
+        policy = build_mwm_policy(
+            FakeFidelityCostModel(),
+            {"action_block": 1},
+            cfg,
+            torch.device("cpu"),
+            Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            process={},
+        )
+
+        self.assertEqual(policy.solver.pop_schedule, {"start": 64, "end": 16})
+        self.assertEqual(policy.solver.elite_frac, 0.25)
+
     def test_action_preprocessing_is_metadata_driven_not_upstream_role_driven(self) -> None:
         cfg = OmegaConf.create({"eval": {"action_preprocessing": "auto"}, "data": {"action_preprocessing": "auto"}})
 
@@ -878,6 +914,33 @@ class MWMCoreTests(unittest.TestCase):
         self.assertTrue(np.allclose(mwm["costs"], upstream["costs"]))
         self.assertEqual(len(mwm["mwm_diagnostics"]), common["n_steps"])
         self.assertEqual(mwm["mwm_diagnostics"][0]["batch_end"], 2)
+
+    def test_scheduled_cem_uses_dynamic_population_schedule(self) -> None:
+        solver = MWMScheduledCEMSolver(
+            FakeFidelityCostModel(),
+            batch_size=1,
+            num_samples=8,
+            var_scale=1.0,
+            n_steps=3,
+            topk=4,
+            scheduler={"policy": "fixed", "level": 0, "rollout_level": "base"},
+            seed=0,
+            std_unbiased=False,
+            pop_schedule={"start": 8, "end": 2},
+            elite_frac=0.5,
+        )
+        solver.configure(
+            action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            n_envs=1,
+            config=PlanConfig(horizon=2, receding_horizon=1, action_block=1),
+        )
+
+        result = solver.solve({"pixels": torch.zeros(1, 1)})
+
+        diagnostics = result["mwm_diagnostics"]
+        self.assertEqual([entry["num_samples"] for entry in diagnostics], [8, 5, 2])
+        self.assertEqual([entry["topk"] for entry in diagnostics], [4, 2, 1])
+        self.assertEqual([entry["candidate_action_values"] for entry in diagnostics], [32, 20, 8])
 
     def test_scheduled_cem_rejects_legacy_get_cost_only_model(self) -> None:
         class LegacyCostOnly(nn.Module):
