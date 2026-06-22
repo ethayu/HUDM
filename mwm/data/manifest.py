@@ -1,37 +1,26 @@
 from __future__ import annotations
 
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Iterable
 
+from mwm.io import file_sha256, jsonable
 
 MANIFEST_SCHEMA_VERSION = "mwm_swm_eval_manifest_v1"
 
 
-def _jsonable(value: Any) -> Any:
-    if isinstance(value, dict):
-        return {str(k): _jsonable(v) for k, v in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_jsonable(v) for v in value]
-    if hasattr(value, "item"):
-        try:
-            return value.item()
-        except Exception:
-            pass
-    return value
-
-
 def _canonical_bytes(payload: dict[str, Any]) -> bytes:
-    return json.dumps(_jsonable(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return json.dumps(jsonable(payload), sort_keys=True, separators=(",", ":")).encode("utf-8")
 
 
 def manifest_sha256(payload: dict[str, Any]) -> str:
+    import hashlib
+
     return hashlib.sha256(_canonical_bytes(payload)).hexdigest()
 
 
 def manifest_file_sha256(path: str | Path) -> str:
-    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+    return file_sha256(path)
 
 
 def _pair_row(pair: Any) -> dict[str, int]:
@@ -72,7 +61,7 @@ def generate_manifest(
         "eval_budget": int(eval_budget),
         "seed": int(seed),
         "restore_spec": str(restore_spec),
-        "dataset_metadata": _jsonable(dataset_metadata or {}),
+        "dataset_metadata": jsonable(dataset_metadata or {}),
         "dependency_shas": dict(dependency_shas or {}),
         "pairs": [_pair_row(pair) for pair in pairs],
     }
@@ -83,7 +72,7 @@ def generate_manifest(
 def write_manifest(path: str | Path, payload: dict[str, Any]) -> None:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(json.dumps(_jsonable(payload), indent=2, sort_keys=True), encoding="utf-8")
+    out.write_text(json.dumps(jsonable(payload), indent=2, sort_keys=True), encoding="utf-8")
 
 
 def load_manifest(path: str | Path) -> dict[str, Any]:

@@ -129,8 +129,11 @@ the public construction API.
 
 ## Generic Runtime Pieces
 
-`mwm.models.world_model.MatryoshkaWorldModel` currently provides the shared
-runtime for Le-WM-shaped latent prediction:
+`mwm.models.world_model` is retained as a compatibility facade for older import
+paths. The shared runtime for Le-WM-shaped latent prediction is implemented in
+`mwm.models.base_adaptive.MatryoshkaWorldModel`, with support types split across
+`mwm.models.transitions`, `mwm.models.objectives`, and
+`mwm.models.planning_costs`:
 
 - shared encoder/projector latent production;
 - per-level `TransitionPackage(action_encoder, predictor, pred_proj)`;
@@ -142,9 +145,11 @@ runtime for Le-WM-shaped latent prediction:
 If another base has the same latent-transition shape, reuse
 `TransitionPackage` and return `MatryoshkaWorldModel`.
 
-If another base has a different objective or rollout contract, add a generic hook
-to `world_model.py` for base-provided per-level loss/rollout behavior. Do not
-put special inference behavior or hidden source-model calls in the adapter.
+If another base has a different objective or rollout contract, add the generic
+hook in the owning model module for base-provided per-level loss/rollout
+behavior and re-export it from `world_model.py` only if compatibility requires
+it. Do not put special inference behavior or hidden source-model calls in the
+adapter.
 
 Use this rule of thumb:
 
@@ -159,8 +164,10 @@ Use this rule of thumb:
   needed by that hook.
 
 The framework boundary is: adapters construct base-derived modules and metadata;
-`world_model.py` owns shared latent reuse, per-level dispatch, loss aggregation,
-checkpoint behavior, and planner-facing runtime behavior.
+`mwm.models.base_adaptive` owns shared latent reuse, per-level dispatch, loss
+aggregation, and planner-facing runtime behavior. Supporting transition,
+objective, loss, and planning-cost behavior belongs in the corresponding
+`mwm.models.*` modules; checkpoint persistence belongs in `mwm.checkpoint_io`.
 
 ## Training And Evaluation Wiring
 

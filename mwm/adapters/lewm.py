@@ -8,11 +8,10 @@ from hydra.utils import instantiate
 import torch.nn as nn
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
+from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.adapters.registry import register_adapter
-from mwm.models.world_model import MatryoshkaWorldModel, TransitionPackage
-
-
-LEWM_BASE_ADAPTER_ARCH = "lewm_base_adapter_v1"
+from mwm.models.base_adaptive import MatryoshkaWorldModel
+from mwm.models.transitions import TransitionPackage
 
 
 @dataclass(frozen=True)

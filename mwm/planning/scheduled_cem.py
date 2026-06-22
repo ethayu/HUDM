@@ -229,6 +229,7 @@ class MWMScheduledCEMSolver:
                     "cost_time_sec": float(cost_time),
                     "cem_cost_calls": 1,
                     "num_samples": int(current_num_samples),
+                    "topk": int(current_topk),
                     "horizon": int(self.horizon),
                     "action_dim": int(self.action_dim),
                     "candidate_action_values": int(current_bs * current_num_samples * self.horizon * self.action_dim),

@@ -3,8 +3,7 @@ from __future__ import annotations
 import time
 from typing import Any
 
-import torch
-import torch.nn.functional as F
+from mwm.preprocessing.images import imagenet_image_input_transform, mwm_image_input_transform
 
 
 try:
@@ -15,49 +14,6 @@ except Exception:  # pragma: no cover - optional dependency
             del args, kwargs
             self.model = model
             self.solver = solver
-
-
-_MWM_IMAGE_SIZE = (224, 224)
-_IMAGENET_MEAN = (0.485, 0.456, 0.406)
-_IMAGENET_STD = (0.229, 0.224, 0.225)
-
-
-def mwm_image_input_transform(image: torch.Tensor) -> torch.Tensor:
-    """Stable-WM policy transform for MWM image inputs.
-
-    The model owns Le-WM/ImageNet normalization in its preprocess module; this
-    policy transform only standardizes layout, range, and image size.
-    """
-
-    tensor = torch.as_tensor(image)
-    if tensor.ndim == 3 and tensor.shape[0] != 3 and tensor.shape[-1] == 3:
-        tensor = tensor.permute(2, 0, 1)
-    if not tensor.is_floating_point():
-        tensor = tensor.to(dtype=torch.float32).div_(255.0)
-    else:
-        tensor = tensor.to(dtype=torch.float32)
-        if tensor.numel() and torch.isfinite(tensor).all().item() and tensor.max().item() > 2.0:
-            tensor = tensor / 255.0
-    if tuple(tensor.shape[-2:]) != _MWM_IMAGE_SIZE:
-        tensor = F.interpolate(
-            tensor.unsqueeze(0),
-            size=_MWM_IMAGE_SIZE,
-            mode="bilinear",
-            align_corners=False,
-            antialias=True,
-        ).squeeze(0)
-    return tensor
-
-
-def imagenet_image_input_transform(image: torch.Tensor) -> torch.Tensor:
-    """Policy transform for imported Stable-WM models trained with ImageNet normalization."""
-
-    tensor = mwm_image_input_transform(image)
-    if tensor.numel() and torch.isfinite(tensor).all().item() and tensor.min().item() < -0.5:
-        return tensor
-    mean = tensor.new_tensor(_IMAGENET_MEAN).view(3, 1, 1)
-    std = tensor.new_tensor(_IMAGENET_STD).view(3, 1, 1)
-    return (tensor - mean) / std
 
 
 def model_accounting(model: Any) -> dict[str, Any]:

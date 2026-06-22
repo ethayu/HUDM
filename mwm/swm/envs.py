@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import importlib
 import json
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
-
-from mwm.swm.restore import restore_spec_for_env
 
 
 def parse_image_shape(value: int | str | tuple[int, int] | list[int]) -> tuple[int, int]:
@@ -30,27 +27,6 @@ def parse_image_shape(value: int | str | tuple[int, int] | list[int]) -> tuple[i
     if out[0] <= 0:
         raise ValueError(f"image_shape must be positive, got {out}")
     return out
-
-
-def import_object(path: str) -> Any:
-    module_name, sep, attr = str(path).partition(":")
-    if not sep:
-        module_name, sep, attr = str(path).rpartition(".")
-    if not module_name or not attr:
-        raise ValueError(f"Import path must be 'module:attr' or 'module.attr', got {path!r}")
-    module = importlib.import_module(module_name)
-    return getattr(module, attr)
-
-
-def swm_extra_wrappers_for_env(env_id: str) -> list[Callable]:
-    wrappers: list[Callable] = []
-    try:
-        spec = restore_spec_for_env(env_id)
-    except ValueError:
-        return wrappers
-    del spec
-    return wrappers
-
 
 def parse_env_kwargs(raw: str | dict[str, Any] | None) -> dict[str, Any]:
     if raw is None:
@@ -77,7 +53,7 @@ def make_swm_world(
         image_shape=shape,
         max_episode_steps=int(max_episode_steps),
         goal_conditioned=bool(goal_conditioned),
-        extra_wrappers=swm_extra_wrappers_for_env(env_id),
+        extra_wrappers=[],
         **(env_kwargs or {}),
     )
 

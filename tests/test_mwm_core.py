@@ -14,37 +14,33 @@ from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 from stable_worldmodel.solver import CEMSolver
 
-from eval_mwm import (
-    _available_stat_keys_for_action_process,
-    _build_mwm_policy,
-    _uses_standardized_action_space,
-)
+from mwm.eval.policy_builder import build_mwm_policy
+from mwm.eval.action_preprocessing import available_stat_keys_for_action_process, uses_standardized_action_space
 from mwm.adapters.builder import build_mwm_from_stable_config
-from mwm.checkpoints import save_world_checkpoint
-from mwm.data.stable_wm import MWMTrainSampleTransform
+from mwm.checkpoint_io import save_world_checkpoint
+from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
+from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
 from mwm.models.world_model import (
     MWMWorldModel,
     MatryoshkaWorldModel,
     TransitionPackage,
-    latent_regularizer_loss,
-    matryoshka_base_loss,
-    weighted_level_mean,
 )
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from train_mwm import (
-    _AllLevelPlateauEarlyStopping,
-    _build_trainable_model_from_base,
-    _lewm_base_adapter_checkpoint_callback,
-    _load_lewm_base_adapter_lightning_state,
-    _resolve_lightning_trainer_runtime,
-    _resolve_lewm_base_adapter_total_steps,
-    _select_lewm_base_adapter_export_checkpoint,
-    _ZScoreScaler,
+from mwm.training.lewm import main as train_mwm_main
+from mwm.training.lewm_callbacks import (
+    AllLevelPlateauEarlyStopping,
+    lewm_base_adapter_checkpoint_callback,
+    select_lewm_base_adapter_export_checkpoint,
 )
-from train_mwm import _prepare_trainer_root
-from train_mwm import main as train_mwm_main
+from mwm.training.lewm_export import load_lewm_base_adapter_lightning_state
+from mwm.training.lewm_model import build_trainable_model_from_base
+from mwm.training.lewm_runtime import (
+    prepare_trainer_root,
+    resolve_lewm_base_adapter_total_steps,
+    resolve_lightning_trainer_runtime,
+)
 
 
 class FakeLeWMEncoder(nn.Module):
@@ -548,7 +544,7 @@ class MWMCoreTests(unittest.TestCase):
                 "normalize_imagenet": False,
             }
 
-            model = _build_trainable_model_from_base(cfg, model_cfg)
+            model = build_trainable_model_from_base(cfg, model_cfg)
 
             self.assertIsInstance(model, MatryoshkaWorldModel)
             self.assertEqual(model.metadata["adapter_family"], "lewm")
@@ -586,7 +582,7 @@ class MWMCoreTests(unittest.TestCase):
             }
 
             with self.assertRaisesRegex(ValueError, "configured D=8.*base latent dimension D=4"):
-                _build_trainable_model_from_base(cfg, model_cfg)
+                build_trainable_model_from_base(cfg, model_cfg)
 
     def test_k_equals_d_lewm_init_forward_grad_and_step_match_direct_backend(self) -> None:
         cfg = OmegaConf.create(
@@ -695,7 +691,7 @@ class MWMCoreTests(unittest.TestCase):
 
     def test_lewm_column_scaler_matches_reference_sample_std(self) -> None:
         values = np.array([[1.0, 3.0], [3.0, 7.0], [np.nan, 1.0]], dtype=np.float32)
-        scaler = _ZScoreScaler().fit(values)
+        scaler = ZScoreScaler().fit(values)
 
         self.assertTrue(np.allclose(scaler.mean, np.array([[2.0, 5.0]], dtype=np.float32)))
         self.assertTrue(np.allclose(scaler.std, np.array([[np.sqrt(2.0), np.sqrt(8.0)]], dtype=np.float32)))
@@ -795,7 +791,7 @@ class MWMCoreTests(unittest.TestCase):
                 },
             }
         )
-        policy = _build_mwm_policy(
+        policy = build_mwm_policy(
             FakeFidelityCostModel(),
             {"action_block": 5},
             cfg,
@@ -812,14 +808,14 @@ class MWMCoreTests(unittest.TestCase):
         cfg = OmegaConf.create({"eval": {"action_preprocessing": "auto"}, "data": {"action_preprocessing": "auto"}})
 
         self.assertFalse(
-            _uses_standardized_action_space(
+            uses_standardized_action_space(
                 object(),
                 {"role": "upstream_lewm_converted"},
                 cfg,
             )
         )
         self.assertTrue(
-            _uses_standardized_action_space(
+            uses_standardized_action_space(
                 object(),
                 {"role": "upstream_lewm_converted", "action_preprocessing": "standard_scaler"},
                 cfg,
@@ -837,7 +833,7 @@ class MWMCoreTests(unittest.TestCase):
             }
         )
 
-        keys = _available_stat_keys_for_action_process(cfg, ["episode_idx", "action", "proprio", "pos_agent"])
+        keys = available_stat_keys_for_action_process(cfg, ["episode_idx", "action", "proprio", "pos_agent"])
 
         self.assertEqual(keys, ["action", "proprio"])
 
@@ -917,19 +913,19 @@ class MWMCoreTests(unittest.TestCase):
             stale.write_text("stale", encoding="utf-8")
 
             cfg = OmegaConf.create({"train": {"clean_trainer_root": True}})
-            trainer_root = _prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
+            trainer_root = prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
             self.assertEqual(trainer_root, stale.parent)
             self.assertFalse(stale.exists())
 
             keep = trainer_root / "keep.ckpt"
             keep.write_text("keep", encoding="utf-8")
             cfg.train.clean_trainer_root = False
-            trainer_root = _prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
+            trainer_root = prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
             self.assertTrue((trainer_root / "keep.ckpt").is_file())
 
     def test_lewm_base_adapter_checkpoint_callback_can_save_within_large_epochs(self) -> None:
         cfg = OmegaConf.create({"train": {"checkpoint_every_n_train_steps": 1000}})
-        callback = _lewm_base_adapter_checkpoint_callback(cfg)
+        callback = lewm_base_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback._every_n_train_steps, 1000)
         self.assertEqual(callback._every_n_epochs, 0)
@@ -946,7 +942,7 @@ class MWMCoreTests(unittest.TestCase):
                 }
             }
         )
-        callback = _lewm_base_adapter_checkpoint_callback(cfg)
+        callback = lewm_base_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback.monitor, "validate/pred_loss_epoch")
         self.assertEqual(callback.mode, "min")
@@ -957,16 +953,16 @@ class MWMCoreTests(unittest.TestCase):
         cfg = OmegaConf.create({"train": {"export_checkpoint": "best"}})
         callback = SimpleNamespace(best_model_path="best.ckpt", last_model_path="last.ckpt")
 
-        self.assertEqual(_select_lewm_base_adapter_export_checkpoint(callback, cfg), "best.ckpt")
+        self.assertEqual(select_lewm_base_adapter_export_checkpoint(callback, cfg), "best.ckpt")
 
     def test_lewm_base_adapter_total_steps_can_decouple_lr_horizon_from_train_epochs(self) -> None:
         cfg = OmegaConf.create({"schedule": {"max_epochs": 80, "lr_max_epochs": 10}})
         loader = [object()] * 7
 
-        self.assertEqual(_resolve_lewm_base_adapter_total_steps(cfg, loader), 70)
+        self.assertEqual(resolve_lewm_base_adapter_total_steps(cfg, loader), 70)
 
     def test_all_level_plateau_stop_waits_until_no_level_improves(self) -> None:
-        callback = _AllLevelPlateauEarlyStopping(
+        callback = AllLevelPlateauEarlyStopping(
             metrics=["validate/pred_loss_l0", "validate/pred_loss_l1"],
             patience=2,
             warmup_epochs=1,
@@ -1012,7 +1008,7 @@ class MWMCoreTests(unittest.TestCase):
     def test_lightning_runtime_defaults_to_single_gpu_when_cuda_available(self) -> None:
         cfg = OmegaConf.create({"train": {"no_cuda": False}})
         with unittest.mock.patch("torch.cuda.is_available", return_value=True):
-            runtime = _resolve_lightning_trainer_runtime(cfg)
+            runtime = resolve_lightning_trainer_runtime(cfg)
 
         self.assertEqual(runtime["accelerator"], "gpu")
         self.assertEqual(runtime["devices"], 1)
@@ -1035,7 +1031,7 @@ class MWMCoreTests(unittest.TestCase):
             }
         )
         with unittest.mock.patch("torch.cuda.is_available", return_value=True):
-            runtime = _resolve_lightning_trainer_runtime(cfg)
+            runtime = resolve_lightning_trainer_runtime(cfg)
 
         self.assertEqual(runtime["accelerator"], "gpu")
         self.assertEqual(runtime["devices"], 4)
@@ -1047,7 +1043,7 @@ class MWMCoreTests(unittest.TestCase):
     def test_lightning_runtime_uses_cpu_devices_when_cuda_disabled(self) -> None:
         cfg = OmegaConf.create({"train": {"no_cuda": True, "devices": 4, "cpu_devices": 1}})
         with unittest.mock.patch("torch.cuda.is_available", return_value=True):
-            runtime = _resolve_lightning_trainer_runtime(cfg)
+            runtime = resolve_lightning_trainer_runtime(cfg)
 
         self.assertEqual(runtime["accelerator"], "cpu")
         self.assertEqual(runtime["devices"], 1)
@@ -1068,7 +1064,7 @@ class MWMCoreTests(unittest.TestCase):
             )
 
             actual = nn.Linear(3, 2)
-            checkpoint = _load_lewm_base_adapter_lightning_state(actual, path)
+            checkpoint = load_lewm_base_adapter_lightning_state(actual, path)
 
             self.assertEqual(checkpoint["epoch"], 7)
             self.assertTrue(torch.equal(actual.weight, expected.weight))

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from mwm.data.stable_wm import write_dataset_metadata
+from mwm.data.metadata import write_dataset_metadata
 
 
 PUSHT_LANCE = "pusht_expert_train.lance"

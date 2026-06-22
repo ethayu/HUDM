@@ -1,8 +1,23 @@
+"""Restore adapters for evaluating MWM checkpoints on SWM datasets.
+
+Selection order is part of the restore contract:
+
+1. A user-provided ``restore.import_path`` wins and is validated against columns.
+2. Built-in specs are checked in ``RESTORE_SPECS`` order.
+3. With dataset columns, the first built-in spec whose required columns are
+   available is selected.
+4. Without dataset columns, the first matching built-in spec is the fallback.
+
+Keep higher-fidelity or canonical dataset schemas before narrower fallbacks for
+the same environment.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
-import importlib
 from typing import Any
+
+from mwm.imports import import_object
 
 
 @dataclass(frozen=True)
@@ -26,6 +41,7 @@ class RestoreSpec:
             )
 
 
+# Ordered by selection priority. See the module docstring before reordering.
 RESTORE_SPECS: tuple[RestoreSpec, ...] = (
     RestoreSpec(
         spec_id="pusht_state_goal_state",
@@ -103,16 +119,6 @@ RESTORE_SPECS: tuple[RestoreSpec, ...] = (
 )
 
 
-def _import_object(path: str) -> Any:
-    module_name, sep, attr = str(path).partition(":")
-    if not sep:
-        module_name, sep, attr = str(path).rpartition(".")
-    if not module_name or not attr:
-        raise ValueError(f"Import path must be 'module:attr' or 'module.attr', got {path!r}")
-    module = importlib.import_module(module_name)
-    return getattr(module, attr)
-
-
 def _normalize_user_spec(raw: RestoreSpec | dict[str, Any], env_id: str) -> RestoreSpec:
     if isinstance(raw, RestoreSpec):
         return raw
@@ -129,7 +135,7 @@ def _normalize_user_spec(raw: RestoreSpec | dict[str, Any], env_id: str) -> Rest
 
 
 def user_restore_spec(import_path: str, env_id: str, columns: list[str] | set[str]) -> RestoreSpec:
-    builder = _import_object(import_path)
+    builder = import_object(import_path)
     if not callable(builder):
         raise TypeError(f"Restore adapter {import_path!r} is not callable.")
     cols = tuple(sorted(str(c) for c in columns))

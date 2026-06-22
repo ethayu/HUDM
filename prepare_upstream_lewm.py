@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 
 from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
 from mwm.adapters.stable_config import stable_config_sha256
-from mwm.checkpoints import save_world_checkpoint
+from mwm.checkpoint_io import save_world_checkpoint
 from mwm.dependency_refs import dependency_refs
 
 

@@ -6,36 +6,38 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-import benchmark_mwm
 import numpy as np
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 
-from benchmark_mwm import DEFAULTS, _merged_run_config, _validate_benchmark_matrix
+from mwm.benchmark import matrix as benchmark_mwm
+from mwm.benchmark.config import DEFAULTS, merged_run_config, validate_benchmark_matrix
 from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
-from mwm.checkpoints import (
+from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
+from mwm.checkpoint_contract import validate_checkpoint_contract
+from mwm.checkpoint_io import (
     CHECKPOINT_FORMAT,
     CONFIG_FILENAME,
-    LEWM_BASE_ADAPTER_ARCH,
     METADATA_FILENAME,
     WEIGHTS_FILENAME,
     file_sha256,
     load_world_metadata,
     save_world_checkpoint,
-    validate_checkpoint_contract,
+    validate_checkpoint_directory,
 )
 from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256
-from mwm.data.stable_wm import StartGoalPair, sample_start_goal_pairs, write_dataset_metadata
-from verify_mwm_benchmark import (
-    _required_plots_for_benchmark,
-    _validate_checkpoint_metadata,
-    _validate_paper_targets,
-    _validate_role_checkpoint_contract,
+from mwm.data.metadata import write_dataset_metadata
+from mwm.data.sampling import StartGoalPair, sample_start_goal_pairs
+from mwm.benchmark.verify import (
+    append_paper_target_errors,
+    load_checkpoint_metadata_for_benchmark,
+    required_plots_for_benchmark,
+    validate_benchmark_role_checkpoint_contract,
     validate_paper_targets,
     verify_benchmark_static,
 )
-from verify_mwm_data import verify_data_configs
+from mwm.data.verify import verify_data_configs
 
 
 def _payload(role: str, env_id: str, seed: int, output_path: Path) -> dict:
@@ -246,9 +248,55 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
                     ],
                 },
             )
-            resolved = [(run, _merged_run_config(cfg, run)[1]) for run in cfg.runs]
+            resolved = [(run, merged_run_config(cfg, run)[1]) for run in cfg.runs]
             with self.assertRaisesRegex(ValueError, "duplicate cells"):
-                _validate_benchmark_matrix(cfg, resolved)
+                validate_benchmark_matrix(cfg, resolved)
+
+    def test_benchmark_run_config_merges_env_overrides(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            cfg_path = Path(tmp) / "eval.yaml"
+            cfg_path.write_text(
+                """
+env_id: swm/PushT-v1
+checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
+data: {path: data/pusht_swm.lance, format: lance}
+eval: {seed: 0}
+env:
+  max_episode_steps: 100
+  goal_conditioned: true
+  kwargs:
+    difficulty: base
+planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+""",
+                encoding="utf-8",
+            )
+            cfg = OmegaConf.merge(
+                DEFAULTS,
+                {
+                    "env_id": "swm/PushT-v1",
+                    "seed": 0,
+                    "eval_config": str(cfg_path),
+                    "manifest": {"group": "test_manifest", "path": str(Path(tmp) / "manifest.json")},
+                    "runs": [
+                        {
+                            "name": "offset_probe",
+                            "role": "mwm_scheduled",
+                            "checkpoint": "checkpoints_mwm/example",
+                            "env": {
+                                "max_episode_steps": 200,
+                                "kwargs": {"difficulty": "hard", "variant": "offset100"},
+                            },
+                        }
+                    ],
+                },
+            )
+
+            _, run_cfg = merged_run_config(cfg, cfg.runs[0])
+
+            self.assertEqual(run_cfg.env.max_episode_steps, 200)
+            self.assertTrue(run_cfg.env.goal_conditioned)
+            self.assertEqual(run_cfg.env.kwargs.difficulty, "hard")
+            self.assertEqual(run_cfg.env.kwargs.variant, "offset100")
 
     def test_benchmark_verifier_static_only_accepts_paper_parity_config(self) -> None:
         report = verify_benchmark_static("configs/benchmark/paper_parity_pusht.yaml", check_checkpoints=False)
@@ -293,7 +341,7 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
     def test_dense_benchmark_requires_scheduler_plots(self) -> None:
         cfg = OmegaConf.create({"runs": [{"role": "upstream_lewm_converted"}, {"role": "mwm_dense"}]})
 
-        required = _required_plots_for_benchmark(cfg)
+        required = required_plots_for_benchmark(cfg)
 
         self.assertIn("schedule_level_usage.png", required)
         self.assertIn("schedule_usage_by_role.png", required)
@@ -427,7 +475,7 @@ runs:
         }
 
         errors: list[str] = []
-        _validate_role_checkpoint_contract(row, metadata, errors)
+        validate_benchmark_role_checkpoint_contract(row, metadata, errors)
 
         self.assertTrue(any("dense MWM checkpoint must be K=[6,12,48,96,144,192]" in error for error in errors), errors)
 
@@ -515,11 +563,18 @@ runs:
             )
 
             calls: list[str] = []
+            eval_manifest_keys: list[tuple[Any, Any]] = []
             old_run_eval = benchmark_mwm.run_eval_mwm
 
             def _fake_run(cfg_path: str) -> None:
                 cfg = OmegaConf.load(cfg_path)
                 calls.append(str(cfg.checkpoint.run_dir))
+                eval_manifest_keys.append(
+                    (
+                        cfg.eval.get("write_manifest_path", None),
+                        cfg.eval.get("writemanifest_path", None),
+                    )
+                )
                 _payload("stub", str(cfg.env_id), int(cfg.eval.seed), Path(str(cfg.eval.output_path)))
 
             benchmark_mwm.run_eval_mwm = _fake_run
@@ -530,6 +585,7 @@ runs:
 
             summary = json.loads((root / "out" / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(calls, ["checkpoints_mwm/upstream"])
+            self.assertEqual(eval_manifest_keys, [(str(root / "manifest.json"), None)])
             self.assertEqual([row["role"] for row in summary["runs"]], ["upstream_lewm_converted"])
             static_report = verify_benchmark_static(
                 str(bench_cfg),
@@ -629,7 +685,7 @@ runs:
             )
 
             errors: list[str] = []
-            _validate_checkpoint_metadata(root, errors)
+            load_checkpoint_metadata_for_benchmark(root, errors)
             self.assertTrue(any("missing action_spec" in error for error in errors), errors)
 
     def test_paper_target_verifier_checks_upstream_and_retrained_match(self) -> None:
@@ -649,11 +705,11 @@ runs:
         ]
 
         errors: list[str] = []
-        _validate_paper_targets(cfg, rows, errors)
+        append_paper_target_errors(cfg, rows, errors)
         self.assertEqual(errors, [])
 
         rows[1]["success_rate"] = 70.0
-        _validate_paper_targets(cfg, rows, errors)
+        append_paper_target_errors(cfg, rows, errors)
         self.assertTrue(any("retrained match check failed" in error for error in errors), errors)
 
     def test_paper_target_upstream_only_benchmark_skips_retrained_match(self) -> None:
@@ -671,7 +727,7 @@ runs:
         rows = [{"env_id": "swm/PushT-v1", "role": "upstream_lewm_converted", "success_rate": 96.0}]
 
         errors: list[str] = []
-        _validate_paper_targets(cfg, rows, errors)
+        append_paper_target_errors(cfg, rows, errors)
 
         self.assertEqual(errors, [])
 
@@ -703,7 +759,7 @@ runs:
         }
 
         errors: list[str] = []
-        _validate_role_checkpoint_contract(row, metadata, errors)
+        validate_benchmark_role_checkpoint_contract(row, metadata, errors)
 
         self.assertTrue(any("Le-WM base-adapter backend" in error for error in errors), errors)
         self.assertTrue(any("generic base-adaptive target" in error for error in errors), errors)
@@ -748,7 +804,7 @@ runs:
 
         errors: list[str] = []
         for row, metadata in zip(rows, metadatas):
-            _validate_role_checkpoint_contract(row, metadata, errors)
+            validate_benchmark_role_checkpoint_contract(row, metadata, errors)
 
         self.assertEqual(errors, [])
 

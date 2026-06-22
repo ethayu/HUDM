@@ -6,9 +6,10 @@ from typing import Any
 from omegaconf import OmegaConf
 
 from mwm.config_cli import load_config
-from mwm.data.stable_wm import write_dataset_metadata
+from mwm.data.metadata import write_dataset_metadata
+from mwm.data.paths import local_path
+from mwm.imports import import_object
 from mwm.swm.envs import (
-    import_object,
     make_swm_world,
     parse_env_kwargs,
     parse_image_shape,
@@ -48,11 +49,6 @@ def _record_dataset_to_path(world: Any, output_path: Path, episodes: int, seed: 
     world.collect(output_path, episodes=int(episodes), seed=int(seed), format="lance")
 
 
-def _local_path(path: str | Path) -> str:
-    p = Path(str(path))
-    return str(p.resolve()) if p.exists() else str(path)
-
-
 def _build_policy(import_path: str | None, seed: int):
     if import_path:
         obj = import_object(import_path)
@@ -90,7 +86,7 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
         _record_dataset_to_path(world, output_path, int(cfg.episodes), int(cfg.seed), data_format)
         from stable_worldmodel.data import load_dataset
 
-        ds = load_dataset(_local_path(output_path), format="lance")
+        ds = load_dataset(local_path(output_path), format="lance")
         dataset_columns = list(ds.column_names)
         restore_spec = validate_restore_columns(env_id, dataset_columns, import_path=restore_import_path)
         metadata: dict[str, Any] = {

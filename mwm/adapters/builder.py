@@ -6,7 +6,7 @@ from typing import Any, Sequence
 from mwm.adapters.base import ComponentPolicy
 from mwm.adapters.registry import adapter_for_family, family_for_target
 from mwm.adapters.stable_config import root_target
-from mwm.models.world_model import MatryoshkaWorldModel
+from mwm.models.base_adaptive import MatryoshkaWorldModel
 
 
 STABLE_CONFIG_TARGET = "mwm.adapters.builder.build_mwm_from_stable_config"

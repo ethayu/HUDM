@@ -5,15 +5,10 @@ import json
 from pathlib import Path
 from typing import Any
 
-from mwm.benchmark.artifacts import (
-    load_json,
-    write_default_plots,
-    write_json,
-    write_metrics_jsonl,
-    write_per_env_table,
-    write_review_html,
-    write_summary_csv,
-)
+from mwm.benchmark.html import write_review_html
+from mwm.benchmark.plots import write_default_plots
+from mwm.benchmark.summary import write_per_env_table, write_summary_csv
+from mwm.io import load_json, write_json, write_metrics_jsonl
 
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
