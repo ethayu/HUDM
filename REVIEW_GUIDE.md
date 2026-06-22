@@ -50,8 +50,8 @@ Use the conda `mwm` environment:
 Use local scripts when reviewing on a desktop or laptop without Slurm:
 
 ```bash
-scripts/local_verify.sh
-scripts/local_benchmark_smoke.sh
+scripts/local/local_verify.sh
+scripts/local/local_benchmark_smoke.sh
 ```
 
 These scripts do not require `SLURM_JOB_ID` and default to
@@ -62,15 +62,15 @@ Before launching GPU work on PARCC/Betty, submit through Slurm. The identity
 parity split jobs are:
 
 ```bash
-sbatch scripts/slurm_mwm_train_pusht_identity.sbatch
-sbatch scripts/slurm_mwm_train_tworoom_identity.sbatch
-sbatch --dependency=afterok:<pusht_job>:<tworoom_job> scripts/slurm_mwm_identity_parity.sbatch
+sbatch scripts/slurm/slurm_mwm_train_pusht_identity.sbatch
+sbatch scripts/slurm/slurm_mwm_train_tworoom_identity.sbatch
+sbatch --dependency=afterok:<pusht_job>:<tworoom_job> scripts/slurm/slurm_mwm_identity_parity.sbatch
 ```
 
 The scheduled-MWM comparison split jobs are:
 
 ```bash
-sbatch scripts/slurm_mwm_train_pusht_scheduled.sbatch
-sbatch scripts/slurm_mwm_train_tworoom_scheduled.sbatch
-sbatch --dependency=afterok:<pusht_job>:<tworoom_job> scripts/slurm_mwm_scheduled_comparison.sbatch
+sbatch scripts/slurm/slurm_mwm_train_pusht_scheduled.sbatch
+sbatch scripts/slurm/slurm_mwm_train_tworoom_scheduled.sbatch
+sbatch --dependency=afterok:<pusht_job>:<tworoom_job> scripts/slurm/slurm_mwm_scheduled_comparison.sbatch
 ```

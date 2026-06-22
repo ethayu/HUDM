@@ -22,25 +22,25 @@ python verify_mwm_benchmark.py configs/benchmark/scheduled_pusht.yaml
 The upstream paper-parity sanity check is:
 
 ```bash
-scripts/run_mwm_paper_parity.sh
+scripts/slurm/run_mwm_paper_parity.sh
 ```
 
 To rerun only the scheduled-MWM comparisons from existing canonical checkpoints:
 
 ```bash
-scripts/run_mwm_scheduled_comparison.sh
+scripts/slurm/run_mwm_scheduled_comparison.sh
 ```
 
 To rerun the paper-parity evaluator sanity check:
 
 ```bash
-scripts/run_mwm_paper_parity.sh
+scripts/slurm/run_mwm_paper_parity.sh
 ```
 
 On Betty/PARCC, submit true scheduled-MWM training as split one-GPU jobs with a dependent comparison benchmark:
 
 ```bash
-scripts/submit_mwm_scheduled_split.sh
+scripts/slurm/submit_mwm_scheduled_split.sh
 ```
 
 ## Local Desktop Workflow
@@ -53,7 +53,7 @@ remain GPU-oriented and should use the Slurm scripts on PARCC/Betty.
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-scripts/local_verify.sh
+scripts/local/local_verify.sh
 ```
 
 For a tiny local benchmark after preparing or copying
@@ -61,28 +61,30 @@ For a tiny local benchmark after preparing or copying
 `checkpoints_mwm/upstream_lewm_pusht`:
 
 ```bash
-scripts/local_benchmark_smoke.sh
+scripts/local/local_benchmark_smoke.sh
 ```
 
 Optional CPU training smoke is deliberately opt-in because it can be slow:
 
 ```bash
-RUN_CPU_TRAIN_SMOKE=1 scripts/local_train_smoke.sh
+RUN_CPU_TRAIN_SMOKE=1 scripts/local/local_train_smoke.sh
 ```
 
 Use `MWM_PYTHON=/path/to/python` if your Python is not named `python`.
 
 ## Architecture
 
-- `mwm.models.world_model.MWMWorldModel` is the runtime model contract, and
+- `mwm.models.core.MWMWorldModel` is the runtime model contract, and
   `MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
 - `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs,
   registers the Le-WM adapter, then returns the normal `MatryoshkaWorldModel`.
   `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
   multi-`K` training encodes once and aggregates requested prefix losses only.
-- `mwm.checkpoints` reads and writes strict canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`.
+- `mwm.checkpoint_io` reads and writes canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`;
+  `mwm.checkpoint_contract` owns semantic config/metadata validation.
 - `mwm.planning.scheduled_cem` is the active evaluator/planner path.
-- `mwm.data.stable_wm` is Lance-only data glue for Stable-WM datasets and immutable eval manifests.
+- `mwm.data.metadata`, `mwm.data.sampling`, `mwm.data.transforms`, and `mwm.data.manifest` own Lance dataset metadata,
+  start/goal sampling, training transforms, and immutable eval manifests.
 - `docs/mwm_adapter_contract.md` is the checklist for implementing another
   base adapter such as PreJEPA, DINO-WM, or PLDM.
 

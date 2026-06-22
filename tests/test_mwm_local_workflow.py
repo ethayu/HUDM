@@ -43,9 +43,9 @@ class MWMLocalWorkflowTests(unittest.TestCase):
 
     def test_local_scripts_are_not_slurm_gated_or_parcc_path_bound(self) -> None:
         scripts = [
-            ROOT / "scripts" / "local_verify.sh",
-            ROOT / "scripts" / "local_benchmark_smoke.sh",
-            ROOT / "scripts" / "local_train_smoke.sh",
+            ROOT / "scripts" / "local" / "local_verify.sh",
+            ROOT / "scripts" / "local" / "local_benchmark_smoke.sh",
+            ROOT / "scripts" / "local" / "local_train_smoke.sh",
         ]
         for script in scripts:
             text = script.read_text(encoding="utf-8")
@@ -53,7 +53,7 @@ class MWMLocalWorkflowTests(unittest.TestCase):
             self.assertNotIn("/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python", text, script)
             self.assertIn('${MWM_PYTHON:-python}', text, script)
 
-        verify_text = (ROOT / "scripts" / "local_verify.sh").read_text(encoding="utf-8")
+        verify_text = (ROOT / "scripts" / "local" / "local_verify.sh").read_text(encoding="utf-8")
         self.assertIn("git ls-files", verify_text)
 
 

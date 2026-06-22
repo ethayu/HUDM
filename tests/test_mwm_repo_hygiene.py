@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import ast
 from pathlib import Path
+import re
+import subprocess
 import unittest
 
 import yaml
@@ -10,6 +13,9 @@ from mwm.swm.restore import eval_callables_for_env
 
 ROOT = Path(__file__).resolve().parents[1]
 STABLE_WORLDMODEL_VERSION = "0.1.0"
+OLD_FLAT_SCRIPT_REF_RE = re.compile(
+    r"scripts/(?:local_|run_mwm_|submit_mwm_|poll_mwm_|slurm_mwm_|slurm_research_|research_)"
+)
 
 
 def _first_line_index(lines: list[str], tokens: tuple[str, ...]) -> int | None:
@@ -226,7 +232,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             "verify_mwm_",
             "prepare_upstream_",
         )
-        scripts = sorted((ROOT / "scripts").glob("run_mwm*.sh"))
+        scripts = sorted((ROOT / "scripts" / "slurm").glob("run_mwm*.sh"))
         self.assertGreater(len(scripts), 0)
 
         for script in scripts:
@@ -245,9 +251,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_benchmark_comparison_scripts_finish_all_envs_before_reporting_failure(self) -> None:
         scripts = [
-            ROOT / "scripts" / "run_mwm_identity_parity.sh",
-            ROOT / "scripts" / "run_mwm_scheduled_comparison.sh",
-            ROOT / "scripts" / "run_mwm_dense_comparison.sh",
+            ROOT / "scripts" / "slurm" / "run_mwm_identity_parity.sh",
+            ROOT / "scripts" / "slurm" / "run_mwm_scheduled_comparison.sh",
+            ROOT / "scripts" / "slurm" / "run_mwm_dense_comparison.sh",
         ]
         for script in scripts:
             text = script.read_text(encoding="utf-8")
@@ -263,9 +269,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
         risk_tokens = (
             "nvidia-smi",
             "torch.cuda",
-            "exec scripts/run_mwm",
+            "exec scripts/slurm/run_mwm",
         )
-        scripts = sorted((ROOT / "scripts").glob("slurm_mwm*.sbatch"))
+        scripts = sorted((ROOT / "scripts" / "slurm").glob("slurm_mwm*.sbatch"))
         self.assertGreater(len(scripts), 0)
 
         for script in scripts:
@@ -308,14 +314,103 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertIn("load_config", text, path)
             self.assertIn('"--set"', text, path)
 
+    def test_top_level_mwm_clis_are_plain_entrypoints(self) -> None:
+        migrated = {
+            "train_mwm.py": "mwm.training.lewm",
+            "eval_mwm.py": "mwm.eval.runner",
+            "benchmark_mwm.py": "mwm.benchmark.matrix",
+            "verify_mwm_benchmark.py": "mwm.benchmark.verify",
+            "verify_mwm_data.py": "mwm.data.verify",
+        }
+        for root_name, module in migrated.items():
+            root_path = ROOT / root_name
+            package_path = ROOT / Path(*module.split(".")).with_suffix(".py")
+            with self.subTest(root=root_name):
+                self.assertTrue(package_path.is_file(), package_path)
+                root_text = root_path.read_text(encoding="utf-8")
+                self.assertNotIn("import *", root_text)
+                self.assertNotIn("sys.modules", root_text)
+                self.assertIn(f"from {module} import", root_text)
+                self.assertIn("main", root_text)
+                root_tree = ast.parse(root_text)
+                root_defs = [
+                    node.name
+                    for node in root_tree.body
+                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
+                ]
+                self.assertEqual(root_defs, [], root_name)
+
+    def test_retired_compatibility_facades_are_absent(self) -> None:
+        retired = [
+            ROOT / "mwm" / "benchmark" / "artifacts.py",
+            ROOT / "mwm" / "data" / "stable_wm.py",
+            ROOT / "mwm" / "checkpoints.py",
+        ]
+        split_modules = [
+            ROOT / "mwm" / "io.py",
+            ROOT / "mwm" / "checkpoint_io.py",
+            ROOT / "mwm" / "checkpoint_contract.py",
+            ROOT / "mwm" / "data" / "metadata.py",
+            ROOT / "mwm" / "data" / "sampling.py",
+            ROOT / "mwm" / "benchmark" / "io.py",
+            ROOT / "mwm" / "benchmark" / "summary.py",
+            ROOT / "mwm" / "benchmark" / "html.py",
+            ROOT / "mwm" / "benchmark" / "plots.py",
+        ]
+        for path in retired:
+            self.assertFalse(path.exists(), path)
+        for path in split_modules:
+            self.assertTrue(path.is_file(), path)
+
     def test_docs_describe_local_and_slurm_workflows_separately(self) -> None:
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
         review = (ROOT / "REVIEW_GUIDE.md").read_text(encoding="utf-8")
         for text in (readme, review):
             self.assertIn("Local Desktop Workflow", text)
             self.assertIn("Slurm", text)
-            self.assertIn("scripts/local_verify.sh", text)
-            self.assertIn("scripts/local_benchmark_smoke.sh", text)
+            self.assertIn("scripts/local/local_verify.sh", text)
+            self.assertIn("scripts/local/local_benchmark_smoke.sh", text)
+
+    def test_scripts_are_grouped_by_workflow_type(self) -> None:
+        scripts_root = ROOT / "scripts"
+        self.assertEqual(
+            sorted(path.name for path in scripts_root.iterdir() if path.is_file()),
+            ["README.md"],
+        )
+        for folder in ("local", "slurm", "research"):
+            self.assertTrue((scripts_root / folder).is_dir(), folder)
+
+        self.assertEqual(
+            sorted(path.name for path in (scripts_root / "local").glob("*.sh")),
+            [
+                "local_benchmark_smoke.sh",
+                "local_train_smoke.sh",
+                "local_verify.sh",
+            ],
+        )
+        self.assertGreater(len(list((scripts_root / "slurm").glob("slurm_mwm*.sbatch"))), 0)
+        self.assertGreater(len(list((scripts_root / "slurm").glob("run_mwm*.sh"))), 0)
+        self.assertGreater(len(list((scripts_root / "research").glob("research_*"))), 0)
+        tracked_scripts = subprocess.check_output(
+            ["git", "ls-files", "scripts"],
+            cwd=ROOT,
+            text=True,
+        ).splitlines()
+        tracked_pycache = [path for path in tracked_scripts if "__pycache__" in Path(path).parts]
+        self.assertEqual(tracked_pycache, [])
+
+    def test_active_docs_and_tests_do_not_reference_flat_script_paths(self) -> None:
+        active_paths = [
+            ROOT / "README.md",
+            ROOT / "REVIEW_GUIDE.md",
+            *sorted((ROOT / "tests").glob("test_mwm*.py")),
+        ]
+        hits: list[str] = []
+        for path in active_paths:
+            text = path.read_text(encoding="utf-8")
+            for match in OLD_FLAT_SCRIPT_REF_RE.finditer(text):
+                hits.append(f"{path.relative_to(ROOT)} references {match.group(0)}")
+        self.assertEqual(hits, [])
 
     def test_upstream_data_prep_is_lance_only(self) -> None:
         text = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
