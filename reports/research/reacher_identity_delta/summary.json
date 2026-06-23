@@ -1,0 +1,39 @@
+{
+  "artifact_root": "/vast/projects/dineshj/lab/ethanyu/code/HUDM",
+  "audit_head": "2f54b271d7eeb3c77cb0a03b7299d9f9adb8948b",
+  "blockers": [],
+  "branch": "codex/reacher-identity-upstream-delta",
+  "classification": {
+    "checkpoint_selection": "possible small contributor, but not evidenced by this run",
+    "code_mismatch": "unlikely",
+    "evaluator_or_manifest_variance": "most likely explanation of the apparent +6pp identity advantage",
+    "primary_cause": "manifest/evaluator sampling variance at 50 episodes, with no evidence of a restore or architecture mismatch",
+    "restore_or_qpos_goal_handling": "not supported",
+    "training_data": "not supported as the paired cause",
+    "training_recipe_or_convergence": "not supported as a negative identity cause"
+  },
+  "dataset": "data/upstream/reacher.lance",
+  "env_id": "swm/ReacherDMControl-v0",
+  "jobs": {
+    "historical_identity_parity_benchmark": "6784362",
+    "historical_identity_train": "6782935",
+    "new_gpu_jobs_submitted": []
+  },
+  "observed": {
+    "delta_count": 3,
+    "delta_pp": 5.999999999999995,
+    "episode_granularity_pp": 2.0,
+    "episodes": 50,
+    "paired_sign_test_p": 0.5810546875,
+    "retrained_identity_success_rate": 86.0,
+    "upstream_success_rate": 80.0
+  },
+  "recommendation": {
+    "next_command": "MWM_REACHER_SWEEP_EPISODES=200 MWM_REACHER_SWEEP_SEEDS=\"0 1 2 42 100\" sbatch scripts/research/slurm_research_reacher_identity_seed_sweep.sbatch",
+    "next_experiment": "five-seed paired Reacher 200-episode sweep of the same two checkpoints",
+    "paper_target_tolerance": "split upstream-paper from identity-upstream and make both checks episode-count aware"
+  },
+  "restore_import_path": "mwm.swm.restore.reacher_qpos_match_restore_spec",
+  "restore_spec": "reacher_qpos_match_qpos_qvel",
+  "task": "qpos_match"
+}
