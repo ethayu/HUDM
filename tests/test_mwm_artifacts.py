@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 import torch
@@ -12,6 +13,7 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 
 import mwm.checkpoint_io as checkpoint_io
+from collect_mwm_data import _record_dataset_to_path
 from mwm.benchmark import matrix as benchmark_mwm
 from mwm.benchmark.config import DEFAULTS, merged_run_config, validate_benchmark_matrix
 from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
@@ -30,6 +32,7 @@ from mwm.checkpoint_io import (
 from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.sampling import StartGoalPair, sample_start_goal_pairs
+from mwm.eval.runner import _device as eval_device
 from mwm.benchmark.verify import (
     append_paper_target_errors,
     load_checkpoint_metadata_for_benchmark,
@@ -113,6 +116,93 @@ def _lewm_source_config() -> dict:
 
 
 class MWMArtifactTests(unittest.TestCase):
+    def test_eval_auto_device_uses_cuda_when_probe_succeeds(self) -> None:
+        with (
+            mock.patch("mwm.eval.runner.torch.cuda.is_available", return_value=True),
+            mock.patch("mwm.eval.runner.torch.empty", return_value=torch.empty(1)) as empty,
+        ):
+            device = eval_device("auto")
+
+        self.assertEqual(device.type, "cuda")
+        empty.assert_called_once_with(1, device="cuda")
+
+    def test_eval_auto_device_falls_back_to_cpu_when_cuda_probe_fails(self) -> None:
+        with (
+            mock.patch("mwm.eval.runner.torch.cuda.is_available", return_value=True),
+            mock.patch("mwm.eval.runner.torch.empty", side_effect=RuntimeError("device unavailable")),
+            self.assertWarnsRegex(RuntimeWarning, "falling back to CPU"),
+        ):
+            device = eval_device("auto")
+
+        self.assertEqual(device.type, "cpu")
+
+    def test_record_dataset_eager_write_uses_world_writer_path(self) -> None:
+        class FakeWorld:
+            def __init__(self) -> None:
+                self.calls: list[dict] = []
+
+            def collect(
+                self,
+                path=None,
+                episodes: int = 0,
+                seed: int | None = None,
+                format: str = "lance",
+                writer=None,
+                progress: bool = True,
+            ) -> None:
+                self.calls.append(
+                    {
+                        "path": path,
+                        "episodes": episodes,
+                        "seed": seed,
+                        "format": format,
+                        "writer": writer,
+                        "progress": progress,
+                    }
+                )
+                self.assert_main_thread_writer_call()
+                with writer as w:
+                    w.write_episodes(
+                        [
+                            {
+                                "pixels": [
+                                    np.zeros((2, 2, 3), dtype=np.uint8),
+                                    np.ones((2, 2, 3), dtype=np.uint8),
+                                ],
+                                "action": [np.zeros(2, dtype=np.float32), np.ones(2, dtype=np.float32)],
+                                "qpos": [np.zeros(3, dtype=np.float32), np.ones(3, dtype=np.float32)],
+                                "qvel": [np.zeros(3, dtype=np.float32), np.ones(3, dtype=np.float32)],
+                                "success": [np.nan, np.nan],
+                            }
+                        ]
+                    )
+
+            def assert_main_thread_writer_call(self) -> None:
+                call = self.calls[-1]
+                if call["path"] is not None:
+                    raise AssertionError("eager collection must pass writer= instead of path=")
+                if call["writer"] is None:
+                    raise AssertionError("eager collection must provide a writer")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            output_path = Path(tmp) / "out.lance"
+            world = FakeWorld()
+
+            _record_dataset_to_path(
+                world,
+                output_path,
+                episodes=1,
+                seed=3,
+                format="lance",
+                eager_write=True,
+                keys_to_save=["pixels", "action", "qpos", "qvel"],
+            )
+
+            self.assertTrue(output_path.exists())
+            self.assertEqual(len(world.calls), 1)
+            self.assertEqual(world.calls[0]["episodes"], 1)
+            self.assertEqual(world.calls[0]["seed"], 3)
+
     def test_hf_vit_encoder_keys_remap_to_custom_vit_layers(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
         state = {
@@ -147,6 +237,63 @@ class MWMArtifactTests(unittest.TestCase):
         state = {"encoder.layers.0.attention.q_proj.weight": torch.ones(1)}
 
         self.assertIs(checkpoint_io.remap_hf_vit_encoder_keys(state), state)
+
+    def test_custom_vit_encoder_keys_remap_to_hf_vit_layers(self) -> None:
+        self.assertTrue(hasattr(checkpoint_io, "remap_custom_vit_encoder_keys_to_hf"))
+        state = {
+            "encoder.layers.2.attention.q_proj.weight": torch.ones(1),
+            "encoder.layers.2.attention.k_proj.bias": torch.ones(1) * 2,
+            "encoder.layers.2.attention.v_proj.weight": torch.ones(1) * 3,
+            "encoder.layers.2.attention.o_proj.bias": torch.ones(1) * 4,
+            "encoder.layers.2.mlp.fc1.weight": torch.ones(1) * 5,
+            "encoder.layers.2.mlp.fc2.bias": torch.ones(1) * 6,
+            "decoder.weight": torch.ones(1) * 7,
+        }
+
+        remapped = checkpoint_io.remap_custom_vit_encoder_keys_to_hf(state)
+
+        self.assertEqual(
+            set(remapped),
+            {
+                "encoder.encoder.layer.2.attention.attention.query.weight",
+                "encoder.encoder.layer.2.attention.attention.key.bias",
+                "encoder.encoder.layer.2.attention.attention.value.weight",
+                "encoder.encoder.layer.2.attention.output.dense.bias",
+                "encoder.encoder.layer.2.intermediate.dense.weight",
+                "encoder.encoder.layer.2.output.dense.bias",
+                "decoder.weight",
+            },
+        )
+        self.assertIs(remapped["encoder.encoder.layer.2.attention.attention.query.weight"], state["encoder.layers.2.attention.q_proj.weight"])
+        self.assertIs(remapped["decoder.weight"], state["decoder.weight"])
+
+    def test_target_aware_vit_key_remap_keeps_matching_hf_keys(self) -> None:
+        self.assertTrue(hasattr(checkpoint_io, "remap_vit_encoder_keys_for_model"))
+        state = {
+            "encoder.encoder.layer.0.attention.attention.query.weight": torch.ones(1),
+            "decoder.weight": torch.ones(1) * 2,
+        }
+        model = SimpleNamespace(state_dict=lambda: dict(state))
+
+        self.assertIs(checkpoint_io.remap_vit_encoder_keys_for_model(state, model), state)
+
+    def test_target_aware_vit_key_remap_maps_custom_keys_to_hf_model(self) -> None:
+        state = {
+            "encoder.layers.0.attention.q_proj.weight": torch.ones(1),
+            "decoder.weight": torch.ones(1) * 2,
+        }
+        model = SimpleNamespace(
+            state_dict=lambda: {
+                "encoder.encoder.layer.0.attention.attention.query.weight": torch.empty(1),
+                "decoder.weight": torch.empty(1),
+            }
+        )
+
+        remapped = checkpoint_io.remap_vit_encoder_keys_for_model(state, model)
+
+        self.assertIn("encoder.encoder.layer.0.attention.attention.query.weight", remapped)
+        self.assertNotIn("encoder.layers.0.attention.q_proj.weight", remapped)
+        self.assertIs(remapped["encoder.encoder.layer.0.attention.attention.query.weight"], state["encoder.layers.0.attention.q_proj.weight"])
 
     def test_stable_worldmodel_sampling_includes_last_valid_start(self) -> None:
         class TinyDataset:
@@ -657,6 +804,12 @@ runs:
 """,
                 encoding="utf-8",
             )
+            output_dir = root / "out"
+            output_dir.mkdir()
+            (output_dir / "summary.json").write_text('{"stale": true}', encoding="utf-8")
+            (output_dir / "summary.csv").write_text("stale\n", encoding="utf-8")
+            (output_dir / "plots").mkdir()
+            (output_dir / "plots" / "success_by_env_role.png").write_bytes(b"stale")
 
             old_run_eval = benchmark_mwm.run_eval_mwm
 
@@ -673,6 +826,9 @@ runs:
             log_text = (root / "out" / "000_broken" / "run.log").read_text(encoding="utf-8")
             self.assertIn("Traceback", log_text)
             self.assertIn("ValueError: synthetic benchmark failure", log_text)
+            self.assertFalse((root / "out" / "summary.json").exists())
+            self.assertFalse((root / "out" / "summary.csv").exists())
+            self.assertFalse((root / "out" / "plots").exists())
 
     def test_checkpoint_verifier_requires_action_spec(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -785,6 +941,34 @@ runs:
 
         self.assertTrue(any("paper target check failed" in error for error in errors), errors)
 
+    def test_paper_target_tolerance_respects_episode_granularity(self) -> None:
+        rows = [
+            {
+                "env_id": "swm/PushT-v1",
+                "role": "upstream_lewm_converted",
+                "success_rate": 98.0,
+                "episodes": 50,
+            },
+            {
+                "env_id": "swm/PushT-v1",
+                "role": "retrained_lewm_identity",
+                "success_rate": 92.0,
+                "episodes": 50,
+            },
+        ]
+        cfg = {
+            "paper_targets": {
+                "enabled": True,
+                "tolerance_pp": 1.0,
+                "retrained_match_tolerance_pp": 5.0,
+                "success_rate": {"swm/PushT-v1": 96.0},
+            }
+        }
+
+        errors = validate_paper_targets(rows, cfg)
+
+        self.assertEqual(errors, [])
+
     def test_role_checkpoint_contract_rejects_direct_target_and_wrong_backend(self) -> None:
         row = {"role": "retrained_lewm_identity", "checkpoint_run_dir": "checkpoints_mwm/retrained"}
         metadata = {
@@ -873,6 +1057,32 @@ runs:
             cfg_path.write_text(f"data: {{path: {dataset}, format: lance}}\n", encoding="utf-8")
             report = verify_data_configs([cfg_path])
             self.assertEqual(report["count"], 1)
+
+    def test_reacher_h5_conversion_writes_lance_dataset_and_metadata(self) -> None:
+        import h5py
+        import lance
+
+        from mwm.data.metadata import load_dataset_metadata
+        from scripts.research.convert_reacher_h5_to_lance import convert_reacher_h5_to_lance
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "reacher.h5"
+            with h5py.File(source, "w") as handle:
+                handle.create_dataset("ep_offset", data=np.asarray([0, 2], dtype=np.int64))
+                handle.create_dataset("ep_len", data=np.asarray([2, 2], dtype=np.int32))
+                handle.create_dataset("pixels", data=np.zeros((4, 8, 8, 3), dtype=np.uint8))
+                handle.create_dataset("action", data=np.zeros((4, 2), dtype=np.float64))
+                handle.create_dataset("qpos", data=np.ones((4, 2), dtype=np.float64))
+                handle.create_dataset("qvel", data=np.full((4, 2), 2.0, dtype=np.float64))
+                handle.create_dataset("observation", data=np.zeros((4, 6), dtype=np.float32))
+
+            output = convert_reacher_h5_to_lance(source, root / "reacher.lance", progress_every=0)
+            dataset = lance.dataset(output)
+
+            self.assertEqual(dataset.count_rows(), 4)
+            self.assertEqual(dataset.schema.names, ["episode_idx", "step_idx", "pixels", "action", "qpos", "qvel", "observation"])
+            self.assertEqual(load_dataset_metadata(output)["restore_spec"], "reacher_qpos_match_qpos_qvel")
 
     def test_dataset_verifier_rejects_hdf5_runtime_configs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

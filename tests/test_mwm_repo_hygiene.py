@@ -8,7 +8,7 @@ import unittest
 
 import yaml
 
-from mwm.swm.restore import eval_callables_for_env
+from mwm.swm.restore import eval_callables_for_env, validate_restore_columns
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,12 +113,14 @@ class MWMRepoHygieneTests(unittest.TestCase):
     def test_lewm_training_configs_follow_base_adaptive_contract(self) -> None:
         expected_levels = {
             "mwm_lewm_pusht.yaml": [192],
+            "mwm_lewm_reacher_upstream.yaml": [192],
             "mwm_lewm_tworoom.yaml": [192],
             "mwm_lewm_pusht_upstream.yaml": [192],
             "mwm_lewm_tworoom_upstream.yaml": [192],
             "mwm_scheduled_pusht.yaml": [48, 96, 144],
             "mwm_scheduled_tworoom.yaml": [48, 96, 144],
             "mwm_dense_pusht.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_dense_reacher.yaml": [6, 12, 48, 96, 144, 192],
             "mwm_dense_tworoom.yaml": [6, 12, 48, 96, 144, 192],
         }
         for name, levels in expected_levels.items():
@@ -142,8 +144,19 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
             self.assertEqual(set(cfg["schedule"]), {"max_epochs"}, name)
             self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
-            if name.startswith(("mwm_scheduled_", "mwm_dense_")):
+            if name.startswith(("mwm_scheduled_", "mwm_dense_")) or name == "mwm_lewm_reacher_upstream.yaml":
                 self.assertTrue(str(cfg["data"]["path"]).startswith("data/upstream/"), name)
+
+            if "reacher" in name:
+                self.assertEqual(cfg["env_id"], "swm/ReacherDMControl-v0", name)
+                self.assertEqual(cfg["base"]["checkpoint"], "models--quentinll--lewm-reacher", name)
+                self.assertEqual(cfg["data"]["path"], "data/upstream/reacher.lance", name)
+                self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"], name)
+                self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "qpos", "qvel", "observation"], name)
+                self.assertEqual(cfg["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec", name)
+                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
+                self.assertEqual(cfg["loss"]["sigreg_knots"], 17, name)
+                self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
 
     def test_train_configs_do_not_override_base_architecture_knobs(self) -> None:
         forbidden_model_keys = {
@@ -173,13 +186,18 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertFalse(forbidden_model_keys & set(model), path)
 
     def test_paper_parity_eval_configs_follow_base_inference_contract(self) -> None:
-        for name in ("paper_pusht.yaml", "paper_tworoom.yaml"):
+        for name in ("paper_pusht.yaml", "paper_reacher.yaml", "paper_tworoom.yaml"):
             cfg = yaml.safe_load((ROOT / "configs" / "eval" / name).read_text(encoding="utf-8"))
 
             self.assertEqual(cfg["data"]["format"], "lance", name)
             self.assertEqual(cfg["data"]["action_preprocessing"], "standard_scaler", name)
             self.assertEqual(cfg["eval"]["sampling"], "stable_worldmodel", name)
             self.assertEqual(cfg["eval"]["goal_offset"], 25, name)
+            self.assertEqual(cfg["eval"]["episodes"], 50, name)
+            self.assertEqual(cfg["eval"]["budget"], 50, name)
+            self.assertEqual(cfg["planner"]["pop_size"], 300, name)
+            self.assertEqual(cfg["planner"]["topk"], 30, name)
+            self.assertEqual(cfg["planner"]["n_iter"], 30, name)
             self.assertEqual(cfg["planner"]["action_block"], 5, name)
             self.assertEqual(cfg["planner"]["scheduler"]["policy"], "fixed", name)
             self.assertEqual(cfg["planner"]["scheduler"]["rollout_level"]["level"], "base", name)
@@ -188,6 +206,21 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(bench_cfg["env_id"], "swm/PushT-v1")
         self.assertEqual([run["role"] for run in bench_cfg["runs"]], ["upstream_lewm_converted", "retrained_lewm_identity"])
         self.assertEqual(bench_cfg["paper_targets"]["tolerance_pp"], 1.0)
+
+        reacher_eval = yaml.safe_load((ROOT / "configs" / "eval" / "paper_reacher.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(reacher_eval["env_id"], "swm/ReacherDMControl-v0")
+        self.assertEqual(reacher_eval["data"]["path"], "data/upstream/reacher.lance")
+        self.assertEqual(reacher_eval["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"])
+        self.assertEqual(reacher_eval["data"]["keys_to_cache"], ["action", "qpos", "qvel", "observation"])
+        self.assertEqual(reacher_eval["env"]["kwargs"], {"task": "qpos_match"})
+        self.assertEqual(reacher_eval["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec")
+
+        reacher_bench = yaml.safe_load((ROOT / "configs" / "benchmark" / "paper_parity_reacher.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(reacher_bench["env_id"], "swm/ReacherDMControl-v0")
+        self.assertEqual(reacher_bench["eval_config"], "configs/eval/paper_reacher.yaml")
+        self.assertEqual([run["role"] for run in reacher_bench["runs"]], ["upstream_lewm_converted", "retrained_lewm_identity"])
+        self.assertEqual(reacher_bench["runs"][0]["checkpoint"], "checkpoints_mwm/upstream_lewm_reacher")
+        self.assertEqual(reacher_bench["runs"][1]["checkpoint"], "checkpoints_mwm/retrained_lewm_identity_reacher_upstream")
 
     def test_tworoom_official_schema_uses_future_proprio_as_eval_goal(self) -> None:
         spec_id, callables = eval_callables_for_env(
@@ -209,6 +242,35 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(callables[0]["args"]["state"]["value"], "pos_agent")
         self.assertEqual(callables[1]["args"]["goal_state"]["value"], "goal_pos_agent")
 
+    def test_reacher_qpos_match_restore_is_opt_in_and_uses_goal_qpos(self) -> None:
+        import_path = "mwm.swm.restore.reacher_qpos_match_restore_spec"
+
+        spec = validate_restore_columns(
+            "swm/ReacherDMControl-v0",
+            {"pixels", "action", "qpos", "qvel", "observation"},
+            import_path=import_path,
+        )
+        spec_id, callables = eval_callables_for_env(
+            "swm/ReacherDMControl-v0",
+            {"pixels", "action", "qpos", "qvel", "observation"},
+            import_path=import_path,
+        )
+
+        self.assertEqual(spec.spec_id, "reacher_qpos_match_qpos_qvel")
+        self.assertEqual(spec_id, "reacher_qpos_match_qpos_qvel")
+        self.assertEqual(callables[0]["method"], "set_state")
+        self.assertEqual(callables[0]["args"]["qpos"]["value"], "qpos")
+        self.assertEqual(callables[0]["args"]["qvel"]["value"], "qvel")
+        self.assertEqual(callables[1]["method"], "set_target_qpos")
+        self.assertEqual(callables[1]["args"]["target_qpos"]["value"], "goal_qpos")
+
+        with self.assertRaisesRegex(ValueError, "qvel"):
+            validate_restore_columns(
+                "swm/ReacherDMControl-v0",
+                {"pixels", "action", "qpos"},
+                import_path=import_path,
+            )
+
     def test_local_tworoom_train_configs_match_available_lance_columns(self) -> None:
         for name in ("mwm_lewm_tworoom.yaml",):
             cfg = yaml.safe_load((ROOT / "configs" / "train" / name).read_text(encoding="utf-8"))
@@ -223,6 +285,17 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["data"]["path"], "data/upstream/tworoom.lance")
         self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
         self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio"])
+
+    def test_upstream_reacher_preparation_is_declared(self) -> None:
+        source = (ROOT / "prepare_upstream_lewm.py").read_text(encoding="utf-8")
+        self.assertIn('"name": "upstream_lewm_reacher"', source)
+        self.assertIn('"repo": "quentinll/lewm-reacher"', source)
+        self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', source)
+
+        data_source = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8")
+        self.assertIn('REACHER_LANCE = "reacher.lance"', data_source)
+        self.assertIn('"env_id": "swm/ReacherDMControl-v0"', data_source)
+        self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', data_source)
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
         work_tokens = (
@@ -264,6 +337,60 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 stripped = line.strip()
                 if "benchmark_mwm.py" in stripped or "verify_mwm_benchmark.py" in stripped:
                     self.assertTrue(stripped.startswith("run_step "), f"{script}: {stripped}")
+
+    def test_reacher_slurm_training_and_parity_commands_exist(self) -> None:
+        identity_runner = (ROOT / "scripts" / "slurm" / "run_mwm_train_identity_env.sh").read_text(encoding="utf-8")
+        self.assertIn("reacher)", identity_runner)
+        self.assertIn("configs/train/mwm_lewm_reacher_upstream.yaml", identity_runner)
+        self.assertIn("{pusht|reacher|tworoom}", identity_runner)
+
+        dense_runner = (ROOT / "scripts" / "slurm" / "run_mwm_train_dense_env.sh").read_text(encoding="utf-8")
+        self.assertIn("reacher)", dense_runner)
+        self.assertIn("configs/train/mwm_dense_reacher.yaml", dense_runner)
+        self.assertIn("{pusht|reacher|tworoom}", dense_runner)
+
+        for name in ("slurm_mwm_train_reacher_identity.sbatch", "slurm_mwm_train_reacher_dense.sbatch"):
+            text = (ROOT / "scripts" / "slurm" / name).read_text(encoding="utf-8")
+            self.assertIn("run_mwm_train_", text, name)
+            self.assertIn("reacher", text, name)
+            self.assertIn('torch.empty(1, device="cuda")', text, name)
+
+        parity_runner = (ROOT / "scripts" / "slurm" / "run_mwm_identity_parity.sh").read_text(encoding="utf-8")
+        self.assertIn("configs/benchmark/paper_parity_reacher.yaml", parity_runner)
+        self.assertIn('export MUJOCO_GL="${MUJOCO_GL:-egl}"', parity_runner)
+        self.assertIn('export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"', parity_runner)
+
+        dense_comparison = (ROOT / "scripts" / "slurm" / "run_mwm_dense_comparison.sh").read_text(encoding="utf-8")
+        self.assertIn("configs/benchmark/dense_reacher.yaml", dense_comparison)
+        self.assertIn('export MUJOCO_GL="${MUJOCO_GL:-egl}"', dense_comparison)
+        self.assertIn('export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"', dense_comparison)
+
+    def test_reacher_h5_to_lance_conversion_tool_is_explicit_and_isolated(self) -> None:
+        script = ROOT / "scripts" / "research" / "convert_reacher_h5_to_lance.py"
+        text = script.read_text(encoding="utf-8")
+
+        self.assertIn("h5py.File", text)
+        self.assertIn("LanceWriter", text)
+        self.assertIn("prepare_reacher", text)
+        self.assertIn("pixels", text)
+        self.assertIn("qpos", text)
+        self.assertIn("qvel", text)
+        self.assertIn("observation", text)
+
+    def test_reacher_h5_to_lance_conversion_tool_is_runnable_by_path(self) -> None:
+        script = ROOT / "scripts" / "research" / "convert_reacher_h5_to_lance.py"
+        result = subprocess.run(
+            ["/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python", str(script), "--help"],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--source", result.stdout)
+        self.assertIn("--output", result.stdout)
 
     def test_slurm_mwm_scripts_refuse_direct_bash_before_gpu_or_work(self) -> None:
         risk_tokens = (
@@ -386,6 +513,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             sorted(path.name for path in (scripts_root / "local").glob("*.sh")),
             [
                 "local_benchmark_smoke.sh",
+                "local_reacher_train_smoke.sh",
                 "local_train_smoke.sh",
                 "local_verify.sh",
             ],

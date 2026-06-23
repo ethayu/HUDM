@@ -14,9 +14,11 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         local_dir = ROOT / "configs" / "local"
         expected = {
             "collect_pusht_smoke.yaml",
+            "collect_reacher_smoke.yaml",
             "eval_pusht_smoke.yaml",
             "benchmark_pusht_smoke.yaml",
             "train_pusht_cpu_smoke.yaml",
+            "train_reacher_cpu_smoke.yaml",
         }
         self.assertEqual({path.name for path in local_dir.glob("*.yaml")}, expected)
 
@@ -41,11 +43,30 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         self.assertEqual(bench_cfg["manifest"]["group"], "local_pusht_smoke")
         self.assertEqual(len(bench_cfg["runs"]), 1)
 
+        reacher_collect_cfg = yaml.safe_load((local_dir / "collect_reacher_smoke.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(reacher_collect_cfg["env_id"], "swm/ReacherDMControl-v0")
+        self.assertEqual(reacher_collect_cfg["env_kwargs"]["task"], "qpos_match")
+        self.assertEqual(reacher_collect_cfg["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec")
+        self.assertTrue(reacher_collect_cfg["eager_write"])
+        self.assertEqual(reacher_collect_cfg["keys_to_save"], ["pixels", "action", "qpos", "qvel", "observation"])
+        self.assertLessEqual(reacher_collect_cfg["episodes"], 4)
+
+        reacher_train_cfg = yaml.safe_load((local_dir / "train_reacher_cpu_smoke.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(reacher_train_cfg["env_id"], "swm/ReacherDMControl-v0")
+        self.assertEqual(reacher_train_cfg["data"]["frameskip"], 5)
+        self.assertEqual(reacher_train_cfg["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"])
+        self.assertEqual(reacher_train_cfg["data"]["keys_to_cache"], ["action", "qpos", "qvel", "observation"])
+        self.assertEqual(reacher_train_cfg["model"]["K"], [192])
+        self.assertEqual(reacher_train_cfg["model"]["action_block"], 5)
+        self.assertTrue(reacher_train_cfg["train"]["no_cuda"])
+        self.assertEqual(reacher_train_cfg["train"]["run_name"], "local_reacher_cpu_smoke")
+
     def test_local_scripts_are_not_slurm_gated_or_parcc_path_bound(self) -> None:
         scripts = [
             ROOT / "scripts" / "local" / "local_verify.sh",
             ROOT / "scripts" / "local" / "local_benchmark_smoke.sh",
             ROOT / "scripts" / "local" / "local_train_smoke.sh",
+            ROOT / "scripts" / "local" / "local_reacher_train_smoke.sh",
         ]
         for script in scripts:
             text = script.read_text(encoding="utf-8")
@@ -55,6 +76,14 @@ class MWMLocalWorkflowTests(unittest.TestCase):
 
         verify_text = (ROOT / "scripts" / "local" / "local_verify.sh").read_text(encoding="utf-8")
         self.assertIn("git ls-files", verify_text)
+
+        reacher_text = (ROOT / "scripts" / "local" / "local_reacher_train_smoke.sh").read_text(encoding="utf-8")
+        self.assertIn('${MUJOCO_GL:-egl}', reacher_text)
+        self.assertIn('${PYOPENGL_PLATFORM:-egl}', reacher_text)
+        self.assertIn("collect_mwm_data.py configs/local/collect_reacher_smoke.yaml", reacher_text)
+        self.assertIn("train_mwm.py configs/local/train_reacher_cpu_smoke.yaml", reacher_text)
+        for name in ("config.json", "weights.pt", "world_metadata.json"):
+            self.assertIn(name, reacher_text)
 
 
 if __name__ == "__main__":
