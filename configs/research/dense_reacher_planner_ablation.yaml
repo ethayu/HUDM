@@ -1,0 +1,94 @@
+output_dir: reports/research/dense_reacher_debug/rollouts/planner_ablation
+title: Reacher Dense MWM Planner Ablation
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/reacher_paper_seed42.yaml
+runs:
+  - name: upstream_fixed_finest
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_reacher
+
+  - name: identity_fixed_finest
+    role: retrained_lewm_identity
+    checkpoint: checkpoints_mwm/retrained_lewm_identity_reacher_upstream
+
+  - name: dense_linear_final
+    role: mwm_dense_linear_final
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: coarsest
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_fixed_finest_final
+    role: mwm_dense_fixed_finest_final
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: fixed
+        level: finest
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_fixed_l4_final
+    role: mwm_dense_fixed_l4_final
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: fixed
+        level: 4
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_fixed_l3_final
+    role: mwm_dense_fixed_l3_final
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: fixed
+        level: 3
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_linear_l4_to_l5_final
+    role: mwm_dense_linear_l4_to_l5_final
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: 4
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_fixed_finest_step31000
+    role: mwm_dense_fixed_finest_step31000
+    checkpoint: checkpoints_mwm/mwm_dense_reacher_step31000_snapshot
+    planner:
+      scheduler:
+        policy: fixed
+        level: finest
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_fixed_finest_interim_epoch1
+    role: mwm_dense_fixed_finest_interim_epoch1
+    checkpoint: checkpoints_mwm/mwm_dense_reacher_interim
+    planner:
+      scheduler:
+        policy: fixed
+        level: finest
+        rollout_level:
+          mode: fixed
+          level: base
