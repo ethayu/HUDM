@@ -13,11 +13,14 @@ case "${1:-}" in
   pusht)
     CONFIG="configs/train/mwm_lewm_pusht_upstream.yaml"
     ;;
+  reacher)
+    CONFIG="configs/train/mwm_lewm_reacher_upstream.yaml"
+    ;;
   tworoom)
     CONFIG="configs/train/mwm_lewm_tworoom_upstream.yaml"
     ;;
   *)
-    echo "Usage: scripts/slurm/run_mwm_train_identity_env.sh {pusht|tworoom}" >&2
+    echo "Usage: scripts/slurm/run_mwm_train_identity_env.sh {pusht|reacher|tworoom}" >&2
     exit 2
     ;;
 esac

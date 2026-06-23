@@ -36,6 +36,18 @@ DEFAULTS = {
             "base_action_dim": 2,
             "action_block": 5,
         },
+        {
+            "name": "upstream_lewm_reacher",
+            "repo": "quentinll/lewm-reacher",
+            "env_id": "swm/ReacherDMControl-v0",
+            "restore_spec": "reacher_qpos_match_qpos_qvel",
+            "image_shape": [224, 224],
+            "action_dim": 10,
+            "base_action_dim": 2,
+            "action_block": 5,
+            "action_low": [-1.0, -1.0],
+            "action_high": [1.0, 1.0],
+        },
     ],
 }
 

@@ -151,6 +151,35 @@ def user_restore_spec(import_path: str, env_id: str, columns: list[str] | set[st
     return spec
 
 
+def reacher_qpos_match_restore_spec(
+    env_id: str = "swm/ReacherDMControl-v0",
+    columns: list[str] | set[str] = (),
+) -> RestoreSpec:
+    """Opt-in Reacher restore spec for SWM's qpos-match success task."""
+
+    del columns
+    return RestoreSpec(
+        spec_id="reacher_qpos_match_qpos_qvel",
+        env_ids=(str(env_id),),
+        required_columns=("qpos", "qvel"),
+        eval_callables=(
+            {
+                "method": "set_state",
+                "args": {
+                    "qpos": {"value": "qpos", "in_dataset": True},
+                    "qvel": {"value": "qvel", "in_dataset": True},
+                },
+            },
+            {
+                "method": "set_target_qpos",
+                "args": {
+                    "target_qpos": {"value": "goal_qpos", "in_dataset": True},
+                },
+            },
+        ),
+    )
+
+
 def restore_spec_for_env(
     env_id: str,
     import_path: str | None = None,

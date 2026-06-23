@@ -1,0 +1,17 @@
+env_id: swm/ReacherDMControl-v0
+image_shape: 224
+max_episode_steps: 20
+num_envs: 1
+episodes: 4
+seed: 0
+output_path: data/reacher_qpos_match_smoke.lance
+format: lance
+eager_write: true
+keys_to_save: [pixels, action, qpos, qvel, observation]
+goal_conditioned: true
+env_kwargs:
+  task: qpos_match
+policy:
+  import_path: null
+restore:
+  import_path: mwm.swm.restore.reacher_qpos_match_restore_spec

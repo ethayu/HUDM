@@ -1,0 +1,22 @@
+output_dir: rollouts/mwm_dense_reacher
+title: Dense-Level MWM vs Upstream Le-WM on Reacher
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/reacher_paper_seed42.yaml
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_reacher
+  - name: dense
+    role: mwm_dense
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: coarsest
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base

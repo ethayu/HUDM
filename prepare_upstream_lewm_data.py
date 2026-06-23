@@ -7,6 +7,7 @@ from mwm.data.metadata import write_dataset_metadata
 
 
 PUSHT_LANCE = "pusht_expert_train.lance"
+REACHER_LANCE = "reacher.lance"
 TWOROOM_LANCE = "tworoom.lance"
 
 
@@ -62,10 +63,39 @@ def _write_tworoom_metadata(path: Path) -> None:
     )
 
 
+def _write_reacher_metadata(path: Path) -> None:
+    write_dataset_metadata(
+        path,
+        {
+            "format": "swm_lance",
+            "env_id": "swm/ReacherDMControl-v0",
+            "restore_spec": "reacher_qpos_match_qpos_qvel",
+            "image_shape": [224, 224],
+            "action_dim": 2,
+            "action_low": [-1.0, -1.0],
+            "action_high": [1.0, 1.0],
+            "dataset": {"pixels_key": "pixels", "action_key": "action"},
+            "source": {
+                "format": "lance",
+                "artifact": REACHER_LANCE,
+                "standard": "paper_parity",
+                "hf_dataset": "quentinll/lewm-reacher",
+            },
+        },
+    )
+
+
 def prepare_pusht(root: Path) -> Path:
     lance_path = root / PUSHT_LANCE
     _require_lance_dataset(lance_path)
     _write_pusht_metadata(lance_path)
+    return lance_path
+
+
+def prepare_reacher(root: Path) -> Path:
+    lance_path = root / REACHER_LANCE
+    _require_lance_dataset(lance_path)
+    _write_reacher_metadata(lance_path)
     return lance_path
 
 
@@ -82,6 +112,7 @@ def main() -> None:
     root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/upstream")
     out = {
         "pusht": str(prepare_pusht(root)),
+        "reacher": str(prepare_reacher(root)),
         "tworoom": str(prepare_tworoom(root)),
     }
     print(json.dumps(out, indent=2, sort_keys=True))

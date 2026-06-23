@@ -27,6 +27,8 @@ DEFAULTS = {
     "seed": 0,
     "output_path": "data/swm_dataset.lance",
     "format": "lance",
+    "eager_write": False,
+    "keys_to_save": None,
     "goal_conditioned": True,
     "env_kwargs": {},
     "policy": {"import_path": None},
@@ -34,7 +36,50 @@ DEFAULTS = {
 }
 
 
-def _record_dataset_to_path(world: Any, output_path: Path, episodes: int, seed: int, format: str | None = None) -> None:
+class _MainThreadEpisodeWriter:
+    def __init__(self, output_path: Path, format: str, keys_to_save: list[str] | tuple[str, ...] | None = None) -> None:
+        self._output_path = output_path
+        self._format = format
+        self._keys_to_save = tuple(keys_to_save) if keys_to_save else None
+        self._writer_cm: Any = None
+        self._writer: Any = None
+
+    def __enter__(self) -> "_MainThreadEpisodeWriter":
+        from stable_worldmodel.data.format import get_format
+
+        self._writer_cm = get_format(self._format).open_writer(self._output_path)
+        self._writer = self._writer_cm.__enter__()
+        return self
+
+    def __exit__(self, *exc: object) -> object:
+        if self._writer_cm is None:
+            return None
+        return self._writer_cm.__exit__(*exc)
+
+    def write_episode(self, ep_data: dict) -> None:
+        if self._writer is None:
+            raise RuntimeError("_MainThreadEpisodeWriter used outside of a `with` block")
+        if self._keys_to_save is not None:
+            missing = [key for key in self._keys_to_save if key not in ep_data]
+            if missing:
+                raise KeyError(f"Cannot save requested dataset columns; missing columns: {missing}")
+            ep_data = {key: ep_data[key] for key in self._keys_to_save}
+        self._writer.write_episode(ep_data)
+
+    def write_episodes(self, episodes: Any) -> None:
+        for episode in episodes:
+            self.write_episode(episode)
+
+
+def _record_dataset_to_path(
+    world: Any,
+    output_path: Path,
+    episodes: int,
+    seed: int,
+    format: str | None = None,
+    eager_write: bool = False,
+    keys_to_save: list[str] | tuple[str, ...] | None = None,
+) -> None:
     if output_path.exists():
         raise FileExistsError(
             f"Refusing to append to existing SWM dataset {output_path}. "
@@ -46,6 +91,13 @@ def _record_dataset_to_path(world: Any, output_path: Path, episodes: int, seed: 
         raise ValueError(f"MWM v1 only supports Lance collection, got format={fmt!r}.")
     if not hasattr(world, "collect"):
         raise AttributeError("MWM data collection requires Stable-WM World.collect(...).")
+    if eager_write or keys_to_save:
+        world.collect(
+            writer=_MainThreadEpisodeWriter(output_path, fmt, keys_to_save=keys_to_save),
+            episodes=int(episodes),
+            seed=int(seed),
+        )
+        return
     world.collect(output_path, episodes=int(episodes), seed=int(seed), format="lance")
 
 
@@ -83,7 +135,18 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
         data_format = str(cfg.get("format", "lance"))
         if data_format != "lance":
             raise ValueError(f"MWM v1 only supports Lance datasets, got format={data_format!r}.")
-        _record_dataset_to_path(world, output_path, int(cfg.episodes), int(cfg.seed), data_format)
+        keys_to_save = cfg.get("keys_to_save", None)
+        if keys_to_save is not None:
+            keys_to_save = [str(key) for key in keys_to_save]
+        _record_dataset_to_path(
+            world,
+            output_path,
+            int(cfg.episodes),
+            int(cfg.seed),
+            data_format,
+            eager_write=bool(cfg.get("eager_write", False)),
+            keys_to_save=keys_to_save,
+        )
         from stable_worldmodel.data import load_dataset
 
         ds = load_dataset(local_path(output_path), format="lance")
