@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 import torch
@@ -86,7 +87,18 @@ DEFAULTS = {
 
 def _device(raw: str) -> torch.device:
     if str(raw) == "auto":
-        return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if torch.cuda.is_available():
+            try:
+                probe = torch.empty(1, device="cuda")
+                del probe
+                return torch.device("cuda")
+            except Exception as exc:
+                warnings.warn(
+                    "CUDA was reported available but a test allocation failed; "
+                    f"falling back to CPU for device=auto: {exc}",
+                    RuntimeWarning,
+                )
+        return torch.device("cpu")
     return torch.device(str(raw))
 
 

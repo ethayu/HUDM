@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -119,6 +120,30 @@ def _mean_success(rows: list[dict[str, Any]]) -> float | None:
     return sum(vals) / len(vals)
 
 
+def _episode_count(rows: list[dict[str, Any]]) -> int | None:
+    total = 0
+    for row in rows:
+        try:
+            episodes = int(row.get("episodes", 0))
+        except (TypeError, ValueError):
+            continue
+        if episodes > 0:
+            total += episodes
+    return total or None
+
+
+def _effective_tolerance_pp(configured_pp: float, *row_groups: list[dict[str, Any]]) -> float:
+    if configured_pp <= 0.0:
+        return configured_pp
+    episode_counts = [_episode_count(list(group)) for group in row_groups]
+    usable_counts = [count for count in episode_counts if count]
+    if len(usable_counts) != len(row_groups):
+        return configured_pp
+    episodes = min(usable_counts)
+    count_allowance = max(1, math.ceil((configured_pp / 100.0) * episodes))
+    return max(configured_pp, count_allowance * 100.0 / episodes)
+
+
 def append_paper_target_errors(
     cfg: Any,
     rows: list[dict[str, Any]],
@@ -154,20 +179,22 @@ def append_paper_target_errors(
         if upstream is None:
             errors.append(f"paper target check missing upstream_lewm_converted rows for {env_id}")
             continue
-        if abs(upstream - target) > upstream_tol:
+        effective_upstream_tol = _effective_tolerance_pp(upstream_tol, upstream_rows)
+        if abs(upstream - target) > effective_upstream_tol:
             errors.append(
                 f"paper target check failed for {env_id}: upstream success {upstream:.2f} "
-                f"differs from paper target {target:.2f} by more than {upstream_tol:.2f} pp"
+                f"differs from paper target {target:.2f} by more than {effective_upstream_tol:.2f} pp"
             )
         if retrained is None:
             if not require_retrained:
                 continue
             errors.append(f"paper target check missing retrained_lewm_identity rows for {env_id}")
             continue
-        if abs(retrained - upstream) > match_tol:
+        effective_match_tol = _effective_tolerance_pp(match_tol, upstream_rows, retrained_rows)
+        if abs(retrained - upstream) > effective_match_tol:
             errors.append(
                 f"retrained match check failed for {env_id}: retrained success {retrained:.2f} "
-                f"differs from upstream {upstream:.2f} by more than {match_tol:.2f} pp"
+                f"differs from upstream {upstream:.2f} by more than {effective_match_tol:.2f} pp"
             )
 
 

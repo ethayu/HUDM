@@ -27,13 +27,21 @@ export MWM_PYTHON="$PY"
 export PYTHONUNBUFFERED=1
 export TOKENIZERS_PARALLELISM=false
 export MPLBACKEND=Agg
+export MUJOCO_GL="${MUJOCO_GL:-egl}"
+export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 
 hostname
 nvidia-smi || true
 "$PY" - <<'PY'
 import torch
 print("python ok")
-print("torch", torch.__version__, "cuda", torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else None)
+cuda_available = torch.cuda.is_available()
+print("torch", torch.__version__, "cuda", cuda_available, torch.cuda.get_device_name(0) if cuda_available else None)
+if not cuda_available:
+    raise SystemExit("ERROR: CUDA is unavailable inside this GPU Slurm allocation.")
+probe = torch.empty(1, device="cuda")
+torch.cuda.synchronize()
+print("cuda allocation probe ok", probe.device)
 PY
 
 exec scripts/slurm/run_mwm_dense_comparison.sh

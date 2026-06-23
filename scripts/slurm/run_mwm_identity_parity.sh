@@ -10,6 +10,8 @@ if [[ -z "${SLURM_JOB_ID:-}" ]]; then
 fi
 
 cd "$ROOT"
+export MUJOCO_GL="${MUJOCO_GL:-egl}"
+export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 
 "$PY" verify_mwm_data.py --paper-parity
 
@@ -24,6 +26,9 @@ run_step() {
 
 run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
 run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml \
+  --roles upstream_lewm_converted retrained_lewm_identity
+run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
+run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml \
   --roles upstream_lewm_converted retrained_lewm_identity
 run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
 run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml \

@@ -34,12 +34,18 @@ while true; do
       static_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
       full_status="$?"
+      "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml --static-only --roles upstream_lewm_converted retrained_lewm_identity
+      static_reacher_status="$?"
+      "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
+      full_reacher_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --static-only --roles upstream_lewm_converted retrained_lewm_identity
       static_tworoom_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
       full_tworoom_status="$?"
       echo "STATIC_VERIFY_PUSHT_EXIT=$static_status"
       echo "FULL_VERIFY_PUSHT_EXIT=$full_status"
+      echo "STATIC_VERIFY_REACHER_EXIT=$static_reacher_status"
+      echo "FULL_VERIFY_REACHER_EXIT=$full_reacher_status"
       echo "STATIC_VERIFY_TWOROOM_EXIT=$static_tworoom_status"
       echo "FULL_VERIFY_TWOROOM_EXIT=$full_tworoom_status"
     } >> "$LOG" 2>&1

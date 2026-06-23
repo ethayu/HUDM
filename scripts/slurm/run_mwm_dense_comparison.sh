@@ -10,6 +10,8 @@ if [[ -z "${SLURM_JOB_ID:-}" ]]; then
 fi
 
 cd "$ROOT"
+export MUJOCO_GL="${MUJOCO_GL:-egl}"
+export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 
 "$PY" verify_mwm_data.py --paper-parity
 
@@ -24,6 +26,8 @@ run_step() {
 
 run_step "$PY" benchmark_mwm.py configs/benchmark/dense_pusht.yaml
 run_step "$PY" verify_mwm_benchmark.py configs/benchmark/dense_pusht.yaml
+run_step "$PY" benchmark_mwm.py configs/benchmark/dense_reacher.yaml
+run_step "$PY" verify_mwm_benchmark.py configs/benchmark/dense_reacher.yaml
 run_step "$PY" benchmark_mwm.py configs/benchmark/dense_tworoom.yaml
 run_step "$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml
 

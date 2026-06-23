@@ -34,12 +34,18 @@ while true; do
       static_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/dense_pusht.yaml --roles upstream_lewm_converted mwm_dense
       full_status="$?"
+      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_reacher.yaml --static-only --roles upstream_lewm_converted mwm_dense
+      static_reacher_status="$?"
+      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_reacher.yaml --roles upstream_lewm_converted mwm_dense
+      full_reacher_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml --static-only --roles upstream_lewm_converted mwm_dense
       static_tworoom_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml --roles upstream_lewm_converted mwm_dense
       full_tworoom_status="$?"
       echo "STATIC_VERIFY_PUSHT_EXIT=$static_status"
       echo "FULL_VERIFY_PUSHT_EXIT=$full_status"
+      echo "STATIC_VERIFY_REACHER_EXIT=$static_reacher_status"
+      echo "FULL_VERIFY_REACHER_EXIT=$full_reacher_status"
       echo "STATIC_VERIFY_TWOROOM_EXIT=$static_tworoom_status"
       echo "FULL_VERIFY_TWOROOM_EXIT=$full_tworoom_status"
     } >> "$LOG" 2>&1

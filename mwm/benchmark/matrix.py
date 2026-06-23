@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import shutil
 import time
 import traceback
 from pathlib import Path
@@ -28,6 +29,18 @@ from mwm.benchmark.summary import eval_summary_row, write_per_env_table, write_s
 from mwm.config_cli import load_config
 from mwm.eval.runner import main as run_eval_mwm
 from mwm.io import file_sha256, load_json, write_json, write_metrics_jsonl
+
+
+AGGREGATE_OUTPUTS = ("summary.json", "summary.csv", "metrics.jsonl", "per_env_summary.csv", "review.html")
+
+
+def _clear_stale_outputs(output_dir: Path, resolved: list[tuple[Any, Any]]) -> None:
+    for name in AGGREGATE_OUTPUTS:
+        (output_dir / name).unlink(missing_ok=True)
+    shutil.rmtree(output_dir / "plots", ignore_errors=True)
+    for idx, (run, _) in enumerate(resolved):
+        name = safe_name(str(run.get("name", run.get("role", "run"))))
+        shutil.rmtree(output_dir / f"{idx:03d}_{name}", ignore_errors=True)
 
 
 def _episode_trace_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -69,6 +82,7 @@ def main(cfg_path: str, *, roles: Any = None, overrides: list[str] | None = None
         resolved.append((run, run_cfg))
     resolved = filter_resolved_by_roles(cfg, resolved, roles)
     validate_benchmark_matrix(cfg, resolved)
+    _clear_stale_outputs(output_dir, resolved)
 
     for idx, (run, run_cfg) in enumerate(resolved):
         name = safe_name(str(run.get("name", run.get("role", "run"))))

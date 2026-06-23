@@ -131,6 +131,53 @@ def remap_hf_vit_encoder_keys(state_dict: dict[str, Any]) -> dict[str, Any]:
     return {remap_key(key): value for key, value in state_dict.items()}
 
 
+def remap_custom_vit_encoder_keys_to_hf(state_dict: dict[str, Any]) -> dict[str, Any]:
+    """Translate custom Le-WM ViT encoder keys to the HF ViT key layout."""
+    custom_attention_map = {
+        "attention.q_proj": "attention.attention.query",
+        "attention.k_proj": "attention.attention.key",
+        "attention.v_proj": "attention.attention.value",
+        "attention.o_proj": "attention.output.dense",
+        "mlp.fc1": "intermediate.dense",
+        "mlp.fc2": "output.dense",
+    }
+    custom_layer_re = re.compile(r"^encoder\.layers\.(\d+)\.(.*)")
+
+    def remap_key(key: str) -> str:
+        match = custom_layer_re.match(key)
+        if not match:
+            return key
+        idx, rest = match.group(1), match.group(2)
+        for custom_prefix, hf_prefix in custom_attention_map.items():
+            if rest == custom_prefix or rest.startswith(f"{custom_prefix}."):
+                rest = hf_prefix + rest[len(custom_prefix):]
+                break
+        return f"encoder.encoder.layer.{idx}.{rest}"
+
+    if not any(custom_layer_re.match(key) for key in state_dict):
+        return state_dict
+    return {remap_key(key): value for key, value in state_dict.items()}
+
+
+def remap_vit_encoder_keys_for_model(state_dict: dict[str, Any], model: Any) -> dict[str, Any]:
+    """Map serialized ViT encoder keys into the instantiated model's key layout."""
+    model_keys = set(model.state_dict())
+    state_keys = set(state_dict)
+    if state_keys <= model_keys:
+        return state_dict
+
+    model_uses_hf = any(key.startswith("encoder.encoder.layer.") for key in model_keys)
+    model_uses_custom = any(key.startswith("encoder.layers.") for key in model_keys)
+    state_uses_hf = any(key.startswith("encoder.encoder.layer.") for key in state_keys)
+    state_uses_custom = any(key.startswith("encoder.layers.") for key in state_keys)
+
+    if state_uses_hf and model_uses_custom:
+        return remap_hf_vit_encoder_keys(state_dict)
+    if state_uses_custom and model_uses_hf:
+        return remap_custom_vit_encoder_keys_to_hf(state_dict)
+    return state_dict
+
+
 def load_checkpoint_config_and_metadata(run_dir: str | Path) -> tuple[dict[str, Any], dict[str, Any]]:
     root = Path(run_dir)
     return _json_load(root / CONFIG_FILENAME), _json_load(root / METADATA_FILENAME)
@@ -188,7 +235,7 @@ def load_world_model_from_checkpoint(
     config, metadata = validate_checkpoint_directory(root, strict_artifacts=False, strict_metadata=False)
     model = instantiate_from_config(config).to(device)
     state_dict = torch.load(weights_path, map_location=device, weights_only=False)
-    model.load_state_dict(remap_hf_vit_encoder_keys(state_dict))
+    model.load_state_dict(remap_vit_encoder_keys_for_model(state_dict, model))
     model.eval()
     return model, metadata, 0
 
@@ -204,7 +251,9 @@ __all__ = [
     "load_checkpoint_config_and_metadata",
     "load_world_metadata",
     "load_world_model_from_checkpoint",
+    "remap_custom_vit_encoder_keys_to_hf",
     "remap_hf_vit_encoder_keys",
+    "remap_vit_encoder_keys_for_model",
     "save_world_checkpoint",
     "save_world_metadata",
     "validate_checkpoint_directory",
