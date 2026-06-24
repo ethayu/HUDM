@@ -1,0 +1,50 @@
+output_dir: reports/research/dense_reacher_debug/rollouts/high_fidelity_schedule
+title: Reacher Dense MWM High-Fidelity Schedule Validation
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/reacher_paper_seed42.yaml
+runs:
+  - name: upstream_fixed_finest
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_reacher
+
+  - name: identity_fixed_finest
+    role: retrained_lewm_identity
+    checkpoint: checkpoints_mwm/retrained_lewm_identity_reacher_upstream
+
+  - name: dense_linear_l0_to_l5
+    role: mwm_dense_linear_l0_to_l5
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: coarsest
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_fixed_finest
+    role: mwm_dense_fixed_finest
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: fixed
+        level: finest
+        rollout_level:
+          mode: fixed
+          level: base
+
+  - name: dense_linear_l4_to_l5
+    role: mwm_dense_linear_l4_to_l5
+    checkpoint: checkpoints_mwm/mwm_dense_reacher
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: 4
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base

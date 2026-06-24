@@ -1,0 +1,120 @@
+{
+  "branch": "codex/dense-mwm-reacher-performance-debug",
+  "base": {
+    "ref": "origin/multienv-support",
+    "sha": "2f54b271d7eeb3c77cb0a03b7299d9f9adb8948b"
+  },
+  "python": "/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python",
+  "configs": {
+    "ablation": "configs/research/dense_reacher_planner_ablation.yaml",
+    "recommended_next": "configs/research/dense_reacher_high_fidelity_schedule.yaml",
+    "slurm_script": "scripts/research/research_dense_reacher_debug.sbatch"
+  },
+  "slurm": {
+    "docs_checked": [
+      "https://parcc.upenn.edu/training/slurm/",
+      "https://parcc.upenn.edu/training/software/containers/"
+    ],
+    "job_id": 6791697,
+    "command": "sbatch scripts/research_dense_reacher_debug.sbatch",
+    "partition": "b200-mig90",
+    "state": "COMPLETED",
+    "elapsed": "00:20:11",
+    "exit_code": "0:0",
+    "alloc_tres": "billing=571,cpu=16,gres/gpu:90gb=1,gres/gpu=1,mem=128G,node=1"
+  },
+  "results": [
+    {
+      "name": "upstream_fixed_finest",
+      "role": "upstream_lewm_converted",
+      "success_rate": 86.0,
+      "schedule_level_counts": {
+        "0": 2310
+      }
+    },
+    {
+      "name": "identity_fixed_finest",
+      "role": "retrained_lewm_identity",
+      "success_rate": 60.0,
+      "schedule_level_counts": {
+        "0": 2340
+      }
+    },
+    {
+      "name": "dense_linear_final",
+      "role": "mwm_dense_linear_final",
+      "success_rate": 32.0,
+      "schedule_level_counts": {
+        "0": 273,
+        "1": 546,
+        "2": 546,
+        "3": 546,
+        "4": 546,
+        "5": 273
+      }
+    },
+    {
+      "name": "dense_fixed_finest_final",
+      "role": "mwm_dense_fixed_finest_final",
+      "success_rate": 62.0,
+      "schedule_level_counts": {
+        "5": 2310
+      }
+    },
+    {
+      "name": "dense_fixed_l4_final",
+      "role": "mwm_dense_fixed_l4_final",
+      "success_rate": 58.0,
+      "schedule_level_counts": {
+        "4": 2280
+      }
+    },
+    {
+      "name": "dense_fixed_l3_final",
+      "role": "mwm_dense_fixed_l3_final",
+      "success_rate": 58.0,
+      "schedule_level_counts": {
+        "3": 2400
+      }
+    },
+    {
+      "name": "dense_linear_l4_to_l5_final",
+      "role": "mwm_dense_linear_l4_to_l5_final",
+      "success_rate": 62.0,
+      "schedule_level_counts": {
+        "4": 1170,
+        "5": 1170
+      }
+    },
+    {
+      "name": "dense_fixed_finest_step31000",
+      "role": "mwm_dense_fixed_finest_step31000",
+      "success_rate": 18.0,
+      "schedule_level_counts": {
+        "5": 2790
+      }
+    },
+    {
+      "name": "dense_fixed_finest_interim_epoch1",
+      "role": "mwm_dense_fixed_finest_interim_epoch1",
+      "success_rate": 44.0,
+      "schedule_level_counts": {
+        "5": 2610
+      }
+    }
+  ],
+  "answers": {
+    "dense_fixed_finest_performance": 62.0,
+    "scheduler_drop_cause": "Canonical dense Reacher uses linear CEM from level 0 to level 5. The low-fidelity early CEM iterations shape the action distribution before high-fidelity levels evaluate it; switching to level 4 -> level 5 recovers to 62.0, matching fixed finest.",
+    "checkpoint_selection": "Final epoch 9 fixed-finest performance is 62.0, above interim epoch 1 at 44.0 and step-31k/epoch 2 at 18.0; the inspected final checkpoint is not stale or worse than these earlier checkpoints.",
+    "primary_next_lever": "Use a Reacher-specific high-fidelity planner schedule before changing training length, best-checkpoint export, or loss weighting.",
+    "concrete_next_config": "configs/research/dense_reacher_high_fidelity_schedule.yaml",
+    "exact_next_experiment": "sbatch --export=ALL,MWM_REACHER_CONFIG=configs/research/dense_reacher_high_fidelity_schedule.yaml scripts/research/research_dense_reacher_debug.sbatch"
+  },
+  "caveats": [
+    "The same-run identity control scored 60.0 while an earlier recorded parity artifact scored 86.0, so identity repeatability should be checked.",
+    "The ablation used 50 episodes; the direction is large but should be confirmed with multi-seed or larger-episode validation.",
+    "EGL emitted /dev/dri permission warnings, but the Slurm job completed and benchmark verification passed."
+  ],
+  "raw_artifacts": "reports/research/dense_reacher_debug/rollouts/planner_ablation"
+}
