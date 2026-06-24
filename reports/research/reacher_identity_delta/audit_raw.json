@@ -1,0 +1,1923 @@
+{
+  "artifact_root": "/vast/projects/dineshj/lab/ethanyu/code/HUDM",
+  "checkpoints": {
+    "metadata_comparison": [
+      {
+        "field": "env_id",
+        "identity": "swm/ReacherDMControl-v0",
+        "same": true,
+        "upstream": "swm/ReacherDMControl-v0"
+      },
+      {
+        "field": "restore_spec",
+        "identity": "reacher_qpos_match_qpos_qvel",
+        "same": true,
+        "upstream": "reacher_qpos_match_qpos_qvel"
+      },
+      {
+        "field": "adapter_family",
+        "identity": "lewm",
+        "same": true,
+        "upstream": "lewm"
+      },
+      {
+        "field": "architecture_version",
+        "identity": "lewm_base_adapter_v1",
+        "same": true,
+        "upstream": "lewm_base_adapter_v1"
+      },
+      {
+        "field": "levels",
+        "identity": [
+          192
+        ],
+        "same": true,
+        "upstream": [
+          192
+        ]
+      },
+      {
+        "field": "D",
+        "identity": 192,
+        "same": false,
+        "upstream": null
+      },
+      {
+        "field": "action_dim",
+        "identity": 2,
+        "same": true,
+        "upstream": 2
+      },
+      {
+        "field": "action_block",
+        "identity": 5,
+        "same": true,
+        "upstream": 5
+      },
+      {
+        "field": "action_spec",
+        "identity": {
+          "base_dim": 2,
+          "block": 5,
+          "dim": 10
+        },
+        "same": true,
+        "upstream": {
+          "base_dim": 2,
+          "block": 5,
+          "dim": 10
+        }
+      },
+      {
+        "field": "image_shape",
+        "identity": [
+          224,
+          224
+        ],
+        "same": true,
+        "upstream": [
+          224,
+          224
+        ]
+      },
+      {
+        "field": "preprocessing_spec",
+        "identity": {
+          "image": "imagenet",
+          "image_shape": [
+            224,
+            224
+          ],
+          "layout": "BCHW"
+        },
+        "same": true,
+        "upstream": {
+          "image": "imagenet",
+          "image_shape": [
+            224,
+            224
+          ],
+          "layout": "BCHW"
+        }
+      },
+      {
+        "field": "component_policy",
+        "identity": {
+          "per_level": [
+            "transition"
+          ],
+          "reconstructor": [],
+          "shared": [
+            "latent_producer"
+          ]
+        },
+        "same": true,
+        "upstream": {
+          "per_level": [
+            "transition"
+          ],
+          "reconstructor": [],
+          "shared": [
+            "latent_producer"
+          ]
+        }
+      },
+      {
+        "field": "source_config_sha256",
+        "identity": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+        "same": true,
+        "upstream": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09"
+      },
+      {
+        "field": "training_recipe",
+        "identity": {
+          "action_preprocessing": "standard_scaler",
+          "history_size": 3,
+          "loss_scope": {
+            "reconstructor_contributes_to_encoder_loss": false,
+            "reconstructor_detach_encoder": true,
+            "regularizers": "shared_latent"
+          },
+          "num_preds": 1,
+          "recon_weight": 0.0,
+          "rollout_weight": 1.0,
+          "sigreg_knots": 17,
+          "sigreg_num_proj": 1024,
+          "sigreg_weight": 0.09
+        },
+        "same": false,
+        "upstream": {
+          "history_size": 3,
+          "loss_scope": {
+            "regularizers": "shared_latent"
+          },
+          "num_preds": 1
+        }
+      },
+      {
+        "field": "fresh_init",
+        "identity": true,
+        "same": false,
+        "upstream": false
+      },
+      {
+        "field": "dataset",
+        "identity": {
+          "action_key": "action",
+          "normalized_columns": [
+            "pixels",
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "path": "data/upstream/reacher.lance",
+          "pixels_key": "pixels",
+          "split": "stable_pretraining_random_split"
+        },
+        "same": false,
+        "upstream": {
+          "action_key": "action",
+          "pixels_key": "pixels"
+        }
+      },
+      {
+        "field": "epoch",
+        "identity": 9,
+        "same": false,
+        "upstream": null
+      },
+      {
+        "field": "best_checkpoint",
+        "identity": null,
+        "same": true,
+        "upstream": null
+      },
+      {
+        "field": "last_checkpoint",
+        "identity": "logs/mwm_training/retrained_lewm_identity_reacher_upstream/checkpoints/last.ckpt",
+        "same": false,
+        "upstream": null
+      },
+      {
+        "field": "selected_lightning_checkpoint",
+        "identity": "logs/mwm_training/retrained_lewm_identity_reacher_upstream/checkpoints/last.ckpt",
+        "same": false,
+        "upstream": null
+      }
+    ],
+    "roles": {
+      "retrained_lewm_identity": {
+        "config": {
+          "kwargs": {
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": 10,
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "expected_D": 192,
+            "family": "lewm",
+            "image_shape": [
+              224,
+              224
+            ],
+            "normalize_imagenet": true,
+            "source_config": {
+              "_target_": "stable_worldmodel.wm.lewm.LeWM",
+              "action_encoder": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                "emb_dim": 192,
+                "input_dim": 10
+              },
+              "encoder": {
+                "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                "image_size": 224,
+                "patch_size": 14,
+                "pretrained": false,
+                "size": "tiny",
+                "use_mask_token": false
+              },
+              "pred_proj": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              },
+              "predictor": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                "depth": 6,
+                "dim_head": 64,
+                "dropout": 0.1,
+                "emb_dropout": 0.0,
+                "heads": 16,
+                "hidden_dim": 192,
+                "input_dim": 192,
+                "mlp_dim": 2048,
+                "num_frames": 3,
+                "output_dim": 192
+              },
+              "projector": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              }
+            },
+            "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+            "training_recipe": {
+              "action_preprocessing": "standard_scaler",
+              "history_size": 3,
+              "loss_scope": {
+                "reconstructor_contributes_to_encoder_loss": false,
+                "reconstructor_detach_encoder": true,
+                "regularizers": "shared_latent"
+              },
+              "num_preds": 1,
+              "recon_weight": 0.0,
+              "rollout_weight": 1.0,
+              "sigreg_knots": 17,
+              "sigreg_num_proj": 1024,
+              "sigreg_weight": 0.09
+            }
+          },
+          "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+        },
+        "config_sha256": "adb01498c3eb31caef0110e6a43a77fb13a197f7363b5f141ad3e2e7beff1856",
+        "metadata": {
+          "D": 192,
+          "action_block": 5,
+          "action_dim": 2,
+          "action_high": [
+            1.0,
+            1.0
+          ],
+          "action_low": [
+            -1.0,
+            -1.0
+          ],
+          "action_preprocessing": "standard_scaler",
+          "action_spec": {
+            "base_dim": 2,
+            "block": 5,
+            "dim": 10
+          },
+          "adapter": "lewm",
+          "adapter_family": "lewm",
+          "architecture_version": "lewm_base_adapter_v1",
+          "artifacts": {
+            "config": {
+              "path": "config.json",
+              "sha256": "adb01498c3eb31caef0110e6a43a77fb13a197f7363b5f141ad3e2e7beff1856"
+            },
+            "weights": {
+              "path": "weights.pt",
+              "sha256": "2880c593eccae0c28b0dc704fef7c90f5b5efd9fc6bbc5970c6b4459751eff2e"
+            }
+          },
+          "best_checkpoint": null,
+          "best_model_score": null,
+          "checkpoint_monitor": null,
+          "component_policy": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "dataset": {
+            "action_key": "action",
+            "normalized_columns": [
+              "pixels",
+              "action",
+              "qpos",
+              "qvel",
+              "observation"
+            ],
+            "path": "data/upstream/reacher.lance",
+            "pixels_key": "pixels",
+            "split": "stable_pretraining_random_split"
+          },
+          "dependencies": {
+            "local_repo": {
+              "commit_id": "c09bff78e51798b01620a252ff073b1c3efc732f",
+              "diff_sha256": "209971de5698f4c76c1e6b0665876bd55c3ccdbf596ec0194aa59d725704992c",
+              "dirty": true
+            },
+            "stable-pretraining": {
+              "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+              "version": "0.1.6"
+            },
+            "stable-worldmodel": {
+              "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+              "version": "0.1.0"
+            },
+            "torch": {
+              "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+              "version": "2.11.0"
+            }
+          },
+          "env_id": "swm/ReacherDMControl-v0",
+          "epoch": 9,
+          "export_checkpoint": "last",
+          "format": "mwm_world_v1",
+          "fresh_init": true,
+          "head_architectures": [
+            {
+              "K": 192,
+              "action_encoder_emb_dim": 192,
+              "action_encoder_hidden_dim": null,
+              "action_encoder_out_dim": null,
+              "pred_proj_hidden_dim": 2048,
+              "pred_proj_input_dim": 192,
+              "pred_proj_output_dim": 192,
+              "predictor_dim_head": 64,
+              "predictor_heads": 16,
+              "predictor_hidden_dim": 192,
+              "predictor_input_dim": 192,
+              "predictor_mlp_dim": 2048,
+              "predictor_output_dim": 192
+            }
+          ],
+          "image_shape": [
+            224,
+            224
+          ],
+          "last_checkpoint": "logs/mwm_training/retrained_lewm_identity_reacher_upstream/checkpoints/last.ckpt",
+          "levels": [
+            192
+          ],
+          "loss_scope": {
+            "reconstructor_contributes_to_encoder_loss": false,
+            "reconstructor_detach_encoder": true,
+            "regularizers": "shared_latent"
+          },
+          "model": {
+            "kwargs": {
+              "K": [
+                192
+              ],
+              "action_block": 5,
+              "action_dim": 10,
+              "component_policy": {
+                "per_level": [
+                  "transition"
+                ],
+                "reconstructor": [],
+                "shared": [
+                  "latent_producer"
+                ]
+              },
+              "expected_D": 192,
+              "family": "lewm",
+              "image_shape": [
+                224,
+                224
+              ],
+              "normalize_imagenet": true,
+              "source_config": {
+                "_target_": "stable_worldmodel.wm.lewm.LeWM",
+                "action_encoder": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                  "emb_dim": 192,
+                  "input_dim": 10
+                },
+                "encoder": {
+                  "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                  "image_size": 224,
+                  "patch_size": 14,
+                  "pretrained": false,
+                  "size": "tiny",
+                  "use_mask_token": false
+                },
+                "pred_proj": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                },
+                "predictor": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                  "depth": 6,
+                  "dim_head": 64,
+                  "dropout": 0.1,
+                  "emb_dropout": 0.0,
+                  "heads": 16,
+                  "hidden_dim": 192,
+                  "input_dim": 192,
+                  "mlp_dim": 2048,
+                  "num_frames": 3,
+                  "output_dim": 192
+                },
+                "projector": {
+                  "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                  "hidden_dim": 2048,
+                  "input_dim": 192,
+                  "norm_fn": {
+                    "_partial_": true,
+                    "_target_": "torch.nn.BatchNorm1d"
+                  },
+                  "output_dim": 192
+                }
+              },
+              "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+              "training_recipe": {
+                "action_preprocessing": "standard_scaler",
+                "history_size": 3,
+                "loss_scope": {
+                  "reconstructor_contributes_to_encoder_loss": false,
+                  "reconstructor_detach_encoder": true,
+                  "regularizers": "shared_latent"
+                },
+                "num_preds": 1,
+                "recon_weight": 0.0,
+                "rollout_weight": 1.0,
+                "sigreg_knots": 17,
+                "sigreg_num_proj": 1024,
+                "sigreg_weight": 0.09
+              }
+            },
+            "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+          },
+          "normalize_imagenet": true,
+          "preprocessing_spec": {
+            "image": "imagenet",
+            "image_shape": [
+              224,
+              224
+            ],
+            "layout": "BCHW"
+          },
+          "restore_spec": "reacher_qpos_match_qpos_qvel",
+          "selected_lightning_checkpoint": "logs/mwm_training/retrained_lewm_identity_reacher_upstream/checkpoints/last.ckpt",
+          "source_config": {
+            "_target_": "stable_worldmodel.wm.lewm.LeWM",
+            "action_encoder": {
+              "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+              "emb_dim": 192,
+              "input_dim": 10
+            },
+            "encoder": {
+              "_target_": "stable_pretraining.backbone.utils.vit_hf",
+              "image_size": 224,
+              "patch_size": 14,
+              "pretrained": false,
+              "size": "tiny",
+              "use_mask_token": false
+            },
+            "pred_proj": {
+              "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+              "hidden_dim": 2048,
+              "input_dim": 192,
+              "norm_fn": {
+                "_partial_": true,
+                "_target_": "torch.nn.BatchNorm1d"
+              },
+              "output_dim": 192
+            },
+            "predictor": {
+              "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+              "depth": 6,
+              "dim_head": 64,
+              "dropout": 0.1,
+              "emb_dropout": 0.0,
+              "heads": 16,
+              "hidden_dim": 192,
+              "input_dim": 192,
+              "mlp_dim": 2048,
+              "num_frames": 3,
+              "output_dim": 192
+            },
+            "projector": {
+              "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+              "hidden_dim": 2048,
+              "input_dim": 192,
+              "norm_fn": {
+                "_partial_": true,
+                "_target_": "torch.nn.BatchNorm1d"
+              },
+              "output_dim": 192
+            }
+          },
+          "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+          "training_backend": "stable_worldmodel_lewm",
+          "training_recipe": {
+            "action_preprocessing": "standard_scaler",
+            "history_size": 3,
+            "loss_scope": {
+              "reconstructor_contributes_to_encoder_loss": false,
+              "reconstructor_detach_encoder": true,
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1,
+            "recon_weight": 0.0,
+            "rollout_weight": 1.0,
+            "sigreg_knots": 17,
+            "sigreg_num_proj": 1024,
+            "sigreg_weight": 0.09
+          },
+          "weights": "weights.pt"
+        },
+        "metadata_sha256": "583763c7e36608cceeff4e4974152addd10d068f8e404cf4d358cf6175ac7b58",
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/checkpoints_mwm/retrained_lewm_identity_reacher_upstream"
+      },
+      "upstream_lewm_converted": {
+        "config": {
+          "kwargs": {
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": 10,
+            "component_policy": {
+              "per_level": [
+                "transition"
+              ],
+              "reconstructor": [],
+              "shared": [
+                "latent_producer"
+              ]
+            },
+            "expected_D": 192,
+            "family": "lewm",
+            "image_shape": [
+              224,
+              224
+            ],
+            "normalize_imagenet": true,
+            "source_config": {
+              "_target_": "stable_worldmodel.wm.lewm.LeWM",
+              "action_encoder": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+                "emb_dim": 192,
+                "input_dim": 10
+              },
+              "encoder": {
+                "_target_": "stable_pretraining.backbone.utils.vit_hf",
+                "image_size": 224,
+                "patch_size": 14,
+                "pretrained": false,
+                "size": "tiny",
+                "use_mask_token": false
+              },
+              "pred_proj": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              },
+              "predictor": {
+                "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+                "depth": 6,
+                "dim_head": 64,
+                "dropout": 0.1,
+                "emb_dropout": 0.0,
+                "heads": 16,
+                "hidden_dim": 192,
+                "input_dim": 192,
+                "mlp_dim": 2048,
+                "num_frames": 3,
+                "output_dim": 192
+              },
+              "projector": {
+                "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+                "hidden_dim": 2048,
+                "input_dim": 192,
+                "norm_fn": {
+                  "_partial_": true,
+                  "_target_": "torch.nn.BatchNorm1d"
+                },
+                "output_dim": 192
+              }
+            },
+            "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+            "training_recipe": {
+              "history_size": 3,
+              "loss_scope": {
+                "regularizers": "shared_latent"
+              },
+              "num_preds": 1
+            }
+          },
+          "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+        },
+        "config_sha256": "970139fc4a7a1d12cb2d3c970ed316e9e59d9767b0593c5f03d8b018dc90c911",
+        "metadata": {
+          "action_block": 5,
+          "action_dim": 2,
+          "action_high": [
+            1.0,
+            1.0
+          ],
+          "action_low": [
+            -1.0,
+            -1.0
+          ],
+          "action_preprocessing": "standard_scaler",
+          "action_spec": {
+            "base_dim": 2,
+            "block": 5,
+            "dim": 10
+          },
+          "adapter_family": "lewm",
+          "architecture_version": "lewm_base_adapter_v1",
+          "artifacts": {
+            "config": {
+              "path": "config.json",
+              "sha256": "970139fc4a7a1d12cb2d3c970ed316e9e59d9767b0593c5f03d8b018dc90c911"
+            },
+            "weights": {
+              "path": "weights.pt",
+              "sha256": "351d9c40922fb99bc46017392a372df59c3b26ba4c7af00cb7b6bcd85b6f78fd"
+            }
+          },
+          "component_policy": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "dataset": {
+            "action_key": "action",
+            "pixels_key": "pixels"
+          },
+          "dependencies": {
+            "local_repo": {
+              "commit_id": "c09bff78e51798b01620a252ff073b1c3efc732f",
+              "diff_sha256": "199187e8d909dd7d69c92f480f36d8aeee2546a27033d9a863b34681adbab689",
+              "dirty": true
+            },
+            "stable-pretraining": {
+              "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+              "version": "0.1.6"
+            },
+            "stable-worldmodel": {
+              "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+              "version": "0.1.0"
+            },
+            "torch": {
+              "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+              "version": "2.11.0"
+            }
+          },
+          "env_id": "swm/ReacherDMControl-v0",
+          "format": "mwm_world_v1",
+          "fresh_init": false,
+          "head_architectures": [
+            {
+              "K": 192,
+              "action_encoder_emb_dim": 192,
+              "action_encoder_hidden_dim": null,
+              "action_encoder_out_dim": null,
+              "pred_proj_hidden_dim": 2048,
+              "pred_proj_input_dim": 192,
+              "pred_proj_output_dim": 192,
+              "predictor_dim_head": 64,
+              "predictor_heads": 16,
+              "predictor_hidden_dim": 192,
+              "predictor_input_dim": 192,
+              "predictor_mlp_dim": 2048,
+              "predictor_output_dim": 192
+            }
+          ],
+          "image_shape": [
+            224,
+            224
+          ],
+          "levels": [
+            192
+          ],
+          "loss_scope": {
+            "regularizers": "shared_latent"
+          },
+          "model": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "action_block": 5,
+            "action_dim": 10,
+            "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+          },
+          "preprocessing_spec": {
+            "image": "imagenet",
+            "image_shape": [
+              224,
+              224
+            ],
+            "layout": "BCHW"
+          },
+          "restore_spec": "reacher_qpos_match_qpos_qvel",
+          "role": "upstream_lewm_converted",
+          "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+          "source_history_size": 3,
+          "training_recipe": {
+            "history_size": 3,
+            "loss_scope": {
+              "regularizers": "shared_latent"
+            },
+            "num_preds": 1
+          },
+          "upstream": {
+            "repo": "quentinll/lewm-reacher",
+            "source": "quentinll/lewm-reacher",
+            "source_config": "/vast/home/e/ethanyu/.stable_worldmodel/checkpoints/models--quentinll--lewm-reacher/config.json"
+          },
+          "weights": "weights.pt"
+        },
+        "metadata_sha256": "2d1757f11fa8371fcc9167753ef7daee1c6b851d5a28c341a8911a28a43574b1",
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/checkpoints_mwm/upstream_lewm_reacher"
+      }
+    }
+  },
+  "configs": {
+    "benchmark": {
+      "data": {
+        "env_id": "swm/ReacherDMControl-v0",
+        "eval_config": "configs/eval/paper_reacher.yaml",
+        "manifest": {
+          "config": "configs/manifest/reacher_paper_seed42.yaml"
+        },
+        "output_dir": "rollouts/mwm_paper_parity_reacher",
+        "runs": [
+          {
+            "checkpoint": "checkpoints_mwm/upstream_lewm_reacher",
+            "name": "upstream",
+            "role": "upstream_lewm_converted"
+          },
+          {
+            "checkpoint": "checkpoints_mwm/retrained_lewm_identity_reacher_upstream",
+            "name": "retrained_identity",
+            "role": "retrained_lewm_identity"
+          }
+        ],
+        "seed": 42,
+        "title": "Paper-Parity Le-WM Identity Check on Reacher"
+      },
+      "path": "configs/benchmark/paper_parity_reacher.yaml",
+      "sha256": "b7e4add9f406cd5af109abf38ed94d35986a9d38bbbe0d85a071e4505f32ad6e"
+    },
+    "eval": {
+      "data": {
+        "checkpoint": {
+          "epoch": null,
+          "run_dir": "checkpoints_mwm/upstream_lewm_reacher"
+        },
+        "data": {
+          "action_key": "action",
+          "action_preprocessing": "standard_scaler",
+          "format": "lance",
+          "keys_to_cache": [
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "keys_to_load": [
+            "pixels",
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "path": "data/upstream/reacher.lance",
+          "pixels_key": "pixels",
+          "split_ratio": 0.9
+        },
+        "device": "auto",
+        "env": {
+          "goal_conditioned": true,
+          "kwargs": {
+            "task": "qpos_match"
+          },
+          "max_episode_steps": 100
+        },
+        "env_id": "swm/ReacherDMControl-v0",
+        "eval": {
+          "budget": 50,
+          "episodes": 50,
+          "goal_offset": 25,
+          "manifest_path": null,
+          "num_envs": 50,
+          "output_path": "rollouts/mwm_paper_parity/reacher_upstream/eval.json",
+          "sampling": "stable_worldmodel",
+          "save_video": false,
+          "seed": 42,
+          "video_path": "rollouts/mwm_paper_parity/reacher_videos",
+          "write_manifest_path": "rollouts/mwm_paper_parity/reacher_seed42_manifest.json"
+        },
+        "planner": {
+          "action_block": 5,
+          "batch_size": 1,
+          "clamp_actions": false,
+          "elite_frac": 0.1,
+          "horizon": 5,
+          "init_std": 1.0,
+          "n_iter": 30,
+          "pop_size": 300,
+          "receding_horizon": 5,
+          "scheduler": {
+            "level": "finest",
+            "policy": "fixed",
+            "rollout_level": {
+              "level": "base",
+              "mode": "fixed"
+            }
+          },
+          "seed": 42,
+          "std_unbiased": true,
+          "topk": 30,
+          "warm_start": true
+        },
+        "restore": {
+          "import_path": "mwm.swm.restore.reacher_qpos_match_restore_spec"
+        }
+      },
+      "path": "configs/eval/paper_reacher.yaml",
+      "sha256": "359049c5c7be85f2a844056a7b178bbb307bc1f295e8d889d038cfaa9a6d2d18"
+    },
+    "research_benchmark": {
+      "data": {
+        "env_id": "swm/ReacherDMControl-v0",
+        "eval_config": "configs/research/reacher_identity_delta/reacher_eval.yaml",
+        "manifest": {
+          "dir": "reports/research/reacher_identity_delta/seed_sweep/manifests",
+          "group": "reacher_identity_delta"
+        },
+        "output_dir": "reports/research/reacher_identity_delta/seed_sweep/reacher_seed42",
+        "runs": [
+          {
+            "checkpoint": "${oc.env:MWM_ARTIFACT_ROOT}/checkpoints_mwm/upstream_lewm_reacher",
+            "eval": {
+              "episodes": 200,
+              "num_envs": 50
+            },
+            "name": "upstream",
+            "role": "upstream_lewm_converted"
+          },
+          {
+            "checkpoint": "${oc.env:MWM_ARTIFACT_ROOT}/checkpoints_mwm/retrained_lewm_identity_reacher_upstream",
+            "eval": {
+              "episodes": 200,
+              "num_envs": 50
+            },
+            "name": "retrained_identity",
+            "role": "retrained_lewm_identity"
+          }
+        ],
+        "seed": 42,
+        "title": "Reacher Identity-Upstream Delta Seed Sweep"
+      },
+      "path": "configs/research/reacher_identity_delta/reacher_benchmark_seed42.yaml",
+      "sha256": "4be58456b7488c021c2c0bf1de52dfeeea9188864f7ab3cc865d208012528e4e"
+    },
+    "research_eval": {
+      "data": {
+        "checkpoint": {
+          "epoch": null,
+          "run_dir": "${oc.env:MWM_ARTIFACT_ROOT}/checkpoints_mwm/upstream_lewm_reacher"
+        },
+        "data": {
+          "action_key": "action",
+          "action_preprocessing": "standard_scaler",
+          "format": "lance",
+          "keys_to_cache": [
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "keys_to_load": [
+            "pixels",
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "path": "${oc.env:MWM_ARTIFACT_ROOT}/data/upstream/reacher.lance",
+          "pixels_key": "pixels",
+          "split_ratio": 0.9
+        },
+        "device": "auto",
+        "env": {
+          "goal_conditioned": true,
+          "kwargs": {
+            "task": "qpos_match"
+          },
+          "max_episode_steps": 100
+        },
+        "env_id": "swm/ReacherDMControl-v0",
+        "eval": {
+          "budget": 50,
+          "episodes": 200,
+          "goal_offset": 25,
+          "manifest_path": null,
+          "num_envs": 50,
+          "output_path": "reports/research/reacher_identity_delta/seed_sweep/reacher/eval.json",
+          "sampling": "stable_worldmodel",
+          "save_video": false,
+          "seed": 42,
+          "video_path": "reports/research/reacher_identity_delta/seed_sweep/reacher/videos",
+          "write_manifest_path": "reports/research/reacher_identity_delta/seed_sweep/manifests/reacher_seed42.json"
+        },
+        "planner": {
+          "action_block": 5,
+          "batch_size": 1,
+          "clamp_actions": false,
+          "elite_frac": 0.1,
+          "horizon": 5,
+          "init_std": 1.0,
+          "n_iter": 30,
+          "pop_size": 300,
+          "receding_horizon": 5,
+          "scheduler": {
+            "level": "finest",
+            "policy": "fixed",
+            "rollout_level": {
+              "level": "base",
+              "mode": "fixed"
+            }
+          },
+          "seed": 42,
+          "std_unbiased": true,
+          "topk": 30,
+          "warm_start": true
+        },
+        "restore": {
+          "import_path": "mwm.swm.restore.reacher_qpos_match_restore_spec"
+        }
+      },
+      "path": "configs/research/reacher_identity_delta/reacher_eval.yaml",
+      "sha256": "1a0c3543ef2ad7aa495ce22a1618df84a8f51dd34504cd1b76ca5edb90d28ce5"
+    },
+    "train": {
+      "data": {
+        "base": {
+          "checkpoint": "models--quentinll--lewm-reacher",
+          "family": "lewm"
+        },
+        "data": {
+          "action_key": "action",
+          "format": "lance",
+          "frameskip": 5,
+          "keys_to_cache": [
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "keys_to_load": [
+            "pixels",
+            "action",
+            "qpos",
+            "qvel",
+            "observation"
+          ],
+          "path": "data/upstream/reacher.lance",
+          "pixels_key": "pixels",
+          "split_ratio": 0.9
+        },
+        "env_id": "swm/ReacherDMControl-v0",
+        "loss": {
+          "history_size": 3,
+          "num_preds": 1,
+          "recon_weight": 0.0,
+          "rollout_weight": 1.0,
+          "sigreg_knots": 17,
+          "sigreg_num_proj": 1024,
+          "sigreg_weight": 0.09
+        },
+        "model": {
+          "D": 192,
+          "K": [
+            192
+          ],
+          "action_block": 5,
+          "action_dim": "auto",
+          "history_size": 3,
+          "image_shape": "auto",
+          "num_preds": 1
+        },
+        "mwm": {
+          "component_policy": {
+            "per_level": [
+              "transition"
+            ],
+            "reconstructor": [],
+            "shared": [
+              "latent_producer"
+            ]
+          },
+          "loss_terms": {
+            "reconstructor_contributes_to_encoder_loss": false,
+            "reconstructor_detach_encoder": true,
+            "regularizers": "shared_latent"
+          }
+        },
+        "optim": {
+          "lr": 5e-05,
+          "weight_decay": 0.001
+        },
+        "restore": {
+          "import_path": "mwm.swm.restore.reacher_qpos_match_restore_spec"
+        },
+        "schedule": {
+          "max_epochs": 10
+        },
+        "seed": 3072,
+        "train": {
+          "backend": "stable_worldmodel_lewm",
+          "batch_size": 128,
+          "checkpoint_dir": "checkpoints_mwm",
+          "checkpoint_every_n_train_steps": 1000,
+          "clean_trainer_root": true,
+          "drop_last": true,
+          "gradient_clip_val": 1.0,
+          "horizon": 4,
+          "limit_train_batches": 1.0,
+          "limit_val_batches": 1.0,
+          "matmul_precision": "high",
+          "no_cuda": false,
+          "num_workers": 6,
+          "pin_memory": true,
+          "precision": "bf16",
+          "prefetch_factor": 3,
+          "run_name": "retrained_lewm_identity_reacher_upstream",
+          "slurm_auto_requeue": false,
+          "timestamp_run_dir": false
+        }
+      },
+      "path": "configs/train/mwm_lewm_reacher_upstream.yaml",
+      "sha256": "9883a0d4b8d076f7a694ce4eb6a5c7e956b44d769c56bfb8603297d2bfae80ee"
+    }
+  },
+  "dataset": {
+    "columns": [
+      {
+        "name": "episode_idx",
+        "type": "int32"
+      },
+      {
+        "name": "step_idx",
+        "type": "int32"
+      },
+      {
+        "name": "pixels",
+        "type": "binary"
+      },
+      {
+        "name": "action",
+        "type": "fixed_size_list<item: float>[2]"
+      },
+      {
+        "name": "qpos",
+        "type": "fixed_size_list<item: float>[2]"
+      },
+      {
+        "name": "qvel",
+        "type": "fixed_size_list<item: float>[2]"
+      },
+      {
+        "name": "observation",
+        "type": "fixed_size_list<item: float>[6]"
+      }
+    ],
+    "episode_lengths": {
+      "episode_count": 10000,
+      "length_max": 201,
+      "length_mean": 201.0,
+      "length_min": 201,
+      "length_quantiles": {
+        "0.0": 201.0,
+        "0.05": 201.0,
+        "0.25": 201.0,
+        "0.5": 201.0,
+        "0.75": 201.0,
+        "0.95": 201.0,
+        "1.0": 201.0
+      },
+      "length_std": 0.0
+    },
+    "metadata_path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/data/upstream/reacher.lance.metadata.json",
+    "numeric_columns": {
+      "action": {
+        "max": [
+          NaN,
+          NaN
+        ],
+        "mean": [
+          NaN,
+          NaN
+        ],
+        "min": [
+          NaN,
+          NaN
+        ],
+        "quantiles": {
+          "0.0": [
+            NaN,
+            NaN
+          ],
+          "0.05": [
+            NaN,
+            NaN
+          ],
+          "0.25": [
+            NaN,
+            NaN
+          ],
+          "0.5": [
+            NaN,
+            NaN
+          ],
+          "0.75": [
+            NaN,
+            NaN
+          ],
+          "0.95": [
+            NaN,
+            NaN
+          ],
+          "1.0": [
+            NaN,
+            NaN
+          ]
+        },
+        "shape": [
+          2010000,
+          2
+        ],
+        "std_population": [
+          NaN,
+          NaN
+        ]
+      },
+      "observation": {
+        "max": [
+          7.913035869598389,
+          2.943047046661377,
+          0.4370807707309723,
+          0.43495604395866394,
+          5.034326553344727,
+          6.296951770782471
+        ],
+        "mean": [
+          -0.030111154113015525,
+          -0.022637741979314247,
+          0.0019662699541190512,
+          0.0005311046291058955,
+          0.00011339037114820117,
+          -0.000595641985689362
+        ],
+        "min": [
+          -8.201593399047852,
+          -2.9473536014556885,
+          -0.4383401572704315,
+          -0.43653813004493713,
+          -4.772832870483398,
+          -6.141103267669678
+        ],
+        "quantiles": {
+          "0.0": [
+            -8.201593399047852,
+            -2.9473536014556885,
+            -0.4383401572704315,
+            -0.43653813004493713,
+            -4.772832870483398,
+            -6.141103267669678
+          ],
+          "0.05": [
+            -3.4032134532928464,
+            -2.5590952396392823,
+            -0.2609000772237778,
+            -0.26252097338438035,
+            -2.2357101678848266,
+            -3.822238993644714
+          ],
+          "0.25": [
+            -1.683083951473236,
+            -1.3859493136405945,
+            -0.11156971380114555,
+            -0.11362867429852486,
+            -0.9571430385112762,
+            -1.9965751469135284
+          ],
+          "0.5": [
+            -0.05203610844910145,
+            -0.02913428656756878,
+            0.003456272534094751,
+            0.0018546990468166769,
+            0.0,
+            0.0
+          ],
+          "0.75": [
+            1.6220496594905853,
+            1.331721842288971,
+            0.11559785529971123,
+            0.11432724259793758,
+            0.95553158223629,
+            1.9965238273143768
+          ],
+          "0.95": [
+            3.3903516530990596,
+            2.5368117690086356,
+            0.26575133949518204,
+            0.2630407527089118,
+            2.2371307134628284,
+            3.820167672634124
+          ],
+          "1.0": [
+            7.913035869598389,
+            2.943047046661377,
+            0.4370807707309723,
+            0.43495604395866394,
+            5.034326553344727,
+            6.296951770782471
+          ]
+        },
+        "shape": [
+          2010000,
+          6
+        ],
+        "std_population": [
+          2.1496126644396263,
+          1.6088218927833922,
+          0.1582158185483883,
+          0.1583700403871924,
+          1.3561863008554336,
+          2.4241374671929012
+        ]
+      },
+      "qpos": {
+        "max": [
+          7.913035869598389,
+          2.943047046661377
+        ],
+        "mean": [
+          -0.030111154113015525,
+          -0.022637741979314247
+        ],
+        "min": [
+          -8.201593399047852,
+          -2.9473536014556885
+        ],
+        "quantiles": {
+          "0.0": [
+            -8.201593399047852,
+            -2.9473536014556885
+          ],
+          "0.05": [
+            -3.4032134532928464,
+            -2.5590952396392823
+          ],
+          "0.25": [
+            -1.683083951473236,
+            -1.3859493136405945
+          ],
+          "0.5": [
+            -0.05203610844910145,
+            -0.02913428656756878
+          ],
+          "0.75": [
+            1.6220496594905853,
+            1.331721842288971
+          ],
+          "0.95": [
+            3.3903516530990596,
+            2.5368117690086356
+          ],
+          "1.0": [
+            7.913035869598389,
+            2.943047046661377
+          ]
+        },
+        "shape": [
+          2010000,
+          2
+        ],
+        "std_population": [
+          2.1496126644396263,
+          1.6088218927833922
+        ]
+      },
+      "qvel": {
+        "max": [
+          5.034326553344727,
+          6.296951770782471
+        ],
+        "mean": [
+          0.00011339037114820117,
+          -0.000595641985689362
+        ],
+        "min": [
+          -4.772832870483398,
+          -6.141103267669678
+        ],
+        "quantiles": {
+          "0.0": [
+            -4.772832870483398,
+            -6.141103267669678
+          ],
+          "0.05": [
+            -2.2357101678848266,
+            -3.822238993644714
+          ],
+          "0.25": [
+            -0.9571430385112762,
+            -1.9965751469135284
+          ],
+          "0.5": [
+            0.0,
+            0.0
+          ],
+          "0.75": [
+            0.95553158223629,
+            1.9965238273143768
+          ],
+          "0.95": [
+            2.2371307134628284,
+            3.820167672634124
+          ],
+          "1.0": [
+            5.034326553344727,
+            6.296951770782471
+          ]
+        },
+        "shape": [
+          2010000,
+          2
+        ],
+        "std_population": [
+          1.3561863008554336,
+          2.4241374671929012
+        ]
+      }
+    },
+    "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/data/upstream/reacher.lance",
+    "row_count": 2010000,
+    "sidecar_metadata": {
+      "action_dim": 2,
+      "action_high": [
+        1.0,
+        1.0
+      ],
+      "action_low": [
+        -1.0,
+        -1.0
+      ],
+      "dataset": {
+        "action_key": "action",
+        "pixels_key": "pixels"
+      },
+      "env_id": "swm/ReacherDMControl-v0",
+      "format": "swm_lance",
+      "image_shape": [
+        224,
+        224
+      ],
+      "restore_spec": "reacher_qpos_match_qpos_qvel",
+      "source": {
+        "artifact": "reacher.lance",
+        "format": "lance",
+        "hf_dataset": "quentinll/lewm-reacher",
+        "standard": "paper_parity"
+      }
+    }
+  },
+  "git": {
+    "base_origin_multienv_support": "2f54b271d7eeb3c77cb0a03b7299d9f9adb8948b",
+    "branch": "codex/reacher-identity-upstream-delta",
+    "head": "2f54b271d7eeb3c77cb0a03b7299d9f9adb8948b",
+    "status_short": "A  configs/research/reacher_identity_delta/reacher_benchmark_seed42.yaml\nA  configs/research/reacher_identity_delta/reacher_eval.yaml\nA  reports/research/reacher_identity_delta/audit_raw.json\nA  reports/research/reacher_identity_delta/report.md\nA  reports/research/reacher_identity_delta/summary.json\nAM scripts/research/research_reacher_identity_delta_audit.py\nA  scripts/research/research_reacher_identity_seed_sweep.sh\nA  scripts/research/slurm_research_reacher_identity_seed_sweep.sbatch"
+  },
+  "historical_benchmark_log": {
+    "job_id": "6784362",
+    "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_identity_parity_6784362.out"
+  },
+  "repo_root": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/.worktrees/codex-reacher-identity-upstream-delta",
+  "restore": {
+    "eval_callables": [
+      {
+        "args": {
+          "qpos": {
+            "in_dataset": true,
+            "value": "qpos"
+          },
+          "qvel": {
+            "in_dataset": true,
+            "value": "qvel"
+          }
+        },
+        "method": "set_state"
+      },
+      {
+        "args": {
+          "target_qpos": {
+            "in_dataset": true,
+            "value": "goal_qpos"
+          }
+        },
+        "method": "set_target_qpos"
+      }
+    ],
+    "eval_callables_spec_id": "reacher_qpos_match_qpos_qvel",
+    "import_path": "mwm.swm.restore.reacher_qpos_match_restore_spec",
+    "missing_column_checks": {
+      "qpos": "Restore spec 'reacher_qpos_match_qpos_qvel' requires dataset columns ['qpos']. Collect the dataset with the matching SWM restore wrapper or provide a restore adapter.",
+      "qvel": "Restore spec 'reacher_qpos_match_qpos_qvel' requires dataset columns ['qvel']. Collect the dataset with the matching SWM restore wrapper or provide a restore adapter."
+    },
+    "required_columns": [
+      "qpos",
+      "qvel"
+    ],
+    "spec_id": "reacher_qpos_match_qpos_qvel"
+  },
+  "rollout": {
+    "delta_count": 3,
+    "delta_pp": 5.999999999999995,
+    "episode_granularity_pp": 2.0,
+    "episodes": 50,
+    "evals": {
+      "retrained_identity": {
+        "failure_indices": [
+          7,
+          18,
+          25,
+          27,
+          31,
+          33,
+          48
+        ],
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_reacher/001_retrained_identity/eval.json",
+        "payload": {
+          "checkpoint_epoch": 0,
+          "checkpoint_run_dir": "checkpoints_mwm/retrained_lewm_identity_reacher_upstream",
+          "dataset": "data/upstream/reacher.lance",
+          "dataset_metadata": {
+            "action_key": "action",
+            "column_names": [
+              "pixels",
+              "action",
+              "qpos",
+              "qvel",
+              "observation"
+            ],
+            "path": "data/upstream/reacher.lance",
+            "pixels_key": "pixels",
+            "sidecar": {
+              "action_dim": 2,
+              "action_high": [
+                1.0,
+                1.0
+              ],
+              "action_low": [
+                -1.0,
+                -1.0
+              ],
+              "dataset": {
+                "action_key": "action",
+                "pixels_key": "pixels"
+              },
+              "env_id": "swm/ReacherDMControl-v0",
+              "format": "swm_lance",
+              "image_shape": [
+                224,
+                224
+              ],
+              "restore_spec": "reacher_qpos_match_qpos_qvel",
+              "source": {
+                "artifact": "reacher.lance",
+                "format": "lance",
+                "hf_dataset": "quentinll/lewm-reacher",
+                "standard": "paper_parity"
+              }
+            },
+            "split_ratio": 1.0
+          },
+          "env_id": "swm/ReacherDMControl-v0",
+          "episodes": 50,
+          "eval_budget": 50,
+          "goal_offset": 25,
+          "manifest": {
+            "manifest_sha256": "04caca1fe5c2387a102291e617b7f1aaac0a2d31aed4008947010596eee59cb5",
+            "path": "rollouts/manifests/reacher_paper_seed42.json",
+            "sha256": "7069e71542035990340226345861c3d007b0d85c6e0d6617680dbc5b4199ffa6"
+          },
+          "model_accounting": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "num_levels": 1,
+            "parameters": 18034478
+          },
+          "planning_summary": {
+            "actions_recorded": 50,
+            "candidate_action_values": 35100000,
+            "cem_cost_calls": 2340,
+            "mean_plan_time_sec": 19.824529223144054,
+            "mean_policy_time_sec": 0.8086103031970561,
+            "replans": 2,
+            "total_bits_used_estimate": 21565440000,
+            "total_plan_time_sec": 39.64905844628811,
+            "total_policy_time_sec": 40.4305151598528
+          },
+          "restore_spec": "reacher_qpos_match_qpos_qvel",
+          "role": "retrained_lewm_identity",
+          "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+          "seed": 42
+        },
+        "success_count": 43,
+        "successes": [
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true
+        ]
+      },
+      "upstream": {
+        "failure_indices": [
+          1,
+          6,
+          12,
+          16,
+          22,
+          26,
+          27,
+          41,
+          46,
+          48
+        ],
+        "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_reacher/000_upstream/eval.json",
+        "payload": {
+          "checkpoint_epoch": 0,
+          "checkpoint_run_dir": "checkpoints_mwm/upstream_lewm_reacher",
+          "dataset": "data/upstream/reacher.lance",
+          "dataset_metadata": {
+            "action_key": "action",
+            "column_names": [
+              "pixels",
+              "action",
+              "qpos",
+              "qvel",
+              "observation"
+            ],
+            "path": "data/upstream/reacher.lance",
+            "pixels_key": "pixels",
+            "sidecar": {
+              "action_dim": 2,
+              "action_high": [
+                1.0,
+                1.0
+              ],
+              "action_low": [
+                -1.0,
+                -1.0
+              ],
+              "dataset": {
+                "action_key": "action",
+                "pixels_key": "pixels"
+              },
+              "env_id": "swm/ReacherDMControl-v0",
+              "format": "swm_lance",
+              "image_shape": [
+                224,
+                224
+              ],
+              "restore_spec": "reacher_qpos_match_qpos_qvel",
+              "source": {
+                "artifact": "reacher.lance",
+                "format": "lance",
+                "hf_dataset": "quentinll/lewm-reacher",
+                "standard": "paper_parity"
+              }
+            },
+            "split_ratio": 1.0
+          },
+          "env_id": "swm/ReacherDMControl-v0",
+          "episodes": 50,
+          "eval_budget": 50,
+          "goal_offset": 25,
+          "manifest": {
+            "manifest_sha256": "04caca1fe5c2387a102291e617b7f1aaac0a2d31aed4008947010596eee59cb5",
+            "path": "rollouts/manifests/reacher_paper_seed42.json",
+            "sha256": "7069e71542035990340226345861c3d007b0d85c6e0d6617680dbc5b4199ffa6"
+          },
+          "model_accounting": {
+            "D": 192,
+            "K": [
+              192
+            ],
+            "num_levels": 1,
+            "parameters": 18034478
+          },
+          "planning_summary": {
+            "actions_recorded": 50,
+            "candidate_action_values": 34650000,
+            "cem_cost_calls": 2310,
+            "mean_plan_time_sec": 19.724881866481155,
+            "mean_policy_time_sec": 0.7977159158606082,
+            "replans": 2,
+            "total_bits_used_estimate": 21288960000,
+            "total_plan_time_sec": 39.44976373296231,
+            "total_policy_time_sec": 39.88579579303041
+          },
+          "restore_spec": "reacher_qpos_match_qpos_qvel",
+          "role": "upstream_lewm_converted",
+          "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+          "seed": 42
+        },
+        "success_count": 40,
+        "successes": [
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          false,
+          false,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          true,
+          true,
+          true,
+          false,
+          true,
+          false,
+          true
+        ]
+      }
+    },
+    "identity_better_discordant_count": 8,
+    "identity_only_failure_indices": [
+      7,
+      18,
+      25,
+      31,
+      33
+    ],
+    "identity_success_count": 43,
+    "independent_diff_se_pp": 7.488658090739622,
+    "manifest": {
+      "manifest_sha256": "04caca1fe5c2387a102291e617b7f1aaac0a2d31aed4008947010596eee59cb5",
+      "path": "rollouts/manifests/reacher_paper_seed42.json",
+      "sha256": "7069e71542035990340226345861c3d007b0d85c6e0d6617680dbc5b4199ffa6"
+    },
+    "paired_sign_test_p": 0.5810546875,
+    "shared_failure_count": 2,
+    "shared_failure_indices": [
+      27,
+      48
+    ],
+    "shared_success_count": 35,
+    "summary_csv": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/rollouts/mwm_paper_parity_reacher/summary.csv",
+    "summary_rows": [
+      {
+        "bits_used_total": "21288960000",
+        "checkpoint_epoch": "0",
+        "checkpoint_run_dir": "checkpoints_mwm/upstream_lewm_reacher",
+        "config_sha256": "4537f6a0cda3708d1fb4da1b13eac3cfd11f7683431ffa9a819e31b33414c4d2",
+        "env_id": "swm/ReacherDMControl-v0",
+        "episodes": "50",
+        "goal_offset": "25",
+        "manifest_file_sha256": "7069e71542035990340226345861c3d007b0d85c6e0d6617680dbc5b4199ffa6",
+        "manifest_sha256": "04caca1fe5c2387a102291e617b7f1aaac0a2d31aed4008947010596eee59cb5",
+        "name": "upstream",
+        "output_json": "rollouts/mwm_paper_parity_reacher/000_upstream/eval.json",
+        "plan_time_total_sec": "39.44976373296231",
+        "plans": "2",
+        "role": "upstream_lewm_converted",
+        "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+        "schedule_level_counts": "{\"0\": 2310}",
+        "seed": "42",
+        "steps": "50",
+        "success_rate": "80.0",
+        "wall_time_sec": "110.96020029811189"
+      },
+      {
+        "bits_used_total": "21565440000",
+        "checkpoint_epoch": "0",
+        "checkpoint_run_dir": "checkpoints_mwm/retrained_lewm_identity_reacher_upstream",
+        "config_sha256": "128e9fa88f405d851c148478d3db78e45f6f502a18fd300f53ae1514495f5ed5",
+        "env_id": "swm/ReacherDMControl-v0",
+        "episodes": "50",
+        "goal_offset": "25",
+        "manifest_file_sha256": "7069e71542035990340226345861c3d007b0d85c6e0d6617680dbc5b4199ffa6",
+        "manifest_sha256": "04caca1fe5c2387a102291e617b7f1aaac0a2d31aed4008947010596eee59cb5",
+        "name": "retrained_identity",
+        "output_json": "rollouts/mwm_paper_parity_reacher/001_retrained_identity/eval.json",
+        "plan_time_total_sec": "39.64905844628811",
+        "plans": "2",
+        "role": "retrained_lewm_identity",
+        "schedule": "{'policy': 'fixed', 'level': 'finest', 'rollout_level': {'mode': 'fixed', 'level': 'base'}}",
+        "schedule_level_counts": "{\"0\": 2340}",
+        "seed": "42",
+        "steps": "50",
+        "success_rate": "86.0",
+        "wall_time_sec": "85.8399426122196"
+      }
+    ],
+    "upstream_better_discordant_count": 5,
+    "upstream_only_failure_indices": [
+      1,
+      6,
+      12,
+      16,
+      22,
+      26,
+      41,
+      46
+    ],
+    "upstream_success_count": 40
+  },
+  "training": {
+    "exact_training_complete": true,
+    "exists": true,
+    "job_id": "6782935",
+    "max_epochs_reached": true,
+    "metric_count": {
+      "fit/loss": 10,
+      "fit/pred_loss": 10,
+      "fit/pred_loss_l0": 10,
+      "fit/rollout_loss": 10,
+      "fit/sigreg_loss": 10,
+      "validate/loss": 11,
+      "validate/loss_epoch": 11,
+      "validate/pred_loss": 11,
+      "validate/pred_loss_epoch": 11,
+      "validate/pred_loss_l0": 11,
+      "validate/pred_loss_l0_epoch": 11,
+      "validate/rollout_loss": 11,
+      "validate/rollout_loss_epoch": 11,
+      "validate/sigreg_loss": 11,
+      "validate/sigreg_loss_epoch": 11
+    },
+    "metric_last": {
+      "fit/loss": 0.13628491759300232,
+      "fit/pred_loss": 0.021538827568292618,
+      "fit/pred_loss_l0": 0.021538827568292618,
+      "fit/rollout_loss": 0.021538827568292618,
+      "fit/sigreg_loss": 1.2734375,
+      "validate/loss": 0.17071571946144104,
+      "validate/loss_epoch": 0.17071571946144104,
+      "validate/pred_loss": 0.024026503786444664,
+      "validate/pred_loss_epoch": 0.024026503786444664,
+      "validate/pred_loss_l0": 0.024026503786444664,
+      "validate/pred_loss_l0_epoch": 0.024026503786444664,
+      "validate/rollout_loss": 0.024026503786444664,
+      "validate/rollout_loss_epoch": 0.024026503786444664,
+      "validate/sigreg_loss": 1.6298165321350098,
+      "validate/sigreg_loss_epoch": 1.6298165321350098
+    },
+    "path": "/vast/projects/dineshj/lab/ethanyu/code/HUDM/logs/mwm_train_reacher_identity_6782935.out"
+  }
+}
