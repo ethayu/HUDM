@@ -22,6 +22,14 @@ def base_dataset(dataset: Any) -> Any:
     return getattr(dataset, "dataset", dataset)
 
 
+def dataset_available_columns(dataset: Any) -> list[str]:
+    base = base_dataset(dataset)
+    schema_names = getattr(base, "_schema_names", None)
+    if schema_names:
+        return [str(col) for col in schema_names if str(col) not in {"episode_idx", "step_idx"}]
+    return [str(col) for col in getattr(base, "column_names", [])]
+
+
 def close_dataset_handles(*datasets: Any) -> None:
     seen: set[int] = set()
     for dataset in datasets:
@@ -76,7 +84,7 @@ def prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[str
 
     tr_ds, va_ds, base_ds = load_lewm_base_adapter_train_valid_datasets(cfg)
     restore_import_path = None if cfg.get("restore", None) is None else cfg.restore.get("import_path", None)
-    restore_spec = validate_restore_columns(str(cfg.env_id), base_dataset(base_ds).column_names, import_path=restore_import_path)
+    restore_spec = validate_restore_columns(str(cfg.env_id), dataset_available_columns(base_ds), import_path=restore_import_path)
     model_cfg = resolve_lewm_base_adapter_model_cfg(cfg, base_dataset(base_ds))
     dataset_meta = dataset_metadata(str(cfg.data.path))
     base_action_dim = int(dataset_meta.get("action_dim", base_dataset(base_ds).get_dim(str(cfg.data.action_key))))
@@ -114,6 +122,7 @@ def prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[str
 __all__ = [
     "base_dataset",
     "close_dataset_handles",
+    "dataset_available_columns",
     "dataset_metadata",
     "load_lewm_base_adapter_train_valid_datasets",
     "prepare_lewm_base_adapter_context",

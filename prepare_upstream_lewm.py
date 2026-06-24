@@ -48,6 +48,18 @@ DEFAULTS = {
             "action_low": [-1.0, -1.0],
             "action_high": [1.0, 1.0],
         },
+        {
+            "name": "upstream_lewm_ogb_cube",
+            "repo": "quentinll/lewm-cube",
+            "env_id": "swm/OGBCube-v0",
+            "restore_spec": "ogbench_cube_single_qpos_qvel_target_pose",
+            "image_shape": [224, 224],
+            "action_dim": 25,
+            "base_action_dim": 5,
+            "action_block": 5,
+            "action_low": [-1.0, -1.0, -1.0, -1.0, -1.0],
+            "action_high": [1.0, 1.0, 1.0, 1.0, 1.0],
+        },
     ],
 }
 
