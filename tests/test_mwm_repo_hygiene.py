@@ -114,6 +114,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         expected_levels = {
             "mwm_lewm_pusht.yaml": [192],
             "mwm_lewm_reacher_upstream.yaml": [192],
+            "mwm_lewm_ogb_cube_upstream.yaml": [192],
             "mwm_lewm_tworoom.yaml": [192],
             "mwm_lewm_pusht_upstream.yaml": [192],
             "mwm_lewm_tworoom_upstream.yaml": [192],
@@ -121,6 +122,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             "mwm_scheduled_tworoom.yaml": [48, 96, 144],
             "mwm_dense_pusht.yaml": [6, 12, 48, 96, 144, 192],
             "mwm_dense_reacher.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_dense_ogb_cube.yaml": [6, 12, 48, 96, 144, 192],
             "mwm_dense_tworoom.yaml": [6, 12, 48, 96, 144, 192],
         }
         for name, levels in expected_levels.items():
@@ -144,7 +146,10 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
             self.assertEqual(set(cfg["schedule"]), {"max_epochs"}, name)
             self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
-            if name.startswith(("mwm_scheduled_", "mwm_dense_")) or name == "mwm_lewm_reacher_upstream.yaml":
+            if name.startswith(("mwm_scheduled_", "mwm_dense_")) or name in {
+                "mwm_lewm_reacher_upstream.yaml",
+                "mwm_lewm_ogb_cube_upstream.yaml",
+            }:
                 self.assertTrue(str(cfg["data"]["path"]).startswith("data/upstream/"), name)
 
             if "reacher" in name:
@@ -154,6 +159,16 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"], name)
                 self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "qpos", "qvel", "observation"], name)
                 self.assertEqual(cfg["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec", name)
+                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
+                self.assertEqual(cfg["loss"]["sigreg_knots"], 17, name)
+                self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
+            if "ogb_cube" in name:
+                self.assertEqual(cfg["env_id"], "swm/OGBCube-v0", name)
+                self.assertEqual(cfg["base"]["checkpoint"], "models--quentinll--lewm-cube", name)
+                self.assertEqual(cfg["data"]["path"], "data/upstream/ogb_cube_single_expert.lance", name)
+                self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "observation"], name)
+                self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "observation"], name)
+                self.assertEqual(cfg["restore"]["import_path"], "mwm.ogbench.restore.ogbench_cube_restore_spec", name)
                 self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
                 self.assertEqual(cfg["loss"]["sigreg_knots"], 17, name)
                 self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
@@ -186,7 +201,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertFalse(forbidden_model_keys & set(model), path)
 
     def test_paper_parity_eval_configs_follow_base_inference_contract(self) -> None:
-        for name in ("paper_pusht.yaml", "paper_reacher.yaml", "paper_tworoom.yaml"):
+        for name in ("paper_pusht.yaml", "paper_reacher.yaml", "paper_tworoom.yaml", "paper_ogb_cube.yaml"):
             cfg = yaml.safe_load((ROOT / "configs" / "eval" / name).read_text(encoding="utf-8"))
 
             self.assertEqual(cfg["data"]["format"], "lance", name)
@@ -215,12 +230,39 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(reacher_eval["env"]["kwargs"], {"task": "qpos_match"})
         self.assertEqual(reacher_eval["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec")
 
+        cube_eval = yaml.safe_load((ROOT / "configs" / "eval" / "paper_ogb_cube.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(cube_eval["env_id"], "swm/OGBCube-v0")
+        self.assertEqual(cube_eval["checkpoint"]["run_dir"], "checkpoints_mwm/upstream_lewm_ogb_cube")
+        self.assertEqual(cube_eval["data"]["path"], "data/upstream/ogb_cube_single_expert.lance")
+        self.assertEqual(
+            cube_eval["data"]["keys_to_load"],
+            ["pixels", "action", "qpos", "qvel", "observation", "privileged/block_0_pos", "privileged/block_0_quat"],
+        )
+        self.assertEqual(
+            cube_eval["data"]["keys_to_cache"],
+            ["action", "qpos", "qvel", "observation", "privileged/block_0_pos", "privileged/block_0_quat"],
+        )
+        self.assertEqual(cube_eval["env"]["kwargs"]["env_type"], "single")
+        self.assertEqual(cube_eval["env"]["kwargs"]["ob_type"], "states")
+        self.assertEqual(cube_eval["env"]["kwargs"]["width"], 224)
+        self.assertEqual(cube_eval["env"]["kwargs"]["height"], 224)
+        self.assertEqual(cube_eval["restore"]["import_path"], "mwm.ogbench.restore.ogbench_cube_restore_spec")
+
         reacher_bench = yaml.safe_load((ROOT / "configs" / "benchmark" / "paper_parity_reacher.yaml").read_text(encoding="utf-8"))
         self.assertEqual(reacher_bench["env_id"], "swm/ReacherDMControl-v0")
         self.assertEqual(reacher_bench["eval_config"], "configs/eval/paper_reacher.yaml")
         self.assertEqual([run["role"] for run in reacher_bench["runs"]], ["upstream_lewm_converted", "retrained_lewm_identity"])
         self.assertEqual(reacher_bench["runs"][0]["checkpoint"], "checkpoints_mwm/upstream_lewm_reacher")
         self.assertEqual(reacher_bench["runs"][1]["checkpoint"], "checkpoints_mwm/retrained_lewm_identity_reacher_upstream")
+
+        cube_bench = yaml.safe_load((ROOT / "configs" / "benchmark" / "paper_parity_ogb_cube.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(cube_bench["env_id"], "swm/OGBCube-v0")
+        self.assertEqual(cube_bench["eval_config"], "configs/eval/paper_ogb_cube.yaml")
+        self.assertEqual(cube_bench["manifest"]["config"], "configs/manifest/ogb_cube_paper_seed42.yaml")
+        self.assertEqual(cube_bench["paper_targets"]["success_rate"], {"swm/OGBCube-v0": 74.0})
+        self.assertEqual([run["role"] for run in cube_bench["runs"]], ["upstream_lewm_converted", "retrained_lewm_identity"])
+        self.assertEqual(cube_bench["runs"][0]["checkpoint"], "checkpoints_mwm/upstream_lewm_ogb_cube")
+        self.assertEqual(cube_bench["runs"][1]["checkpoint"], "checkpoints_mwm/retrained_lewm_identity_ogb_cube_upstream")
 
     def test_tworoom_official_schema_uses_future_proprio_as_eval_goal(self) -> None:
         spec_id, callables = eval_callables_for_env(
@@ -271,6 +313,52 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 import_path=import_path,
             )
 
+    def test_ogbench_cube_restore_is_opt_in_and_uses_goal_block_pose(self) -> None:
+        import_path = "mwm.ogbench.restore.ogbench_cube_restore_spec"
+        columns = {
+            "pixels",
+            "action",
+            "qpos",
+            "qvel",
+            "observation",
+            "privileged/block_0_pos",
+            "privileged/block_0_quat",
+        }
+
+        spec = validate_restore_columns("swm/OGBCube-v0", columns, import_path=import_path)
+        spec_id, callables = eval_callables_for_env("swm/OGBCube-v0", columns, import_path=import_path)
+
+        self.assertEqual(spec.spec_id, "ogbench_cube_single_qpos_qvel_target_pose")
+        self.assertEqual(spec_id, "ogbench_cube_single_qpos_qvel_target_pose")
+        self.assertEqual(callables[0]["method"], "set_state")
+        self.assertEqual(callables[0]["args"]["qpos"]["value"], "qpos")
+        self.assertEqual(callables[0]["args"]["qvel"]["value"], "qvel")
+        self.assertEqual(callables[1]["method"], "set_target_pos")
+        self.assertEqual(callables[1]["args"]["cube_id"]["value"], 0)
+        self.assertFalse(callables[1]["args"]["cube_id"]["in_dataset"])
+        self.assertEqual(callables[1]["args"]["target_pos"]["value"], "goal_privileged/block_0_pos")
+        self.assertEqual(callables[1]["args"]["target_quat"]["value"], "goal_privileged/block_0_quat")
+
+        underscore_columns = {
+            "pixels",
+            "action",
+            "qpos",
+            "qvel",
+            "observation",
+            "privileged_block_0_pos",
+            "privileged_block_0_quat",
+        }
+        _, underscore_callables = eval_callables_for_env("swm/OGBCube-v0", underscore_columns, import_path=import_path)
+        self.assertEqual(underscore_callables[1]["args"]["target_pos"]["value"], "goal_privileged_block_0_pos")
+        self.assertEqual(underscore_callables[1]["args"]["target_quat"]["value"], "goal_privileged_block_0_quat")
+
+        with self.assertRaisesRegex(ValueError, "privileged/block_0_quat"):
+            validate_restore_columns(
+                "swm/OGBCube-v0",
+                columns - {"privileged/block_0_quat"},
+                import_path=import_path,
+            )
+
     def test_local_tworoom_train_configs_match_available_lance_columns(self) -> None:
         for name in ("mwm_lewm_tworoom.yaml",):
             cfg = yaml.safe_load((ROOT / "configs" / "train" / name).read_text(encoding="utf-8"))
@@ -291,11 +379,18 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertIn('"name": "upstream_lewm_reacher"', source)
         self.assertIn('"repo": "quentinll/lewm-reacher"', source)
         self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', source)
+        self.assertIn('"name": "upstream_lewm_ogb_cube"', source)
+        self.assertIn('"repo": "quentinll/lewm-cube"', source)
+        self.assertIn('"restore_spec": "ogbench_cube_single_qpos_qvel_target_pose"', source)
 
         data_source = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8")
         self.assertIn('REACHER_LANCE = "reacher.lance"', data_source)
         self.assertIn('"env_id": "swm/ReacherDMControl-v0"', data_source)
         self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', data_source)
+        self.assertIn('OGB_CUBE_LANCE = "ogb_cube_single_expert.lance"', data_source)
+        self.assertIn('"env_id": "swm/OGBCube-v0"', data_source)
+        self.assertIn('"restore_spec": "ogbench_cube_single_qpos_qvel_target_pose"', data_source)
+        self.assertTrue((ROOT / "scripts" / "research" / "convert_ogb_cube_hdf5_to_lance.py").is_file())
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
         work_tokens = (
@@ -342,26 +437,36 @@ class MWMRepoHygieneTests(unittest.TestCase):
         identity_runner = (ROOT / "scripts" / "slurm" / "run_mwm_train_identity_env.sh").read_text(encoding="utf-8")
         self.assertIn("reacher)", identity_runner)
         self.assertIn("configs/train/mwm_lewm_reacher_upstream.yaml", identity_runner)
-        self.assertIn("{pusht|reacher|tworoom}", identity_runner)
+        self.assertIn("ogb_cube|cube)", identity_runner)
+        self.assertIn("configs/train/mwm_lewm_ogb_cube_upstream.yaml", identity_runner)
+        self.assertIn("{pusht|reacher|ogb_cube|tworoom}", identity_runner)
 
         dense_runner = (ROOT / "scripts" / "slurm" / "run_mwm_train_dense_env.sh").read_text(encoding="utf-8")
         self.assertIn("reacher)", dense_runner)
         self.assertIn("configs/train/mwm_dense_reacher.yaml", dense_runner)
-        self.assertIn("{pusht|reacher|tworoom}", dense_runner)
+        self.assertIn("ogb_cube|cube)", dense_runner)
+        self.assertIn("configs/train/mwm_dense_ogb_cube.yaml", dense_runner)
+        self.assertIn("{pusht|reacher|ogb_cube|tworoom}", dense_runner)
 
-        for name in ("slurm_mwm_train_reacher_identity.sbatch", "slurm_mwm_train_reacher_dense.sbatch"):
+        for name in (
+            "slurm_mwm_train_reacher_identity.sbatch",
+            "slurm_mwm_train_reacher_dense.sbatch",
+            "slurm_mwm_train_ogb_cube_identity.sbatch",
+            "slurm_mwm_train_ogb_cube_dense.sbatch",
+        ):
             text = (ROOT / "scripts" / "slurm" / name).read_text(encoding="utf-8")
             self.assertIn("run_mwm_train_", text, name)
-            self.assertIn("reacher", text, name)
             self.assertIn('torch.empty(1, device="cuda")', text, name)
 
         parity_runner = (ROOT / "scripts" / "slurm" / "run_mwm_identity_parity.sh").read_text(encoding="utf-8")
         self.assertIn("configs/benchmark/paper_parity_reacher.yaml", parity_runner)
+        self.assertIn("configs/benchmark/paper_parity_ogb_cube.yaml", parity_runner)
         self.assertIn('export MUJOCO_GL="${MUJOCO_GL:-egl}"', parity_runner)
         self.assertIn('export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"', parity_runner)
 
         dense_comparison = (ROOT / "scripts" / "slurm" / "run_mwm_dense_comparison.sh").read_text(encoding="utf-8")
         self.assertIn("configs/benchmark/dense_reacher.yaml", dense_comparison)
+        self.assertIn("configs/benchmark/dense_ogb_cube.yaml", dense_comparison)
         self.assertIn('export MUJOCO_GL="${MUJOCO_GL:-egl}"', dense_comparison)
         self.assertIn('export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"', dense_comparison)
 
@@ -371,7 +476,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
         self.assertIn("h5py.File", text)
         self.assertIn("LanceWriter", text)
-        self.assertIn("prepare_reacher", text)
+        self.assertIn("write_dataset_metadata", text)
+        self.assertIn("validate_restore_columns", text)
+        self.assertNotIn("prepare_reacher", text)
         self.assertIn("pixels", text)
         self.assertIn("qpos", text)
         self.assertIn("qvel", text)
@@ -513,6 +620,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             sorted(path.name for path in (scripts_root / "local").glob("*.sh")),
             [
                 "local_benchmark_smoke.sh",
+                "local_ogb_cube_train_smoke.sh",
                 "local_reacher_train_smoke.sh",
                 "local_train_smoke.sh",
                 "local_verify.sh",
@@ -542,17 +650,10 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 hits.append(f"{path.relative_to(ROOT)} references {match.group(0)}")
         self.assertEqual(hits, [])
 
-    def test_upstream_data_prep_is_lance_only(self) -> None:
+    def test_upstream_data_prep_keeps_runtime_lance_but_allows_cube_hdf5_conversion(self) -> None:
         text = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
-        forbidden = [
-            "hdf5",
-            ".h5",
-            "tar.zst",
-            "zstd",
-            "stable_worldmodel.data.convert",
-            "source_format",
-            "dest_format",
-        ]
+        self.assertIn("convert_ogb_cube_hdf5_to_lance", text)
+        forbidden = ["tar.zst", "zstd", "stable_worldmodel.data.convert", "source_format", "dest_format"]
         for token in forbidden:
             self.assertNotIn(token, text)
 

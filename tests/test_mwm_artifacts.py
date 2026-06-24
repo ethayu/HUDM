@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -518,6 +519,30 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
             {
                 ("swm/PushT-v1", 42, "upstream_lewm_converted"),
                 ("swm/PushT-v1", 42, "mwm_dense"),
+            },
+        )
+
+    def test_ogb_cube_parity_and_dense_benchmarks_are_single_env_shared_manifest(self) -> None:
+        parity = verify_benchmark_static("configs/benchmark/paper_parity_ogb_cube.yaml", check_checkpoints=False)
+        dense = verify_benchmark_static("configs/benchmark/dense_ogb_cube.yaml", check_checkpoints=False)
+
+        self.assertEqual(parity["env_id"], "swm/OGBCube-v0")
+        self.assertEqual(parity["paper_targets"]["success_rate"], {"swm/OGBCube-v0": 74.0})
+        self.assertEqual(parity["manifest"]["group"], "ogb_cube_paper_seed42")
+        self.assertEqual(
+            {tuple(cell) for cell in parity["expected_cells"]},
+            {
+                ("swm/OGBCube-v0", 42, "upstream_lewm_converted"),
+                ("swm/OGBCube-v0", 42, "retrained_lewm_identity"),
+            },
+        )
+        self.assertEqual(dense["env_id"], "swm/OGBCube-v0")
+        self.assertEqual(dense["manifest"]["group"], "ogb_cube_paper_seed42")
+        self.assertEqual(
+            {tuple(cell) for cell in dense["expected_cells"]},
+            {
+                ("swm/OGBCube-v0", 42, "upstream_lewm_converted"),
+                ("swm/OGBCube-v0", 42, "mwm_dense"),
             },
         )
 
@@ -1083,6 +1108,103 @@ runs:
             self.assertEqual(dataset.count_rows(), 4)
             self.assertEqual(dataset.schema.names, ["episode_idx", "step_idx", "pixels", "action", "qpos", "qvel", "observation"])
             self.assertEqual(load_dataset_metadata(output)["restore_spec"], "reacher_qpos_match_qpos_qvel")
+
+    def test_ogb_cube_hdf5_conversion_writes_lance_dataset_and_metadata(self) -> None:
+        import h5py
+        import lance
+
+        from mwm.data.metadata import load_dataset_metadata
+        from mwm.swm.restore import validate_restore_columns
+        from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "cube_single_expert.h5"
+            with h5py.File(source, "w") as handle:
+                handle.create_dataset("ep_offset", data=np.asarray([0, 2], dtype=np.int64))
+                handle.create_dataset("ep_len", data=np.asarray([2], dtype=np.int32))
+                handle.create_dataset("pixels", data=np.zeros((2, 8, 8, 3), dtype=np.uint8))
+                handle.create_dataset("action", data=np.zeros((2, 5), dtype=np.float32))
+                handle.create_dataset("qpos", data=np.ones((2, 21), dtype=np.float64))
+                handle.create_dataset("qvel", data=np.full((2, 20), 2.0, dtype=np.float64))
+                handle.create_dataset("observation", data=np.zeros((2, 28), dtype=np.float32))
+                handle.create_dataset("privileged/block_0_pos", data=np.full((2, 3), 0.5, dtype=np.float64))
+                handle.create_dataset("privileged/block_0_quat", data=np.tile(np.asarray([1.0, 0.0, 0.0, 0.0]), (2, 1)))
+
+            old_cwd = os.getcwd()
+            try:
+                os.chdir(root)
+                output = convert_ogb_cube_hdf5_to_lance(source, "ogb_cube_single_expert.lance", progress_every=0)
+            finally:
+                os.chdir(old_cwd)
+            self.assertEqual(output, Path("ogb_cube_single_expert.lance"))
+            dataset_path = root / output
+            dataset = lance.dataset(dataset_path)
+            metadata = load_dataset_metadata(dataset_path)
+
+            self.assertEqual(dataset.count_rows(), 2)
+            self.assertEqual(
+                dataset.schema.names,
+                [
+                    "episode_idx",
+                    "step_idx",
+                    "pixels",
+                    "action",
+                    "observation",
+                    "qpos",
+                    "qvel",
+                    "privileged/block_0_pos",
+                    "privileged/block_0_quat",
+                ],
+            )
+            self.assertEqual(metadata["env_id"], "swm/OGBCube-v0")
+            self.assertEqual(metadata["restore_spec"], "ogbench_cube_single_qpos_qvel_target_pose")
+            self.assertEqual(metadata["action_dim"], 5)
+            self.assertEqual(metadata["action_low"], [-1.0] * 5)
+            self.assertEqual(metadata["action_high"], [1.0] * 5)
+            validate_restore_columns(
+                "swm/OGBCube-v0",
+                dataset.schema.names,
+                import_path="mwm.ogbench.restore.ogbench_cube_restore_spec",
+            )
+
+    def test_ogb_cube_hdf5_conversion_accepts_upstream_underscore_privileged_columns(self) -> None:
+        import h5py
+        import lance
+
+        from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "cube_single_expert.h5"
+            with h5py.File(source, "w") as handle:
+                handle.create_dataset("ep_offset", data=np.asarray([0], dtype=np.int64))
+                handle.create_dataset("ep_len", data=np.asarray([2], dtype=np.int32))
+                handle.create_dataset("pixels", data=np.zeros((2, 8, 8, 3), dtype=np.uint8))
+                handle.create_dataset("action", data=np.zeros((2, 5), dtype=np.float32))
+                handle.create_dataset("qpos", data=np.ones((2, 21), dtype=np.float64))
+                handle.create_dataset("qvel", data=np.full((2, 20), 2.0, dtype=np.float64))
+                handle.create_dataset("observation", data=np.zeros((2, 28), dtype=np.float32))
+                handle.create_dataset("privileged_block_0_pos", data=np.full((2, 3), 0.5, dtype=np.float64))
+                handle.create_dataset("privileged_block_0_quat", data=np.tile(np.asarray([1.0, 0.0, 0.0, 0.0]), (2, 1)))
+
+            output = convert_ogb_cube_hdf5_to_lance(source, root / "ogb_cube_single_expert.lance", progress_every=0)
+            dataset = lance.dataset(output)
+
+            self.assertEqual(
+                dataset.schema.names,
+                [
+                    "episode_idx",
+                    "step_idx",
+                    "pixels",
+                    "action",
+                    "observation",
+                    "qpos",
+                    "qvel",
+                    "privileged/block_0_pos",
+                    "privileged/block_0_quat",
+                ],
+            )
 
     def test_dataset_verifier_rejects_hdf5_runtime_configs(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

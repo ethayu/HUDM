@@ -14,9 +14,11 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         local_dir = ROOT / "configs" / "local"
         expected = {
             "collect_pusht_smoke.yaml",
+            "collect_ogb_cube_smoke.yaml",
             "collect_reacher_smoke.yaml",
             "eval_pusht_smoke.yaml",
             "benchmark_pusht_smoke.yaml",
+            "train_ogb_cube_cpu_smoke.yaml",
             "train_pusht_cpu_smoke.yaml",
             "train_reacher_cpu_smoke.yaml",
         }
@@ -61,12 +63,45 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         self.assertTrue(reacher_train_cfg["train"]["no_cuda"])
         self.assertEqual(reacher_train_cfg["train"]["run_name"], "local_reacher_cpu_smoke")
 
+        cube_collect_cfg = yaml.safe_load((local_dir / "collect_ogb_cube_smoke.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(cube_collect_cfg["env_id"], "swm/OGBCube-v0")
+        self.assertEqual(cube_collect_cfg["env_kwargs"]["env_type"], "single")
+        self.assertEqual(cube_collect_cfg["env_kwargs"]["ob_type"], "states")
+        self.assertEqual(cube_collect_cfg["env_kwargs"]["width"], 224)
+        self.assertEqual(cube_collect_cfg["env_kwargs"]["height"], 224)
+        self.assertEqual(cube_collect_cfg["restore"]["import_path"], "mwm.ogbench.restore.ogbench_cube_restore_spec")
+        self.assertTrue(cube_collect_cfg["eager_write"])
+        self.assertGreaterEqual(cube_collect_cfg["max_episode_steps"], 20)
+        self.assertEqual(
+            cube_collect_cfg["keys_to_save"],
+            ["pixels", "action", "qpos", "qvel", "observation", "privileged/block_0_pos", "privileged/block_0_quat"],
+        )
+        self.assertLessEqual(cube_collect_cfg["episodes"], 4)
+
+        cube_train_cfg = yaml.safe_load((local_dir / "train_ogb_cube_cpu_smoke.yaml").read_text(encoding="utf-8"))
+        self.assertEqual(cube_train_cfg["env_id"], "swm/OGBCube-v0")
+        self.assertEqual(cube_train_cfg["base"]["checkpoint"], "models--quentinll--lewm-cube")
+        self.assertEqual(cube_train_cfg["data"]["frameskip"], 5)
+        self.assertEqual(
+            cube_train_cfg["data"]["keys_to_load"],
+            ["pixels", "action", "qpos", "qvel", "observation", "privileged/block_0_pos", "privileged/block_0_quat"],
+        )
+        self.assertEqual(
+            cube_train_cfg["data"]["keys_to_cache"],
+            ["action", "qpos", "qvel", "observation", "privileged/block_0_pos", "privileged/block_0_quat"],
+        )
+        self.assertEqual(cube_train_cfg["model"]["K"], [192])
+        self.assertEqual(cube_train_cfg["model"]["action_block"], 5)
+        self.assertTrue(cube_train_cfg["train"]["no_cuda"])
+        self.assertEqual(cube_train_cfg["train"]["run_name"], "local_ogb_cube_cpu_smoke")
+
     def test_local_scripts_are_not_slurm_gated_or_parcc_path_bound(self) -> None:
         scripts = [
             ROOT / "scripts" / "local" / "local_verify.sh",
             ROOT / "scripts" / "local" / "local_benchmark_smoke.sh",
             ROOT / "scripts" / "local" / "local_train_smoke.sh",
             ROOT / "scripts" / "local" / "local_reacher_train_smoke.sh",
+            ROOT / "scripts" / "local" / "local_ogb_cube_train_smoke.sh",
         ]
         for script in scripts:
             text = script.read_text(encoding="utf-8")
@@ -84,6 +119,14 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         self.assertIn("train_mwm.py configs/local/train_reacher_cpu_smoke.yaml", reacher_text)
         for name in ("config.json", "weights.pt", "world_metadata.json"):
             self.assertIn(name, reacher_text)
+
+        cube_text = (ROOT / "scripts" / "local" / "local_ogb_cube_train_smoke.sh").read_text(encoding="utf-8")
+        self.assertIn('${MUJOCO_GL:-egl}', cube_text)
+        self.assertIn('${PYOPENGL_PLATFORM:-egl}', cube_text)
+        self.assertIn("collect_mwm_data.py configs/local/collect_ogb_cube_smoke.yaml", cube_text)
+        self.assertIn("train_mwm.py configs/local/train_ogb_cube_cpu_smoke.yaml", cube_text)
+        for name in ("config.json", "weights.pt", "world_metadata.json"):
+            self.assertIn(name, cube_text)
 
 
 if __name__ == "__main__":
