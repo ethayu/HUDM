@@ -16,6 +16,7 @@ DEFAULT_CONFIGS = [
     "configs/train/mwm_scheduled_tworoom.yaml",
     "configs/train/mwm_dense_pusht.yaml",
     "configs/train/mwm_dense_reacher.yaml",
+    "configs/train/mwm_dense_ogb_cube.yaml",
     "configs/train/mwm_dense_tworoom.yaml",
     "configs/eval/mwm_lewm_pusht.yaml",
     "configs/eval/mwm_lewm_tworoom.yaml",
@@ -24,9 +25,11 @@ DEFAULT_CONFIGS = [
 PAPER_PARITY_CONFIGS = [
     "configs/train/mwm_lewm_pusht_upstream.yaml",
     "configs/train/mwm_lewm_reacher_upstream.yaml",
+    "configs/train/mwm_lewm_ogb_cube_upstream.yaml",
     "configs/train/mwm_lewm_tworoom_upstream.yaml",
     "configs/eval/paper_pusht.yaml",
     "configs/eval/paper_reacher.yaml",
+    "configs/eval/paper_ogb_cube.yaml",
     "configs/eval/paper_tworoom.yaml",
 ]
 

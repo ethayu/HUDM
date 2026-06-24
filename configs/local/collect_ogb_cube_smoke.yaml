@@ -1,0 +1,23 @@
+env_id: swm/OGBCube-v0
+image_shape: 224
+max_episode_steps: 20
+num_envs: 1
+episodes: 2
+seed: 0
+output_path: data/ogb_cube_smoke.lance
+format: lance
+eager_write: true
+keys_to_save: [pixels, action, qpos, qvel, observation, privileged/block_0_pos, privileged/block_0_quat]
+goal_conditioned: true
+env_kwargs:
+  env_type: single
+  ob_type: states
+  multiview: false
+  width: 224
+  height: 224
+  visualize_info: false
+  terminate_at_goal: true
+policy:
+  import_path: null
+restore:
+  import_path: mwm.ogbench.restore.ogbench_cube_restore_spec

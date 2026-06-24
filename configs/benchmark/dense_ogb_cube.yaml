@@ -1,0 +1,22 @@
+output_dir: rollouts/mwm_dense_ogb_cube
+title: Dense-Level MWM vs Upstream Le-WM on OGBench Cube
+env_id: swm/OGBCube-v0
+seed: 42
+eval_config: configs/eval/paper_ogb_cube.yaml
+manifest:
+  config: configs/manifest/ogb_cube_paper_seed42.yaml
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_ogb_cube
+  - name: dense
+    role: mwm_dense
+    checkpoint: checkpoints_mwm/mwm_dense_ogb_cube
+    planner:
+      scheduler:
+        policy: linear_cem
+        start_level: coarsest
+        end_level: finest
+        rollout_level:
+          mode: fixed
+          level: base

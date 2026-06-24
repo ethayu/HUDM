@@ -38,6 +38,10 @@ while true; do
       static_reacher_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
       full_reacher_status="$?"
+      "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_ogb_cube.yaml --static-only --roles upstream_lewm_converted retrained_lewm_identity
+      static_ogb_cube_status="$?"
+      "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
+      full_ogb_cube_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --static-only --roles upstream_lewm_converted retrained_lewm_identity
       static_tworoom_status="$?"
       "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
@@ -46,6 +50,8 @@ while true; do
       echo "FULL_VERIFY_PUSHT_EXIT=$full_status"
       echo "STATIC_VERIFY_REACHER_EXIT=$static_reacher_status"
       echo "FULL_VERIFY_REACHER_EXIT=$full_reacher_status"
+      echo "STATIC_VERIFY_OGB_CUBE_EXIT=$static_ogb_cube_status"
+      echo "FULL_VERIFY_OGB_CUBE_EXIT=$full_ogb_cube_status"
       echo "STATIC_VERIFY_TWOROOM_EXIT=$static_tworoom_status"
       echo "FULL_VERIFY_TWOROOM_EXIT=$full_tworoom_status"
     } >> "$LOG" 2>&1

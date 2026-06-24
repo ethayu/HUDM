@@ -1,0 +1,59 @@
+checkpoint:
+  run_dir: checkpoints_mwm/upstream_lewm_ogb_cube
+  epoch: null
+env_id: swm/OGBCube-v0
+data:
+  path: data/upstream/ogb_cube_single_expert.lance
+  format: lance
+  split_ratio: 0.9
+  pixels_key: pixels
+  action_key: action
+  keys_to_load: [pixels, action, qpos, qvel, observation, privileged/block_0_pos, privileged/block_0_quat]
+  keys_to_cache: [action, qpos, qvel, observation, privileged/block_0_pos, privileged/block_0_quat]
+  action_preprocessing: standard_scaler
+eval:
+  episodes: 50
+  goal_offset: 25
+  seed: 42
+  budget: 50
+  num_envs: 50
+  output_path: rollouts/mwm_paper_parity/ogb_cube_upstream/eval.json
+  manifest_path: null
+  sampling: stable_worldmodel
+  write_manifest_path: rollouts/mwm_paper_parity/ogb_cube_seed42_manifest.json
+  save_video: false
+  video_path: rollouts/mwm_paper_parity/ogb_cube_videos
+env:
+  max_episode_steps: 100
+  goal_conditioned: true
+  kwargs:
+    env_type: single
+    ob_type: states
+    multiview: false
+    width: 224
+    height: 224
+    visualize_info: false
+    terminate_at_goal: true
+restore:
+  import_path: mwm.ogbench.restore.ogbench_cube_restore_spec
+planner:
+  horizon: 5
+  receding_horizon: 5
+  action_block: 5
+  batch_size: 1
+  pop_size: 300
+  topk: 30
+  elite_frac: 0.1
+  n_iter: 30
+  init_std: 1.0
+  seed: 42
+  warm_start: true
+  clamp_actions: false
+  std_unbiased: true
+  scheduler:
+    policy: fixed
+    level: finest
+    rollout_level:
+      mode: fixed
+      level: base
+device: auto

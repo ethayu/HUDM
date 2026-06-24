@@ -16,11 +16,14 @@ case "${1:-}" in
   reacher)
     CONFIG="configs/train/mwm_lewm_reacher_upstream.yaml"
     ;;
+  ogb_cube|cube)
+    CONFIG="configs/train/mwm_lewm_ogb_cube_upstream.yaml"
+    ;;
   tworoom)
     CONFIG="configs/train/mwm_lewm_tworoom_upstream.yaml"
     ;;
   *)
-    echo "Usage: scripts/slurm/run_mwm_train_identity_env.sh {pusht|reacher|tworoom}" >&2
+    echo "Usage: scripts/slurm/run_mwm_train_identity_env.sh {pusht|reacher|ogb_cube|tworoom}" >&2
     exit 2
     ;;
 esac

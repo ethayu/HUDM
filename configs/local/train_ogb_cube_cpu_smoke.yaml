@@ -1,0 +1,64 @@
+seed: 7
+env_id: swm/OGBCube-v0
+base:
+  family: lewm
+  checkpoint: models--quentinll--lewm-cube
+mwm:
+  component_policy:
+    shared: [latent_producer]
+    per_level: [transition]
+    reconstructor: []
+  loss_terms:
+    regularizers: shared_latent
+    reconstructor_detach_encoder: true
+    reconstructor_contributes_to_encoder_loss: false
+data:
+  path: data/ogb_cube_smoke.lance
+  format: lance
+  split_ratio: 0.9
+  pixels_key: pixels
+  action_key: action
+  frameskip: 5
+  keys_to_load: [pixels, action, qpos, qvel, observation, privileged/block_0_pos, privileged/block_0_quat]
+  keys_to_cache: [action, qpos, qvel, observation, privileged/block_0_pos, privileged/block_0_quat]
+restore:
+  import_path: mwm.ogbench.restore.ogbench_cube_restore_spec
+model:
+  D: 192
+  K: [192]
+  action_dim: auto
+  action_block: 5
+  image_shape: auto
+  history_size: 3
+  num_preds: 1
+train:
+  batch_size: 1
+  horizon: 4
+  num_workers: 0
+  drop_last: true
+  prefetch_factor: null
+  pin_memory: false
+  no_cuda: true
+  cpu_devices: 1
+  checkpoint_dir: checkpoints_mwm
+  run_name: local_ogb_cube_cpu_smoke
+  backend: stable_worldmodel_lewm
+  timestamp_run_dir: false
+  clean_trainer_root: true
+  limit_train_batches: 1
+  limit_val_batches: 1
+  checkpoint_every_n_train_steps: 0
+  gradient_clip_val: 1.0
+  matmul_precision: high
+  slurm_auto_requeue: false
+optim:
+  lr: 0.00005
+  weight_decay: 0.001
+loss:
+  rollout_weight: 1.0
+  recon_weight: 0.0
+  sigreg_weight: 0.0
+  history_size: 3
+  num_preds: 1
+schedule:
+  max_epochs: 1
