@@ -15,7 +15,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `requirements.txt`: Python dependency list, including pinned `stable-worldmodel[env]==0.1.0`.
 - `collect_mwm_data.py`: CLI for collecting Stable-WM world rollouts into Lance datasets and writing MWM dataset metadata sidecars.
 - `prepare_upstream_lewm.py`: Converts trusted upstream Le-WM checkpoints into canonical MWM identity-parity checkpoints by building an MWM shell and copying upstream weights.
-- `prepare_upstream_lewm_data.py`: Verifies prebuilt upstream Lance datasets exist and writes paper-parity metadata sidecars for PushT and TwoRoom.
+- `prepare_upstream_lewm_data.py`: Verifies or converts upstream Lance datasets and writes paper-parity metadata sidecars for PushT, Reacher, OGBench Cube, and TwoRoom.
 - `train_mwm.py`: Thin root CLI for Le-WM base-adapter training or exporting a Lightning checkpoint to canonical MWM format.
 - `eval_mwm.py`: Thin root CLI that delegates checkpoint evaluation to `mwm.eval.runner`.
 - `benchmark_mwm.py`: Thin root CLI that delegates benchmark matrix execution to `mwm.benchmark.matrix`.
@@ -99,6 +99,8 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/swm/__init__.py`: Empty Stable-WM integration package marker.
 - `mwm/swm/envs.py`: Stable-WM world factory, image-shape/env-kwargs parsing, continuous Box action validation, and action-space inference.
 - `mwm/swm/restore.py`: Built-in and user-provided restore specs for PushT, TwoRoom/Piecewise, and DMControl-style datasets; returns eval callables for SWM starts/goals.
+- `mwm/ogbench/__init__.py`: Small OGBench integration barrel exporting the cube restore spec.
+- `mwm/ogbench/restore.py`: OGBench Cube restore metadata and callables for qpos/qvel plus privileged cube pose columns.
 
 ### Training
 
@@ -118,32 +120,52 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `configs/collect/mwm_tworoom.yaml`: Collects 100 TwoRoom Lance episodes at 224px with longer max steps and more envs.
 - `configs/eval/mwm_lewm_pusht.yaml`: PushT eval on local collected dataset with linear CEM fidelity schedule and auto action preprocessing.
 - `configs/eval/mwm_lewm_tworoom.yaml`: TwoRoom eval on local collected dataset with TwoRoom columns and linear CEM fidelity schedule.
+- `configs/eval/paper_ogb_cube.yaml`: Paper-parity OGBench Cube eval against upstream Lance data with fixed finest-level planning and OGBench-specific restore metadata.
 - `configs/eval/paper_pusht.yaml`: Paper-parity PushT eval against upstream Lance data with fixed finest-level planning and Stable-WM sampling.
+- `configs/eval/paper_reacher.yaml`: Paper-parity Reacher qpos-match eval against upstream Lance data with fixed finest-level planning and DMControl restore metadata.
 - `configs/eval/paper_tworoom.yaml`: Paper-parity TwoRoom eval against upstream Lance data with fixed finest-level planning and Stable-WM sampling.
+- `configs/local/collect_ogb_cube_smoke.yaml`: Tiny local OGBench Cube collection smoke config with eager Lance writing and privileged cube pose keys.
 - `configs/local/collect_pusht_smoke.yaml`: Tiny local PushT collection smoke config.
+- `configs/local/collect_reacher_smoke.yaml`: Tiny local Reacher qpos-match collection smoke config with eager Lance writing.
 - `configs/local/eval_pusht_smoke.yaml`: CPU-safe two-episode PushT eval smoke config.
 - `configs/local/benchmark_pusht_smoke.yaml`: One-role local benchmark wrapper around the PushT smoke eval config.
+- `configs/local/train_ogb_cube_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 OGBench Cube identity model.
 - `configs/local/train_pusht_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 PushT identity model.
+- `configs/local/train_reacher_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 Reacher identity model.
+- `configs/manifest/ogb_cube_paper_seed42.yaml`: Named manifest location for OGBench Cube paper seed 42.
 - `configs/manifest/pusht_paper_seed42.yaml`: Named manifest location for PushT paper seed 42.
+- `configs/manifest/reacher_paper_seed42.yaml`: Named manifest location for Reacher paper seed 42.
 - `configs/manifest/tworoom_paper_seed42.yaml`: Named manifest location for TwoRoom paper seed 42.
+- `configs/train/mwm_lewm_ogb_cube_upstream.yaml`: OGBench Cube identity retraining on upstream paper-parity data with K=[192].
 - `configs/train/mwm_lewm_pusht.yaml`: PushT identity-style retraining on locally collected data with K=[192].
 - `configs/train/mwm_lewm_tworoom.yaml`: TwoRoom identity-style retraining on locally collected data with K=[192].
 - `configs/train/mwm_lewm_pusht_upstream.yaml`: PushT identity retraining on upstream paper-parity data.
+- `configs/train/mwm_lewm_reacher_upstream.yaml`: Reacher identity retraining on upstream paper-parity data with qpos-match restore metadata.
 - `configs/train/mwm_lewm_tworoom_upstream.yaml`: TwoRoom identity retraining on upstream paper-parity data.
 - `configs/train/mwm_scheduled_pusht.yaml`: PushT scheduled MWM training with K=[48,96,144].
 - `configs/train/mwm_scheduled_tworoom.yaml`: TwoRoom scheduled MWM training with K=[48,96,144].
+- `configs/train/mwm_dense_ogb_cube.yaml`: OGBench Cube dense-level MWM training with K=[6,12,48,96,144,192].
 - `configs/train/mwm_dense_pusht.yaml`: PushT dense-level MWM training with K=[6,12,48,96,144,192].
+- `configs/train/mwm_dense_reacher.yaml`: Reacher dense-level MWM training with K=[6,12,48,96,144,192].
 - `configs/train/mwm_dense_tworoom.yaml`: TwoRoom dense-level MWM training with K=[6,12,48,96,144,192].
+- `configs/benchmark/paper_parity_ogb_cube.yaml`: OGBench Cube paper target benchmark comparing converted upstream and retrained identity checkpoints.
 - `configs/benchmark/paper_parity_pusht.yaml`: PushT paper target benchmark comparing converted upstream and retrained identity checkpoints.
+- `configs/benchmark/paper_parity_reacher.yaml`: Reacher identity/parity benchmark comparing converted upstream and retrained identity checkpoints.
 - `configs/benchmark/paper_parity_tworoom.yaml`: TwoRoom paper target benchmark comparing converted upstream and retrained identity checkpoints.
 - `configs/benchmark/scheduled_pusht.yaml`: PushT benchmark comparing converted upstream to scheduled MWM.
 - `configs/benchmark/scheduled_tworoom.yaml`: TwoRoom benchmark comparing converted upstream to scheduled MWM.
+- `configs/benchmark/dense_ogb_cube.yaml`: OGBench Cube benchmark comparing converted upstream to dense-level MWM.
 - `configs/benchmark/dense_pusht.yaml`: PushT benchmark comparing converted upstream to dense-level MWM.
+- `configs/benchmark/dense_reacher.yaml`: Reacher benchmark comparing converted upstream to dense-level MWM.
 - `configs/benchmark/dense_tworoom.yaml`: TwoRoom benchmark comparing converted upstream to dense-level MWM.
+- `configs/research/dense_reacher_high_fidelity_schedule.yaml`: Dense Reacher research benchmark that stresses higher-fidelity scheduler choices.
+- `configs/research/dense_reacher_planner_ablation.yaml`: Dense Reacher planner ablation benchmark/sweep config for comparing CEM scheduler and population settings.
 - `configs/research/identity_delta_pusht_eval.yaml`: Artifact-root-parametric PushT eval config for identity-vs-upstream seed sweep.
 - `configs/research/identity_delta_tworoom_eval.yaml`: Artifact-root-parametric TwoRoom eval config for identity-vs-upstream seed sweep.
 - `configs/research/identity_delta_pusht_benchmark.yaml`: PushT seed-sweep benchmark comparing upstream and retrained identity roles.
 - `configs/research/identity_delta_tworoom_benchmark.yaml`: TwoRoom seed-sweep benchmark comparing upstream and retrained identity roles.
+- `configs/research/reacher_identity_delta/reacher_eval.yaml`: Artifact-root-parametric Reacher qpos-match eval config for the identity-vs-upstream investigation.
+- `configs/research/reacher_identity_delta/reacher_benchmark_seed42.yaml`: Reacher seed-42 benchmark comparing upstream and retrained identity roles for the identity-delta report.
 - `configs/research/train_mwm_dense_pusht_highk_weighted.yaml`: Research PushT dense training with high-K-weighted level losses into dense debug outputs.
 - `configs/research/train_mwm_dense_tworoom_highk_weighted.yaml`: Research TwoRoom dense training with high-K-weighted level losses into dense debug outputs.
 - `configs/research/train_mwm_dense_pusht_highk_weighted_converge.yaml`: PushT high-K weighted dense training with convergence early stopping and best-checkpoint export.
@@ -155,13 +177,21 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `scripts/local/local_verify.sh`: Desktop verification: py_compile, pytest, and local static benchmark check.
 - `scripts/local/local_benchmark_smoke.sh`: Local PushT smoke benchmark after checking required data/checkpoint artifacts.
 - `scripts/local/local_train_smoke.sh`: Opt-in CPU training smoke wrapper.
+- `scripts/local/local_reacher_train_smoke.sh`: Opt-in local Reacher CPU smoke workflow that collects a tiny dataset if needed, trains, and checks canonical checkpoint files.
+- `scripts/local/local_ogb_cube_train_smoke.sh`: Opt-in local OGBench Cube CPU smoke workflow that collects a tiny dataset if needed, trains, and checks canonical checkpoint files.
+- `scripts/research/convert_reacher_h5_to_lance.py`: Converts Reacher HDF5 data into Lance format and writes MWM metadata used by paper-parity workflows.
+- `scripts/research/convert_ogb_cube_hdf5_to_lance.py`: Converts OGBench Cube HDF5 data into Lance format with privileged state columns and metadata.
+- `scripts/research/research_dense_reacher_debug.sbatch`: Slurm entrypoint for dense Reacher debugging experiments.
 - `scripts/research/research_identity_delta_audit.py`: Deep audit script comparing identity/upstream checkpoints, configs, datasets, logs, rollouts, and writing markdown/json research reports.
 - `scripts/research/research_identity_delta_collect.py`: Aggregates seed-sweep benchmark summaries, failure overlaps, and identity-minus-upstream deltas.
+- `scripts/research/research_reacher_identity_delta_audit.py`: Reacher-specific identity/upstream audit script covering qpos-match data, checkpoints, logs, rollout outcomes, and static config diffs.
+- `scripts/research/research_reacher_identity_seed_sweep.sh`: Slurm-only Reacher identity-delta benchmark driver.
 - `scripts/research/run_cem_sweep.py`: Research helper that runs a CEM scheduler/population sweep across selected envs and writes aggregate sweep results.
 - `scripts/research/research_identity_seed_sweep.sh`: Slurm-only multi-seed identity-delta benchmark driver for PushT and TwoRoom.
 - `scripts/research/research_train_dense_highk_converge.sh`: Runs a selected high-K weighted dense convergence training config.
 - `scripts/research/research_train_dense_highk_converge.sbatch`: Slurm wrapper for high-K dense convergence training with environment diagnostics.
 - `scripts/research/slurm_research_identity_seed_sweep.sbatch`: Slurm wrapper for the identity seed sweep.
+- `scripts/research/slurm_research_reacher_identity_seed_sweep.sbatch`: Slurm wrapper for the Reacher identity seed sweep.
 - `scripts/slurm/run_mwm_train_identity_env.sh`: Slurm-allocation runner for identity training by env.
 - `scripts/slurm/run_mwm_train_scheduled_env.sh`: Slurm-allocation runner for scheduled MWM training by env.
 - `scripts/slurm/run_mwm_train_dense_env.sh`: Slurm-allocation runner for dense MWM training by env.
@@ -170,10 +200,14 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `scripts/slurm/run_mwm_scheduled_comparison.sh`: Scheduled comparison benchmark runner that verifies data and continues across env failures.
 - `scripts/slurm/run_mwm_dense_comparison.sh`: Dense comparison benchmark runner with the same continue-and-report pattern.
 - `scripts/slurm/slurm_mwm_train_pusht_identity.sbatch`: One-GPU PushT identity training batch job.
+- `scripts/slurm/slurm_mwm_train_reacher_identity.sbatch`: One-GPU Reacher identity training batch job.
+- `scripts/slurm/slurm_mwm_train_ogb_cube_identity.sbatch`: One-GPU OGBench Cube identity training batch job.
 - `scripts/slurm/slurm_mwm_train_tworoom_identity.sbatch`: One-GPU TwoRoom identity training batch job.
 - `scripts/slurm/slurm_mwm_train_pusht_scheduled.sbatch`: One-GPU PushT scheduled MWM training batch job.
 - `scripts/slurm/slurm_mwm_train_tworoom_scheduled.sbatch`: One-GPU TwoRoom scheduled MWM training batch job.
 - `scripts/slurm/slurm_mwm_train_pusht_dense.sbatch`: One-GPU PushT dense MWM training batch job.
+- `scripts/slurm/slurm_mwm_train_reacher_dense.sbatch`: One-GPU Reacher dense MWM training batch job.
+- `scripts/slurm/slurm_mwm_train_ogb_cube_dense.sbatch`: One-GPU OGBench Cube dense MWM training batch job.
 - `scripts/slurm/slurm_mwm_train_tworoom_dense.sbatch`: One-GPU TwoRoom dense MWM training batch job.
 - `scripts/slurm/slurm_mwm_paper_parity.sbatch`: Batch job for the full paper-parity workflow.
 - `scripts/slurm/slurm_mwm_identity_parity.sbatch`: Batch job for identity-parity benchmark comparison.
@@ -201,6 +235,9 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `reports/research/dense_debug/next_training_plan.json`: Machine-readable dense debug follow-up plan.
 - `reports/research/dense_debug/equal_long_failure_investigation.md`: Investigation notes for equal-long dense failure behavior.
 - `reports/research/dense_debug/equal_long_failure_investigation.json`: Machine-readable equal-long failure investigation facts.
+- `reports/research/dense_reacher_debug/.gitignore`: Keeps generated dense Reacher debug rollout artifacts out of git.
+- `reports/research/dense_reacher_debug/report.md`: Dense Reacher debugging narrative report.
+- `reports/research/dense_reacher_debug/summary.json`: Machine-readable dense Reacher debug summary.
 - `reports/research/identity_delta/report.md`: Identity-vs-upstream performance delta report.
 - `reports/research/identity_delta/summary.json`: Machine-readable identity delta summary.
 - `reports/research/identity_delta/static_audit.md`: Static checkpoint/config/training audit writeup.
@@ -209,6 +246,9 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `reports/research/identity_delta/seed_sweep_summary.csv`: Tabular seed-sweep aggregate summary.
 - `reports/research/identity_delta/seed_sweep_summary.json`: Machine-readable seed-sweep aggregate summary.
 - `reports/research/identity_delta/seed_sweep/.gitignore`: Keeps generated per-seed sweep outputs out of git.
+- `reports/research/reacher_identity_delta/report.md`: Reacher identity-vs-upstream performance delta report.
+- `reports/research/reacher_identity_delta/summary.json`: Machine-readable Reacher identity delta summary.
+- `reports/research/reacher_identity_delta/audit_raw.json`: Raw Reacher audit payload backing the report and summary.
 
 ## Tests
 
@@ -228,4 +268,4 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - Canonical checkpoints are deliberately strict: exactly `config.json`, `weights.pt`, and `world_metadata.json`.
 - Eval and training are Lance-only; HDF5 and legacy source-object checkpoint paths are intentionally absent.
 - Current scheduled planning can choose different base levels across CEM iterations, but `MatryoshkaWorldModel` currently enforces fixed-level rollouts within each plan.
-- The worktree is dirty and mid-refactor: several old modules are deleted while replacement modules are untracked/new. This review describes the current filesystem state, not pristine `HEAD`.
+- This review describes tracked source files. Generated datasets, checkpoints, rollouts, logs, caches, and nested worktrees are intentionally out of scope.
