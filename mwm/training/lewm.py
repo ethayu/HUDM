@@ -1,17 +1,27 @@
 from __future__ import annotations
 
 import argparse
+from importlib import import_module
+from typing import Any
 
-import torch
-
-from mwm.checkpoint_io import save_world_checkpoint
-from mwm.config_cli import load_config
-from mwm.training import lewm_data, lewm_lightning, lewm_model
-from mwm.training.lewm_config import DEFAULTS, make_run_dir
-from mwm.training.lewm_export import export_lewm_base_adapter_lightning_checkpoint
+_LAZY_EXPORTS = {
+    "DEFAULTS": ("mwm.training.lewm_config", "DEFAULTS"),
+    "make_run_dir": ("mwm.training.lewm_config", "make_run_dir"),
+    "export_lewm_base_adapter_lightning_checkpoint": (
+        "mwm.training.lewm_export",
+        "export_lewm_base_adapter_lightning_checkpoint",
+    ),
+}
 
 
 def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
+    import torch
+
+    from mwm.checkpoint_io import save_world_checkpoint
+    from mwm.config_cli import load_config
+    from mwm.training import lewm_data, lewm_lightning, lewm_model
+    from mwm.training.lewm_config import DEFAULTS, make_run_dir
+
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
     torch.manual_seed(int(cfg.seed))
@@ -46,6 +56,8 @@ def _main() -> None:
     if args.export_from_lightning:
         if args.set:
             parser.error("--set is only supported for training, not --export-from-lightning")
+        from mwm.training.lewm_export import export_lewm_base_adapter_lightning_checkpoint
+
         export_lewm_base_adapter_lightning_checkpoint(
             args.config,
             args.export_from_lightning,
@@ -59,6 +71,16 @@ def _main() -> None:
 
 if __name__ == "__main__":
     _main()
+
+
+def __getattr__(name: str) -> Any:
+    try:
+        module_name, attr_name = _LAZY_EXPORTS[name]
+    except KeyError as exc:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}") from exc
+    value = getattr(import_module(module_name), attr_name)
+    globals()[name] = value
+    return value
 
 
 __all__ = [

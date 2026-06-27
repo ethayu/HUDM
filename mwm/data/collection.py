@@ -3,20 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from omegaconf import OmegaConf
-
-from mwm.config_cli import load_config
-from mwm.data.metadata import write_dataset_metadata
-from mwm.data.paths import local_path
-from mwm.imports import import_object
-from mwm.swm.envs import (
-    make_swm_world,
-    parse_env_kwargs,
-    parse_image_shape,
-    validate_continuous_box_action_space,
-)
-from mwm.swm.restore import restore_spec_for_env, validate_restore_columns
-
 
 DEFAULTS = {
     "env_id": "swm/PushT-v1",
@@ -103,6 +89,8 @@ def _record_dataset_to_path(
 
 def _build_policy(import_path: str | None, seed: int):
     if import_path:
+        from mwm.imports import import_object
+
         obj = import_object(import_path)
         return obj() if isinstance(obj, type) else obj
     from stable_worldmodel.policy import RandomPolicy
@@ -111,6 +99,19 @@ def _build_policy(import_path: str | None, seed: int):
 
 
 def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
+    from omegaconf import OmegaConf
+
+    from mwm.config_cli import load_config
+    from mwm.data.metadata import write_dataset_metadata
+    from mwm.data.paths import local_path
+    from mwm.swm.envs import (
+        make_swm_world,
+        parse_env_kwargs,
+        parse_image_shape,
+        validate_continuous_box_action_space,
+    )
+    from mwm.swm.restore import restore_spec_for_env, validate_restore_columns
+
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     env_id = str(cfg.env_id)
     image_shape = parse_image_shape(cfg.image_shape)

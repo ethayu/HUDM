@@ -8,33 +8,19 @@ import traceback
 from pathlib import Path
 from typing import Any
 
-from omegaconf import OmegaConf
-
-from mwm.benchmark.config import (
-    DEFAULTS,
-    filter_resolved_by_roles,
-    load_manifest_config,
-    manifest_path as benchmark_manifest_path,
-    merged_run_config,
-    require_no_legacy_fields,
-    role,
-    safe_name,
-    validate_benchmark_matrix,
-    write_temp_config,
-)
-from mwm.benchmark.html import write_review_html
-from mwm.benchmark.io import write_run_sidecars
-from mwm.benchmark.plots import write_default_plots
-from mwm.benchmark.summary import eval_summary_row, write_per_env_table, write_summary_csv
-from mwm.config_cli import load_config
-from mwm.eval.runner import main as run_eval_mwm
-from mwm.io import file_sha256, load_json, write_json, write_metrics_jsonl
-
 
 AGGREGATE_OUTPUTS = ("summary.json", "summary.csv", "metrics.jsonl", "per_env_summary.csv", "review.html")
 
 
+def run_eval_mwm(cfg_path: str) -> None:
+    from mwm.eval.runner import main as run_eval
+
+    run_eval(cfg_path)
+
+
 def _clear_stale_outputs(output_dir: Path, resolved: list[tuple[Any, Any]]) -> None:
+    from mwm.benchmark.config import safe_name
+
     for name in AGGREGATE_OUTPUTS:
         (output_dir / name).unlink(missing_ok=True)
     shutil.rmtree(output_dir / "plots", ignore_errors=True)
@@ -64,6 +50,27 @@ def _episode_trace_rows(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def main(cfg_path: str, *, roles: Any = None, overrides: list[str] | None = None) -> None:
+    from omegaconf import OmegaConf
+
+    from mwm.benchmark.config import (
+        DEFAULTS,
+        filter_resolved_by_roles,
+        load_manifest_config,
+        manifest_path as benchmark_manifest_path,
+        merged_run_config,
+        require_no_legacy_fields,
+        role,
+        safe_name,
+        validate_benchmark_matrix,
+        write_temp_config,
+    )
+    from mwm.benchmark.html import write_review_html
+    from mwm.benchmark.io import write_run_sidecars
+    from mwm.benchmark.plots import write_default_plots
+    from mwm.benchmark.summary import eval_summary_row, write_per_env_table, write_summary_csv
+    from mwm.config_cli import load_config
+    from mwm.io import file_sha256, load_json, write_json, write_metrics_jsonl
+
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
     require_no_legacy_fields(cfg)
     output_dir = Path(str(cfg.output_dir))

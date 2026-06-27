@@ -14,4 +14,4 @@ fi
 
 "$PY" -m py_compile $py_files
 "$PY" -m pytest -q
-"$PY" verify_mwm_benchmark.py configs/local/benchmark_pusht_smoke.yaml --static-only --no-checkpoints
+"$PY" -m mwm.benchmark.verify configs/local/benchmark_pusht_smoke.yaml --static-only --no-checkpoints

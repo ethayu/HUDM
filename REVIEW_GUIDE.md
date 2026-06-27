@@ -40,9 +40,10 @@ Use the conda `mwm` environment:
 ```bash
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m py_compile $(rg --files -g '*.py')
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m pytest -q
-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_data.py --paper-parity
-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml --static-only --roles upstream_lewm_converted retrained_lewm_identity
-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/benchmark/scheduled_pusht.yaml --static-only --roles upstream_lewm_converted mwm_scheduled
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.data.verify --paper-parity
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.benchmark.verify configs/benchmark/paper_parity_pusht.yaml --static-only --roles upstream_lewm_converted retrained_lewm_identity
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.benchmark.verify configs/benchmark/scheduled_pusht.yaml --static-only --roles upstream_lewm_converted mwm_scheduled
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.benchmark.render_review rollouts/mwm_benchmark
 ```
 
 ### Local Desktop Workflow

@@ -12,7 +12,7 @@ from mwm.adapters.builder import build_mwm_from_stable_config
 from mwm.adapters.lewm import LeWMStableWMAdapter
 from mwm.adapters.registry import family_for_target
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
-from mwm.models.world_model import MatryoshkaWorldModel
+from mwm.models.base_adaptive import MatryoshkaWorldModel
 
 
 class AdapterPolicyTests(unittest.TestCase):

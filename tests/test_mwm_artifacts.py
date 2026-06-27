@@ -14,9 +14,11 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 
 import mwm.checkpoint_io as checkpoint_io
-from collect_mwm_data import _record_dataset_to_path
 from mwm.benchmark import matrix as benchmark_mwm
+from mwm.benchmark import output_verify as output_verify_module
 from mwm.benchmark.config import DEFAULTS, merged_run_config, validate_benchmark_matrix
+from mwm.benchmark.html import write_review_html
+from mwm.benchmark.summary import eval_summary_row, write_per_env_table, write_summary_csv
 from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
 from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.checkpoint_contract import validate_checkpoint_contract
@@ -30,18 +32,20 @@ from mwm.checkpoint_io import (
     save_world_checkpoint,
     validate_checkpoint_directory,
 )
-from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256
+from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256, write_manifest
+from mwm.data.collection import _record_dataset_to_path
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.sampling import StartGoalPair, sample_start_goal_pairs
-from mwm.eval.runner import _device as eval_device
-from mwm.benchmark.verify import (
-    append_paper_target_errors,
+from mwm.eval.runner import resolve_device as eval_device
+from mwm.benchmark.checkpoint_verify import (
     load_checkpoint_metadata_for_benchmark,
-    required_plots_for_benchmark,
     validate_benchmark_role_checkpoint_contract,
-    validate_paper_targets,
-    verify_benchmark_static,
 )
+from mwm.benchmark.paper_targets import append_paper_target_errors, validate_paper_targets
+from mwm.benchmark.plot_contract import BASE_REQUIRED_PLOTS, required_plots_for_benchmark
+from mwm.benchmark.output_verify import verify_benchmark_output
+from mwm.benchmark.static_verify import verify_benchmark_static
+from mwm.io import file_sha256 as io_file_sha256, write_json, write_metrics_jsonl
 from mwm.data.verify import verify_data_configs
 
 
@@ -119,8 +123,8 @@ def _lewm_source_config() -> dict:
 class MWMArtifactTests(unittest.TestCase):
     def test_eval_auto_device_uses_cuda_when_probe_succeeds(self) -> None:
         with (
-            mock.patch("mwm.eval.runner.torch.cuda.is_available", return_value=True),
-            mock.patch("mwm.eval.runner.torch.empty", return_value=torch.empty(1)) as empty,
+            mock.patch.object(torch.cuda, "is_available", return_value=True),
+            mock.patch.object(torch, "empty", return_value=torch.empty(1)) as empty,
         ):
             device = eval_device("auto")
 
@@ -129,8 +133,8 @@ class MWMArtifactTests(unittest.TestCase):
 
     def test_eval_auto_device_falls_back_to_cpu_when_cuda_probe_fails(self) -> None:
         with (
-            mock.patch("mwm.eval.runner.torch.cuda.is_available", return_value=True),
-            mock.patch("mwm.eval.runner.torch.empty", side_effect=RuntimeError("device unavailable")),
+            mock.patch.object(torch.cuda, "is_available", return_value=True),
+            mock.patch.object(torch, "empty", side_effect=RuntimeError("device unavailable")),
             self.assertWarnsRegex(RuntimeWarning, "falling back to CPU"),
         ):
             device = eval_device("auto")
@@ -436,6 +440,125 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
             with self.assertRaisesRegex(ValueError, "duplicate cells"):
                 validate_benchmark_matrix(cfg, resolved)
 
+    def test_benchmark_output_verifier_has_public_owner(self) -> None:
+        self.assertTrue(callable(verify_benchmark_output))
+
+    def test_benchmark_output_verifier_checks_minimal_output_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_dir = root / "out"
+            run_dir = output_dir / "000_upstream"
+            run_dir.mkdir(parents=True)
+            plots_dir = output_dir / "plots"
+            plots_dir.mkdir(parents=True)
+            eval_cfg = root / "eval.yaml"
+            eval_cfg.write_text(
+                """
+env_id: swm/PushT-v1
+checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
+data: {path: data/pusht_swm.lance, format: lance}
+eval: {seed: 0}
+planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+""",
+                encoding="utf-8",
+            )
+            manifest_path = root / "manifest.json"
+            bench_cfg = root / "benchmark.yaml"
+            bench_cfg.write_text(
+                f"""
+title: Minimal verifier fixture
+output_dir: {output_dir}
+env_id: swm/PushT-v1
+seed: 0
+eval_config: {eval_cfg}
+manifest: {{group: verifier_fixture, path: {manifest_path}}}
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/example
+""",
+                encoding="utf-8",
+            )
+            deps = {
+                "stable-worldmodel": {"sha256": "stable-worldmodel"},
+                "stable-pretraining": {"sha256": "stable-pretraining"},
+                "torch": {"sha256": "torch"},
+                "local_repo": {"commit_id": "local"},
+            }
+            manifest = generate_manifest(
+                env_id="swm/PushT-v1",
+                dataset_path="data/pusht_swm.lance",
+                pairs=[StartGoalPair(episode=0, start_step=0, goal_step=1, start_row=0, goal_row=1)],
+                goal_offset=1,
+                eval_budget=1,
+                seed=0,
+                restore_spec="pusht_state_goal_state",
+                dependency_shas=deps,
+            )
+            write_manifest(manifest_path, manifest)
+            for plot_name in BASE_REQUIRED_PLOTS:
+                (plots_dir / plot_name).write_bytes(b"png")
+
+            resolved_cfg = run_dir / "resolved_config.yaml"
+            resolved_cfg.write_text("env_id: swm/PushT-v1\n", encoding="utf-8")
+            eval_path = run_dir / "eval.json"
+            payload = {
+                "env_id": "swm/PushT-v1",
+                "checkpoint_epoch": 0,
+                "checkpoint_run_dir": "checkpoints_mwm/example",
+                "config": {"sha256": io_file_sha256(resolved_cfg)},
+                "manifest": {
+                    "path": str(manifest_path),
+                    "manifest_sha256": manifest["manifest_sha256"],
+                    "sha256": manifest_file_sha256(manifest_path),
+                },
+                "episodes": 1,
+                "goal_offset": 1,
+                "swm_results": {"success_rate": 100.0},
+                "planning_diagnostics": {
+                    "plans": 1,
+                    "steps": 1,
+                    "bits_used_total": 10,
+                    "plan_time_total_sec": 0.1,
+                    "summary": {"cem_cost_calls": 1, "candidate_action_values": 1},
+                },
+                "dependencies": deps,
+                "schedule": "fixed",
+                "role": "upstream_lewm_converted",
+                "seed": 0,
+                "wall_time_sec": 0.1,
+            }
+            write_json(eval_path, payload)
+            row = eval_summary_row("upstream", eval_path, payload)
+            write_json(run_dir / "summary.json", {"run": row})
+            write_json(run_dir / "dependencies.json", deps)
+            write_json(run_dir / "planning_diagnostics.json", payload["planning_diagnostics"])
+            write_metrics_jsonl(run_dir / "metrics.jsonl", [row])
+            write_metrics_jsonl(run_dir / "episode_traces.jsonl", [{"episode_index": 0, "success": True}])
+            write_summary_csv(output_dir / "summary.csv", [row])
+            write_metrics_jsonl(output_dir / "metrics.jsonl", [row])
+            write_per_env_table(output_dir / "per_env_summary.csv", [row])
+            plots = [str(plots_dir / name) for name in sorted(BASE_REQUIRED_PLOTS)]
+            write_review_html(output_dir / "review.html", "Minimal verifier fixture", [row], [payload], plots=plots, expected_cells=1)
+            write_json(
+                output_dir / "summary.json",
+                {
+                    "title": "Minimal verifier fixture",
+                    "output_dir": str(output_dir),
+                    "runs": [row],
+                    "manifest": {"group": "verifier_fixture", "path": str(manifest_path), "seed": 0},
+                    "plots": plots,
+                },
+            )
+
+            with mock.patch.object(output_verify_module, "load_checkpoint_metadata_for_benchmark", return_value={}):
+                report = verify_benchmark_output(str(bench_cfg))
+                self.assertEqual(report["runs"], 1)
+
+                (plots_dir / next(iter(BASE_REQUIRED_PLOTS))).unlink()
+                with self.assertRaisesRegex(ValueError, "missing file"):
+                    verify_benchmark_output(str(bench_cfg))
+
     def test_benchmark_run_config_merges_env_overrides(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "eval.yaml"
@@ -723,7 +846,8 @@ runs:
             result = subprocess.run(
                 [
                     sys.executable,
-                    "verify_mwm_benchmark.py",
+                    "-m",
+                    "mwm.benchmark.verify",
                     str(bench_cfg),
                     "--static-only",
                     "--no-checkpoints",
@@ -1088,7 +1212,7 @@ runs:
         import lance
 
         from mwm.data.metadata import load_dataset_metadata
-        from scripts.research.convert_reacher_h5_to_lance import convert_reacher_h5_to_lance
+        from mwm.upstream.converters.reacher import convert_reacher_h5_to_lance
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1115,7 +1239,7 @@ runs:
 
         from mwm.data.metadata import load_dataset_metadata
         from mwm.swm.restore import validate_restore_columns
-        from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+        from mwm.upstream.converters.ogb_cube import convert_ogb_cube_hdf5_to_lance
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1172,7 +1296,7 @@ runs:
         import h5py
         import lance
 
-        from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+        from mwm.upstream.converters.ogb_cube import convert_ogb_cube_hdf5_to_lance
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

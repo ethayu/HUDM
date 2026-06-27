@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -176,30 +177,37 @@ def prepare_ogb_cube(root: Path, *, source_h5: str | Path | None = None, convert
 
     for candidate in _ogb_cube_h5_candidates(root, source_h5):
         if candidate.is_file():
-            from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+            from mwm.upstream.converters.ogb_cube import convert_ogb_cube_hdf5_to_lance
 
             return convert_ogb_cube_hdf5_to_lance(candidate, lance_path, source_h5=candidate)
     candidates = "\n  - ".join(str(path) for path in _ogb_cube_h5_candidates(root, source_h5))
     raise FileNotFoundError(
         f"Missing upstream OGBench Cube Lance dataset {lance_path} and no extracted HDF5 source was found. "
         "Download/decompress the Le-WM Cube data, then run:\n"
-        f"  python scripts/research/convert_ogb_cube_hdf5_to_lance.py --source <cube_single_expert.h5> --output {lance_path}\n"
+        f"  python -m mwm.upstream.converters.ogb_cube --source <cube_single_expert.h5> --output {lance_path}\n"
         f"Checked:\n  - {candidates}"
     )
 
 
-def main() -> None:
-    import sys
-
-    root = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("data/upstream")
+def main(root: str | Path = "data/upstream", *, source_h5: str | Path | None = None, convert_ogb_cube: bool = True) -> None:
+    root = Path(root)
     out = {
         "pusht": str(prepare_pusht(root)),
         "reacher": str(prepare_reacher(root)),
         "tworoom": str(prepare_tworoom(root)),
-        "ogb_cube": str(prepare_ogb_cube(root)),
+        "ogb_cube": str(prepare_ogb_cube(root, source_h5=source_h5, convert_if_missing=convert_ogb_cube)),
     }
     print(json.dumps(out, indent=2, sort_keys=True))
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Prepare upstream Le-WM Lance datasets and metadata.")
+    parser.add_argument("root", nargs="?", default="data/upstream", help="Directory containing upstream Lance datasets")
+    parser.add_argument("--source-h5", default=None, help="Optional OGBench Cube HDF5 source for conversion")
+    parser.add_argument(
+        "--no-convert-ogb-cube",
+        action="store_true",
+        help="Require a prebuilt OGBench Cube Lance dataset instead of converting from HDF5",
+    )
+    args = parser.parse_args()
+    main(args.root, source_h5=args.source_h5, convert_ogb_cube=not args.no_convert_ogb_cube)

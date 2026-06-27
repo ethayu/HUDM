@@ -16,12 +16,12 @@ fi
 
 DATASET="data/reacher_qpos_match_smoke.lance"
 if [[ ! -e "$DATASET" ]]; then
-  "$PY" collect_mwm_data.py configs/local/collect_reacher_smoke.yaml
+  "$PY" -m mwm.data.collection configs/local/collect_reacher_smoke.yaml
 else
   echo "Using existing Reacher smoke dataset: $DATASET"
 fi
 
-"$PY" train_mwm.py configs/local/train_reacher_cpu_smoke.yaml
+"$PY" -m mwm.training.lewm configs/local/train_reacher_cpu_smoke.yaml
 
 CHECKPOINT="checkpoints_mwm/local_reacher_cpu_smoke"
 for name in config.json weights.pt world_metadata.json; do

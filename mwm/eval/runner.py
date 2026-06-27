@@ -3,37 +3,6 @@ from __future__ import annotations
 import warnings
 from pathlib import Path
 
-import torch
-from omegaconf import OmegaConf
-
-from mwm.checkpoint_io import load_world_model_from_checkpoint
-from mwm.config_cli import load_config
-from mwm.data.paths import local_path
-from mwm.dependency_refs import dependency_refs
-from mwm.eval.action_preprocessing import (
-    available_stat_keys_for_action_process,
-    build_eval_process,
-    uses_standardized_action_space,
-)
-from mwm.eval.execution import (
-    combine_mwm_diagnostics,
-    combine_policy_diagnostics,
-    combine_swm_results,
-    run_batch,
-)
-from mwm.eval.manifest import pairs_for_eval
-from mwm.eval.policy import model_accounting
-from mwm.eval.validation import (
-    close_dataset,
-    dataset_path,
-    dataset_runtime_metadata,
-    eval_keys_to_load,
-    validate_dataset_metadata,
-)
-from mwm.io import jsonable, write_json
-from mwm.swm.envs import parse_image_shape
-from mwm.swm.restore import eval_callables_for_env
-
 
 DEFAULTS = {
     "checkpoint": {"run_dir": "checkpoints_mwm/run", "epoch": None},
@@ -85,7 +54,9 @@ DEFAULTS = {
 }
 
 
-def _device(raw: str) -> torch.device:
+def resolve_device(raw: str):
+    import torch
+
     if str(raw) == "auto":
         if torch.cuda.is_available():
             try:
@@ -103,8 +74,38 @@ def _device(raw: str) -> torch.device:
 
 
 def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
+    from omegaconf import OmegaConf
+
+    from mwm.checkpoint_io import load_world_model_from_checkpoint
+    from mwm.config_cli import load_config
+    from mwm.data.paths import local_path
+    from mwm.dependency_refs import dependency_refs
+    from mwm.eval.action_preprocessing import (
+        available_stat_keys_for_action_process,
+        build_eval_process,
+        uses_standardized_action_space,
+    )
+    from mwm.eval.execution import (
+        combine_mwm_diagnostics,
+        combine_policy_diagnostics,
+        combine_swm_results,
+        run_batch,
+    )
+    from mwm.eval.manifest import pairs_for_eval
+    from mwm.eval.policy import model_accounting
+    from mwm.eval.validation import (
+        close_dataset,
+        dataset_path,
+        dataset_runtime_metadata,
+        eval_keys_to_load,
+        validate_dataset_metadata,
+    )
+    from mwm.io import jsonable, write_json
+    from mwm.swm.envs import parse_image_shape
+    from mwm.swm.restore import eval_callables_for_env
+
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
-    device = _device(str(cfg.device))
+    device = resolve_device(str(cfg.device))
     data_format = str(cfg.data.get("format", "lance")).lower()
     if data_format != "lance":
         raise ValueError(f"MWM evaluation requires format lance, got format={data_format!r}.")
@@ -209,4 +210,4 @@ if __name__ == "__main__":
     main(args.config, overrides=args.set)
 
 
-__all__ = ["DEFAULTS", "main"]
+__all__ = ["DEFAULTS", "main", "resolve_device"]

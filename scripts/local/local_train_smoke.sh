@@ -11,4 +11,4 @@ if [[ "${RUN_CPU_TRAIN_SMOKE:-0}" != "1" ]]; then
   exit 2
 fi
 
-"$PY" train_mwm.py configs/local/train_pusht_cpu_smoke.yaml
+"$PY" -m mwm.training.lewm configs/local/train_pusht_cpu_smoke.yaml

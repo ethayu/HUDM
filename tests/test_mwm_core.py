@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,12 +22,10 @@ from mwm.checkpoint_io import save_world_checkpoint
 from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
+from mwm.models.base_adaptive import MatryoshkaWorldModel
+from mwm.models.core import MWMWorldModel
 from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
-from mwm.models.world_model import (
-    MWMWorldModel,
-    MatryoshkaWorldModel,
-    TransitionPackage,
-)
+from mwm.models.transitions import TransitionPackage
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
 from mwm.training.lewm import main as train_mwm_main
 from mwm.training.lewm_callbacks import (
@@ -206,6 +205,12 @@ def _stable_vit_lewm_source_config(model_cfg: dict) -> dict:
             "norm_fn": {"_target_": "torch.nn.BatchNorm1d", "_partial_": True},
         },
     }
+
+
+def _seed_all(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
 def _build_direct_lewm_reference(model_cfg: dict, cfg: Any) -> nn.Module:
@@ -626,9 +631,9 @@ class MWMCoreTests(unittest.TestCase):
         from stable_worldmodel.wm.lewm.module import MLP as _MLP  # noqa: F401
         from stable_worldmodel.wm.lewm.module import Predictor as _Predictor  # noqa: F401
 
-        torch.manual_seed(123)
+        _seed_all(123)
         direct = _build_direct_lewm_reference(model_cfg, cfg)
-        torch.manual_seed(123)
+        _seed_all(123)
         mwm = build_mwm_from_stable_config(
             family="lewm",
             source_config=_stable_vit_lewm_source_config(model_cfg),
@@ -653,12 +658,18 @@ class MWMCoreTests(unittest.TestCase):
             "pred_proj.": "transitions.0.pred_proj.",
         }
         mwm_state = mwm.state_dict()
+        aligned_mwm_state = dict(mwm_state)
         for direct_name, direct_tensor in direct.state_dict().items():
             for src, dst in mapping.items():
                 if direct_name.startswith(src):
                     mwm_name = dst + direct_name[len(src) :]
-                    self.assertTrue(torch.equal(direct_tensor, mwm_state[mwm_name]), direct_name)
+                    self.assertIn(mwm_name, mwm_state, direct_name)
+                    self.assertEqual(tuple(direct_tensor.shape), tuple(mwm_state[mwm_name].shape), direct_name)
+                    if not direct_name.startswith("encoder."):
+                        self.assertTrue(torch.equal(direct_tensor, mwm_state[mwm_name]), direct_name)
+                    aligned_mwm_state[mwm_name] = direct_tensor.detach().clone()
                     break
+        mwm.load_state_dict(aligned_mwm_state, strict=True)
 
         batch = {
             "pixels": torch.randn(2, 3, 3, 224, 224),

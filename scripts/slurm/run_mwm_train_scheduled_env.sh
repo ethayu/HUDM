@@ -24,5 +24,5 @@ esac
 
 cd "$ROOT"
 
-"$PY" verify_mwm_data.py --paper-parity
-"$PY" train_mwm.py "$CONFIG"
+"$PY" -m mwm.data.verify --paper-parity
+"$PY" -m mwm.training.lewm "$CONFIG"

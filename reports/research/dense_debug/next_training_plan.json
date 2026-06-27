@@ -32,6 +32,7 @@
     }
   },
   "exact_training_command": "DENSE_HIGHK_ENV=tworoom sbatch --parsable --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch",
+  "current_replay_command": "DENSE_HIGHK_ENV=tworoom sbatch --parsable --export=ALL,DENSE_HIGHK_ENV scripts/research/research_train_dense_highk_converge.sbatch",
   "job_id": "6384263",
   "submit_output": [
     "sbatch: lua: cli_filter: defaulting --qos=mig for partition 'b200-mig90' (acct=dineshj-lab)",

@@ -4,8 +4,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from omegaconf import OmegaConf
-
 from mwm.data.metadata import dataset_metadata_path, load_dataset_metadata
 
 
@@ -35,6 +33,8 @@ PAPER_PARITY_CONFIGS = [
 
 
 def _data_cfg(path: str | Path) -> dict[str, Any] | None:
+    from omegaconf import OmegaConf
+
     cfg = OmegaConf.load(str(path))
     data = cfg.get("data", None)
     if not isinstance(data, dict) and not OmegaConf.is_config(data):
@@ -81,13 +81,27 @@ def verify_data_configs(config_paths: list[str | Path] | None = None) -> dict[st
 
 
 def _resolve_cli_paths(argv: list[str]) -> list[str | Path] | None:
-    if not argv:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Verify MWM Lance dataset configs and sidecar metadata.")
+    parser.add_argument("configs", nargs="*", help="Optional config paths to verify instead of the default smoke set.")
+    parser.add_argument("--paper-parity", action="store_true", help="Verify paper-parity train/eval configs.")
+    parser.add_argument("--all", dest="all_configs", action="store_true", help="Verify default and paper-parity configs.")
+    args = parser.parse_args(argv)
+
+    selected_modes = int(bool(args.paper_parity)) + int(bool(args.all_configs))
+    if selected_modes > 1:
+        parser.error("--paper-parity and --all are mutually exclusive")
+    if args.configs and selected_modes:
+        parser.error("explicit config paths cannot be combined with --paper-parity or --all")
+
+    if not args.configs and not selected_modes:
         return None
-    if argv == ["--paper-parity"]:
+    if args.paper_parity:
         return PAPER_PARITY_CONFIGS
-    if argv == ["--all"]:
+    if args.all_configs:
         return [*DEFAULT_CONFIGS, *PAPER_PARITY_CONFIGS]
-    return argv
+    return args.configs
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -98,11 +112,13 @@ def main(argv: list[str] | None = None) -> None:
     print(json.dumps(report, indent=2, sort_keys=True))
 
 
+if __name__ == "__main__":
+    main()
+
+
 __all__ = [
     "DEFAULT_CONFIGS",
     "PAPER_PARITY_CONFIGS",
-    "_data_cfg",
-    "_resolve_cli_paths",
     "main",
     "verify_data_configs",
 ]

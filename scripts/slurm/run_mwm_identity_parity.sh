@@ -13,7 +13,7 @@ cd "$ROOT"
 export MUJOCO_GL="${MUJOCO_GL:-egl}"
 export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"
 
-"$PY" verify_mwm_data.py --paper-parity
+"$PY" -m mwm.data.verify --paper-parity
 
 status=0
 run_step() {
@@ -24,17 +24,17 @@ run_step() {
   fi
 }
 
-run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml \
+run_step "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
+run_step "$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_pusht.yaml \
   --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml \
+run_step "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
+run_step "$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_reacher.yaml \
   --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_ogb_cube.yaml \
+run_step "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
+run_step "$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_ogb_cube.yaml \
   --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" benchmark_mwm.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
-run_step "$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml \
+run_step "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
+run_step "$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_tworoom.yaml \
   --roles upstream_lewm_converted retrained_lewm_identity
 
 exit "$status"

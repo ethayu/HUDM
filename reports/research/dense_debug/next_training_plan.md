@@ -48,6 +48,8 @@ DENSE_HIGHK_ENV=tworoom \
 sbatch --parsable --export=ALL,DENSE_HIGHK_ENV scripts/research_train_dense_highk_converge.sbatch
 ```
 
+Current replay command: `DENSE_HIGHK_ENV=tworoom sbatch --parsable --export=ALL,DENSE_HIGHK_ENV scripts/research/research_train_dense_highk_converge.sbatch`.
+
 Submit output:
 
 ```text

@@ -129,10 +129,10 @@ the public construction API.
 
 ## Generic Runtime Pieces
 
-`mwm.models.world_model` is retained as a compatibility facade for older import
-paths. The shared runtime for Le-WM-shaped latent prediction is implemented in
+`mwm.models.core.MWMWorldModel` is the abstract runtime contract. The shared
+runtime for Le-WM-shaped latent prediction is implemented in
 `mwm.models.base_adaptive.MatryoshkaWorldModel`, with support types split across
-`mwm.models.transitions`, `mwm.models.objectives`, and
+`mwm.models.transitions`, `mwm.models.losses`, `mwm.models.objectives`, and
 `mwm.models.planning_costs`:
 
 - shared encoder/projector latent production;
@@ -147,9 +147,8 @@ If another base has the same latent-transition shape, reuse
 
 If another base has a different objective or rollout contract, add the generic
 hook in the owning model module for base-provided per-level loss/rollout
-behavior and re-export it from `world_model.py` only if compatibility requires
-it. Do not put special inference behavior or hidden source-model calls in the
-adapter.
+behavior. Do not put special inference behavior or hidden source-model calls in
+the adapter.
 
 Use this rule of thumb:
 
@@ -176,11 +175,11 @@ To make a new family trainable:
 - add the family to the Stable-WM registry mapping in `mwm/adapters/registry.py`;
 - add a train config with `base.family`, source checkpoint, data path, `D`, `K`,
   and the base training recipe;
-- route `train_mwm.py` to the generic builder for that family and its dataset
+- route `mwm.training.lewm` to the generic builder for that family and its dataset
   shape;
 - export canonical checkpoints with `config.json`, `weights.pt`, and
   `world_metadata.json`;
-- teach `verify_mwm_benchmark.py` the expected checkpoint contract for the new
+- teach `mwm.benchmark.checkpoint_verify` the expected checkpoint contract for the new
   role/family;
 - add benchmark config rows for the relevant environments.
 

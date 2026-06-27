@@ -13,19 +13,10 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `REVIEW_GUIDE.md`: Reviewer contract: current expected runtime surface, removed legacy APIs, and validation commands.
 - `LIBRARY_FILE_REVIEW.md`: This file; a file-by-file orientation map for reviewing the current library surface.
 - `requirements.txt`: Python dependency list, including pinned `stable-worldmodel[env]==0.1.0`.
-- `collect_mwm_data.py`: CLI for collecting Stable-WM world rollouts into Lance datasets and writing MWM dataset metadata sidecars.
-- `prepare_upstream_lewm.py`: Converts trusted upstream Le-WM checkpoints into canonical MWM identity-parity checkpoints by building an MWM shell and copying upstream weights.
-- `prepare_upstream_lewm_data.py`: Verifies or converts upstream Lance datasets and writes paper-parity metadata sidecars for PushT, Reacher, OGBench Cube, and TwoRoom.
-- `train_mwm.py`: Thin root CLI for Le-WM base-adapter training or exporting a Lightning checkpoint to canonical MWM format.
-- `eval_mwm.py`: Thin root CLI that delegates checkpoint evaluation to `mwm.eval.runner`.
-- `benchmark_mwm.py`: Thin root CLI that delegates benchmark matrix execution to `mwm.benchmark.matrix`.
-- `verify_mwm_data.py`: Thin root CLI that delegates Lance dataset/config verification to `mwm.data.verify`.
-- `verify_mwm_benchmark.py`: Thin root CLI that delegates static or output benchmark verification to `mwm.benchmark.verify`.
-- `render_benchmark_review.py`: Re-renders plots, CSV/JSONL summaries, and HTML review pages from an existing benchmark output directory.
 
 ## `mwm` Package
 
-- `mwm/__init__.py`: Canonical package marker with a lazy failure for retired root symbols such as `MWMWorldModel`.
+- `mwm/__init__.py`: Canonical package marker; model classes are imported from their owning modules rather than the package root.
 - `mwm/imports.py`: Import-path resolver for `module.attr` or `module:attr` strings.
 - `mwm/io.py`: JSON, JSONL metrics, numpy/tensor-to-JSON conversion, and file SHA utilities.
 - `mwm/config_cli.py`: Shared OmegaConf loader with dotlist override support.
@@ -46,18 +37,18 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 
 ### Models
 
-- `mwm/models/__init__.py`: Public model/loss/preprocessing exports.
+- `mwm/models/__init__.py`: Direct package convenience exports imported from canonical model, loss, transition, and preprocessing owners.
 - `mwm/models/core.py`: Generic `MWMWorldModel` runtime base with encode, per-level dynamics rollout, scheduled rollout, decode, and cost-with-fidelity methods.
 - `mwm/models/base_adaptive.py`: Active Le-WM-shaped `MatryoshkaWorldModel`; shared image encoder/projector, per-level transition packages, training loss, fixed-level rollout, and planner cost.
 - `mwm/models/transitions.py`: `TransitionPackage(action_encoder, predictor, pred_proj)` wrapper for per-level latent prediction.
 - `mwm/models/losses.py`: Level-weighted aggregation, latent regularizer routing, and matryoshka base-loss composition.
 - `mwm/models/objectives.py`: Le-WM-style MWM training objective over encoded latents and per-level prefix predictions.
 - `mwm/models/planning_costs.py`: Helpers that enforce fixed-level rollout decisions for the current base-adaptive evaluator.
-- `mwm/models/world_model.py`: Compatibility facade for older import paths; re-exports current model/loss/preprocess symbols.
 
 ### Data
 
 - `mwm/data/__init__.py`: Empty data package marker.
+- `mwm/data/collection.py`: CLI for collecting Stable-WM world rollouts into Lance datasets and writing MWM dataset metadata sidecars.
 - `mwm/data/loading.py`: Stable-WM dataset loader wrapper that installs the MWM training sample transform.
 - `mwm/data/manifest.py`: Immutable eval manifest creation/loading, logical manifest hash, and file hash support.
 - `mwm/data/metadata.py`: Dataset metadata sidecar path, read, and write helpers.
@@ -67,6 +58,15 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/data/transforms.py`: Training sample transform, z-score scaler, action/pixel normalization, and stable-pretraining image transform assembly.
 - `mwm/data/verify.py`: Lance-only data config verifier and CLI modes for default, paper-parity, and all config sets.
 
+### Upstream
+
+- `mwm/upstream/__init__.py`: Upstream package marker.
+- `mwm/upstream/lewm_checkpoints.py`: Converts trusted upstream Le-WM checkpoints into canonical MWM identity-parity checkpoints by building an MWM shell and copying upstream weights.
+- `mwm/upstream/lewm_data.py`: Verifies or converts upstream Lance datasets and writes paper-parity metadata sidecars for PushT, Reacher, OGBench Cube, and TwoRoom.
+- `mwm/upstream/converters/__init__.py`: Upstream converter package marker.
+- `mwm/upstream/converters/reacher.py`: Converts Reacher HDF5 data into Lance format and writes MWM metadata used by paper-parity workflows.
+- `mwm/upstream/converters/ogb_cube.py`: Converts OGBench Cube HDF5 data into Lance format with privileged state columns and metadata.
+
 ### Evaluation
 
 - `mwm/eval/__init__.py`: Empty eval package marker.
@@ -75,7 +75,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/eval/manifest.py`: Converts manifest rows to `StartGoalPair`s or samples/writes manifests for eval runs.
 - `mwm/eval/policy.py`: Stable-WM policy wrapper that tracks action calls, plan time, latent work, and solver diagnostics.
 - `mwm/eval/policy_builder.py`: Constructs `MWMScheduledCEMSolver`, `PlanConfig`, image transforms, and `MWMWorldModelPolicy`.
-- `mwm/eval/runner.py`: Main evaluation orchestrator: config load, checkpoint load, dataset load, metadata/restore validation, manifest selection, batch execution, and output JSON writing.
+- `mwm/eval/runner.py`: Main evaluation CLI/orchestrator: public device resolution, config load, checkpoint load, dataset load, metadata/restore validation, manifest selection, batch execution, and output JSON writing.
 - `mwm/eval/validation.py`: Dataset metadata validation, manifest validation, keys-to-load resolution, dataset path/runtime metadata helpers, and dataset close helper.
 
 ### Benchmarking
@@ -86,9 +86,16 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/benchmark/html.py`: Static HTML review renderer with status cards, warnings, outcome tables, plots, drilldown links, notes, and media links.
 - `mwm/benchmark/io.py`: Per-run sidecar writer plus public re-exports for common IO helpers.
 - `mwm/benchmark/matrix.py`: Executes benchmark run matrices, manages shared manifests, logs failures, writes summaries/sidecars/traces/plots/review HTML.
+- `mwm/benchmark/matrix_identity.py`: Shared expected-cell and metric identity helpers used by static and output verification.
+- `mwm/benchmark/checkpoint_verify.py`: Checkpoint metadata loading plus role-specific benchmark checkpoint contract validation.
+- `mwm/benchmark/paper_targets.py`: Paper target success-rate and retrained-vs-upstream tolerance checks.
+- `mwm/benchmark/plot_contract.py`: Required plot set selection by benchmark roles.
+- `mwm/benchmark/output_verify.py`: Output artifact verifier for summaries, metrics, sidecars, manifests, plots, review HTML links, and dependency refs.
+- `mwm/benchmark/static_verify.py`: Static benchmark verifier for config matrix shape, paper targets, and optional checkpoint role contracts.
 - `mwm/benchmark/plots.py`: Matplotlib plot generation for success vs compute/time, by-env success, paired deltas, efficiency ratios, and scheduler usage.
+- `mwm/benchmark/render_review.py`: Re-renders plots, CSV/JSONL summaries, and HTML review pages from an existing benchmark output directory.
 - `mwm/benchmark/summary.py`: Converts eval payloads into summary rows and writes aggregate/per-env CSV tables.
-- `mwm/benchmark/verify.py`: Static and output verifier for benchmark completeness, shared manifests, dependency refs, checkpoint role contracts, paper targets, plots, HTML links, and sidecars.
+- `mwm/benchmark/verify.py`: CLI-only orchestrator for selecting static or output benchmark verification.
 
 ### Planning, Preprocessing, SWM
 
@@ -179,8 +186,6 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `scripts/local/local_train_smoke.sh`: Opt-in CPU training smoke wrapper.
 - `scripts/local/local_reacher_train_smoke.sh`: Opt-in local Reacher CPU smoke workflow that collects a tiny dataset if needed, trains, and checks canonical checkpoint files.
 - `scripts/local/local_ogb_cube_train_smoke.sh`: Opt-in local OGBench Cube CPU smoke workflow that collects a tiny dataset if needed, trains, and checks canonical checkpoint files.
-- `scripts/research/convert_reacher_h5_to_lance.py`: Converts Reacher HDF5 data into Lance format and writes MWM metadata used by paper-parity workflows.
-- `scripts/research/convert_ogb_cube_hdf5_to_lance.py`: Converts OGBench Cube HDF5 data into Lance format with privileged state columns and metadata.
 - `scripts/research/research_dense_reacher_debug.sbatch`: Slurm entrypoint for dense Reacher debugging experiments.
 - `scripts/research/research_identity_delta_audit.py`: Deep audit script comparing identity/upstream checkpoints, configs, datasets, logs, rollouts, and writing markdown/json research reports.
 - `scripts/research/research_identity_delta_collect.py`: Aggregates seed-sweep benchmark summaries, failure overlaps, and identity-minus-upstream deltas.

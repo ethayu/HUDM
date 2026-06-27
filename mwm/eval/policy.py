@@ -3,9 +3,6 @@ from __future__ import annotations
 import time
 from typing import Any
 
-from mwm.preprocessing.images import imagenet_image_input_transform, mwm_image_input_transform
-
-
 try:
     from stable_worldmodel.policy import WorldModelPolicy
 except Exception:  # pragma: no cover - optional dependency
@@ -98,7 +95,5 @@ class MWMWorldModelPolicy(WorldModelPolicy):
 __all__ = [
     "MWMWorldModelPolicy",
     "WorldModelPolicy",
-    "imagenet_image_input_transform",
     "model_accounting",
-    "mwm_image_input_transform",
 ]

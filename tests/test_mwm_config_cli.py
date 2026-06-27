@@ -47,7 +47,8 @@ class MWMConfigCLITests(unittest.TestCase):
         result = subprocess.run(
             [
                 sys.executable,
-                "train_mwm.py",
+                "-m",
+                "mwm.training.lewm",
                 "missing.yaml",
                 "--export-from-lightning",
                 "missing.ckpt",
@@ -62,6 +63,24 @@ class MWMConfigCLITests(unittest.TestCase):
 
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("--set is only supported for training", result.stderr)
+
+    def test_data_verify_module_help_lists_modes(self) -> None:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "mwm.data.verify",
+                "--help",
+            ],
+            cwd=Path(__file__).resolve().parents[1],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--paper-parity", result.stdout)
+        self.assertIn("--all", result.stdout)
 
 
 if __name__ == "__main__":

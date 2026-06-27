@@ -100,13 +100,13 @@ For TwoRoom, the K=192 transition head is not the main failure. With a 96D cost 
 
 The effect is teased out by harder offsets/horizons. TwoRoom K192 under K96 by `-14.0` at offset 25/horizon 5, but by `-40.7` at offset 100/horizon 9. On PushT, harder conditions lower absolute success for all K and reduce the K192 advantage, but do not show the same harmful suffix-cost signature.
 
-Caveat: the corrected K sweep materialized per-run `eval` and `planner` overrides. `benchmark_mwm.py` does not apply per-run `env` overrides the same way, so the offset-100 probes used the intended larger goal offsets/budgets while retaining the base eval config's environment step cap.
+Caveat: the corrected K sweep materialized per-run `eval` and `planner` overrides. The `mwm.benchmark.matrix` module does not apply per-run `env` overrides the same way, so the offset-100 probes used the intended larger goal offsets/budgets while retaining the base eval config's environment step cap.
 
 ## Experiments Run
 
 Checkpoint/training audit:
 
-- Script: `/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python scripts/research_dense_debug_audit.py`
+- Audit helper: retired dense-debug research helper; the listed outputs remain historical artifacts.
 - Outputs: `checkpoint_audit.md`, `scheduler_diagnostics.md`, `training_diagnostics.md`, `audit_summary.json`
 - Canonical dense train logs audited: `logs/mwm_train_pusht_dense_6196243.out`, `logs/mwm_train_tworoom_dense_6196244.out`
 
@@ -225,7 +225,7 @@ sbatch --job-name=mwm_dense_tworoom_highk \
   --cpus-per-task=16 \
   --mem=128G \
   --time=4-00:00:00 \
-  --wrap='cd "$SLURM_SUBMIT_DIR" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=${MWM_ARTIFACT_ROOT} && [[ -e data ]] || ln -s "$ARTIFACT_ROOT/data" data && $MWM_PYTHON verify_mwm_data.py --paper-parity && $MWM_PYTHON train_mwm.py configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'
+  --wrap='cd "$SLURM_SUBMIT_DIR" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=${MWM_ARTIFACT_ROOT} && [[ -e data ]] || ln -s "$ARTIFACT_ROOT/data" data && $MWM_PYTHON -m mwm.data.verify --paper-parity && $MWM_PYTHON -m mwm.training.lewm configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'
 ```
 
 Then rerun the K matrix on the new checkpoint:

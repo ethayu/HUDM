@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 import unittest
 
@@ -16,6 +17,28 @@ else:
 
 
 class MWMDataBoundaryTests(unittest.TestCase):
+    def test_data_and_upstream_clis_live_in_canonical_package_modules(self) -> None:
+        for module_name in (
+            "mwm.data.collection",
+            "mwm.upstream.lewm_checkpoints",
+            "mwm.upstream.lewm_data",
+            "mwm.upstream.converters.reacher",
+            "mwm.upstream.converters.ogb_cube",
+        ):
+            with self.subTest(module=module_name):
+                module = importlib.import_module(module_name)
+                self.assertTrue(callable(getattr(module, "main", None)))
+
+        for rel in (
+            "collect_mwm_data.py",
+            "prepare_upstream_lewm.py",
+            "prepare_upstream_lewm_data.py",
+            "scripts/research/convert_reacher_h5_to_lance.py",
+            "scripts/research/convert_ogb_cube_hdf5_to_lance.py",
+        ):
+            with self.subTest(path=rel):
+                self.assertFalse((ROOT / rel).exists(), rel)
+
     @unittest.skipUnless(HAS_DATA_DEPS, "requires numpy and torch")
     def test_data_helpers_live_in_canonical_modules(self) -> None:
         from mwm.data.metadata import dataset_metadata_path, load_dataset_metadata, write_dataset_metadata
@@ -38,12 +61,11 @@ class MWMDataBoundaryTests(unittest.TestCase):
 
     def test_image_preprocessing_implementation_lives_in_preprocessing_package(self) -> None:
         eval_policy = (ROOT / "mwm" / "eval" / "policy.py").read_text(encoding="utf-8")
-        world_model = (ROOT / "mwm" / "models" / "world_model.py").read_text(encoding="utf-8")
         preprocessing = (ROOT / "mwm" / "preprocessing" / "images.py").read_text(encoding="utf-8")
 
         self.assertNotIn("def mwm_image_input_transform(", eval_policy)
         self.assertNotIn("def imagenet_image_input_transform(", eval_policy)
-        self.assertNotIn("class ImageNetPreprocess", world_model)
+        self.assertFalse((ROOT / "mwm" / "models" / "world_model.py").exists())
         self.assertIn("def mwm_image_input_transform(", preprocessing)
         self.assertIn("def imagenet_image_input_transform(", preprocessing)
         self.assertIn("class ImageNetPreprocess", preprocessing)

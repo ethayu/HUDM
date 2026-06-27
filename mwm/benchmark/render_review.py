@@ -5,11 +5,6 @@ import json
 from pathlib import Path
 from typing import Any
 
-from mwm.benchmark.html import write_review_html
-from mwm.benchmark.plots import write_default_plots
-from mwm.benchmark.summary import write_per_env_table, write_summary_csv
-from mwm.io import load_json, write_json, write_metrics_jsonl
-
 
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.is_file():
@@ -19,6 +14,11 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def render_benchmark_review(output_dir: str | Path, *, title: str | None = None) -> dict[str, Any]:
+    from mwm.benchmark.html import write_review_html
+    from mwm.benchmark.plots import write_default_plots
+    from mwm.benchmark.summary import write_per_env_table, write_summary_csv
+    from mwm.io import load_json, write_json, write_metrics_jsonl
+
     root = Path(output_dir)
     summary_path = root / "summary.json"
     if not summary_path.is_file():
@@ -65,3 +65,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+__all__ = ["main", "render_benchmark_review"]

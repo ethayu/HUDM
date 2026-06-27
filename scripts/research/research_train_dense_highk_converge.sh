@@ -20,8 +20,8 @@ run_one() {
   local config="configs/research/train_mwm_dense_${env_name}_highk_weighted_converge.yaml"
   echo "[dense-highk-converge] env=${env_name}"
   echo "[dense-highk-converge] config=${config}"
-  "${PYTHON_BIN}" verify_mwm_data.py --paper-parity
-  "${PYTHON_BIN}" train_mwm.py "${config}"
+  "${PYTHON_BIN}" -m mwm.data.verify --paper-parity
+  "${PYTHON_BIN}" -m mwm.training.lewm "${config}"
 }
 
 case "${ENV_NAME}" in

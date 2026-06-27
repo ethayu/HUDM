@@ -7,16 +7,19 @@ The review story is intentionally narrow: every evaluated checkpoint is loaded a
 ## Quick Start
 
 ```bash
-python collect_mwm_data.py configs/collect/mwm_pusht.yaml
-python collect_mwm_data.py configs/collect/mwm_tworoom.yaml
-python verify_mwm_data.py
-python prepare_upstream_lewm.py
-python train_mwm.py configs/train/mwm_lewm_pusht.yaml
-python train_mwm.py configs/train/mwm_lewm_tworoom.yaml
-python train_mwm.py configs/train/mwm_scheduled_pusht.yaml
-python train_mwm.py configs/train/mwm_scheduled_tworoom.yaml
-python benchmark_mwm.py configs/benchmark/scheduled_pusht.yaml
-python verify_mwm_benchmark.py configs/benchmark/scheduled_pusht.yaml
+python -m mwm.data.collection configs/collect/mwm_pusht.yaml
+python -m mwm.data.collection configs/collect/mwm_tworoom.yaml
+python -m mwm.data.verify
+python -m mwm.upstream.lewm_checkpoints
+python -m mwm.upstream.lewm_data
+python -m mwm.training.lewm configs/train/mwm_lewm_pusht.yaml
+python -m mwm.training.lewm configs/train/mwm_lewm_tworoom.yaml
+python -m mwm.training.lewm configs/train/mwm_scheduled_pusht.yaml
+python -m mwm.training.lewm configs/train/mwm_scheduled_tworoom.yaml
+python -m mwm.eval.runner configs/eval/mwm_lewm_pusht.yaml
+python -m mwm.benchmark.matrix configs/benchmark/scheduled_pusht.yaml
+python -m mwm.benchmark.verify configs/benchmark/scheduled_pusht.yaml
+python -m mwm.benchmark.render_review rollouts/mwm_benchmark
 ```
 
 The upstream paper-parity sanity check is:
@@ -75,7 +78,7 @@ Use `MWM_PYTHON=/path/to/python` if your Python is not named `python`.
 ## Architecture
 
 - `mwm.models.core.MWMWorldModel` is the runtime model contract, and
-  `MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
+  `mwm.models.base_adaptive.MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
 - `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs,
   registers the Le-WM adapter, then returns the normal `MatryoshkaWorldModel`.
   `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;

@@ -115,16 +115,16 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         reacher_text = (ROOT / "scripts" / "local" / "local_reacher_train_smoke.sh").read_text(encoding="utf-8")
         self.assertIn('${MUJOCO_GL:-egl}', reacher_text)
         self.assertIn('${PYOPENGL_PLATFORM:-egl}', reacher_text)
-        self.assertIn("collect_mwm_data.py configs/local/collect_reacher_smoke.yaml", reacher_text)
-        self.assertIn("train_mwm.py configs/local/train_reacher_cpu_smoke.yaml", reacher_text)
+        self.assertIn("-m mwm.data.collection configs/local/collect_reacher_smoke.yaml", reacher_text)
+        self.assertIn("-m mwm.training.lewm configs/local/train_reacher_cpu_smoke.yaml", reacher_text)
         for name in ("config.json", "weights.pt", "world_metadata.json"):
             self.assertIn(name, reacher_text)
 
         cube_text = (ROOT / "scripts" / "local" / "local_ogb_cube_train_smoke.sh").read_text(encoding="utf-8")
         self.assertIn('${MUJOCO_GL:-egl}', cube_text)
         self.assertIn('${PYOPENGL_PLATFORM:-egl}', cube_text)
-        self.assertIn("collect_mwm_data.py configs/local/collect_ogb_cube_smoke.yaml", cube_text)
-        self.assertIn("train_mwm.py configs/local/train_ogb_cube_cpu_smoke.yaml", cube_text)
+        self.assertIn("-m mwm.data.collection configs/local/collect_ogb_cube_smoke.yaml", cube_text)
+        self.assertIn("-m mwm.training.lewm configs/local/train_ogb_cube_cpu_smoke.yaml", cube_text)
         for name in ("config.json", "weights.pt", "world_metadata.json"):
             self.assertIn(name, cube_text)
 

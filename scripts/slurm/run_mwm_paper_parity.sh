@@ -11,28 +11,28 @@ fi
 
 cd "$ROOT"
 
-"$PY" prepare_upstream_lewm.py
-"$PY" prepare_upstream_lewm_data.py
-"$PY" verify_mwm_data.py --paper-parity
+"$PY" -m mwm.upstream.lewm_checkpoints
+"$PY" -m mwm.upstream.lewm_data
+"$PY" -m mwm.data.verify --paper-parity
 
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
 
-"$PY" train_mwm.py configs/train/mwm_lewm_pusht_upstream.yaml
-"$PY" train_mwm.py configs/train/mwm_lewm_reacher_upstream.yaml
-"$PY" train_mwm.py configs/train/mwm_lewm_ogb_cube_upstream.yaml
-"$PY" train_mwm.py configs/train/mwm_lewm_tworoom_upstream.yaml
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" benchmark_mwm.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
-"$PY" verify_mwm_benchmark.py configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.training.lewm configs/train/mwm_lewm_pusht_upstream.yaml
+"$PY" -m mwm.training.lewm configs/train/mwm_lewm_reacher_upstream.yaml
+"$PY" -m mwm.training.lewm configs/train/mwm_lewm_ogb_cube_upstream.yaml
+"$PY" -m mwm.training.lewm configs/train/mwm_lewm_tworoom_upstream.yaml
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_ogb_cube.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity
+"$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted retrained_lewm_identity

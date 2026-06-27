@@ -2,17 +2,12 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import sys
 from pathlib import Path
 from typing import Iterator
 
 import h5py
 from stable_worldmodel.data import load_dataset
 from stable_worldmodel.data.formats.lance import LanceWriter
-
-ROOT = Path(__file__).resolve().parents[2]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
 
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.paths import local_path

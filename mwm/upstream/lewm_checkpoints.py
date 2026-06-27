@@ -1,16 +1,9 @@
 from __future__ import annotations
 
+import argparse
+import json
 from pathlib import Path
 from typing import Any
-
-import json
-import torch
-from omegaconf import OmegaConf
-
-from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
-from mwm.adapters.stable_config import stable_config_sha256
-from mwm.checkpoint_io import save_world_checkpoint
-from mwm.dependency_refs import dependency_refs
 
 
 DEFAULTS = {
@@ -89,7 +82,9 @@ def _read_json(path: Path) -> dict[str, Any]:
     return payload
 
 
-def _resolve_upstream(repo_or_path: str) -> tuple[torch.nn.Module, dict[str, Any], Path]:
+def _resolve_upstream(repo_or_path: str) -> tuple[Any, dict[str, Any], Path]:
+    import torch
+
     path = Path(repo_or_path)
     if path.is_file():
         obj = torch.load(path, map_location="cpu", weights_only=False)
@@ -117,7 +112,9 @@ def _resolve_upstream(repo_or_path: str) -> tuple[torch.nn.Module, dict[str, Any
     return obj, source_config, config_path
 
 
-def _validate_upstream_object(obj: torch.nn.Module, *, expected_class_name: str | None) -> None:
+def _validate_upstream_object(obj: Any, *, expected_class_name: str | None) -> None:
+    import torch
+
     missing = [name for name in ("encoder", "predictor", "action_encoder") if not hasattr(obj, name)]
     if missing:
         raise ValueError(f"Trusted Le-WM object is missing components: {missing}")
@@ -129,7 +126,7 @@ def _validate_upstream_object(obj: torch.nn.Module, *, expected_class_name: str 
         raise ValueError(f"Trusted Le-WM object has class {class_name!r}; expected {expected_class_name!r}.")
 
 
-def _copy_upstream_lewm_weights(model: torch.nn.Module, upstream: torch.nn.Module) -> None:
+def _copy_upstream_lewm_weights(model: Any, upstream: Any) -> None:
     target_state = model.state_dict()
     copied: set[str] = set()
     prefixes = (
@@ -163,6 +160,11 @@ def _copy_upstream_lewm_weights(model: torch.nn.Module, upstream: torch.nn.Modul
 
 
 def prepare_one(spec: Any, output_root: str | Path) -> Path:
+    from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
+    from mwm.adapters.stable_config import stable_config_sha256
+    from mwm.checkpoint_io import save_world_checkpoint
+    from mwm.dependency_refs import dependency_refs
+
     root = Path(output_root)
     out_dir = root / str(spec.name)
     action_spec = _action_spec(spec)
@@ -221,7 +223,7 @@ def prepare_one(spec: Any, output_root: str | Path) -> Path:
             "action_dim": int(action_spec["dim"]),
             "action_block": int(action_spec["block"]),
         },
-        "dependencies": dependency_refs(Path(__file__).resolve().parent),
+            "dependencies": dependency_refs(Path(__file__).resolve().parents[2]),
     }
     for key in ("action_low", "action_high"):
         if key in spec:
@@ -231,6 +233,8 @@ def prepare_one(spec: Any, output_root: str | Path) -> Path:
 
 
 def main(cfg_path: str | None = None) -> None:
+    from omegaconf import OmegaConf
+
     cfg = OmegaConf.merge(DEFAULTS, OmegaConf.load(cfg_path) if cfg_path else {})
     for spec in cfg.sources:
         out = prepare_one(spec, cfg.output_root)
@@ -238,6 +242,7 @@ def main(cfg_path: str | None = None) -> None:
 
 
 if __name__ == "__main__":
-    import sys
-
-    main(sys.argv[1] if len(sys.argv) > 1 else None)
+    parser = argparse.ArgumentParser(description="Prepare upstream Le-WM checkpoints as MWM checkpoints.")
+    parser.add_argument("config", nargs="?", default=None, help="Optional YAML config overriding the built-in sources")
+    args = parser.parse_args()
+    main(args.config)

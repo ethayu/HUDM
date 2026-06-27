@@ -6,8 +6,9 @@ import torch
 from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 
-from mwm.eval.policy import MWMWorldModelPolicy, mwm_image_input_transform
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
+from mwm.preprocessing.images import mwm_image_input_transform
+from mwm.eval.policy import MWMWorldModelPolicy
 
 
 def build_mwm_policy(

@@ -4,6 +4,7 @@ import ast
 from pathlib import Path
 import re
 import subprocess
+import sys
 import unittest
 
 import yaml
@@ -15,6 +16,52 @@ ROOT = Path(__file__).resolve().parents[1]
 STABLE_WORLDMODEL_VERSION = "0.1.0"
 OLD_FLAT_SCRIPT_REF_RE = re.compile(
     r"scripts/(?:local_|run_mwm_|submit_mwm_|poll_mwm_|slurm_mwm_|slurm_research_|research_)"
+)
+ROOT_CLI_COMMANDS = (
+    "collect_" + "mwm_data.py",
+    "train_" + "mwm.py",
+    "eval_" + "mwm.py",
+    "benchmark_" + "mwm.py",
+    "prepare_" + "upstream_lewm.py",
+    "prepare_" + "upstream_lewm_data.py",
+    "verify_" + "mwm_data.py",
+    "verify_" + "mwm_benchmark.py",
+    "render_" + "benchmark_review.py",
+)
+PACKAGE_CLI_COMMANDS = (
+    "-m mwm.data.collection",
+    "-m mwm.upstream.lewm_checkpoints",
+    "-m mwm.upstream.lewm_data",
+    "-m mwm.training.lewm",
+    "-m mwm.eval.runner",
+    "-m mwm.benchmark.matrix",
+    "-m mwm.data.verify",
+    "-m mwm.benchmark.verify",
+    "-m mwm.benchmark.render_review",
+)
+REQUIRED_TRACKED_PACKAGE_MODULES = (
+    "mwm/benchmark/checkpoint_verify.py",
+    "mwm/benchmark/matrix_identity.py",
+    "mwm/benchmark/output_verify.py",
+    "mwm/benchmark/paper_targets.py",
+    "mwm/benchmark/plot_contract.py",
+    "mwm/benchmark/render_review.py",
+    "mwm/benchmark/static_verify.py",
+    "mwm/data/collection.py",
+    "mwm/upstream/__init__.py",
+    "mwm/upstream/converters/__init__.py",
+    "mwm/upstream/converters/ogb_cube.py",
+    "mwm/upstream/converters/reacher.py",
+    "mwm/upstream/lewm_checkpoints.py",
+    "mwm/upstream/lewm_data.py",
+)
+OLD_ROOT_SCRIPT_PATH_RE = re.compile(
+    r"(?:python(?:\S*)?\s+)?(?:\./)?scripts/"
+    r"(?:local_|run_mwm_|submit_mwm_|poll_mwm_|slurm_mwm_|slurm_research_|research_)[\w/.-]*\.py"
+    r"|(?:python(?:\S*)?\s+)(?:\./)?"
+    r"(?:local_|run_mwm_|submit_mwm_|poll_mwm_|slurm_mwm_|slurm_research_|research_)[\w/.-]*\.py"
+    r"|(?:python(?:\S*)?\s+)?(?:\./)?scripts/"
+    r"(?:convert_reacher_h5_to_lance|convert_ogb_cube_hdf5_to_lance)\.py"
 )
 
 
@@ -30,9 +77,6 @@ def _first_line_index(lines: list[str], tokens: tuple[str, ...]) -> int | None:
 
 def _tracked_review_files() -> list[Path]:
     skip_dirs = {
-        ".git",
-        ".pytest_cache",
-        ".worktrees",
         "__pycache__",
         "checkpoints",
         "checkpoints_mwm",
@@ -41,11 +85,31 @@ def _tracked_review_files() -> list[Path]:
         "rollouts",
         "synthetic",
     }
+    tracked = subprocess.check_output(["git", "ls-files"], cwd=ROOT, text=True).splitlines()
     files: list[Path] = []
-    for path in ROOT.rglob("*"):
-        if any(part in skip_dirs for part in path.parts):
+    for rel in tracked:
+        path = ROOT / rel
+        if not path.is_file():
             continue
-        if path.is_file() and path.suffix in {".py", ".yaml", ".yml", ".md", ".sh", ".sbatch"}:
+        if any(part in skip_dirs for part in Path(rel).parts):
+            continue
+        if path.suffix in {".py", ".yaml", ".yml", ".md", ".sh", ".sbatch"}:
+            files.append(path)
+    return files
+
+
+def _active_command_reference_files() -> list[Path]:
+    tracked = subprocess.check_output(
+        ["git", "ls-files", "README.md", "REVIEW_GUIDE.md", "docs", "scripts"],
+        cwd=ROOT,
+        text=True,
+    ).splitlines()
+    files: list[Path] = []
+    for rel in tracked:
+        path = ROOT / rel
+        if rel.startswith("docs/superpowers/"):
+            continue
+        if path.is_file() and path.suffix in {".py", ".md", ".sh", ".sbatch", ".json"}:
             files.append(path)
     return files
 
@@ -375,7 +439,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio"])
 
     def test_upstream_reacher_preparation_is_declared(self) -> None:
-        source = (ROOT / "prepare_upstream_lewm.py").read_text(encoding="utf-8")
+        source = (ROOT / "mwm" / "upstream" / "lewm_checkpoints.py").read_text(encoding="utf-8")
         self.assertIn('"name": "upstream_lewm_reacher"', source)
         self.assertIn('"repo": "quentinll/lewm-reacher"', source)
         self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', source)
@@ -383,22 +447,23 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertIn('"repo": "quentinll/lewm-cube"', source)
         self.assertIn('"restore_spec": "ogbench_cube_single_qpos_qvel_target_pose"', source)
 
-        data_source = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8")
+        data_source = (ROOT / "mwm" / "upstream" / "lewm_data.py").read_text(encoding="utf-8")
         self.assertIn('REACHER_LANCE = "reacher.lance"', data_source)
         self.assertIn('"env_id": "swm/ReacherDMControl-v0"', data_source)
         self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', data_source)
         self.assertIn('OGB_CUBE_LANCE = "ogb_cube_single_expert.lance"', data_source)
         self.assertIn('"env_id": "swm/OGBCube-v0"', data_source)
         self.assertIn('"restore_spec": "ogbench_cube_single_qpos_qvel_target_pose"', data_source)
-        self.assertTrue((ROOT / "scripts" / "research" / "convert_ogb_cube_hdf5_to_lance.py").is_file())
+        self.assertTrue((ROOT / "mwm" / "upstream" / "converters" / "ogb_cube.py").is_file())
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
         work_tokens = (
-            '"$PY"',
-            "train_mwm.py",
-            "benchmark_mwm.py",
-            "verify_mwm_",
-            "prepare_upstream_",
+            '"$PY" -m mwm.training.lewm',
+            '"$PY" -m mwm.benchmark.matrix',
+            '"$PY" -m mwm.benchmark.verify',
+            '"$PY" -m mwm.data.verify',
+            "mwm.upstream.lewm_checkpoints",
+            "mwm.upstream.lewm_data",
         )
         scripts = sorted((ROOT / "scripts" / "slurm").glob("run_mwm*.sh"))
         self.assertGreater(len(scripts), 0)
@@ -430,7 +495,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertIn('exit "$status"', text, script)
             for line in text.splitlines():
                 stripped = line.strip()
-                if "benchmark_mwm.py" in stripped or "verify_mwm_benchmark.py" in stripped:
+                if "-m mwm.benchmark.matrix" in stripped or "-m mwm.benchmark.verify" in stripped:
                     self.assertTrue(stripped.startswith("run_step "), f"{script}: {stripped}")
 
     def test_reacher_slurm_training_and_parity_commands_exist(self) -> None:
@@ -471,7 +536,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertIn('export PYOPENGL_PLATFORM="${PYOPENGL_PLATFORM:-egl}"', dense_comparison)
 
     def test_reacher_h5_to_lance_conversion_tool_is_explicit_and_isolated(self) -> None:
-        script = ROOT / "scripts" / "research" / "convert_reacher_h5_to_lance.py"
+        script = ROOT / "mwm" / "upstream" / "converters" / "reacher.py"
         text = script.read_text(encoding="utf-8")
 
         self.assertIn("h5py.File", text)
@@ -484,10 +549,14 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertIn("qvel", text)
         self.assertIn("observation", text)
 
-    def test_reacher_h5_to_lance_conversion_tool_is_runnable_by_path(self) -> None:
-        script = ROOT / "scripts" / "research" / "convert_reacher_h5_to_lance.py"
+    def test_reacher_h5_to_lance_conversion_tool_is_runnable_by_module(self) -> None:
         result = subprocess.run(
-            ["/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python", str(script), "--help"],
+            [
+                "/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python",
+                "-m",
+                "mwm.upstream.converters.reacher",
+                "--help",
+            ],
             cwd=ROOT,
             text=True,
             stdout=subprocess.PIPE,
@@ -498,6 +567,29 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("--source", result.stdout)
         self.assertIn("--output", result.stdout)
+
+    def test_upstream_preparation_tools_are_runnable_by_module(self) -> None:
+        for module_name, expected in (
+            ("mwm.upstream.lewm_checkpoints", "config"),
+            ("mwm.upstream.lewm_data", "--source-h5"),
+        ):
+            with self.subTest(module=module_name):
+                result = subprocess.run(
+                    [
+                        "/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python",
+                        "-m",
+                        module_name,
+                        "--help",
+                    ],
+                    cwd=ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(expected, result.stdout)
 
     def test_slurm_mwm_scripts_refuse_direct_bash_before_gpu_or_work(self) -> None:
         risk_tokens = (
@@ -524,8 +616,8 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_lance_only_runtime_has_no_hdf5_support_paths(self) -> None:
         runtime_files = [
-            ROOT / "eval_mwm.py",
-            ROOT / "verify_mwm_data.py",
+            ROOT / "mwm" / "eval" / "runner.py",
+            ROOT / "mwm" / "data" / "verify.py",
         ]
         hits: list[str] = []
         for path in runtime_files:
@@ -538,41 +630,76 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_desktop_entrypoints_accept_set_overrides(self) -> None:
         entrypoints = [
-            ROOT / "collect_mwm_data.py",
-            ROOT / "train_mwm.py",
-            ROOT / "eval_mwm.py",
-            ROOT / "benchmark_mwm.py",
+            ROOT / "mwm" / "data" / "collection.py",
+            ROOT / "mwm" / "training" / "lewm.py",
+            ROOT / "mwm" / "eval" / "runner.py",
+            ROOT / "mwm" / "benchmark" / "matrix.py",
         ]
         for path in entrypoints:
             text = path.read_text(encoding="utf-8")
             self.assertIn("load_config", text, path)
             self.assertIn('"--set"', text, path)
 
-    def test_top_level_mwm_clis_are_plain_entrypoints(self) -> None:
+    def test_mwm_clis_are_package_modules_without_root_wrappers(self) -> None:
         migrated = {
-            "train_mwm.py": "mwm.training.lewm",
-            "eval_mwm.py": "mwm.eval.runner",
-            "benchmark_mwm.py": "mwm.benchmark.matrix",
-            "verify_mwm_benchmark.py": "mwm.benchmark.verify",
-            "verify_mwm_data.py": "mwm.data.verify",
+            "train_" + "mwm.py": "mwm.training.lewm",
+            "eval_" + "mwm.py": "mwm.eval.runner",
+            "benchmark_" + "mwm.py": "mwm.benchmark.matrix",
+            "verify_" + "mwm_benchmark.py": "mwm.benchmark.verify",
+            "verify_" + "mwm_data.py": "mwm.data.verify",
+            "render_" + "benchmark_review.py": "mwm.benchmark.render_review",
         }
         for root_name, module in migrated.items():
             root_path = ROOT / root_name
             package_path = ROOT / Path(*module.split(".")).with_suffix(".py")
             with self.subTest(root=root_name):
                 self.assertTrue(package_path.is_file(), package_path)
-                root_text = root_path.read_text(encoding="utf-8")
-                self.assertNotIn("import *", root_text)
-                self.assertNotIn("sys.modules", root_text)
-                self.assertIn(f"from {module} import", root_text)
-                self.assertIn("main", root_text)
-                root_tree = ast.parse(root_text)
-                root_defs = [
-                    node.name
-                    for node in root_tree.body
-                    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-                ]
-                self.assertEqual(root_defs, [], root_name)
+                self.assertFalse(root_path.exists(), root_name)
+                package_text = package_path.read_text(encoding="utf-8")
+                self.assertIn("def main", package_text, package_path)
+                self.assertIn("if __name__ == \"__main__\"", package_text, package_path)
+
+    def test_required_replacement_modules_are_tracked(self) -> None:
+        for rel in REQUIRED_TRACKED_PACKAGE_MODULES:
+            with self.subTest(path=rel):
+                result = subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", rel],
+                    cwd=ROOT,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_data_upstream_clis_are_package_modules_without_root_wrappers(self) -> None:
+        package_modules = [
+            ROOT / "mwm" / "data" / "collection.py",
+            ROOT / "mwm" / "upstream" / "lewm_checkpoints.py",
+            ROOT / "mwm" / "upstream" / "lewm_data.py",
+            ROOT / "mwm" / "upstream" / "converters" / "reacher.py",
+            ROOT / "mwm" / "upstream" / "converters" / "ogb_cube.py",
+        ]
+        retired = [
+            ROOT / "collect_mwm_data.py",
+            ROOT / "prepare_upstream_lewm.py",
+            ROOT / "prepare_upstream_lewm_data.py",
+            ROOT / "scripts" / "research" / "convert_reacher_h5_to_lance.py",
+            ROOT / "scripts" / "research" / "convert_ogb_cube_hdf5_to_lance.py",
+        ]
+        for path in package_modules:
+            with self.subTest(path=path):
+                self.assertTrue(path.is_file(), path)
+                self.assertIn("def main(", path.read_text(encoding="utf-8"), path)
+                ignored = subprocess.run(
+                    ["git", "check-ignore", "-q", str(path.relative_to(ROOT))],
+                    cwd=ROOT,
+                    check=False,
+                )
+                self.assertNotEqual(ignored.returncode, 0, path)
+        for path in retired:
+            with self.subTest(path=path):
+                self.assertFalse(path.exists(), path)
 
     def test_retired_compatibility_facades_are_absent(self) -> None:
         retired = [
@@ -637,21 +764,78 @@ class MWMRepoHygieneTests(unittest.TestCase):
         tracked_pycache = [path for path in tracked_scripts if "__pycache__" in Path(path).parts]
         self.assertEqual(tracked_pycache, [])
 
-    def test_active_docs_and_tests_do_not_reference_flat_script_paths(self) -> None:
+    def test_active_docs_scripts_tests_and_reports_use_package_module_commands(self) -> None:
         active_paths = [
             ROOT / "README.md",
             ROOT / "REVIEW_GUIDE.md",
-            *sorted((ROOT / "tests").glob("test_mwm*.py")),
+            ROOT / "scripts" / "README.md",
         ]
         hits: list[str] = []
         for path in active_paths:
             text = path.read_text(encoding="utf-8")
             for match in OLD_FLAT_SCRIPT_REF_RE.finditer(text):
                 hits.append(f"{path.relative_to(ROOT)} references {match.group(0)}")
+        for path in _active_command_reference_files():
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for command in ROOT_CLI_COMMANDS:
+                if command in text:
+                    hits.append(f"{path.relative_to(ROOT)} references {command}")
+            for match in OLD_ROOT_SCRIPT_PATH_RE.finditer(text):
+                reference = match.group(0).strip().strip("'\"`")
+                hits.append(f"{path.relative_to(ROOT)} references old script path {reference}")
         self.assertEqual(hits, [])
 
+        docs_text = "\n".join(
+            (ROOT / rel).read_text(encoding="utf-8")
+            for rel in ("README.md", "REVIEW_GUIDE.md", "scripts/README.md")
+        )
+        for command in PACKAGE_CLI_COMMANDS:
+            self.assertIn(command, docs_text)
+
+    def test_package_module_clis_show_help(self) -> None:
+        modules = {
+            "mwm.data.collection": ("config", "--set"),
+            "mwm.upstream.lewm_checkpoints": ("config",),
+            "mwm.upstream.lewm_data": ("--source-h5",),
+            "mwm.training.lewm": ("config", "--set"),
+            "mwm.eval.runner": ("config", "--set"),
+            "mwm.benchmark.matrix": ("config", "--roles"),
+            "mwm.data.verify": ("--paper-parity",),
+            "mwm.benchmark.verify": ("--static-only", "--roles"),
+            "mwm.benchmark.render_review": ("output_dir",),
+        }
+        for module, expected in modules.items():
+            with self.subTest(module=module):
+                result = subprocess.run(
+                    [sys.executable, "-S", "-m", module, "--help"],
+                    cwd=ROOT,
+                    env={"PYTHONDONTWRITEBYTECODE": "1"},
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=60,
+                    check=False,
+                )
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("usage:", result.stdout)
+                for token in expected:
+                    self.assertIn(token, result.stdout)
+
+    def test_active_file_review_does_not_document_deleted_root_clis(self) -> None:
+        text = (ROOT / "LIBRARY_FILE_REVIEW.md").read_text(encoding="utf-8")
+        hits = [command for command in ROOT_CLI_COMMANDS if command in text]
+        self.assertEqual(hits, [])
+
+    def test_slurm_poll_scripts_honor_configured_python(self) -> None:
+        for script in sorted((ROOT / "scripts" / "slurm").glob("poll_mwm*_jobs.sh")):
+            with self.subTest(script=script.name):
+                text = script.read_text(encoding="utf-8")
+                self.assertIn("MWM_PYTHON", text)
+                self.assertIn('PY="${MWM_PYTHON:-', text)
+
     def test_upstream_data_prep_keeps_runtime_lance_but_allows_cube_hdf5_conversion(self) -> None:
-        text = (ROOT / "prepare_upstream_lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
+        text = (ROOT / "mwm" / "upstream" / "lewm_data.py").read_text(encoding="utf-8", errors="ignore").lower()
         self.assertIn("convert_ogb_cube_hdf5_to_lance", text)
         forbidden = ["tar.zst", "zstd", "stable_worldmodel.data.convert", "source_format", "dest_format"]
         for token in forbidden:
@@ -671,10 +855,10 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
         runtime_files = [
             ROOT / "mwm" / "adapters" / "lewm.py",
-            ROOT / "mwm" / "models" / "world_model.py",
-            ROOT / "prepare_upstream_lewm.py",
-            ROOT / "train_mwm.py",
+            ROOT / "mwm" / "upstream" / "lewm_checkpoints.py",
+            ROOT / "mwm" / "training" / "lewm.py",
         ]
+        self.assertFalse((ROOT / "mwm" / "models" / "world_model.py").exists())
         forbidden = (
             "source_model",
             "delegated_source_cost",
