@@ -43,9 +43,14 @@ planner:
   std_unbiased: true
   seed: 42
   scheduler:
-    policy: fixed
-    level: finest
-    rollout_level:
+    enabled: true
+    mpc:
+      mode: fixed
+      level: finest
+    cem:
+      mode: fixed
+      level: base
+    rollout:
       mode: fixed
       level: base
 device: auto

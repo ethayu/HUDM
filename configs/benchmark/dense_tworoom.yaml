@@ -14,9 +14,14 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_tworoom
     planner:
       scheduler:
-        policy: linear_cem
-        start_level: coarsest
-        end_level: finest
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: finest
+        cem:
+          mode: linear
+          start_level: coarsest
+          end_level: finest
+        rollout:
           mode: fixed
           level: base

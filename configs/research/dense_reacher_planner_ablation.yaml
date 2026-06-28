@@ -19,10 +19,15 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher
     planner:
       scheduler:
-        policy: linear_cem
-        start_level: coarsest
-        end_level: finest
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: finest
+        cem:
+          mode: linear
+          start_level: coarsest
+          end_level: finest
+        rollout:
           mode: fixed
           level: base
 
@@ -31,9 +36,14 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher
     planner:
       scheduler:
-        policy: fixed
-        level: finest
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: finest
+        cem:
+          mode: fixed
+          level: base
+        rollout:
           mode: fixed
           level: base
 
@@ -42,9 +52,14 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher
     planner:
       scheduler:
-        policy: fixed
-        level: 4
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: 4
+        cem:
+          mode: fixed
+          level: base
+        rollout:
           mode: fixed
           level: base
 
@@ -53,9 +68,14 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher
     planner:
       scheduler:
-        policy: fixed
-        level: 3
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: 3
+        cem:
+          mode: fixed
+          level: base
+        rollout:
           mode: fixed
           level: base
 
@@ -64,10 +84,15 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher
     planner:
       scheduler:
-        policy: linear_cem
-        start_level: 4
-        end_level: finest
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: finest
+        cem:
+          mode: linear
+          start_level: 4
+          end_level: finest
+        rollout:
           mode: fixed
           level: base
 
@@ -76,9 +101,14 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher_step31000_snapshot
     planner:
       scheduler:
-        policy: fixed
-        level: finest
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: finest
+        cem:
+          mode: fixed
+          level: base
+        rollout:
           mode: fixed
           level: base
 
@@ -87,8 +117,13 @@ runs:
     checkpoint: checkpoints_mwm/mwm_dense_reacher_interim
     planner:
       scheduler:
-        policy: fixed
-        level: finest
-        rollout_level:
+        enabled: true
+        mpc:
+          mode: fixed
+          level: finest
+        cem:
+          mode: fixed
+          level: base
+        rollout:
           mode: fixed
           level: base

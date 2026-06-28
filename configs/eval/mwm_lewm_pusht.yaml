@@ -41,10 +41,15 @@ planner:
   clamp_actions: false
   std_unbiased: true
   scheduler:
-    policy: linear_cem
-    start_level: coarsest
-    end_level: finest
-    rollout_level:
+    enabled: true
+    mpc:
+      mode: fixed
+      level: finest
+    cem:
+      mode: linear
+      start_level: coarsest
+      end_level: finest
+    rollout:
       mode: fixed
       level: base
 device: auto

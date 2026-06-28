@@ -1,7 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Mapping
+
+
+LEGACY_SCHEDULER_KEYS = {
+    "policy",
+    "level",
+    "base_level",
+    "start_level",
+    "end_level",
+    "rollout_level",
+    "rollout_levels",
+    "table",
+    "steps",
+}
 
 
 def _clamp_progress(value: float) -> float:
@@ -27,24 +40,37 @@ class FidelityDecision:
 
 
 class FidelityScheduler:
-    """Small explicit fidelity scheduler for MWM planning and tests."""
+    """Adapter-agnostic scheduler for MPC, CEM, and rollout fidelity."""
 
-    def __init__(self, policy: str, num_levels: int, horizon: int, **kwargs: Any) -> None:
-        self.policy = str(policy).lower()
+    def __init__(
+        self,
+        *,
+        num_levels: int,
+        horizon: int,
+        enabled: bool = True,
+        mpc: Mapping[str, Any] | None = None,
+        cem: Mapping[str, Any] | None = None,
+        rollout: Mapping[str, Any] | None = None,
+    ) -> None:
         self.num_levels = int(num_levels)
         self.horizon = int(horizon)
-        self.kwargs = dict(kwargs)
+        self.enabled = bool(enabled)
         if self.num_levels <= 0:
             raise ValueError(f"num_levels must be > 0, got {self.num_levels}")
         if self.horizon <= 0:
             raise ValueError(f"horizon must be > 0, got {self.horizon}")
-        if self.policy not in {"fixed", "linear_cem", "table"}:
-            raise ValueError(f"Unknown MWM fidelity policy {policy!r}")
+        self.mpc_cfg = self._stage_cfg(mpc, "planner.scheduler.mpc", default={"mode": "fixed", "level": "finest"})
+        self.cem_cfg = self._stage_cfg(cem, "planner.scheduler.cem", default={"mode": "fixed", "level": "base"})
+        self.rollout_cfg = self._stage_cfg(
+            rollout,
+            "planner.scheduler.rollout",
+            default={"mode": "fixed", "level": "base"},
+        )
 
     @classmethod
     def from_config(
         cls,
-        cfg: "FidelityScheduler | dict[str, Any] | None",
+        cfg: "FidelityScheduler | Mapping[str, Any] | None",
         *,
         num_levels: int,
         horizon: int,
@@ -52,10 +78,35 @@ class FidelityScheduler:
         if isinstance(cfg, FidelityScheduler):
             return cfg
         raw = dict(cfg or {})
-        policy = raw.pop("policy", raw.pop("mode", "fixed"))
-        return cls(str(policy), num_levels=num_levels, horizon=horizon, **raw)
+        legacy = LEGACY_SCHEDULER_KEYS & set(raw)
+        if legacy:
+            keys = ", ".join(sorted(legacy))
+            raise ValueError(
+                "legacy planner.scheduler schema is no longer supported. "
+                "Use nested planner.scheduler.{mpc,cem,rollout}; legacy keys: "
+                f"{keys}."
+            )
+        allowed = {"enabled", "mpc", "cem", "rollout"}
+        unknown = set(raw) - allowed
+        if unknown:
+            raise ValueError(f"Unknown planner.scheduler keys: {sorted(unknown)}")
+        return cls(
+            num_levels=num_levels,
+            horizon=horizon,
+            enabled=bool(raw.get("enabled", True)),
+            mpc=raw.get("mpc"),
+            cem=raw.get("cem"),
+            rollout=raw.get("rollout"),
+        )
 
-    def resolve_level(self, value: Any, *, base_level_idx: int | None = None, field_name: str = "level") -> int:
+    def resolve_level(
+        self,
+        value: Any,
+        *,
+        base_level_idx: int | None = None,
+        field_name: str = "level",
+        allow_base: bool = True,
+    ) -> int:
         if value is None:
             raise ValueError(f"{field_name} must be set.")
         if isinstance(value, bool):
@@ -73,10 +124,15 @@ class FidelityScheduler:
             if token in {"finest", "max", "highest"}:
                 return self.num_levels - 1
             if token in {"base", "auto"}:
+                if not allow_base:
+                    raise ValueError(f"{field_name} cannot use base; mpc has no prior base level.")
                 if base_level_idx is None:
                     raise ValueError(f"{field_name}={value!r} requires a base level.")
                 return self._validated_level(int(base_level_idx), field_name)
-            return self._validated_level(int(token), field_name)
+            try:
+                return self._validated_level(int(token), field_name)
+            except ValueError as exc:
+                raise ValueError(f"{field_name} has unsupported level token {value!r}.") from exc
         raise ValueError(f"{field_name} has unsupported type {type(value).__name__}.")
 
     def _validated_level(self, idx: int, field_name: str) -> int:
@@ -84,82 +140,96 @@ class FidelityScheduler:
             raise ValueError(f"{field_name}={idx} is outside [0, {self.num_levels - 1}]")
         return int(idx)
 
-    def _fixed_decision(self, cem_progress: float, mpc_progress: float) -> FidelityDecision:
-        base = self.resolve_level(self.kwargs.get("base_level", self.kwargs.get("level", "finest")), field_name="base_level")
-        rollout = self._rollout_levels(base, default="base")
-        return self._decision(base, rollout, cem_progress, mpc_progress)
+    def _stage_cfg(self, raw: Mapping[str, Any] | None, field_name: str, *, default: dict[str, Any]) -> dict[str, Any]:
+        cfg = dict(default if raw is None else raw)
+        unknown = set(cfg) - {"mode", "level", "start_level", "end_level"}
+        if unknown:
+            raise ValueError(f"Unknown {field_name} keys: {sorted(unknown)}")
+        mode = str(cfg.get("mode", "fixed")).lower()
+        if mode not in {"fixed", "linear"}:
+            raise ValueError(f"{field_name}.mode must be fixed or linear, got {mode!r}.")
+        cfg["mode"] = mode
+        return cfg
 
-    def _linear_cem_decision(self, cem_progress: float, mpc_progress: float) -> FidelityDecision:
-        start = self.resolve_level(self.kwargs.get("start_level", "coarsest"), field_name="start_level")
-        end = self.resolve_level(self.kwargs.get("end_level", "finest"), field_name="end_level")
-        base = self._validated_level(_interp_level(start, end, cem_progress), "base_level")
-        rollout = self._rollout_levels(base, default="base")
-        return self._decision(base, rollout, cem_progress, mpc_progress)
-
-    def _table_decision(self, cem_iter: int, cem_progress: float, mpc_progress: float) -> FidelityDecision:
-        rows = list(self.kwargs.get("table", self.kwargs.get("steps", [])))
-        if not rows:
-            raise ValueError("table fidelity policy requires a non-empty table.")
-        idx = min(max(0, int(cem_iter)), len(rows) - 1)
-        row = dict(rows[idx])
-        base = self.resolve_level(row.get("base_level", row.get("level", "finest")), field_name=f"table[{idx}].base_level")
-        raw_rollout = row.get("rollout_levels", row.get("rollout_level", self.kwargs.get("rollout_level", "base")))
-        rollout = self._coerce_rollout(raw_rollout, base, field_name=f"table[{idx}].rollout")
-        return self._decision(base, rollout, cem_progress, mpc_progress, {"table_index": idx})
-
-    def _rollout_levels(self, base_level_idx: int, *, default: Any) -> list[int]:
-        if "rollout_levels" in self.kwargs:
-            raw = self.kwargs["rollout_levels"]
+    def _stage_level_index(
+        self,
+        cfg: Mapping[str, Any],
+        *,
+        stage_name: str,
+        progress: float,
+        base_level_idx: int | None,
+    ) -> int:
+        mode = str(cfg.get("mode", "fixed")).lower()
+        allow_base = base_level_idx is not None
+        if mode == "fixed":
+            default_level = "finest" if stage_name == "mpc" else "base"
+            return self.resolve_level(
+                cfg.get("level", default_level),
+                base_level_idx=base_level_idx,
+                field_name=f"planner.scheduler.{stage_name}.level",
+                allow_base=allow_base,
+            )
+        if stage_name == "mpc":
+            start_default, end_default = "coarsest", "finest"
+        elif stage_name == "cem":
+            start_default, end_default = "base", "finest"
         else:
-            raw = self.kwargs.get("rollout_level", default)
-        return self._coerce_rollout(raw, base_level_idx, field_name="rollout")
+            start_default, end_default = "base", "coarsest"
+        start = self.resolve_level(
+            cfg.get("start_level", start_default),
+            base_level_idx=base_level_idx,
+            field_name=f"planner.scheduler.{stage_name}.start_level",
+            allow_base=allow_base,
+        )
+        end = self.resolve_level(
+            cfg.get("end_level", end_default),
+            base_level_idx=base_level_idx,
+            field_name=f"planner.scheduler.{stage_name}.end_level",
+            allow_base=allow_base,
+        )
+        return self._validated_level(_interp_level(start, end, progress), f"planner.scheduler.{stage_name}.level")
 
-    def _coerce_rollout(self, raw: Any, base_level_idx: int, *, field_name: str) -> list[int]:
-        if isinstance(raw, dict):
-            mode = str(raw.get("mode", "fixed")).lower()
-            if mode == "linear":
-                start = self.resolve_level(raw.get("start_level", "base"), base_level_idx=base_level_idx, field_name=f"{field_name}.start_level")
-                end = self.resolve_level(raw.get("end_level", "coarsest"), base_level_idx=base_level_idx, field_name=f"{field_name}.end_level")
-                if self.horizon == 1:
-                    return self._validate_rollout([start], base_level_idx, field_name)
-                levels = [_interp_level(start, end, t / (self.horizon - 1)) for t in range(self.horizon)]
-                return self._validate_rollout(levels, base_level_idx, field_name)
-            if mode != "fixed":
-                raise ValueError(f"{field_name}.mode must be fixed or linear, got {mode!r}")
-            raw = raw.get("level", "base")
-        if isinstance(raw, (list, tuple)):
-            if len(raw) != self.horizon:
-                raise ValueError(f"{field_name} must have horizon={self.horizon} entries, got {len(raw)}")
-            levels = [self.resolve_level(x, base_level_idx=base_level_idx, field_name=f"{field_name}[{i}]") for i, x in enumerate(raw)]
-            return self._validate_rollout(levels, base_level_idx, field_name)
-        level = self.resolve_level(raw, base_level_idx=base_level_idx, field_name=field_name)
-        return self._validate_rollout([level] * self.horizon, base_level_idx, field_name)
+    def _rollout_levels(self, base_level_idx: int) -> list[int]:
+        mode = str(self.rollout_cfg.get("mode", "fixed")).lower()
+        if mode == "fixed":
+            idx = self.resolve_level(
+                self.rollout_cfg.get("level", "base"),
+                base_level_idx=base_level_idx,
+                field_name="planner.scheduler.rollout.level",
+            )
+            return self._validate_rollout([idx] * self.horizon, base_level_idx)
+        start = self.resolve_level(
+            self.rollout_cfg.get("start_level", "base"),
+            base_level_idx=base_level_idx,
+            field_name="planner.scheduler.rollout.start_level",
+        )
+        end = self.resolve_level(
+            self.rollout_cfg.get("end_level", "coarsest"),
+            base_level_idx=base_level_idx,
+            field_name="planner.scheduler.rollout.end_level",
+        )
+        if self.horizon == 1:
+            levels = [start]
+        else:
+            levels = [_interp_level(start, end, step / (self.horizon - 1)) for step in range(self.horizon)]
+        return self._validate_rollout(levels, base_level_idx)
 
-    def _validate_rollout(self, levels: list[int], base_level_idx: int, field_name: str) -> list[int]:
-        out = [self._validated_level(int(x), field_name) for x in levels]
+    def _validate_rollout(self, levels: list[int], base_level_idx: int) -> list[int]:
+        out = [self._validated_level(int(level), "planner.scheduler.rollout") for level in levels]
+        if len(out) != self.horizon:
+            raise ValueError(f"planner.scheduler.rollout must have horizon={self.horizon} entries, got {len(out)}.")
         for idx in out:
             if idx > int(base_level_idx):
-                raise ValueError(f"{field_name} cannot use level {idx} finer than base level {base_level_idx}.")
+                raise ValueError(
+                    f"planner.scheduler.rollout cannot use level {idx} finer than base level {base_level_idx}."
+                )
         for prev, cur in zip(out, out[1:]):
             if cur > prev:
-                raise ValueError(f"{field_name} cannot move from lower to higher fidelity within one rollout: {out}")
+                raise ValueError(
+                    "planner.scheduler.rollout cannot move from lower to higher fidelity within one rollout: "
+                    f"{out}"
+                )
         return out
-
-    def _decision(
-        self,
-        base: int,
-        rollout: list[int],
-        cem_progress: float,
-        mpc_progress: float,
-        metadata: dict[str, Any] | None = None,
-    ) -> FidelityDecision:
-        return FidelityDecision(
-            base_level_idx=int(base),
-            rollout_level_indices=[int(x) for x in rollout],
-            cem_progress=float(cem_progress),
-            mpc_progress=float(mpc_progress),
-            metadata=dict(metadata or {}),
-        )
 
     def decision(
         self,
@@ -171,11 +241,40 @@ class FidelityScheduler:
     ) -> FidelityDecision:
         del context
         cem_progress = 1.0 if int(n_iter) <= 1 else int(cem_iter) / max(1, int(n_iter) - 1)
-        if self.policy == "fixed":
-            return self._fixed_decision(cem_progress, float(mpc_progress))
-        if self.policy == "linear_cem":
-            return self._linear_cem_decision(cem_progress, float(mpc_progress))
-        return self._table_decision(int(cem_iter), cem_progress, float(mpc_progress))
+        mpc_progress = _clamp_progress(float(mpc_progress))
+        if self.enabled:
+            mpc_idx = self._stage_level_index(
+                self.mpc_cfg,
+                stage_name="mpc",
+                progress=mpc_progress,
+                base_level_idx=None,
+            )
+            base_idx = self._stage_level_index(
+                self.cem_cfg,
+                stage_name="cem",
+                progress=cem_progress,
+                base_level_idx=mpc_idx,
+            )
+            rollout = self._rollout_levels(base_idx)
+        else:
+            mpc_idx = self.num_levels - 1
+            base_idx = self.num_levels - 1
+            rollout = [base_idx] * self.horizon
+        return FidelityDecision(
+            base_level_idx=int(base_idx),
+            rollout_level_indices=[int(x) for x in rollout],
+            cem_progress=float(cem_progress),
+            mpc_progress=float(mpc_progress),
+            metadata={
+                "enabled": bool(self.enabled),
+                "mpc_level_idx": int(mpc_idx),
+                "base_level_idx": int(base_idx),
+                "terminal_level_idx": int(rollout[-1]),
+                "mpc_mode": str(self.mpc_cfg.get("mode", "fixed")),
+                "cem_mode": str(self.cem_cfg.get("mode", "fixed")),
+                "rollout_mode": str(self.rollout_cfg.get("mode", "fixed")),
+            },
+        )
 
 
-__all__ = ["FidelityDecision", "FidelityScheduler"]
+__all__ = ["FidelityDecision", "FidelityScheduler", "LEGACY_SCHEDULER_KEYS"]

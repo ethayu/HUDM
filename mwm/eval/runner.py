@@ -48,7 +48,12 @@ DEFAULTS = {
         "warm_start": True,
         "clamp_actions": False,
         "std_unbiased": True,
-        "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+        "scheduler": {
+            "enabled": True,
+            "mpc": {"mode": "fixed", "level": "finest"},
+            "cem": {"mode": "fixed", "level": "base"},
+            "rollout": {"mode": "fixed", "level": "base"},
+        },
     },
     "device": "auto",
 }
