@@ -197,11 +197,13 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["mwm"]["component_policy"], {
                 "shared": ["latent_producer"],
                 "per_level": ["transition"],
-                "reconstructor": [],
+                "reconstructor": ["decoder"],
             }, name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_detach_encoder"], True, name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_contributes_to_encoder_loss"], False, name)
+            self.assertIn("recon_latent_weight", cfg["loss"], name)
+            self.assertNotIn("recon_weight", cfg["loss"], name)
             self.assertEqual(cfg["data"]["format"], "lance", name)
             self.assertTrue(str(cfg["data"]["path"]).endswith(".lance"), name)
             self.assertEqual(cfg["model"]["D"], 192, name)
@@ -236,6 +238,20 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
                 self.assertEqual(cfg["loss"]["sigreg_knots"], 17, name)
                 self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
+
+    def test_all_lewm_training_configs_use_decoder_reconstruction_contract(self) -> None:
+        paths = [
+            *sorted((ROOT / "configs" / "train").glob("*.yaml")),
+            *sorted((ROOT / "configs" / "local").glob("train_*.yaml")),
+            *sorted((ROOT / "configs" / "research").glob("train_mwm*.yaml")),
+        ]
+        self.assertGreater(len(paths), 0)
+        for path in paths:
+            cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
+            with self.subTest(path=path.relative_to(ROOT)):
+                self.assertEqual(cfg["mwm"]["component_policy"]["reconstructor"], ["decoder"])
+                self.assertIn("recon_latent_weight", cfg["loss"])
+                self.assertNotIn("recon_weight", cfg["loss"])
 
     def test_train_configs_do_not_override_base_architecture_knobs(self) -> None:
         forbidden_model_keys = {

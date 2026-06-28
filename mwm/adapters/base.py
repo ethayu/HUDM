@@ -88,10 +88,15 @@ class StableWMBaseAdapter(Protocol):
 
 def validate_component_policy(groups: Mapping[str, ComponentGroup], policy: ComponentPolicy) -> None:
     known = set(groups)
-    selected = set(policy.shared) | set(policy.per_level) | set(policy.reconstructor)
+    selected = set(policy.shared) | set(policy.per_level)
     unknown = sorted(selected - known)
     if unknown:
         raise ValueError(f"Unknown component group(s): {unknown}")
+
+    reconstructor_components = set(groups.get("reconstructor", ComponentGroup("reconstructor", ())).components)
+    unknown_reconstructors = sorted(set(policy.reconstructor) - reconstructor_components)
+    if unknown_reconstructors:
+        raise ValueError(f"Unknown reconstructor component(s): {unknown_reconstructors}")
 
     overlap = sorted(set(policy.shared) & set(policy.per_level))
     if overlap:

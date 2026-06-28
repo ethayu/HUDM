@@ -63,11 +63,11 @@ shared and non-encoder/tail modules should be per-level unless the base design
 requires otherwise:
 
 ```python
-ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
+ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=("decoder",))
 ```
 
-Invalid policies that leave no shared latent producer must be rejected through
-`validate_component_policy`.
+Invalid policies that leave no shared latent producer or select an unknown
+reconstructor component must be rejected through `validate_component_policy`.
 
 `resolve_spec(...)`
 

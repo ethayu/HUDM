@@ -7,7 +7,7 @@ mwm:
   component_policy:
     shared: [latent_producer]
     per_level: [transition]
-    reconstructor: []
+    reconstructor: [decoder]
   loss_terms:
     regularizers: shared_latent
     reconstructor_detach_encoder: true
@@ -56,7 +56,7 @@ optim:
   weight_decay: 0.001
 loss:
   rollout_weight: 1.0
-  recon_weight: 0.0
+  recon_latent_weight: 0.0
   sigreg_weight: 0.09
   sigreg_knots: 17
   sigreg_num_proj: 1024

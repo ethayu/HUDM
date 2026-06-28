@@ -20,9 +20,10 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
     from mwm.checkpoint_io import save_world_checkpoint
     from mwm.config_cli import load_config
     from mwm.training import lewm_data, lewm_lightning, lewm_model
-    from mwm.training.lewm_config import DEFAULTS, make_run_dir
+    from mwm.training.lewm_config import DEFAULTS, make_run_dir, validate_lewm_loss_config
 
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
+    validate_lewm_loss_config(cfg.loss)
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
     torch.manual_seed(int(cfg.seed))
     backend = str(cfg.train.backend).lower()

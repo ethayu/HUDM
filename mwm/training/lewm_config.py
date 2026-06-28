@@ -53,7 +53,7 @@ DEFAULTS = {
         "slurm_auto_requeue": False,
     },
     "optim": {"lr": 3e-4},
-    "loss": {"rollout_weight": 1.0, "recon_weight": 0.0, "sigreg_weight": 0.0},
+    "loss": {"rollout_weight": 1.0, "recon_latent_weight": 0.0, "sigreg_weight": 0.0},
     "schedule": {"max_epochs": 30, "lr_max_epochs": None},
 }
 
@@ -75,7 +75,13 @@ def as_container(value: Any) -> Any:
     return value
 
 
+def validate_lewm_loss_config(loss_cfg: Any) -> None:
+    loss = as_container(loss_cfg)
+    if isinstance(loss, dict) and "recon_weight" in loss:
+        raise ValueError("loss.recon_weight has been removed; use loss.recon_latent_weight instead.")
+
+
 _as_container = as_container
 
 
-__all__ = ["DEFAULTS", "_as_container", "as_container", "make_run_dir"]
+__all__ = ["DEFAULTS", "_as_container", "as_container", "make_run_dir", "validate_lewm_loss_config"]

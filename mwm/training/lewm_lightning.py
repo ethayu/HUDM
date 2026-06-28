@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from mwm.data.module import PrebuiltLoaderDataModule
 from mwm.models.base_adaptive import MatryoshkaWorldModel
 from mwm.training.lewm_callbacks import lewm_base_adapter_callbacks, select_lewm_base_adapter_export_checkpoint
-from mwm.training.lewm_config import as_container
+from mwm.training.lewm_config import as_container, validate_lewm_loss_config
 from mwm.training.lewm_runtime import (
     prepare_trainer_root,
     resolve_lewm_base_adapter_total_steps,
@@ -24,10 +24,12 @@ def lewm_base_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage
     cfg = module.lewm_base_adapter_cfg
     if not isinstance(module.model, MatryoshkaWorldModel):
         raise RuntimeError("Le-WM training requires the MWM base-adapter model, not a raw Stable-WM object.")
+    validate_lewm_loss_config(cfg.loss)
     output = module.model.training_loss(
         batch,
         level_weights=cfg.loss.get("level_weights", None),
         rollout_weight=float(cfg.loss.get("rollout_weight", 1.0)),
+        recon_latent_weight=float(cfg.loss.get("recon_latent_weight", 0.0)),
         sigreg=module.sigreg,
         sigreg_weight=float(cfg.loss.get("sigreg_weight", cfg.loss.get("sigreg", {}).get("weight", 0.0))),
         sigreg_scope=str(cfg.loss.get("sigreg_scope", "shared_latent")),

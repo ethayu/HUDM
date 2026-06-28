@@ -342,7 +342,7 @@ class MWMArtifactTests(unittest.TestCase):
             self.assertIn("training_recipe", metadata)
 
     def test_base_adaptive_checkpoint_contract_requires_metadata(self) -> None:
-        policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+        policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
         config = {
             "target": STABLE_CONFIG_TARGET,
             "kwargs": {
@@ -368,7 +368,10 @@ class MWMArtifactTests(unittest.TestCase):
             ("source_config_sha256", {**valid_metadata, "source_config_sha256": "wrong"}),
             ("component_policy", {k: v for k, v in valid_metadata.items() if k != "component_policy"}),
             ("component_policy", {**valid_metadata, "component_policy": "not-a-policy"}),
-            ("missing=.*per_level", {**valid_metadata, "component_policy": {"shared": ["latent_producer"], "reconstructor": []}}),
+            (
+                "missing=.*per_level",
+                {**valid_metadata, "component_policy": {"shared": ["latent_producer"], "reconstructor": ["decoder"]}},
+            ),
             (
                 "unknown=.*extra",
                 {
@@ -376,14 +379,14 @@ class MWMArtifactTests(unittest.TestCase):
                     "component_policy": {
                         "shared": ["latent_producer"],
                         "per_level": ["transition"],
-                        "reconstructor": [],
+                        "reconstructor": ["decoder"],
                         "extra": [],
                     },
                 },
             ),
             (
                 "shared latent producer",
-                {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"], "reconstructor": []}},
+                {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"], "reconstructor": ["decoder"]}},
             ),
         ]
         for expected, metadata in invalid_cases:
@@ -722,7 +725,7 @@ runs:
             config_path = checkpoint / CONFIG_FILENAME
             weights_path = checkpoint / WEIGHTS_FILENAME
             metadata_path = checkpoint / METADATA_FILENAME
-            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
             config_path.write_text(
                 json.dumps(
                     {
@@ -985,7 +988,7 @@ runs:
             cfg_path = root / CONFIG_FILENAME
             weights_path = root / WEIGHTS_FILENAME
             metadata_path = root / METADATA_FILENAME
-            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
             cfg_path.write_text(
                 json.dumps(
                     {

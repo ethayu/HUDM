@@ -23,6 +23,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
         encoder: nn.Module,
         projector: nn.Module,
         transitions: Sequence[TransitionPackage],
+        decoders: Sequence[nn.Module],
         K: Sequence[int],
         D: int,
         action_dim: int,
@@ -32,6 +33,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
         history_size: int,
         num_preds: int,
         head_architectures: Sequence[dict[str, Any]],
+        decoder_architectures: Sequence[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
         architecture_version: str | None = None,
     ) -> None:
@@ -39,6 +41,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
         self.encoder = encoder
         self.projector = projector
         self.transitions = nn.ModuleList(list(transitions))
+        self.decoders = nn.ModuleList(list(decoders))
         self.K = [int(k) for k in K]
         self.D = int(D)
         self.action_dim = int(action_dim)
@@ -49,8 +52,11 @@ class MatryoshkaWorldModel(MWMWorldModel):
         self.history_size = int(history_size)
         self.num_preds = int(num_preds)
         self.head_architectures = [dict(x) for x in head_architectures]
+        self.decoder_architectures = [dict(x) for x in decoder_architectures or []]
         if len(self.K) != len(self.transitions):
             raise ValueError(f"K has {len(self.K)} entries but transitions has {len(self.transitions)}.")
+        if len(self.K) != len(self.decoders):
+            raise ValueError(f"K has {len(self.K)} entries but decoders has {len(self.decoders)}.")
         if not self.K:
             raise ValueError("K must contain at least one fidelity level.")
         if any(k <= 0 or k > self.D for k in self.K):
@@ -80,6 +86,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
             },
         )
         meta.setdefault("head_architectures", self.head_architectures)
+        meta.setdefault("decoder_architectures", self.decoder_architectures)
         meta.setdefault("levels", list(self.K))
         self.metadata = meta
         self._last_cost_diagnostics: dict[str, Any] = {}
@@ -130,12 +137,18 @@ class MatryoshkaWorldModel(MWMWorldModel):
         k = self.K[int(level_idx)]
         return self.transitions[int(level_idx)].predict(emb[..., :k], action)
 
+    def decode(self, level_idx: int, latent: torch.Tensor) -> torch.Tensor:
+        idx = int(level_idx)
+        k = self.K[idx]
+        return self.decoders[idx](latent[..., :k])
+
     def training_loss(
         self,
         batch: dict[str, torch.Tensor],
         *,
         level_weights: Sequence[float] | None = None,
         rollout_weight: float = 1.0,
+        recon_latent_weight: float = 0.0,
         sigreg: nn.Module | None = None,
         sigreg_weight: float = 0.0,
         sigreg_scope: str = "shared_latent",
@@ -145,6 +158,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
             batch,
             level_weights=level_weights,
             rollout_weight=rollout_weight,
+            recon_latent_weight=recon_latent_weight,
             sigreg=sigreg,
             sigreg_weight=sigreg_weight,
             sigreg_scope=sigreg_scope,

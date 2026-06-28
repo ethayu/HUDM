@@ -170,8 +170,12 @@ class LeWMStableConfigTests(unittest.TestCase):
         self.assertEqual(model.mwm_config["kwargs"]["K"], [4])
         self.assertIs(model.encoder, model.encoder)
         self.assertEqual(len(model.transitions), 1)
-        self.assertFalse(hasattr(model, "reconstructor"))
+        self.assertEqual(len(model.decoders), 1)
+        self.assertEqual(model.metadata["component_policy"]["reconstructor"], ["decoder"])
+        decoded = model.decode(0, torch.randn(2, 4))
+        self.assertEqual(tuple(decoded.shape), (2, 3, 8, 8))
         out = model.training_loss({"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)})
+        self.assertIn("recon_loss_l0", out)
         self.assertIn("loss", out)
 
     def test_resolve_spec_requires_shared_latent_producer(self) -> None:

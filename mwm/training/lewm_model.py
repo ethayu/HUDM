@@ -5,7 +5,7 @@ from typing import Any
 
 import torch
 
-from mwm.training.lewm_config import as_container
+from mwm.training.lewm_config import as_container, validate_lewm_loss_config
 
 
 def resolve_lewm_base_adapter_model_cfg(cfg: Any, dataset: Any) -> dict[str, Any]:
@@ -63,6 +63,7 @@ def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torc
 
     mwm_cfg = as_container(cfg.get("mwm", {}) if hasattr(cfg, "get") else {})
     loss_cfg = as_container(cfg.get("loss", {}) if hasattr(cfg, "get") else {})
+    validate_lewm_loss_config(loss_cfg)
     model_section = cfg.get("model", {}) if hasattr(cfg, "get") else {}
     recipe = {
         **dict(loss_cfg),
@@ -82,7 +83,9 @@ def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torc
         action_block=int(model_cfg.get("action_block", 1)),
         image_shape=tuple(int(x) for x in model_cfg["image_shape"]),
         normalize_imagenet=bool(model_cfg.get("normalize_imagenet", True)),
-        component_policy=ComponentPolicy.from_mapping(mwm_cfg.get("component_policy", None)),
+        component_policy=ComponentPolicy.from_mapping(mwm_cfg["component_policy"])
+        if "component_policy" in mwm_cfg
+        else None,
     )
 
 

@@ -11,6 +11,7 @@ from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec,
 from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.adapters.registry import register_adapter
 from mwm.models.base_adaptive import MatryoshkaWorldModel
+from mwm.models.decoders import ConvImageDecoder
 from mwm.models.transitions import TransitionPackage
 
 
@@ -33,17 +34,18 @@ class LeWMStableWMAdapter:
                 latent_producer=True,
             ),
             "transition": ComponentGroup(name="transition", components=("action_encoder", "predictor", "pred_proj")),
-            "reconstructor": ComponentGroup(name="reconstructor", components=()),
+            "reconstructor": ComponentGroup(name="reconstructor", components=("decoder",)),
         }
 
     def default_policy(self) -> ComponentPolicy:
-        return ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
+        return ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=("decoder",))
 
     def _validate_supported_policy(self, policy: ComponentPolicy) -> None:
         expected = self.default_policy()
         if policy != expected:
             raise ValueError(
-                "Le-WM Stable-WM adapter only supports shared latent_producer and per-level transition policies."
+                "Le-WM Stable-WM adapter only supports shared latent_producer, per-level transition, "
+                "and decoder reconstructor policies."
             )
 
     def _base_latent_dim(self, source_config: dict[str, Any]) -> int:
@@ -269,6 +271,19 @@ def _model_from_base_spec(
     ]
     encoder, projector, transitions = _instantiate_components_in_source_order(source_config, bundles)
     head_architectures = [copy.deepcopy(bundle.arch) for bundle in bundles]
+    decoder_architectures = [
+        {
+            "K": int(k),
+            "decoder": "ConvImageDecoder",
+            "latent_dim": int(k),
+            "image_shape": [int(x) for x in image_shape],
+        }
+        for k in spec.levels
+    ]
+    decoders = [
+        ConvImageDecoder(latent_dim=int(k), image_shape=tuple(int(x) for x in image_shape))
+        for k in spec.levels
+    ]
     loss_recipe = spec.training_recipe.get("loss", {}) if isinstance(spec.training_recipe.get("loss", {}), dict) else {}
     predictor_config = source_config.get("predictor", {}) if isinstance(source_config.get("predictor", {}), dict) else {}
     history_size = int(
@@ -287,6 +302,7 @@ def _model_from_base_spec(
         "source_config": copy.deepcopy(spec.source_config),
         "training_recipe": copy.deepcopy(spec.training_recipe),
         "head_architectures": head_architectures,
+        "decoder_architectures": decoder_architectures,
         "action_preprocessing": "standard_scaler",
         "preprocessing_spec": {
             "image": "imagenet" if bool(normalize_imagenet) else "identity",
@@ -303,6 +319,7 @@ def _model_from_base_spec(
         encoder=encoder,
         projector=projector,
         transitions=transitions,
+        decoders=decoders,
         K=tuple(int(k) for k in spec.levels),
         D=int(spec.D),
         action_dim=int(action_dim),
@@ -312,6 +329,7 @@ def _model_from_base_spec(
         history_size=history_size,
         num_preds=num_preds,
         head_architectures=head_architectures,
+        decoder_architectures=decoder_architectures,
         metadata=metadata,
         architecture_version=LEWM_BASE_ADAPTER_ARCH,
     )

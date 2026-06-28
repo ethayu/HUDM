@@ -24,6 +24,7 @@ from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
 from mwm.models.base_adaptive import MatryoshkaWorldModel
 from mwm.models.core import MWMWorldModel
+from mwm.models.decoders import ConvImageDecoder
 from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
 from mwm.models.transitions import TransitionPackage
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
@@ -108,6 +109,14 @@ class CountingRegularizer(nn.Module):
         self.calls += 1
         self.shapes.append(tuple(value.shape))
         return value.square().mean() * 0.0
+
+
+def _grad_abs_sum(module: nn.Module) -> float:
+    total = 0.0
+    for param in module.parameters():
+        if param.grad is not None:
+            total += float(param.grad.detach().abs().sum().item())
+    return total
 
 
 def _lewm_source_config(
@@ -464,7 +473,7 @@ class MWMCoreTests(unittest.TestCase):
         model = _base_adaptive_lewm(K=(8,), D=8, action_dim=2)
         self.assertIsInstance(model, MatryoshkaWorldModel)
         self.assertEqual(model.K, [model.D])
-        self.assertFalse(hasattr(model, "decoders"))
+        self.assertEqual(len(model.decoders), 1)
         self.assertEqual(len(model.transitions), 1)
         self.assertEqual(model.metadata["action_spec"]["dim"], 2)
         self.assertEqual(model.metadata["preprocessing_spec"]["image"], "identity")
@@ -473,6 +482,8 @@ class MWMCoreTests(unittest.TestCase):
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
         out = model.training_loss(batch)
         self.assertIn("pred_loss_l0", out)
+        self.assertIn("recon_loss_l0", out)
+        self.assertEqual(tuple(model.decode(0, torch.randn(2, 8)).shape), (2, 3, 8, 8))
         self.assertIn("loss", out)
 
     def test_lewm_matryoshka_head_scaling_and_k_may_omit_d(self) -> None:
@@ -497,6 +508,8 @@ class MWMCoreTests(unittest.TestCase):
         out = model.training_loss(batch)
         self.assertIn("pred_loss_l0", out)
         self.assertIn("pred_loss_l1", out)
+        self.assertIn("recon_loss_l0", out)
+        self.assertIn("recon_loss_l1", out)
         self.assertNotIn("pred_loss_l2", out)
 
     def test_lewm_sigreg_is_shared_once_by_default(self) -> None:
@@ -520,6 +533,33 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(reg.calls, 2)
         self.assertEqual([shape[-1] for shape in reg.shapes], [4, 8])
 
+    def test_reconstruction_trains_decoders_without_latent_gradients_by_default(self) -> None:
+        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.0)
+        model.zero_grad(set_to_none=True)
+        out["loss"].backward()
+
+        self.assertGreater(_grad_abs_sum(model.decoders), 0.0)
+        self.assertEqual(_grad_abs_sum(model.encoder), 0.0)
+        self.assertEqual(_grad_abs_sum(model.projector), 0.0)
+        self.assertIn("recon_loss", out)
+        self.assertNotIn("recon_latent_loss", out)
+
+    def test_reconstruction_latent_weight_shapes_encoder_latents(self) -> None:
+        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.25)
+        model.zero_grad(set_to_none=True)
+        out["loss"].backward()
+
+        self.assertGreater(_grad_abs_sum(model.decoders), 0.0)
+        self.assertGreater(_grad_abs_sum(model.encoder), 0.0)
+        self.assertGreater(_grad_abs_sum(model.projector), 0.0)
+        self.assertIn("recon_latent_loss", out)
+
     def test_train_entrypoint_builds_from_stable_wm_base_config(self) -> None:
         source_config = _lewm_source_config(D=4, action_dim=2, predictor_heads=1, predictor_dim_head=2, predictor_mlp_dim=8)
         with tempfile.TemporaryDirectory() as tmp:
@@ -532,7 +572,7 @@ class MWMCoreTests(unittest.TestCase):
                         "component_policy": {
                             "shared": ["latent_producer"],
                             "per_level": ["transition"],
-                            "reconstructor": [],
+                            "reconstructor": ["decoder"],
                         },
                         "loss_terms": {"regularizers": "shared_latent"},
                     },
@@ -570,7 +610,7 @@ class MWMCoreTests(unittest.TestCase):
                         "component_policy": {
                             "shared": ["latent_producer"],
                             "per_level": ["transition"],
-                            "reconstructor": [],
+                            "reconstructor": ["decoder"],
                         }
                     },
                     "model": {"history_size": 2, "num_preds": 1},
@@ -684,8 +724,10 @@ class MWMCoreTests(unittest.TestCase):
         direct.train()
         mwm.train()
         d_loss = direct_loss()
-        m_loss = mwm.training_loss(dict(batch))["loss"]
-        self.assertTrue(torch.allclose(d_loss, m_loss, atol=0.0, rtol=0.0))
+        m_out = mwm.training_loss(dict(batch))
+        m_loss = m_out["loss"]
+        self.assertTrue(torch.allclose(d_loss, m_out["pred_loss"], atol=0.0, rtol=0.0))
+        self.assertIn("recon_loss", m_out)
 
         direct.zero_grad(set_to_none=True)
         mwm.zero_grad(set_to_none=True)
@@ -760,6 +802,7 @@ class MWMCoreTests(unittest.TestCase):
                     pred_proj=nn.Identity(),
                 )
             ],
+            decoders=[ConvImageDecoder(latent_dim=4, image_shape=(8, 8))],
             K=[4],
             D=4,
             action_dim=10,

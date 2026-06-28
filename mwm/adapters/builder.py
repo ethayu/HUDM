@@ -41,11 +41,12 @@ def build_mwm_from_stable_config(
 ) -> MatryoshkaWorldModel:
     resolved_family = _family_from_source_config(family, source_config)
     adapter = adapter_for_family(resolved_family)
-    policy = (
-        component_policy
-        if isinstance(component_policy, ComponentPolicy)
-        else ComponentPolicy.from_mapping(component_policy)
-    )
+    if isinstance(component_policy, ComponentPolicy):
+        policy = component_policy
+    elif component_policy is None:
+        policy = None
+    else:
+        policy = ComponentPolicy.from_mapping(component_policy)
     spec = adapter.resolve_spec(
         source_config=source_config,
         source_config_sha256=source_config_sha256,
