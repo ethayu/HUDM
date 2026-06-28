@@ -81,7 +81,4 @@ def validate_lewm_loss_config(loss_cfg: Any) -> None:
         raise ValueError("loss.recon_weight has been removed; use loss.recon_latent_weight instead.")
 
 
-_as_container = as_container
-
-
-__all__ = ["DEFAULTS", "_as_container", "as_container", "make_run_dir", "validate_lewm_loss_config"]
+__all__ = ["DEFAULTS", "as_container", "make_run_dir", "validate_lewm_loss_config"]

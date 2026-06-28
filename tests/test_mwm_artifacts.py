@@ -14,6 +14,7 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 
 import mwm.checkpoint_io as checkpoint_io
+import mwm.checkpoint_keymaps as checkpoint_keymaps
 from mwm.benchmark import matrix as benchmark_mwm
 from mwm.benchmark import output_verify as output_verify_module
 from mwm.benchmark.config import DEFAULTS, merged_run_config, validate_benchmark_matrix
@@ -33,7 +34,7 @@ from mwm.checkpoint_io import (
     validate_checkpoint_directory,
 )
 from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256, write_manifest
-from mwm.data.collection import _record_dataset_to_path
+from mwm.data.collection import record_dataset_to_path
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.sampling import StartGoalPair, sample_start_goal_pairs
 from mwm.eval.runner import resolve_device as eval_device
@@ -193,7 +194,7 @@ class MWMArtifactTests(unittest.TestCase):
             output_path = Path(tmp) / "out.lance"
             world = FakeWorld()
 
-            _record_dataset_to_path(
+            record_dataset_to_path(
                 world,
                 output_path,
                 episodes=1,
@@ -210,6 +211,7 @@ class MWMArtifactTests(unittest.TestCase):
 
     def test_hf_vit_encoder_keys_remap_to_custom_vit_layers(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
+        self.assertIs(checkpoint_io.remap_hf_vit_encoder_keys, checkpoint_keymaps.remap_hf_vit_encoder_keys)
         state = {
             "encoder.encoder.layer.2.attention.attention.query.weight": torch.ones(1),
             "encoder.encoder.layer.2.attention.attention.key.bias": torch.ones(1) * 2,
@@ -220,7 +222,7 @@ class MWMArtifactTests(unittest.TestCase):
             "decoder.weight": torch.ones(1) * 7,
         }
 
-        remapped = checkpoint_io.remap_hf_vit_encoder_keys(state)
+        remapped = checkpoint_keymaps.remap_hf_vit_encoder_keys(state)
 
         self.assertEqual(
             set(remapped),
@@ -241,10 +243,11 @@ class MWMArtifactTests(unittest.TestCase):
         self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
         state = {"encoder.layers.0.attention.q_proj.weight": torch.ones(1)}
 
-        self.assertIs(checkpoint_io.remap_hf_vit_encoder_keys(state), state)
+        self.assertIs(checkpoint_keymaps.remap_hf_vit_encoder_keys(state), state)
 
     def test_custom_vit_encoder_keys_remap_to_hf_vit_layers(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_custom_vit_encoder_keys_to_hf"))
+        self.assertIs(checkpoint_io.remap_custom_vit_encoder_keys_to_hf, checkpoint_keymaps.remap_custom_vit_encoder_keys_to_hf)
         state = {
             "encoder.layers.2.attention.q_proj.weight": torch.ones(1),
             "encoder.layers.2.attention.k_proj.bias": torch.ones(1) * 2,
@@ -255,7 +258,7 @@ class MWMArtifactTests(unittest.TestCase):
             "decoder.weight": torch.ones(1) * 7,
         }
 
-        remapped = checkpoint_io.remap_custom_vit_encoder_keys_to_hf(state)
+        remapped = checkpoint_keymaps.remap_custom_vit_encoder_keys_to_hf(state)
 
         self.assertEqual(
             set(remapped),
@@ -274,13 +277,14 @@ class MWMArtifactTests(unittest.TestCase):
 
     def test_target_aware_vit_key_remap_keeps_matching_hf_keys(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_vit_encoder_keys_for_model"))
+        self.assertIs(checkpoint_io.remap_vit_encoder_keys_for_model, checkpoint_keymaps.remap_vit_encoder_keys_for_model)
         state = {
             "encoder.encoder.layer.0.attention.attention.query.weight": torch.ones(1),
             "decoder.weight": torch.ones(1) * 2,
         }
         model = SimpleNamespace(state_dict=lambda: dict(state))
 
-        self.assertIs(checkpoint_io.remap_vit_encoder_keys_for_model(state, model), state)
+        self.assertIs(checkpoint_keymaps.remap_vit_encoder_keys_for_model(state, model), state)
 
     def test_target_aware_vit_key_remap_maps_custom_keys_to_hf_model(self) -> None:
         state = {
@@ -294,7 +298,7 @@ class MWMArtifactTests(unittest.TestCase):
             }
         )
 
-        remapped = checkpoint_io.remap_vit_encoder_keys_for_model(state, model)
+        remapped = checkpoint_keymaps.remap_vit_encoder_keys_for_model(state, model)
 
         self.assertIn("encoder.encoder.layer.0.attention.attention.query.weight", remapped)
         self.assertNotIn("encoder.layers.0.attention.q_proj.weight", remapped)
@@ -1234,7 +1238,11 @@ runs:
 
             self.assertEqual(dataset.count_rows(), 4)
             self.assertEqual(dataset.schema.names, ["episode_idx", "step_idx", "pixels", "action", "qpos", "qvel", "observation"])
-            self.assertEqual(load_dataset_metadata(output)["restore_spec"], "reacher_qpos_match_qpos_qvel")
+            metadata = load_dataset_metadata(output)
+            self.assertEqual(metadata["restore_spec"], "reacher_qpos_match_qpos_qvel")
+            self.assertEqual(metadata["source"]["format"], "hdf5")
+            self.assertEqual(metadata["source"]["path"], str(source))
+            self.assertEqual(metadata["source"]["hf_dataset"], "quentinll/lewm-reacher")
 
     def test_ogb_cube_hdf5_conversion_writes_lance_dataset_and_metadata(self) -> None:
         import h5py

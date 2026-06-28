@@ -57,7 +57,7 @@ class _MainThreadEpisodeWriter:
             self.write_episode(episode)
 
 
-def _record_dataset_to_path(
+def record_dataset_to_path(
     world: Any,
     output_path: Path,
     episodes: int,
@@ -139,7 +139,7 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
         keys_to_save = cfg.get("keys_to_save", None)
         if keys_to_save is not None:
             keys_to_save = [str(key) for key in keys_to_save]
-        _record_dataset_to_path(
+        record_dataset_to_path(
             world,
             output_path,
             int(cfg.episodes),
@@ -184,3 +184,6 @@ if __name__ == "__main__":
     parser.add_argument("--set", action="append", default=[], help="OmegaConf dotlist override, e.g. seed=1")
     args = parser.parse_args()
     main(args.config, overrides=args.set)
+
+
+__all__ = ["DEFAULTS", "main", "record_dataset_to_path"]

@@ -5,14 +5,13 @@ from typing import Any, Sequence
 import torch
 import torch.nn as nn
 
-from mwm.models.core import MWMWorldModel
 from mwm.models.objectives import matryoshka_training_loss
 from mwm.models.planning_costs import validate_fixed_level_rollout
 from mwm.models.transitions import TransitionPackage
 from mwm.preprocessing.images import ImageNetPreprocess, image_tensor_to_bchw, maybe_apply_image_preprocess
 
 
-class MatryoshkaWorldModel(MWMWorldModel):
+class MatryoshkaWorldModel(nn.Module):
     """Base-adaptive MWM shell with shared latent production and per-level tails."""
 
     architecture_version = "base_adaptive_world_model_v1"
@@ -37,7 +36,7 @@ class MatryoshkaWorldModel(MWMWorldModel):
         metadata: dict[str, Any] | None = None,
         architecture_version: str | None = None,
     ) -> None:
-        nn.Module.__init__(self)
+        super().__init__()
         self.encoder = encoder
         self.projector = projector
         self.transitions = nn.ModuleList(list(transitions))

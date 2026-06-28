@@ -76,22 +76,10 @@ def build_eval_process(dataset: Any, model: Any, metadata: dict[str, Any], cfg: 
     return process
 
 
-_available_stat_keys_for_action_process = available_stat_keys_for_action_process
-_build_eval_process = build_eval_process
-_fit_standard_scaler = fit_standard_scaler
-_stat_keys_for_action_process = stat_keys_for_action_process
-_uses_standardized_action_space = uses_standardized_action_space
-
-
 __all__ = [
     "available_stat_keys_for_action_process",
     "build_eval_process",
     "fit_standard_scaler",
     "stat_keys_for_action_process",
     "uses_standardized_action_space",
-    "_available_stat_keys_for_action_process",
-    "_build_eval_process",
-    "_fit_standard_scaler",
-    "_stat_keys_for_action_process",
-    "_uses_standardized_action_space",
 ]

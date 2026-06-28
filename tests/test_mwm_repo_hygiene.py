@@ -10,6 +10,7 @@ import unittest
 import yaml
 
 from mwm.swm.restore import eval_callables_for_env, validate_restore_columns
+from mwm.upstream.paper_parity import paper_parity_dataset_spec
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -463,13 +464,14 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertIn('"repo": "quentinll/lewm-cube"', source)
         self.assertIn('"restore_spec": "ogbench_cube_single_qpos_qvel_target_pose"', source)
 
-        data_source = (ROOT / "mwm" / "upstream" / "lewm_data.py").read_text(encoding="utf-8")
-        self.assertIn('REACHER_LANCE = "reacher.lance"', data_source)
-        self.assertIn('"env_id": "swm/ReacherDMControl-v0"', data_source)
-        self.assertIn('"restore_spec": "reacher_qpos_match_qpos_qvel"', data_source)
-        self.assertIn('OGB_CUBE_LANCE = "ogb_cube_single_expert.lance"', data_source)
-        self.assertIn('"env_id": "swm/OGBCube-v0"', data_source)
-        self.assertIn('"restore_spec": "ogbench_cube_single_qpos_qvel_target_pose"', data_source)
+        reacher = paper_parity_dataset_spec("reacher")
+        self.assertEqual(reacher.lance_name, "reacher.lance")
+        self.assertEqual(reacher.env_id, "swm/ReacherDMControl-v0")
+        self.assertEqual(reacher.restore_spec, "reacher_qpos_match_qpos_qvel")
+        ogb_cube = paper_parity_dataset_spec("ogb_cube")
+        self.assertEqual(ogb_cube.lance_name, "ogb_cube_single_expert.lance")
+        self.assertEqual(ogb_cube.env_id, "swm/OGBCube-v0")
+        self.assertEqual(ogb_cube.restore_spec, "ogbench_cube_single_qpos_qvel_target_pose")
         self.assertTrue((ROOT / "mwm" / "upstream" / "converters" / "ogb_cube.py").is_file())
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:

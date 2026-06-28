@@ -23,7 +23,6 @@ from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
 from mwm.models.base_adaptive import MatryoshkaWorldModel
-from mwm.models.core import MWMWorldModel
 from mwm.models.decoders import ConvImageDecoder
 from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
 from mwm.models.transitions import TransitionPackage
@@ -378,25 +377,14 @@ class FakeCEMParityCostModel(nn.Module):
 
 
 class MWMCoreTests(unittest.TestCase):
-    def test_raw_world_model_does_not_create_default_base_modules(self) -> None:
-        encoder = FakeLeWMEncoder(out_dim=4)
+    def test_core_module_has_no_separate_runtime_model_class(self) -> None:
+        import mwm.models.core as core
 
-        with self.assertRaisesRegex(ValueError, "explicit dynamics"):
-            MWMWorldModel(encoder=encoder, K=(4,), D=4, action_dim=2)
+        self.assertEqual(core.__all__, [])
+        self.assertFalse(hasattr(core, "MWMWorldModel"))
 
-        model = MWMWorldModel(
-            encoder=encoder,
-            K=(4,),
-            D=4,
-            action_dim=2,
-            dynamics=[FakeStepDynamics(action_dim=2, out_dim=4)],
-            decoder=None,
-            metadata={"image_shape": [8, 8]},
-        )
-
-        self.assertFalse(hasattr(model, "decoders"))
-        with self.assertRaisesRegex(NotImplementedError, "decoder"):
-            model.decode(0, torch.zeros(1, 4))
+    def test_matryoshka_world_model_is_direct_nn_module_runtime(self) -> None:
+        self.assertEqual(MatryoshkaWorldModel.__bases__, (nn.Module,))
 
     def test_world_model_provides_matryoshka_loss_and_regularizer_routing(self) -> None:
         losses = [torch.tensor(2.0), torch.tensor(6.0)]

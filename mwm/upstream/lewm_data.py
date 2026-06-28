@@ -5,13 +5,14 @@ import json
 from pathlib import Path
 
 from mwm.data.metadata import write_dataset_metadata
+from mwm.upstream.paper_parity import paper_parity_dataset_spec, paper_parity_hdf5_metadata, paper_parity_lance_metadata
 
 
-PUSHT_LANCE = "pusht_expert_train.lance"
-REACHER_LANCE = "reacher.lance"
-TWOROOM_LANCE = "tworoom.lance"
-OGB_CUBE_LANCE = "ogb_cube_single_expert.lance"
-OGB_CUBE_H5 = Path("ogbench") / "cube_single_expert.h5"
+PUSHT_LANCE = paper_parity_dataset_spec("pusht").lance_name
+REACHER_LANCE = paper_parity_dataset_spec("reacher").lance_name
+TWOROOM_LANCE = paper_parity_dataset_spec("tworoom").lance_name
+OGB_CUBE_LANCE = paper_parity_dataset_spec("ogb_cube").lance_name
+OGB_CUBE_H5 = Path(paper_parity_dataset_spec("ogb_cube").source_artifacts["hdf5"])
 
 
 def _require_lance_dataset(path: Path) -> None:
@@ -25,92 +26,19 @@ def _require_lance_dataset(path: Path) -> None:
 
 
 def _write_pusht_metadata(path: Path) -> None:
-    write_dataset_metadata(
-        path,
-        {
-            "format": "swm_lance",
-            "env_id": "swm/PushT-v1",
-            "restore_spec": "pusht_state_goal_state",
-            "image_shape": [224, 224],
-            "action_dim": 2,
-            "action_low": [-1.0, -1.0],
-            "action_high": [1.0, 1.0],
-            "dataset": {"pixels_key": "pixels", "action_key": "action"},
-            "source": {
-                "format": "lance",
-                "artifact": PUSHT_LANCE,
-                "standard": "paper_parity",
-            },
-        },
-    )
+    write_dataset_metadata(path, paper_parity_lance_metadata("pusht"))
 
 
 def _write_tworoom_metadata(path: Path) -> None:
-    write_dataset_metadata(
-        path,
-        {
-            "format": "swm_lance",
-            "env_id": "swm/TwoRoom-v1",
-            "restore_spec": "point_state_goal_state",
-            "image_shape": [224, 224],
-            "action_dim": 2,
-            "action_low": [-1.0, -1.0],
-            "action_high": [1.0, 1.0],
-            "dataset": {"pixels_key": "pixels", "action_key": "action"},
-            "source": {
-                "format": "lance",
-                "artifact": TWOROOM_LANCE,
-                "standard": "paper_parity",
-            },
-        },
-    )
+    write_dataset_metadata(path, paper_parity_lance_metadata("tworoom"))
 
 
 def _write_reacher_metadata(path: Path) -> None:
-    write_dataset_metadata(
-        path,
-        {
-            "format": "swm_lance",
-            "env_id": "swm/ReacherDMControl-v0",
-            "restore_spec": "reacher_qpos_match_qpos_qvel",
-            "image_shape": [224, 224],
-            "action_dim": 2,
-            "action_low": [-1.0, -1.0],
-            "action_high": [1.0, 1.0],
-            "dataset": {"pixels_key": "pixels", "action_key": "action"},
-            "source": {
-                "format": "lance",
-                "artifact": REACHER_LANCE,
-                "standard": "paper_parity",
-                "hf_dataset": "quentinll/lewm-reacher",
-            },
-        },
-    )
+    write_dataset_metadata(path, paper_parity_lance_metadata("reacher"))
 
 
 def _write_ogb_cube_metadata(path: Path, *, source_h5: Path | None = None) -> None:
-    source: dict[str, object] = {
-        "format": "hdf5",
-        "artifact": str(OGB_CUBE_H5),
-        "standard": "paper_parity",
-        "hf_dataset": "quentinll/lewm-cube",
-    }
-    if source_h5 is not None:
-        source["path"] = str(source_h5)
-    write_dataset_metadata(
-        path,
-        {
-            "format": "swm_lance",
-            "env_id": "swm/OGBCube-v0",
-            "restore_spec": "ogbench_cube_single_qpos_qvel_target_pose",
-            "image_shape": [224, 224],
-            "action_dim": 5,
-            "action_low": [-1.0] * 5,
-            "action_high": [1.0] * 5,
-            "dataset": {"pixels_key": "pixels", "action_key": "action"},
-            "source": source,
-        },
-    )
+    write_dataset_metadata(path, paper_parity_hdf5_metadata("ogb_cube", source_path=source_h5))
 
 
 def prepare_pusht(root: Path) -> Path:

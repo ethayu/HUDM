@@ -3,10 +3,11 @@ from __future__ import annotations
 import copy
 from typing import Any, Sequence
 
+import torch.nn as nn
+
 from mwm.adapters.base import ComponentPolicy
 from mwm.adapters.registry import adapter_for_family, family_for_target
 from mwm.adapters.stable_config import root_target
-from mwm.models.base_adaptive import MatryoshkaWorldModel
 
 
 STABLE_CONFIG_TARGET = "mwm.adapters.builder.build_mwm_from_stable_config"
@@ -38,7 +39,7 @@ def build_mwm_from_stable_config(
     image_shape: Sequence[int] = (224, 224),
     normalize_imagenet: bool = True,
     component_policy: ComponentPolicy | dict[str, Any] | None = None,
-) -> MatryoshkaWorldModel:
+) -> nn.Module:
     resolved_family = _family_from_source_config(family, source_config)
     adapter = adapter_for_family(resolved_family)
     if isinstance(component_policy, ComponentPolicy):

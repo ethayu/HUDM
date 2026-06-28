@@ -8,10 +8,10 @@ import torch
 from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.data.metadata import load_dataset_metadata
 from mwm.data.paths import local_path
-from mwm.data.transforms import build_lewm_base_adapter_dataset_transform
 from mwm.dependency_refs import dependency_refs
 from mwm.swm.restore import validate_restore_columns
 from mwm.training.lewm_model import resolve_lewm_base_adapter_model_cfg
+from mwm.training.lewm_transforms import build_lewm_base_adapter_dataset_transform
 
 
 def dataset_metadata(path: str | Path) -> dict[str, Any]:

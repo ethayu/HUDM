@@ -31,6 +31,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             "mwm/models/planning_costs.py",
             "mwm/training/lewm_config.py",
             "mwm/training/lewm_data.py",
+            "mwm/training/lewm_transforms.py",
             "mwm/training/lewm_model.py",
             "mwm/training/lewm_runtime.py",
             "mwm/training/lewm_callbacks.py",
@@ -113,14 +114,16 @@ class MWMMigrationHygieneTests(unittest.TestCase):
     def test_model_package_exports_come_from_canonical_owner_modules(self) -> None:
         import mwm
         import mwm.models as models
+        import mwm.models.core as core
         import mwm.models.losses as losses
         from mwm.models.base_adaptive import MatryoshkaWorldModel
-        from mwm.models.core import MWMWorldModel
         from mwm.models.transitions import TransitionPackage
         from mwm.preprocessing.images import ImageNetPreprocess
 
         self.assertEqual(getattr(mwm, "__all__", None), [])
         self.assertEqual(getattr(models, "__all__", None), [])
+        self.assertEqual(getattr(core, "__all__", None), [])
+        self.assertFalse(hasattr(core, "MWMWorldModel"))
         for module, name in (
             (mwm, "ImageNetPreprocess"),
             (mwm, "MatryoshkaWorldModel"),
@@ -135,13 +138,17 @@ class MWMMigrationHygieneTests(unittest.TestCase):
                 self.assertFalse(hasattr(module, name), name)
         self.assertIs(ImageNetPreprocess, importlib.import_module("mwm.preprocessing.images").ImageNetPreprocess)
         self.assertIs(MatryoshkaWorldModel, importlib.import_module("mwm.models.base_adaptive").MatryoshkaWorldModel)
-        self.assertIs(MWMWorldModel, importlib.import_module("mwm.models.core").MWMWorldModel)
         self.assertIs(TransitionPackage, importlib.import_module("mwm.models.transitions").TransitionPackage)
         for name in ("latent_regularizer_loss", "matryoshka_base_loss", "weighted_level_mean"):
             with self.subTest(loss=name):
                 self.assertFalse(hasattr(mwm, name), name)
                 self.assertFalse(hasattr(models, name), name)
                 self.assertTrue(callable(getattr(losses, name)))
+
+    def test_builder_does_not_import_concrete_runtime_model(self) -> None:
+        source = (ROOT / "mwm" / "adapters" / "builder.py").read_text(encoding="utf-8")
+        self.assertNotIn("MatryoshkaWorldModel", source)
+        self.assertNotIn("mwm.models.base_adaptive", source)
 
     def test_model_package_import_surface_is_light_and_explicit(self) -> None:
         code = (
@@ -336,9 +343,13 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         loading_source = (ROOT / "mwm/data/loading.py").read_text(encoding="utf-8")
         self.assertIn("def load_stable_wm_dataset_for_mwm", loading_source)
         transforms_source = (ROOT / "mwm/data/transforms.py").read_text(encoding="utf-8")
+        lewm_data_source = (ROOT / "mwm/training/lewm_data.py").read_text(encoding="utf-8")
         self.assertNotIn("def load_stable_wm_dataset_for_mwm", transforms_source)
+        self.assertNotIn("build_lewm_base_adapter_dataset_transform", transforms_source)
+        self.assertNotIn("stable_pretraining_image_transforms", transforms_source)
         self.assertNotIn("_ZScoreScaler", transforms_source)
         self.assertNotIn("_column_normalizer", transforms_source)
+        self.assertIn("from mwm.training.lewm_transforms import build_lewm_base_adapter_dataset_transform", lewm_data_source)
 
     def test_swm_envs_do_not_expose_noop_restore_wrapper_hook(self) -> None:
         source = (ROOT / "mwm/swm/envs.py").read_text(encoding="utf-8")
@@ -398,6 +409,29 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             {"DEFAULT_CONFIGS", "PAPER_PARITY_CONFIGS", "main", "verify_data_configs"},
         )
         self.assertFalse(any(name.startswith("_") for name in module.__all__))
+
+    def test_cleaned_modules_do_not_export_private_compatibility_aliases(self) -> None:
+        action_preprocessing = importlib.import_module("mwm.eval.action_preprocessing")
+        self.assertFalse(any(name.startswith("_") for name in action_preprocessing.__all__))
+        for name in (
+            "_available_stat_keys_for_action_process",
+            "_build_eval_process",
+            "_fit_standard_scaler",
+            "_stat_keys_for_action_process",
+            "_uses_standardized_action_space",
+        ):
+            self.assertFalse(hasattr(action_preprocessing, name), name)
+
+        lewm_config = importlib.import_module("mwm.training.lewm_config")
+        self.assertNotIn("_as_container", lewm_config.__all__)
+        self.assertFalse(hasattr(lewm_config, "_as_container"))
+
+        benchmark_io = importlib.import_module("mwm.benchmark.io")
+        self.assertFalse(hasattr(benchmark_io, "_jsonable"))
+
+        collection = importlib.import_module("mwm.data.collection")
+        self.assertIn("record_dataset_to_path", collection.__all__)
+        self.assertFalse(hasattr(collection, "_record_dataset_to_path"))
 
     def test_artifact_tests_use_focused_benchmark_verifier_modules(self) -> None:
         source = (ROOT / "tests/test_mwm_artifacts.py").read_text(encoding="utf-8")
@@ -527,7 +561,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         self.assertNotIn("mwm.models.world_model", docs)
         self.assertNotIn("compatibility facade", docs)
         self.assertIn("mwm.models.base_adaptive.MatryoshkaWorldModel", docs)
-        self.assertIn("mwm.models.core.MWMWorldModel", docs)
+        self.assertNotIn("mwm.models.core.MWMWorldModel", docs)
 
 
 if __name__ == "__main__":

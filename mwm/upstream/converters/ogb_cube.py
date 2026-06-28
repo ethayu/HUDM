@@ -12,11 +12,13 @@ from stable_worldmodel.data.formats.lance import LanceWriter
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.paths import local_path
 from mwm.swm.restore import validate_restore_columns
+from mwm.upstream.paper_parity import paper_parity_dataset_metadata, paper_parity_dataset_spec
 
 
-OGB_CUBE_ENV_ID = "swm/OGBCube-v0"
-OGB_CUBE_LANCE = "ogb_cube_single_expert.lance"
-OGB_CUBE_RESTORE_SPEC = "ogbench_cube_single_qpos_qvel_target_pose"
+OGB_CUBE_SPEC = paper_parity_dataset_spec("ogb_cube")
+OGB_CUBE_ENV_ID = OGB_CUBE_SPEC.env_id
+OGB_CUBE_LANCE = OGB_CUBE_SPEC.lance_name
+OGB_CUBE_RESTORE_SPEC = OGB_CUBE_SPEC.restore_spec
 OGB_CUBE_RESTORE_IMPORT_PATH = "mwm.ogbench.restore.ogbench_cube_restore_spec"
 OGB_CUBE_COLUMNS = (
     "pixels",
@@ -73,26 +75,7 @@ def _replace_output(output: Path, *, overwrite: bool) -> None:
 
 
 def _write_metadata(output: Path, source: Path) -> None:
-    write_dataset_metadata(
-        output,
-        {
-            "format": "swm_lance",
-            "env_id": OGB_CUBE_ENV_ID,
-            "restore_spec": OGB_CUBE_RESTORE_SPEC,
-            "image_shape": [224, 224],
-            "action_dim": 5,
-            "action_low": [-1.0] * 5,
-            "action_high": [1.0] * 5,
-            "dataset": {"pixels_key": "pixels", "action_key": "action"},
-            "source": {
-                "format": "hdf5",
-                "artifact": "ogbench/cube_single_expert.h5",
-                "path": str(source),
-                "standard": "paper_parity",
-                "hf_dataset": "quentinll/lewm-cube",
-            },
-        },
-    )
+    write_dataset_metadata(output, paper_parity_dataset_metadata("ogb_cube", source_format="hdf5", source_path=source))
 
 
 def convert_ogb_cube_hdf5_to_lance(

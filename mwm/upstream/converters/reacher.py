@@ -12,10 +12,12 @@ from stable_worldmodel.data.formats.lance import LanceWriter
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.paths import local_path
 from mwm.swm.restore import validate_restore_columns
+from mwm.upstream.paper_parity import paper_parity_dataset_metadata, paper_parity_dataset_spec
 
 
-REACHER_ENV_ID = "swm/ReacherDMControl-v0"
-REACHER_LANCE = "reacher.lance"
+REACHER_SPEC = paper_parity_dataset_spec("reacher")
+REACHER_ENV_ID = REACHER_SPEC.env_id
+REACHER_LANCE = REACHER_SPEC.lance_name
 REACHER_COLUMNS = ("pixels", "action", "qpos", "qvel", "observation")
 
 
@@ -60,26 +62,7 @@ def convert_reacher_h5_to_lance(
         with LanceWriter(output, mode="error") as writer:
             writer.write_episodes(_episode_rows(handle, progress_every=progress_every))
 
-    write_dataset_metadata(
-        output,
-        {
-            "format": "swm_lance",
-            "env_id": REACHER_ENV_ID,
-            "restore_spec": "reacher_qpos_match_qpos_qvel",
-            "image_shape": [224, 224],
-            "action_dim": 2,
-            "action_low": [-1.0, -1.0],
-            "action_high": [1.0, 1.0],
-            "dataset": {"pixels_key": "pixels", "action_key": "action"},
-            "source": {
-                "format": "hdf5",
-                "path": str(source),
-                "artifact": "reacher.h5",
-                "standard": "paper_parity",
-                "hf_dataset": "quentinll/lewm-reacher",
-            },
-        },
-    )
+    write_dataset_metadata(output, paper_parity_dataset_metadata("reacher", source_format="hdf5", source_path=source))
     dataset = load_dataset(local_path(output), format="lance")
     try:
         validate_restore_columns(
