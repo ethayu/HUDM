@@ -35,12 +35,14 @@ class MatryoshkaWorldModel(nn.Module):
         decoder_architectures: Sequence[dict[str, Any]] | None = None,
         metadata: dict[str, Any] | None = None,
         architecture_version: str | None = None,
+        runtime_strategy: nn.Module | None = None,
     ) -> None:
         super().__init__()
         self.encoder = encoder
         self.projector = projector
         self.transitions = nn.ModuleList(list(transitions))
         self.decoders = nn.ModuleList(list(decoders))
+        self.runtime_strategy = runtime_strategy
         self.K = [int(k) for k in K]
         self.D = int(D)
         self.action_dim = int(action_dim)
@@ -67,6 +69,7 @@ class MatryoshkaWorldModel(nn.Module):
         meta.setdefault("architecture_version", arch)
         meta.setdefault("image_shape", [int(x) for x in self.image_shape])
         meta.setdefault("action_block", int(self.action_block))
+        meta.setdefault("action_dim", int(self.action_dim) // max(1, int(self.action_block)))
         meta.setdefault("normalize_imagenet", bool(self.normalize_imagenet))
         meta.setdefault(
             "preprocessing_spec",
@@ -123,6 +126,8 @@ class MatryoshkaWorldModel(nn.Module):
         return emb.reshape(*original_shape, self.D)
 
     def encode(self, info: dict[str, torch.Tensor] | torch.Tensor, *, already_preprocessed: bool = False) -> Any:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.encode(self, info, already_preprocessed=already_preprocessed)
         if torch.is_tensor(info):
             return self._encode_pixels(info, already_preprocessed=already_preprocessed)
         out = dict(info)
@@ -133,10 +138,14 @@ class MatryoshkaWorldModel(nn.Module):
         return out
 
     def _predict_prefix(self, level_idx: int, emb: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.predict_prefix(self, level_idx, emb, action)
         k = self.K[int(level_idx)]
         return self.transitions[int(level_idx)].predict(emb[..., :k], action)
 
     def decode(self, level_idx: int, latent: torch.Tensor) -> torch.Tensor:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.decode(self, level_idx, latent)
         idx = int(level_idx)
         k = self.K[idx]
         return self.decoders[idx](latent[..., :k])
@@ -152,6 +161,17 @@ class MatryoshkaWorldModel(nn.Module):
         sigreg_weight: float = 0.0,
         sigreg_scope: str = "shared_latent",
     ) -> dict[str, torch.Tensor]:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.training_loss(
+                self,
+                batch,
+                level_weights=level_weights,
+                rollout_weight=rollout_weight,
+                recon_latent_weight=recon_latent_weight,
+                sigreg=sigreg,
+                sigreg_weight=sigreg_weight,
+                sigreg_scope=sigreg_scope,
+            )
         return matryoshka_training_loss(
             self,
             batch,
@@ -164,6 +184,8 @@ class MatryoshkaWorldModel(nn.Module):
         )
 
     def rollout_at_level(self, infos: dict[str, Any], action_sequence: torch.Tensor, level_idx: int) -> dict[str, Any]:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.rollout_at_level(self, infos, action_sequence, level_idx)
         if "pixels" not in infos:
             raise KeyError("pixels not in info_dict")
         pixels = infos["pixels"]
@@ -192,6 +214,9 @@ class MatryoshkaWorldModel(nn.Module):
         return infos
 
     def _ensure_goal_emb(self, infos: dict[str, Any]) -> None:
+        if self.runtime_strategy is not None:
+            self.runtime_strategy.ensure_goal_emb(self, infos)
+            return
         if "goal_emb" in infos:
             return
         goal = {k: v[:, 0] for k, v in infos.items() if torch.is_tensor(v)}
@@ -205,6 +230,8 @@ class MatryoshkaWorldModel(nn.Module):
 
     @torch.no_grad()
     def get_cost_with_fidelity(self, infos: dict[str, Any], candidates: torch.Tensor, decision: Any) -> torch.Tensor:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.get_cost_with_fidelity(self, infos, candidates, decision)
         if candidates.ndim != 4:
             raise ValueError(f"candidates must have shape (B,N,H,A), got {tuple(candidates.shape)}")
         level_idx, rollout_levels = validate_fixed_level_rollout(decision, int(candidates.shape[2]))
