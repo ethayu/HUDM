@@ -3,16 +3,60 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 
 import torch
+import torch.nn as nn
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, validate_component_policy
 from mwm.adapters.builder import build_mwm_from_stable_config
 from mwm.adapters.lewm import LeWMStableWMAdapter
 from mwm.adapters.registry import family_for_target
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
+from mwm.checkpoint_io import load_world_model_from_checkpoint, save_world_checkpoint, validate_checkpoint_directory
 from mwm.models.base_adaptive import MatryoshkaWorldModel
+
+
+class FakeDINOBackbone(nn.Module):
+    def __init__(self, hidden_size: int = 6, num_patches: int = 4) -> None:
+        super().__init__()
+        self.config = SimpleNamespace(hidden_size=int(hidden_size))
+        self.hidden_size = int(hidden_size)
+        self.num_patches = int(num_patches)
+        self.scale = nn.Parameter(torch.arange(1, int(hidden_size) + 1, dtype=torch.float32))
+
+    def forward(self, pixels: torch.Tensor, interpolate_pos_encoding: bool = True) -> SimpleNamespace:
+        del interpolate_pos_encoding
+        pooled = pixels.reshape(pixels.shape[0], -1).mean(dim=1, keepdim=True)
+        patches = pooled[:, None, :] * self.scale.view(1, 1, -1)
+        patches = patches.expand(-1, self.num_patches, -1)
+        cls = torch.zeros(pixels.shape[0], 1, self.hidden_size, dtype=patches.dtype, device=patches.device)
+        return SimpleNamespace(last_hidden_state=torch.cat([cls, patches], dim=1))
+
+
+class FakePreJEPAPredictor(nn.Module):
+    def __init__(
+        self,
+        *,
+        num_patches: int,
+        num_frames: int,
+        dim: int,
+        depth: int = 1,
+        heads: int = 1,
+        mlp_dim: int = 4,
+        dim_head: int = 1,
+        dropout: float = 0.0,
+        emb_dropout: float = 0.0,
+    ) -> None:
+        super().__init__()
+        del num_patches, num_frames, depth, heads, mlp_dim, dim_head, dropout, emb_dropout
+        self.dim = int(dim)
+        self.proj = nn.Linear(int(dim), int(dim), bias=False)
+        nn.init.eye_(self.proj.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.proj(x)
 
 
 class AdapterPolicyTests(unittest.TestCase):
@@ -279,10 +323,194 @@ class LeWMStableConfigTests(unittest.TestCase):
         self.assertEqual(model.transitions[0].pred_proj.net[0].out_features, 16)
 
 
+class PreJEPAStableConfigTests(unittest.TestCase):
+    def _prejepa_config(self) -> dict:
+        return {
+            "_target_": "stable_worldmodel.wm.prejepa.PreJEPA",
+            "history_size": 2,
+            "num_pred": 1,
+            "interpolate_pos_encoding": True,
+            "encoder": {
+                "_target_": "tests.test_mwm_base_adapter.FakeDINOBackbone",
+                "hidden_size": 6,
+                "num_patches": 4,
+            },
+            "predictor": {
+                "_target_": "tests.test_mwm_base_adapter.FakePreJEPAPredictor",
+                "num_patches": 4,
+                "num_frames": 2,
+                "dim": 10,
+                "depth": 1,
+                "heads": 2,
+                "mlp_dim": 12,
+                "dim_head": 2,
+                "dropout": 0.0,
+                "emb_dropout": 0.0,
+            },
+            "extra_encoders": {
+                "_target_": "torch.nn.ModuleDict",
+                "modules": {
+                    "proprio": {
+                        "_target_": "stable_worldmodel.wm.prejepa.module.Embedder",
+                        "in_chans": 3,
+                        "emb_dim": 2,
+                    },
+                    "action": {
+                        "_target_": "stable_worldmodel.wm.prejepa.module.Embedder",
+                        "in_chans": 2,
+                        "emb_dim": 2,
+                    },
+                },
+            },
+        }
+
+    def test_dino_alias_builds_canonical_prejepa_adapter_with_fixed_extras(self) -> None:
+        model = build_mwm_from_stable_config(
+            family="dino",
+            source_config=self._prejepa_config(),
+            source_config_sha256="prejepa-sha",
+            training_recipe={"history_size": 2, "num_preds": 1, "backbone": {"name": "dinov2_small"}},
+            K=(3, 6),
+            action_dim=2,
+            action_block=1,
+            image_shape=(4, 4),
+            normalize_imagenet=False,
+        )
+
+        self.assertIsInstance(model, MatryoshkaWorldModel)
+        self.assertEqual(model.metadata["adapter_family"], "prejepa")
+        self.assertEqual(model.mwm_config["kwargs"]["family"], "prejepa")
+        self.assertEqual(model.D, 6)
+        self.assertEqual(model.metadata["D_visual"], 6)
+        self.assertEqual(model.metadata["extra_dims"], {"proprio": 2, "action": 2})
+        self.assertEqual(model.metadata["extra_order"], ["proprio", "action"])
+        self.assertEqual(model.metadata["level_dims"], [7, 10])
+        self.assertEqual([head["predictor_dim"] for head in model.metadata["head_architectures"]], [7, 10])
+        self.assertEqual([transition.dim for transition in model.transitions], [7, 10])
+
+    def test_prejepa_loss_excludes_action_slice_but_logs_pixel_and_proprio_losses(self) -> None:
+        model = build_mwm_from_stable_config(
+            family="prejepa",
+            source_config=self._prejepa_config(),
+            source_config_sha256="prejepa-sha",
+            training_recipe={"history_size": 2, "num_preds": 1},
+            K=(6,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(4, 4),
+            normalize_imagenet=False,
+        )
+        batch = {
+            "pixels": torch.zeros(1, 3, 3, 4, 4),
+            "proprio": torch.ones(1, 3, 3),
+            "action": torch.tensor([[[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]]]),
+        }
+
+        out = model.training_loss(batch)
+
+        self.assertTrue(torch.allclose(out["loss"], torch.tensor(0.0), atol=1e-6))
+        self.assertTrue(torch.allclose(out["pred_loss_l0"], torch.tensor(0.0), atol=1e-6))
+        self.assertTrue(torch.allclose(out["pixels_loss_l0"], torch.tensor(0.0), atol=1e-6))
+        self.assertTrue(torch.allclose(out["proprio_loss_l0"], torch.tensor(0.0), atol=1e-6))
+        self.assertNotIn("action_loss_l0", out)
+
+    def test_prejepa_rollout_cost_uses_patch_pixels_and_non_action_goal_extras(self) -> None:
+        model = build_mwm_from_stable_config(
+            family="prejepa",
+            source_config=self._prejepa_config(),
+            source_config_sha256="prejepa-sha",
+            training_recipe={"history_size": 2, "num_preds": 1},
+            K=(3,),
+            action_dim=2,
+            action_block=1,
+            image_shape=(4, 4),
+            normalize_imagenet=False,
+        )
+        infos = {
+            "pixels": torch.zeros(1, 2, 2, 3, 4, 4),
+            "goal": torch.zeros(1, 2, 2, 3, 4, 4),
+            "proprio": torch.zeros(1, 2, 2, 3),
+            "goal_proprio": torch.zeros(1, 2, 2, 3),
+        }
+        candidates = torch.zeros(1, 2, 3, 2)
+        decision = SimpleNamespace(base_level_idx=0, rollout_level_indices=[0, 0, 0])
+
+        cost = model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertEqual(tuple(cost.shape), (1, 2))
+        self.assertTrue(torch.isfinite(cost).all())
+        self.assertEqual(model._last_cost_diagnostics["terminal_k"], 3)
+        self.assertEqual(model._last_cost_diagnostics["num_patches"], 4)
+
+    def test_prejepa_checkpoint_round_trips_through_generic_builder(self) -> None:
+        import tempfile
+
+        model = build_mwm_from_stable_config(
+            family="dinowm",
+            source_config=self._prejepa_config(),
+            source_config_sha256="prejepa-sha",
+            training_recipe={"history_size": 2, "num_preds": 1, "backbone": {"name": "dinov2_small"}},
+            K=(3, 6),
+            action_dim=2,
+            action_block=1,
+            image_shape=(4, 4),
+            normalize_imagenet=False,
+        )
+
+        with tempfile.TemporaryDirectory() as tmp:
+            save_world_checkpoint(model, tmp)
+            config, metadata = validate_checkpoint_directory(tmp, strict_metadata=True)
+            loaded, loaded_metadata, epoch = load_world_model_from_checkpoint(tmp, None, torch.device("cpu"))
+
+        self.assertEqual(epoch, 0)
+        self.assertEqual(config["kwargs"]["family"], "prejepa")
+        self.assertEqual(metadata["adapter_family"], "prejepa")
+        self.assertEqual(metadata["D"], 6)
+        self.assertEqual(metadata["D_visual"], 6)
+        self.assertEqual(metadata["level_dims"], [7, 10])
+        self.assertEqual(loaded_metadata["extra_dims"], {"proprio": 2, "action": 2})
+        self.assertEqual(loaded.metadata["adapter_family"], "prejepa")
+        self.assertEqual([transition.dim for transition in loaded.transitions], [7, 10])
+
+    def test_prejepa_rejects_missing_action_encoder(self) -> None:
+        config = self._prejepa_config()
+        config["extra_encoders"]["modules"].pop("action")
+
+        with self.assertRaisesRegex(ValueError, "requires an action extra encoder"):
+            build_mwm_from_stable_config(
+                family="prejepa",
+                source_config=config,
+                source_config_sha256="prejepa-sha",
+                training_recipe={},
+                K=(6,),
+                action_dim=2,
+                image_shape=(4, 4),
+                normalize_imagenet=False,
+            )
+
+    def test_prejepa_rejects_cnn_fallback_encoder_paths(self) -> None:
+        config = self._prejepa_config()
+        config["encoder"] = {
+            "_target_": "stable_worldmodel.wm.prejepa.module.create_backbone",
+            "name": "microsoft/resnet-18",
+        }
+
+        with self.assertRaisesRegex(ValueError, "not CNN fallbacks"):
+            build_mwm_from_stable_config(
+                family="prejepa",
+                source_config=config,
+                source_config_sha256="prejepa-sha",
+                training_recipe={},
+                K=(6,),
+                action_dim=2,
+                image_shape=(4, 4),
+                normalize_imagenet=False,
+            )
+
+
 class UnsupportedAdapterTests(unittest.TestCase):
     def test_generic_builder_dispatches_unsupported_adapters_without_lewm_special_case(self) -> None:
         cases = (
-            ("prejepa", "stable_worldmodel.wm.prejepa.PreJEPA"),
             ("pldm", "stable_worldmodel.wm.pldm.PLDM"),
         )
         for family, target in cases:
