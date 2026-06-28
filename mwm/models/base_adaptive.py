@@ -6,7 +6,12 @@ import torch
 import torch.nn as nn
 
 from mwm.models.objectives import matryoshka_training_loss
-from mwm.models.planning_costs import validate_fixed_level_rollout
+from mwm.models.planning_costs import (
+    active_rollout_levels,
+    latent_work_for_levels,
+    rollout_schedule_indices,
+    terminal_rollout_level,
+)
 from mwm.models.transitions import TransitionPackage
 from mwm.preprocessing.images import ImageNetPreprocess, image_tensor_to_bchw, maybe_apply_image_preprocess
 
@@ -213,6 +218,45 @@ class MatryoshkaWorldModel(nn.Module):
         infos["predicted_emb"] = emb
         return infos
 
+    def rollout_with_schedule(
+        self,
+        infos: dict[str, Any],
+        action_sequence: torch.Tensor,
+        rollout_levels: Sequence[int],
+    ) -> dict[str, Any]:
+        if self.runtime_strategy is not None:
+            return self.runtime_strategy.rollout_with_schedule(self, infos, action_sequence, rollout_levels)
+        if "pixels" not in infos:
+            raise KeyError("pixels not in info_dict")
+        pixels = infos["pixels"]
+        history = int(pixels.size(2))
+        batch, samples, horizon = action_sequence.shape[:3]
+        if horizon < history:
+            raise ValueError(f"Action horizon {horizon} is shorter than pixel history {history}.")
+        active_levels = active_rollout_levels([int(x) for x in rollout_levels], horizon=int(horizon), history=history)
+        if "emb" not in infos:
+            init = {k: v[:, 0] for k, v in infos.items() if torch.is_tensor(v)}
+            init.pop("action", None)
+            init = self.encode(init, already_preprocessed=False)
+            infos["emb"] = init["emb"].detach().unsqueeze(1).expand(batch, samples, -1, -1)
+        emb_init = infos["emb"][..., : self.D].reshape(batch * samples, history, self.D)
+        all_actions = action_sequence.reshape(batch * samples, int(horizon), self.action_dim)
+        emb_list = list(emb_init.unbind(dim=1))
+        for step, level_idx in enumerate(active_levels):
+            level_idx = int(level_idx)
+            k = self.K[level_idx]
+            pred_time = history + step
+            lo = max(0, pred_time - self.history_size)
+            emb_trunc = torch.stack(emb_list[lo:], dim=1)
+            act_trunc = all_actions[:, lo:pred_time]
+            pred_k = self._predict_prefix(level_idx, emb_trunc[..., :k], act_trunc)[:, -1]
+            next_emb = emb_list[-1].clone()
+            next_emb[..., :k] = pred_k
+            emb_list.append(next_emb)
+        emb = torch.stack(emb_list, dim=1).reshape(batch, samples, history + len(active_levels), self.D)
+        infos["predicted_emb"] = emb
+        return infos
+
     def _ensure_goal_emb(self, infos: dict[str, Any]) -> None:
         if self.runtime_strategy is not None:
             self.runtime_strategy.ensure_goal_emb(self, infos)
@@ -234,14 +278,21 @@ class MatryoshkaWorldModel(nn.Module):
             return self.runtime_strategy.get_cost_with_fidelity(self, infos, candidates, decision)
         if candidates.ndim != 4:
             raise ValueError(f"candidates must have shape (B,N,H,A), got {tuple(candidates.shape)}")
-        level_idx, rollout_levels = validate_fixed_level_rollout(decision, int(candidates.shape[2]))
+        base_level_idx, rollout_levels = rollout_schedule_indices(
+            decision,
+            int(candidates.shape[2]),
+            num_levels=self.num_levels,
+        )
         if int(candidates.shape[-1]) != self.action_dim:
             raise ValueError(f"Expected action_dim={self.action_dim}, got {int(candidates.shape[-1])}")
         self._ensure_goal_emb(infos)
-        out = self.rollout_at_level(infos, candidates, level_idx)
+        out = self.rollout_with_schedule(infos, candidates, rollout_levels)
         pred_emb = out["predicted_emb"]
         goal_emb = out["goal_emb"]
-        k = self.K[level_idx]
+        history = int(infos["pixels"].size(2))
+        active_levels = active_rollout_levels(rollout_levels, horizon=int(candidates.shape[2]), history=history)
+        terminal_idx = terminal_rollout_level(rollout_levels, horizon=int(candidates.shape[2]), history=history)
+        k = self.K[terminal_idx]
         if goal_emb.ndim == 2:
             goal_emb = goal_emb[:, None, None, :]
         elif goal_emb.ndim == 3:
@@ -249,9 +300,15 @@ class MatryoshkaWorldModel(nn.Module):
         goal_emb = goal_emb[..., -1:, :k].expand_as(pred_emb[..., -1:, :k])
         cost = (pred_emb[..., -1:, :k] - goal_emb.detach()).pow(2).sum(dim=tuple(range(2, pred_emb.ndim)))
         self._last_cost_diagnostics = {
-            "base_level_idx": int(level_idx),
+            "base_level_idx": int(base_level_idx),
+            "terminal_level_idx": int(terminal_idx),
             "rollout_level_indices": rollout_levels,
-            "latent_work": int(candidates.shape[0] * candidates.shape[1] * candidates.shape[2] * k),
+            "latent_work": latent_work_for_levels(
+                batch=int(candidates.shape[0]),
+                samples=int(candidates.shape[1]),
+                levels=active_levels,
+                level_width=lambda idx: self.K[int(idx)],
+            ),
             "terminal_k": int(k),
             "prefix_criterion": True,
             "history_size": int(self.history_size),

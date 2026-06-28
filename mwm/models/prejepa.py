@@ -6,7 +6,12 @@ import torch
 import torch.nn as nn
 
 from mwm.models.losses import matryoshka_base_loss, weighted_level_mean
-from mwm.models.planning_costs import validate_fixed_level_rollout
+from mwm.models.planning_costs import (
+    active_rollout_levels,
+    latent_work_for_levels,
+    rollout_schedule_indices,
+    terminal_rollout_level,
+)
 from mwm.preprocessing.images import image_tensor_to_bchw, maybe_apply_image_preprocess
 
 
@@ -208,6 +213,23 @@ class PreJEPARuntimeStrategy(nn.Module):
             raise ValueError(f"PreJEPA level {level_idx} produced dim {int(level.shape[-1])}; expected {expected_dim}.")
         return level
 
+    def _compose_level_parts(
+        self,
+        model: Any,
+        level_idx: int,
+        pixels: torch.Tensor,
+        extras: dict[str, torch.Tensor],
+    ) -> torch.Tensor:
+        k = int(model.K[int(level_idx)])
+        pieces = [pixels[..., :k]]
+        for key in self.extra_order:
+            pieces.append(extras[key])
+        level = torch.cat(pieces, dim=-1)
+        expected_dim = self.level_dim(model, int(level_idx))
+        if int(level.shape[-1]) != expected_dim:
+            raise ValueError(f"PreJEPA level {level_idx} produced dim {int(level.shape[-1])}; expected {expected_dim}.")
+        return level
+
     def predict_prefix(self, model: Any, level_idx: int, emb: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
         del action
         if emb.ndim < 4:
@@ -334,6 +356,22 @@ class PreJEPARuntimeStrategy(nn.Module):
             start, end = self._extra_slice(model, int(level_idx), key)
             infos[f"predicted_{key}_emb"] = embedding[..., start:end]
 
+    def _store_scheduled_predicted_parts(
+        self,
+        model: Any,
+        infos: dict[str, Any],
+        level_idx: int,
+        pixels: torch.Tensor,
+        extras: dict[str, torch.Tensor],
+    ) -> None:
+        k = int(model.K[int(level_idx)])
+        embedding = self._compose_level_parts(model, int(level_idx), pixels, extras)
+        infos["predicted_embedding"] = embedding
+        infos["predicted_emb"] = embedding
+        infos["predicted_pixels_emb"] = pixels[..., :k]
+        for key in self.extra_order:
+            infos[f"predicted_{key}_emb"] = extras[key]
+
     def rollout_at_level(self, model: Any, infos: dict[str, Any], action_sequence: torch.Tensor, level_idx: int) -> dict[str, Any]:
         if "pixels" not in infos:
             raise KeyError("pixels not in info_dict")
@@ -401,6 +439,111 @@ class PreJEPARuntimeStrategy(nn.Module):
         self._store_predicted_parts(model, infos, int(level_idx), predicted)
         return infos
 
+    def rollout_with_schedule(
+        self,
+        model: Any,
+        infos: dict[str, Any],
+        action_sequence: torch.Tensor,
+        rollout_levels: Sequence[int],
+    ) -> dict[str, Any]:
+        if "pixels" not in infos:
+            raise KeyError("pixels not in info_dict")
+        if action_sequence.ndim != 4:
+            raise ValueError(f"action_sequence must have shape (B,N,H,A), got {tuple(action_sequence.shape)}")
+        batch, samples, horizon = (
+            int(action_sequence.shape[0]),
+            int(action_sequence.shape[1]),
+            int(action_sequence.shape[2]),
+        )
+        if int(action_sequence.shape[-1]) != model.action_dim:
+            raise ValueError(f"Expected action_dim={model.action_dim}, got {int(action_sequence.shape[-1])}")
+        history = int(infos["pixels"].shape[2])
+        if horizon < history:
+            raise ValueError(f"Action horizon {horizon} is shorter than pixel history {history}.")
+        active_levels = active_rollout_levels([int(x) for x in rollout_levels], horizon=horizon, history=history)
+
+        pixels_init = self._expand_samples(
+            self._encode_pixels(model, self._sample_zero(infos["pixels"]), already_preprocessed=False),
+            samples,
+        ).reshape(batch * samples, history, self.num_patches, self.visual_dim)
+
+        extras_init: dict[str, torch.Tensor] = {}
+        for key in self.non_action_extra_order:
+            if key not in infos:
+                raise KeyError(f"PreJEPA rollout requires non-action extra input {key!r}.")
+            extra = self._expand_samples(self._encode_extra(key, self._sample_zero(infos[key])), samples)
+            extras_init[key] = extra.unsqueeze(-2).expand(
+                *extra.shape[:-1],
+                self.num_patches,
+                extra.shape[-1],
+            ).reshape(batch * samples, history, self.num_patches, self.extra_dims[key])
+
+        actions = action_sequence.reshape(batch * samples, horizon, model.action_dim)
+        action_emb_flat = self._encode_extra(self.action_key, actions).reshape(
+            batch * samples,
+            horizon,
+            self.extra_dims[self.action_key],
+        )
+        action_init = action_emb_flat[:, :history].unsqueeze(-2).expand(
+            batch * samples,
+            history,
+            self.num_patches,
+            self.extra_dims[self.action_key],
+        )
+        extras_init[self.action_key] = action_init
+
+        pixels_list = list(pixels_init.unbind(dim=1))
+        extra_lists: dict[str, list[torch.Tensor]] = {
+            key: list(value.unbind(dim=1)) for key, value in extras_init.items()
+        }
+        for step, level_idx in enumerate(active_levels):
+            level_idx = int(level_idx)
+            k = int(model.K[level_idx])
+            pred_time = history + step
+            lo = max(0, pred_time - model.history_size)
+            pixels_context = torch.stack(pixels_list[lo:], dim=1)
+            extras_context = {key: torch.stack(values[lo:], dim=1) for key, values in extra_lists.items()}
+            context = self._compose_level_parts(model, level_idx, pixels_context, extras_context)
+            pred = model.transitions[level_idx](context)[:, -1]
+            pixels_next = pixels_list[-1].clone()
+            pixels_next[..., :k] = pred[..., :k]
+            extras_next: dict[str, torch.Tensor] = {}
+            for key in self.extra_order:
+                start, end = self._extra_slice(model, level_idx, key)
+                if key == self.action_key and pred_time < horizon:
+                    extra_value = action_emb_flat[:, pred_time].unsqueeze(-2).expand(
+                        batch * samples,
+                        self.num_patches,
+                        self.extra_dims[key],
+                    )
+                else:
+                    extra_value = pred[..., start:end]
+                extras_next[key] = extra_value
+            pixels_list.append(pixels_next)
+            for key, value in extras_next.items():
+                extra_lists[key].append(value)
+
+        pixels = torch.stack(pixels_list, dim=1).reshape(
+            batch,
+            samples,
+            history + len(active_levels),
+            self.num_patches,
+            self.visual_dim,
+        )
+        extras = {
+            key: torch.stack(values, dim=1).reshape(
+                batch,
+                samples,
+                history + len(active_levels),
+                self.num_patches,
+                self.extra_dims[key],
+            )
+            for key, values in extra_lists.items()
+        }
+        terminal_idx = terminal_rollout_level([int(x) for x in rollout_levels], horizon=horizon, history=history)
+        self._store_scheduled_predicted_parts(model, infos, terminal_idx, pixels, extras)
+        return infos
+
     def ensure_goal_emb(self, model: Any, infos: dict[str, Any]) -> None:
         if "pixels_goal_emb" in infos:
             return
@@ -426,12 +569,19 @@ class PreJEPARuntimeStrategy(nn.Module):
     def get_cost_with_fidelity(self, model: Any, infos: dict[str, Any], candidates: torch.Tensor, decision: Any) -> torch.Tensor:
         if candidates.ndim != 4:
             raise ValueError(f"candidates must have shape (B,N,H,A), got {tuple(candidates.shape)}")
-        level_idx, rollout_levels = validate_fixed_level_rollout(decision, int(candidates.shape[2]))
+        base_level_idx, rollout_levels = rollout_schedule_indices(
+            decision,
+            int(candidates.shape[2]),
+            num_levels=model.num_levels,
+        )
         if int(candidates.shape[-1]) != model.action_dim:
             raise ValueError(f"Expected action_dim={model.action_dim}, got {int(candidates.shape[-1])}")
         self.ensure_goal_emb(model, infos)
-        out = self.rollout_at_level(model, infos, candidates, int(level_idx))
-        k = int(model.K[int(level_idx)])
+        out = self.rollout_with_schedule(model, infos, candidates, rollout_levels)
+        history = int(infos["pixels"].shape[2])
+        active_levels = active_rollout_levels(rollout_levels, horizon=int(candidates.shape[2]), history=history)
+        terminal_idx = terminal_rollout_level(rollout_levels, horizon=int(candidates.shape[2]), history=history)
+        k = int(model.K[int(terminal_idx)])
         pred_pixels = out["predicted_pixels_emb"][..., -1, :, :k]
         goal_pixels = out["pixels_goal_emb"][..., -1, :, :k].expand_as(pred_pixels)
         cost = (pred_pixels - goal_pixels.detach()).pow(2).sum(dim=(-2, -1))
@@ -440,11 +590,18 @@ class PreJEPARuntimeStrategy(nn.Module):
             goal_extra = out[f"{key}_goal_emb"][..., -1, :, :].expand_as(pred_extra)
             cost = cost + (pred_extra - goal_extra.detach()).pow(2).sum(dim=(-2, -1))
         model._last_cost_diagnostics = {
-            "base_level_idx": int(level_idx),
+            "base_level_idx": int(base_level_idx),
+            "terminal_level_idx": int(terminal_idx),
             "rollout_level_indices": rollout_levels,
-            "latent_work": int(candidates.shape[0] * candidates.shape[1] * candidates.shape[2] * self.level_dim(model, level_idx) * self.num_patches),
+            "latent_work": latent_work_for_levels(
+                batch=int(candidates.shape[0]),
+                samples=int(candidates.shape[1]),
+                levels=active_levels,
+                level_width=lambda idx: self.level_dim(model, int(idx)),
+                multiplier=int(self.num_patches),
+            ),
             "terminal_k": int(k),
-            "level_dim": int(self.level_dim(model, int(level_idx))),
+            "level_dim": int(self.level_dim(model, int(terminal_idx))),
             "num_patches": int(self.num_patches),
             "prefix_criterion": True,
             "history_size": int(model.history_size),
