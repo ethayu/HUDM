@@ -42,7 +42,7 @@ def stable_checkpoint_config_path(checkpoint: str) -> Path:
 def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torch.nn.Module:
     from mwm.adapters.base import ComponentPolicy
     from mwm.adapters.builder import build_mwm_from_stable_config
-    from mwm.adapters.registry import family_for_target
+    from mwm.adapters.registry import canonical_family, family_for_target
     from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 
     base = cfg.get("base", {}) if hasattr(cfg, "get") else {}
@@ -53,12 +53,12 @@ def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torc
     config_path = stable_checkpoint_config_path(str(base["checkpoint"]))
     source_config, loaded_path = load_stable_wm_config(config_path)
     detected_family = family_for_target(root_target(source_config))
-    configured_family = str(base.get("family", detected_family))
+    configured_family = canonical_family(str(base.get("family", detected_family)))
     if configured_family != detected_family:
         raise ValueError(
             f"Configured Stable-WM base family {configured_family!r} does not match config target family {detected_family!r}."
         )
-    if configured_family != "lewm":
+    if configured_family not in {"lewm", "prejepa"}:
         raise ValueError(f"Unsupported trainable Stable-WM base family {configured_family!r}.")
 
     mwm_cfg = as_container(cfg.get("mwm", {}) if hasattr(cfg, "get") else {})

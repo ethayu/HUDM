@@ -6,7 +6,7 @@ from typing import Any, Sequence
 import torch.nn as nn
 
 from mwm.adapters.base import ComponentPolicy
-from mwm.adapters.registry import adapter_for_family, family_for_target
+from mwm.adapters.registry import adapter_for_family, canonical_family, family_for_target
 from mwm.adapters.stable_config import root_target
 
 
@@ -17,9 +17,10 @@ def _family_from_source_config(family: str | None, source_config: dict[str, Any]
     detected = family_for_target(root_target(source_config))
     if family is None:
         return detected
-    if str(family) != detected:
+    requested = canonical_family(str(family))
+    if requested != detected:
         raise ValueError(f"Configured Stable-WM base family {family!r} does not match config target family {detected!r}.")
-    return str(family)
+    return requested
 
 
 def _set_model_config(model: Any, target: str, kwargs: dict[str, Any]) -> None:

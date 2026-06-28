@@ -36,3 +36,15 @@ else:
         if _name not in __all__:
             __all__.append(_name)
     del _lewm
+
+try:
+    _prejepa = import_module("mwm.adapters.prejepa")
+except ModuleNotFoundError as exc:
+    if exc.name != "mwm.adapters.prejepa":
+        raise
+else:
+    for _name in getattr(_prejepa, "__all__", ()):
+        globals()[_name] = getattr(_prejepa, _name)
+        if _name not in __all__:
+            __all__.append(_name)
+    del _prejepa

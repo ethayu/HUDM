@@ -27,9 +27,9 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
     torch.manual_seed(int(cfg.seed))
     backend = str(cfg.train.backend).lower()
-    if backend != "stable_worldmodel_lewm":
+    if backend not in {"stable_worldmodel_lewm", "stable_worldmodel_prejepa", "stable_worldmodel_dino", "stable_worldmodel_dinowm"}:
         raise ValueError(
-            "MWM training requires train.backend=stable_worldmodel_lewm so the adapter-owned "
+            "MWM training requires train.backend=stable_worldmodel_lewm or stable_worldmodel_prejepa so the adapter-owned "
             "Stable-WM base architecture and recipe are explicit."
         )
     run_dir = make_run_dir(

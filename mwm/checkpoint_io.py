@@ -76,6 +76,8 @@ def save_world_checkpoint(
     if isinstance(model_metadata, dict):
         for key in (
             "action_spec",
+            "action_dim",
+            "action_block",
             "preprocessing_spec",
             "architecture_version",
             "head_architectures",
@@ -86,6 +88,17 @@ def save_world_checkpoint(
             "fresh_init",
             "loss_scope",
             "training_recipe",
+            "D",
+            "D_visual",
+            "full_dim",
+            "extra_dims",
+            "extra_input_dims",
+            "extra_order",
+            "level_dims",
+            "num_patches",
+            "patch_size",
+            "backbone_name",
+            "fixed_extra_policy",
         ):
             if key in model_metadata and key not in meta:
                 meta[key] = model_metadata[key]
