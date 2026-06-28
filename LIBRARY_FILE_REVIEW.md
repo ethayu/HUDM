@@ -38,9 +38,10 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 ### Models
 
 - `mwm/models/__init__.py`: Direct package convenience exports imported from canonical model, loss, transition, and preprocessing owners.
-- `mwm/models/core.py`: Generic `MWMWorldModel` runtime base with encode, per-level dynamics rollout, scheduled rollout, decode, and cost-with-fidelity methods.
-- `mwm/models/base_adaptive.py`: Active Le-WM-shaped `MatryoshkaWorldModel`; shared image encoder/projector, per-level transition packages, training loss, fixed-level rollout, and planner cost.
+- `mwm/models/core.py`: Lightweight model-core namespace documenting that concrete runtime behavior lives in owner modules.
+- `mwm/models/base_adaptive.py`: Canonical active `MatryoshkaWorldModel`; shared image encoder/projector, per-level transition packages, training loss, fixed-level rollout, and planner cost.
 - `mwm/models/transitions.py`: `TransitionPackage(action_encoder, predictor, pred_proj)` wrapper for per-level latent prediction.
+- `mwm/models/decoders.py`: Per-level convolutional image decoder used for reconstruction losses and latent-prefix visualization from each configured `K`.
 - `mwm/models/losses.py`: Level-weighted aggregation, latent regularizer routing, and matryoshka base-loss composition.
 - `mwm/models/objectives.py`: Le-WM-style MWM training objective over encoded latents and per-level prefix predictions.
 - `mwm/models/planning_costs.py`: Helpers that enforce fixed-level rollout decisions for the current base-adaptive evaluator.

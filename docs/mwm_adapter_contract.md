@@ -129,8 +129,7 @@ the public construction API.
 
 ## Generic Runtime Pieces
 
-`mwm.models.core.MWMWorldModel` is the abstract runtime contract. The shared
-runtime for Le-WM-shaped latent prediction is implemented in
+The canonical active runtime for Le-WM-shaped latent prediction is
 `mwm.models.base_adaptive.MatryoshkaWorldModel`, with support types split across
 `mwm.models.transitions`, `mwm.models.losses`, `mwm.models.objectives`, and
 `mwm.models.planning_costs`:

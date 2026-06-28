@@ -2,7 +2,7 @@
 
 Matryoshka World Models (MWM) is a Stable-WM-compatible benchmark and evaluation repo for multi-fidelity world models.
 
-The review story is intentionally narrow: every evaluated checkpoint is loaded as an `MWMWorldModel`, datasets are Lance, and all benchmark roles run through the same scheduled CEM evaluator. Trainable Le-WM MWM keeps a shared Le-WM encoder/projector trunk and adds fresh per-`K` transition heads (`action_encoder`, `predictor`, `pred_proj`) trained with Le-WM loss semantics.
+The review story is intentionally narrow: every evaluated checkpoint is loaded as a `MatryoshkaWorldModel`, datasets are Lance, and all benchmark roles run through the same scheduled CEM evaluator. Trainable Le-WM MWM keeps a shared Le-WM encoder/projector trunk and adds fresh per-`K` transition heads (`action_encoder`, `predictor`, `pred_proj`) trained with Le-WM loss semantics.
 
 ## Quick Start
 
@@ -77,8 +77,7 @@ Use `MWM_PYTHON=/path/to/python` if your Python is not named `python`.
 
 ## Architecture
 
-- `mwm.models.core.MWMWorldModel` is the runtime model contract, and
-  `mwm.models.base_adaptive.MatryoshkaWorldModel` owns the shared multi-level shell used by base adapters.
+- `mwm.models.base_adaptive.MatryoshkaWorldModel` is the runtime model contract and owns the shared multi-level shell used by base adapters.
 - `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs,
   registers the Le-WM adapter, then returns the normal `MatryoshkaWorldModel`.
   `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
