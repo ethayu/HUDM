@@ -17,6 +17,7 @@ class MWMLocalWorkflowTests(unittest.TestCase):
             "collect_ogb_cube_smoke.yaml",
             "collect_reacher_smoke.yaml",
             "eval_pusht_smoke.yaml",
+            "eval_pusht_all_axis_fidelity_smoke.yaml",
             "benchmark_pusht_smoke.yaml",
             "train_ogb_cube_cpu_smoke.yaml",
             "train_pusht_cpu_smoke.yaml",

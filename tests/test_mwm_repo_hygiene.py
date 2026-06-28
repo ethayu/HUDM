@@ -295,8 +295,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["planner"]["topk"], 30, name)
             self.assertEqual(cfg["planner"]["n_iter"], 30, name)
             self.assertEqual(cfg["planner"]["action_block"], 5, name)
-            self.assertEqual(cfg["planner"]["scheduler"]["policy"], "fixed", name)
-            self.assertEqual(cfg["planner"]["scheduler"]["rollout_level"]["level"], "base", name)
+            self.assertEqual(cfg["planner"]["scheduler"]["mpc"], {"mode": "fixed", "level": "finest"}, name)
+            self.assertEqual(cfg["planner"]["scheduler"]["cem"], {"mode": "fixed", "level": "base"}, name)
+            self.assertEqual(cfg["planner"]["scheduler"]["rollout"], {"mode": "fixed", "level": "base"}, name)
 
         bench_cfg = yaml.safe_load((ROOT / "configs" / "benchmark" / "paper_parity_pusht.yaml").read_text(encoding="utf-8"))
         self.assertEqual(bench_cfg["env_id"], "swm/PushT-v1")
@@ -328,6 +329,25 @@ class MWMRepoHygieneTests(unittest.TestCase):
         self.assertEqual(cube_eval["env"]["kwargs"]["width"], 224)
         self.assertEqual(cube_eval["env"]["kwargs"]["height"], 224)
         self.assertEqual(cube_eval["restore"]["import_path"], "mwm.ogbench.restore.ogbench_cube_restore_spec")
+
+    def test_eval_and_benchmark_configs_use_nested_scheduler_schema(self) -> None:
+        legacy_keys = {"policy", "level", "base_level", "start_level", "end_level", "rollout_level", "rollout_levels"}
+        for directory in ("benchmark", "eval", "local", "research"):
+            for path in sorted((ROOT / "configs" / directory).glob("**/*.yaml")):
+                cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+                schedulers = []
+                if isinstance(cfg.get("planner"), dict) and isinstance(cfg["planner"].get("scheduler"), dict):
+                    schedulers.append(cfg["planner"]["scheduler"])
+                for run in cfg.get("runs", []) or []:
+                    planner = run.get("planner", {}) if isinstance(run, dict) else {}
+                    if isinstance(planner.get("scheduler"), dict):
+                        schedulers.append(planner["scheduler"])
+                for scheduler in schedulers:
+                    self.assertFalse(legacy_keys & set(scheduler), path)
+                    self.assertEqual(set(scheduler), {"enabled", "mpc", "cem", "rollout"}, path)
+                    self.assertIn(scheduler["mpc"]["mode"], {"fixed", "linear"}, path)
+                    self.assertIn(scheduler["cem"]["mode"], {"fixed", "linear"}, path)
+                    self.assertIn(scheduler["rollout"]["mode"], {"fixed", "linear"}, path)
 
         reacher_bench = yaml.safe_load((ROOT / "configs" / "benchmark" / "paper_parity_reacher.yaml").read_text(encoding="utf-8"))
         self.assertEqual(reacher_bench["env_id"], "swm/ReacherDMControl-v0")

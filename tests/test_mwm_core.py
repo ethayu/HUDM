@@ -376,6 +376,26 @@ class FakeCEMParityCostModel(nn.Module):
         return self.get_cost(info_dict, action_candidates)
 
 
+class RecordingFidelityCostModel(nn.Module):
+    K = [2, 4]
+    num_levels = 2
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.decisions = []
+        self._last_cost_diagnostics = {}
+
+    def get_cost_with_fidelity(self, info_dict: dict, action_candidates: torch.Tensor, decision) -> torch.Tensor:
+        del info_dict
+        self.decisions.append(decision)
+        self._last_cost_diagnostics = {
+            "base_level_idx": int(decision.base_level_idx),
+            "terminal_level_idx": int(decision.metadata.get("terminal_level_idx", decision.rollout_level_indices[-1])),
+            "latent_work": int(action_candidates.shape[0] * action_candidates.shape[1]),
+        }
+        return action_candidates.square().sum(dim=(2, 3))
+
+
 class MWMCoreTests(unittest.TestCase):
     def test_core_module_has_no_separate_runtime_model_class(self) -> None:
         import mwm.models.core as core
@@ -829,7 +849,12 @@ class MWMCoreTests(unittest.TestCase):
                     "warm_start": True,
                     "clamp_actions": False,
                     "std_unbiased": True,
-                    "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+                    "scheduler": {
+                        "enabled": True,
+                        "mpc": {"mode": "fixed", "level": "finest"},
+                        "cem": {"mode": "fixed", "level": "base"},
+                        "rollout": {"mode": "fixed", "level": "base"},
+                    },
                 },
             }
         )
@@ -864,7 +889,12 @@ class MWMCoreTests(unittest.TestCase):
                     "warm_start": False,
                     "clamp_actions": False,
                     "std_unbiased": True,
-                    "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+                    "scheduler": {
+                        "enabled": True,
+                        "mpc": {"mode": "fixed", "level": "finest"},
+                        "cem": {"mode": "fixed", "level": "base"},
+                        "rollout": {"mode": "fixed", "level": "base"},
+                    },
                     "pop_schedule": {"start": 64, "end": 16},
                 },
             }
@@ -941,7 +971,12 @@ class MWMCoreTests(unittest.TestCase):
         upstream_solver = CEMSolver(**common)
         mwm_solver = MWMScheduledCEMSolver(
             **common,
-            scheduler={"policy": "fixed", "level": 0, "rollout_level": 0},
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 0},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
             std_unbiased=True,
         )
         upstream_solver.configure(action_space=action_space, n_envs=2, config=plan_cfg)
@@ -965,7 +1000,12 @@ class MWMCoreTests(unittest.TestCase):
             var_scale=1.0,
             n_steps=3,
             topk=4,
-            scheduler={"policy": "fixed", "level": 0, "rollout_level": "base"},
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 0},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
             seed=0,
             std_unbiased=False,
             pop_schedule={"start": 8, "end": 2},
@@ -999,7 +1039,12 @@ class MWMCoreTests(unittest.TestCase):
             num_samples=4,
             n_steps=1,
             topk=2,
-            scheduler={"policy": "fixed", "level": 0, "rollout_level": 0},
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 0},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
             seed=0,
         )
         solver.configure(
@@ -1193,30 +1238,118 @@ train:
             with self.assertRaisesRegex(ValueError, "adapter-owned Stable-WM base architecture"):
                 train_mwm_main(str(cfg_path))
 
-    def test_multi_fidelity_scheduler_monotonicity_and_no_low_to_high_rollout(self) -> None:
+    def test_multi_fidelity_scheduler_resolves_mpc_cem_and_rollout_in_order(self) -> None:
         scheduler = FidelityScheduler.from_config(
             {
-                "policy": "linear_cem",
-                "start_level": "coarsest",
-                "end_level": "finest",
-                "rollout_level": "base",
+                "enabled": True,
+                "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
+                "cem": {"mode": "linear", "start_level": "base", "end_level": "finest"},
+                "rollout": {"mode": "linear", "start_level": "base", "end_level": "coarsest"},
             },
             num_levels=4,
-            horizon=3,
+            horizon=4,
         )
-        decisions = [scheduler.decision(cem_iter=i, n_iter=5) for i in range(5)]
-        bases = [d.base_level_idx for d in decisions]
-        self.assertEqual(bases, sorted(bases))
-        self.assertEqual(bases[0], 0)
-        self.assertEqual(bases[-1], 3)
+
+        early = scheduler.decision(cem_iter=0, n_iter=5, mpc_progress=0.0)
+        late = scheduler.decision(cem_iter=4, n_iter=5, mpc_progress=1.0)
+
+        self.assertEqual(early.metadata["mpc_level_idx"], 0)
+        self.assertEqual(early.base_level_idx, 0)
+        self.assertEqual(early.rollout_level_indices, [0, 0, 0, 0])
+        self.assertEqual(early.metadata["terminal_level_idx"], 0)
+        self.assertEqual(late.metadata["mpc_level_idx"], 3)
+        self.assertEqual(late.base_level_idx, 3)
+        self.assertEqual(late.rollout_level_indices, [3, 2, 1, 0])
+        self.assertEqual(late.metadata["terminal_level_idx"], 0)
+
+    def test_multi_fidelity_scheduler_rejects_legacy_schema_and_bad_rollout(self) -> None:
+        with self.assertRaisesRegex(ValueError, "legacy.*planner.scheduler"):
+            FidelityScheduler.from_config(
+                {"policy": "linear_cem", "start_level": "coarsest", "end_level": "finest"},
+                num_levels=4,
+                horizon=3,
+            )
 
         bad = FidelityScheduler.from_config(
-            {"policy": "fixed", "level": 1, "rollout_levels": [0, 1]},
+            {
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 1},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "linear", "start_level": "coarsest", "end_level": "base"},
+            },
             num_levels=3,
             horizon=2,
         )
         with self.assertRaisesRegex(ValueError, "lower to higher"):
             bad.decision(cem_iter=0, n_iter=1)
+
+        mpc_base = FidelityScheduler.from_config(
+            {
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": "base"},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
+            num_levels=3,
+            horizon=2,
+        )
+        with self.assertRaisesRegex(ValueError, "mpc.*base"):
+            mpc_base.decision(cem_iter=0, n_iter=1)
+
+    def test_scheduled_cem_tracks_mpc_progress_across_replans(self) -> None:
+        model = RecordingFidelityCostModel()
+        solver = MWMScheduledCEMSolver(
+            model,
+            batch_size=1,
+            num_samples=4,
+            n_steps=1,
+            topk=2,
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
+            max_replans=3,
+            seed=0,
+            std_unbiased=False,
+        )
+        solver.configure(
+            action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            n_envs=1,
+            config=PlanConfig(horizon=2, receding_horizon=1, action_block=1),
+        )
+
+        solver.solve({"pixels": torch.zeros(1, 1)})
+        solver.solve({"pixels": torch.zeros(1, 1)})
+        solver.solve({"pixels": torch.zeros(1, 1)})
+
+        self.assertEqual([round(d.mpc_progress, 2) for d in model.decisions], [0.0, 0.5, 1.0])
+        self.assertEqual([d.base_level_idx for d in model.decisions], [0, 0, 1])
+        self.assertEqual([h["mwm_diagnostics"][0]["mpc_progress"] for h in solver.solve_history], [0.0, 0.5, 1.0])
+
+        solver.reset_history()
+        model.decisions.clear()
+        solver.solve({"pixels": torch.zeros(1, 1)})
+        self.assertEqual(model.decisions[-1].mpc_progress, 0.0)
+
+    def test_lewm_dynamic_rollout_scores_final_active_level(self) -> None:
+        model = _base_adaptive_lewm(K=(2, 4), D=4, action_dim=2, history_size=2)
+        infos = {
+            "pixels": torch.zeros(1, 2, 2, 3, 8, 8),
+            "goal": torch.zeros(1, 2, 2, 3, 8, 8),
+        }
+        candidates = torch.zeros(1, 2, 4, 2)
+        decision = SimpleNamespace(base_level_idx=1, rollout_level_indices=[1, 0, 0, 0])
+
+        cost = model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertEqual(tuple(cost.shape), (1, 2))
+        self.assertTrue(torch.isfinite(cost).all())
+        self.assertEqual(tuple(infos["predicted_emb"].shape), (1, 2, 5, 4))
+        self.assertEqual(model._last_cost_diagnostics["base_level_idx"], 1)
+        self.assertEqual(model._last_cost_diagnostics["terminal_level_idx"], 0)
+        self.assertEqual(model._last_cost_diagnostics["terminal_k"], 2)
 
 
 if __name__ == "__main__":

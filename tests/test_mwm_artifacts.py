@@ -68,7 +68,7 @@ def _payload(role: str, env_id: str, seed: int, output_path: Path) -> dict:
             "plan_time_total_sec": 0.5,
             "schedule_level_counts": {"0": 1, "1": 1},
         },
-        "schedule": {"policy": "linear_cem"},
+        "schedule": {"enabled": True, "mpc": {"mode": "fixed", "level": "finest"}, "cem": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"}, "rollout": {"mode": "fixed", "level": "base"}},
         "role": role,
         "seed": seed,
         "wall_time_sec": 1.0 + seed,
@@ -426,7 +426,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -465,7 +465,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -580,7 +580,7 @@ env:
   goal_conditioned: true
   kwargs:
     difficulty: base
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -693,7 +693,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -779,7 +779,7 @@ env_id: swm/PushT-v1
 checkpoint: {{run_dir: {checkpoint}, epoch: null}}
 data: {{path: data/pusht_swm.lance, format: lance}}
 eval: {{seed: 0}}
-planner: {{scheduler: {{policy: fixed, level: finest, rollout_level: base}}}}
+planner: {{scheduler: {{enabled: true, mpc: {{mode: fixed, level: finest}}, cem: {{mode: fixed, level: base}}, rollout: {{mode: fixed, level: base}}}}}}
 """,
                 encoding="utf-8",
             )
@@ -830,7 +830,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: missing_checkpoint, epoch: null}
 data: {path: data/upstream/pusht_expert_train.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -878,7 +878,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -943,7 +943,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )

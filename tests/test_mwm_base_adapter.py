@@ -442,6 +442,39 @@ class PreJEPAStableConfigTests(unittest.TestCase):
         self.assertEqual(model._last_cost_diagnostics["terminal_k"], 3)
         self.assertEqual(model._last_cost_diagnostics["num_patches"], 4)
 
+    def test_prejepa_dynamic_rollout_keeps_fixed_extras_and_scores_terminal_level(self) -> None:
+        model = build_mwm_from_stable_config(
+            family="prejepa",
+            source_config=self._prejepa_config(),
+            source_config_sha256="prejepa-sha",
+            training_recipe={"history_size": 2, "num_preds": 1},
+            K=(3, 6),
+            action_dim=2,
+            action_block=1,
+            image_shape=(4, 4),
+            normalize_imagenet=False,
+        )
+        infos = {
+            "pixels": torch.zeros(1, 2, 2, 3, 4, 4),
+            "goal": torch.zeros(1, 2, 2, 3, 4, 4),
+            "proprio": torch.zeros(1, 2, 2, 3),
+            "goal_proprio": torch.zeros(1, 2, 2, 3),
+        }
+        candidates = torch.zeros(1, 2, 4, 2)
+        decision = SimpleNamespace(base_level_idx=1, rollout_level_indices=[1, 0, 0, 0])
+
+        cost = model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertEqual(tuple(cost.shape), (1, 2))
+        self.assertTrue(torch.isfinite(cost).all())
+        self.assertEqual(model._last_cost_diagnostics["base_level_idx"], 1)
+        self.assertEqual(model._last_cost_diagnostics["terminal_level_idx"], 0)
+        self.assertEqual(model._last_cost_diagnostics["terminal_k"], 3)
+        self.assertEqual(model._last_cost_diagnostics["level_dim"], 7)
+        self.assertEqual(tuple(infos["predicted_pixels_emb"].shape), (1, 2, 5, 4, 3))
+        self.assertEqual(tuple(infos["predicted_proprio_emb"].shape), (1, 2, 5, 4, 2))
+        self.assertEqual(tuple(infos["predicted_action_emb"].shape), (1, 2, 5, 4, 2))
+
     def test_prejepa_checkpoint_round_trips_through_generic_builder(self) -> None:
         import tempfile
 
