@@ -30,6 +30,7 @@ class MWMScheduledCEMSolver:
         callbacks: list[Any] | None = None,
         pop_schedule: dict[str, Any] | None = None,
         elite_frac: float | None = None,
+        max_replans: int | None = None,
     ) -> None:
         self.model = model
         self.batch_size = int(batch_size)
@@ -40,6 +41,8 @@ class MWMScheduledCEMSolver:
         self.scheduler_spec = scheduler
         self.pop_schedule = dict(pop_schedule) if pop_schedule else None
         self.elite_frac = float(elite_frac) if elite_frac is not None else None
+        self.max_replans = max(1, int(max_replans)) if max_replans is not None else 1
+        self._replan_idx = 0
         self.device = torch.device(device)
         self.torch_gen = torch.Generator(device=self.device).manual_seed(int(seed))
         self.clamp_actions = bool(clamp_actions)
@@ -149,11 +152,18 @@ class MWMScheduledCEMSolver:
             raise TypeError("MWMScheduledCEMSolver requires get_cost_with_fidelity(...); legacy get_cost fallback is disabled.")
         return self.model.get_cost_with_fidelity(infos, candidates, decision)
 
+    def _current_mpc_progress(self) -> float:
+        if self.max_replans <= 1:
+            return 0.0
+        return max(0.0, min(1.0, float(self._replan_idx) / float(self.max_replans - 1)))
+
     @torch.inference_mode()
     def solve(self, info_dict: dict[str, Any], init_action: torch.Tensor | None = None) -> dict[str, Any]:
         if not self._configured:
             raise RuntimeError("MWMScheduledCEMSolver.configure must be called before solve")
         start_time = time.perf_counter()
+        mpc_progress = self._current_mpc_progress()
+        replan_idx = int(self._replan_idx)
         total_envs = len(next(iter(info_dict.values())))
         mean, var = self.init_action_distrib(total_envs, init_action)
         mean = mean.to(self.device)
@@ -173,7 +183,7 @@ class MWMScheduledCEMSolver:
                 decision = self.scheduler.decision(
                     cem_iter=step,
                     n_iter=self.n_steps,
-                    mpc_progress=0.0,
+                    mpc_progress=mpc_progress,
                     context={"batch_start": start_idx, "batch_end": end_idx},
                 )
                 current_num_samples = self._resolve_num_samples(decision.cem_progress)
@@ -224,7 +234,13 @@ class MWMScheduledCEMSolver:
                     "batch_end": int(end_idx),
                     "cem_iter": int(step),
                     "cem_progress": float(decision.cem_progress),
+                    "mpc_iter": int(replan_idx),
+                    "mpc_progress": float(decision.mpc_progress),
                     "base_level_idx": int(decision.base_level_idx),
+                    "mpc_level_idx": int(decision.metadata.get("mpc_level_idx", decision.base_level_idx)),
+                    "terminal_level_idx": int(
+                        decision.metadata.get("terminal_level_idx", decision.rollout_level_indices[-1])
+                    ),
                     "rollout_level_indices": [int(x) for x in decision.rollout_level_indices],
                     "cost_time_sec": float(cost_time),
                     "cem_cost_calls": 1,
@@ -258,10 +274,12 @@ class MWMScheduledCEMSolver:
                 "mwm_diagnostics": list(outputs["mwm_diagnostics"]),
             }
         )
+        self._replan_idx += 1
         return outputs
 
     def reset_history(self) -> None:
         self.solve_history = []
+        self._replan_idx = 0
 
 
 __all__ = ["MWMScheduledCEMSolver"]

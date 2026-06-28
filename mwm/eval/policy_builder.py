@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import torch
@@ -37,6 +38,9 @@ def build_mwm_policy(
     )
     raw_pop_schedule = cfg.planner.get("pop_schedule", None)
     pop_schedule = OmegaConf.to_container(raw_pop_schedule, resolve=True) if raw_pop_schedule else None
+    replan_interval = max(1, int(cfg.planner.receding_horizon) * int(action_block))
+    eval_budget = int(cfg.eval.get("budget", cfg.planner.horizon))
+    max_replans = max(1, int(math.ceil(eval_budget / replan_interval)))
     solver = MWMScheduledCEMSolver(
         model,
         batch_size=max(1, planner_batch_size),
@@ -51,6 +55,7 @@ def build_mwm_policy(
         std_unbiased=bool(cfg.planner.get("std_unbiased", True)),
         pop_schedule=pop_schedule,
         elite_frac=float(cfg.planner.elite_frac) if pop_schedule is not None else None,
+        max_replans=max_replans,
     )
     plan_cfg = PlanConfig(
         horizon=int(cfg.planner.horizon),
