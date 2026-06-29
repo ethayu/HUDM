@@ -42,7 +42,8 @@ class LeWMStableWMAdapter:
 
     def _validate_supported_policy(self, policy: ComponentPolicy) -> None:
         expected = self.default_policy()
-        if policy != expected:
+        legacy_without_decoder = ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
+        if policy not in {expected, legacy_without_decoder}:
             raise ValueError(
                 "Le-WM Stable-WM adapter only supports shared latent_producer, per-level transition, "
                 "and decoder reconstructor policies."

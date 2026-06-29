@@ -177,9 +177,43 @@ def load_world_model_from_checkpoint(
     config, metadata = validate_checkpoint_directory(root, strict_artifacts=False, strict_metadata=False)
     model = instantiate_from_config(config).to(device)
     state_dict = torch.load(weights_path, map_location=device, weights_only=False)
-    model.load_state_dict(remap_vit_encoder_keys_for_model(state_dict, model))
+    remapped = remap_vit_encoder_keys_for_model(state_dict, model)
+    incompatible = model.load_state_dict(remapped, strict=False)
+    missing = list(incompatible.missing_keys)
+    unexpected = list(incompatible.unexpected_keys)
+    if missing or unexpected:
+        if not _allow_legacy_lewm_missing_decoders(config, metadata, missing, unexpected):
+            details = []
+            if missing:
+                details.append(f"Missing key(s): {missing}")
+            if unexpected:
+                details.append(f"Unexpected key(s): {unexpected}")
+            raise RuntimeError("Error(s) in loading state_dict for MWM checkpoint: " + "; ".join(details))
     model.eval()
     return model, metadata, 0
+
+
+def _allow_legacy_lewm_missing_decoders(
+    config: dict[str, Any],
+    metadata: dict[str, Any],
+    missing: list[str],
+    unexpected: list[str],
+) -> bool:
+    if unexpected or not missing:
+        return False
+    kwargs = config.get("kwargs", {})
+    if not isinstance(kwargs, dict):
+        return False
+    family = str(kwargs.get("family", metadata.get("adapter_family", ""))).lower()
+    if family != "lewm":
+        return False
+    policy = kwargs.get("component_policy", metadata.get("component_policy", {}))
+    if not isinstance(policy, dict):
+        return False
+    reconstructor = policy.get("reconstructor", None)
+    if reconstructor != []:
+        return False
+    return all(key.startswith("decoders.") for key in missing)
 
 
 __all__ = [

@@ -346,6 +346,77 @@ class MWMArtifactTests(unittest.TestCase):
             self.assertEqual(metadata["loss_scope"]["regularizers"], "shared_latent")
             self.assertIn("training_recipe", metadata)
 
+    def test_legacy_lewm_checkpoint_without_decoder_policy_loads_for_eval(self) -> None:
+        legacy_policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            model = build_mwm_from_stable_config(
+                family="lewm",
+                source_config=_lewm_source_config(),
+                source_config_sha256="abc",
+                training_recipe={"history_size": 2, "num_preds": 1, "loss_scope": {"regularizers": "shared_latent"}},
+                K=(4,),
+                action_dim=2,
+                action_block=1,
+                image_shape=(8, 8),
+                normalize_imagenet=False,
+            )
+            out_dir = Path(tmp) / "checkpoint"
+            save_world_checkpoint(model, out_dir, metadata={"env_id": "swm/PushT-v1"})
+
+            config_path = out_dir / CONFIG_FILENAME
+            weights_path = out_dir / WEIGHTS_FILENAME
+            metadata_path = out_dir / METADATA_FILENAME
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            config["kwargs"]["component_policy"] = legacy_policy
+            metadata["component_policy"] = legacy_policy
+            state = torch.load(weights_path, map_location="cpu", weights_only=False)
+            state = {key: value for key, value in state.items() if not key.startswith("decoders.")}
+            torch.save(state, weights_path)
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            metadata["artifacts"]["config"]["sha256"] = file_sha256(config_path)
+            metadata["artifacts"]["weights"]["sha256"] = file_sha256(weights_path)
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+            loaded, loaded_metadata, epoch = checkpoint_io.load_world_model_from_checkpoint(
+                out_dir,
+                None,
+                torch.device("cpu"),
+            )
+
+        self.assertEqual(epoch, 0)
+        self.assertEqual(loaded_metadata["component_policy"], legacy_policy)
+        self.assertEqual(loaded.metadata["component_policy"], legacy_policy)
+        self.assertEqual(len(loaded.decoders), 1)
+
+    def test_modern_lewm_checkpoint_requires_decoder_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = build_mwm_from_stable_config(
+                family="lewm",
+                source_config=_lewm_source_config(),
+                source_config_sha256="abc",
+                training_recipe={"history_size": 2, "num_preds": 1, "loss_scope": {"regularizers": "shared_latent"}},
+                K=(4,),
+                action_dim=2,
+                action_block=1,
+                image_shape=(8, 8),
+                normalize_imagenet=False,
+            )
+            out_dir = Path(tmp) / "checkpoint"
+            save_world_checkpoint(model, out_dir, metadata={"env_id": "swm/PushT-v1"})
+
+            weights_path = out_dir / WEIGHTS_FILENAME
+            metadata_path = out_dir / METADATA_FILENAME
+            state = torch.load(weights_path, map_location="cpu", weights_only=False)
+            state = {key: value for key, value in state.items() if not key.startswith("decoders.")}
+            torch.save(state, weights_path)
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["artifacts"]["weights"]["sha256"] = file_sha256(weights_path)
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "Missing key.*decoders"):
+                checkpoint_io.load_world_model_from_checkpoint(out_dir, None, torch.device("cpu"))
+
     def test_stable_wm_checkpoint_contract_requires_metadata(self) -> None:
         policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
         config = {
