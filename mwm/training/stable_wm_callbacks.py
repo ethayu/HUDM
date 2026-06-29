@@ -6,7 +6,7 @@ import torch
 from lightning.pytorch.callbacks import Callback, ModelCheckpoint
 
 
-def lewm_base_adapter_checkpoint_callback(cfg: Any) -> ModelCheckpoint:
+def stable_wm_adapter_checkpoint_callback(cfg: Any) -> ModelCheckpoint:
     checkpoint_steps = int(cfg.train.get("checkpoint_every_n_train_steps", 0) or 0)
     monitor = cfg.train.get("checkpoint_monitor", None)
     checkpoint_kwargs: dict[str, Any] = {"save_last": True}
@@ -118,8 +118,8 @@ class AllLevelPlateauEarlyStopping(Callback):
             trainer.should_stop = True
 
 
-def lewm_base_adapter_callbacks(cfg: Any) -> list[Callback]:
-    callbacks: list[Callback] = [lewm_base_adapter_checkpoint_callback(cfg)]
+def stable_wm_adapter_callbacks(cfg: Any) -> list[Callback]:
+    callbacks: list[Callback] = [stable_wm_adapter_checkpoint_callback(cfg)]
     convergence_cfg = cfg.schedule.get("convergence", None)
     if convergence_cfg is not None and bool(convergence_cfg.get("enabled", False)):
         default_metrics = [f"validate/pred_loss_l{idx}" for idx, _ in enumerate(cfg.model.K)]
@@ -135,7 +135,7 @@ def lewm_base_adapter_callbacks(cfg: Any) -> list[Callback]:
     return callbacks
 
 
-def select_lewm_base_adapter_export_checkpoint(checkpoint_cb: Any, cfg: Any) -> str | None:
+def select_stable_wm_adapter_export_checkpoint(checkpoint_cb: Any, cfg: Any) -> str | None:
     policy = str(cfg.train.get("export_checkpoint", "last")).lower()
     best_path = str(getattr(checkpoint_cb, "best_model_path", "") or "")
     last_path = str(getattr(checkpoint_cb, "last_model_path", "") or "")
@@ -154,7 +154,7 @@ def select_lewm_base_adapter_export_checkpoint(checkpoint_cb: Any, cfg: Any) -> 
 
 __all__ = [
     "AllLevelPlateauEarlyStopping",
-    "lewm_base_adapter_callbacks",
-    "lewm_base_adapter_checkpoint_callback",
-    "select_lewm_base_adapter_export_checkpoint",
+    "stable_wm_adapter_callbacks",
+    "stable_wm_adapter_checkpoint_callback",
+    "select_stable_wm_adapter_export_checkpoint",
 ]

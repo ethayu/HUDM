@@ -5,11 +5,12 @@ from typing import Any, Sequence
 import torch
 import torch.nn as nn
 
-from mwm.models.flops import (
+from mwm.diagnostics.flops import (
     FLOP_ACCOUNTING_DYNAMICS_AUDIT,
     decision_flop_accounting,
     profile_dynamics_call,
 )
+from mwm.models.common import MatryoshkaRuntimeModel
 from mwm.models.losses import matryoshka_base_loss, weighted_level_mean
 from mwm.models.planning_costs import (
     active_rollout_levels,
@@ -63,7 +64,7 @@ class PreJEPALevelPredictor(nn.Module):
         return out.reshape(*prefix, time, patches, dim)
 
 
-class PreJEPARuntimeStrategy(nn.Module):
+class _PreJEPARuntime(nn.Module):
     """Runtime semantics for Matryoshka PreJEPA/DINO-WM patch latents."""
 
     def __init__(
@@ -641,7 +642,136 @@ class PreJEPARuntimeStrategy(nn.Module):
         return cost
 
 
+class PreJEPAMatryoshkaWorldModel(MatryoshkaRuntimeModel):
+    """Planner-facing MWM runtime for PreJEPA/DINO-WM patch latents."""
+
+    def __init__(
+        self,
+        *,
+        encoder: nn.Module,
+        projector: nn.Module,
+        transitions: Sequence[nn.Module],
+        decoders: Sequence[nn.Module],
+        K: Sequence[int],
+        D: int,
+        action_dim: int,
+        action_block: int,
+        image_shape: Sequence[int],
+        normalize_imagenet: bool,
+        history_size: int,
+        num_preds: int,
+        head_architectures: Sequence[dict[str, Any]],
+        decoder_architectures: Sequence[dict[str, Any]] | None,
+        metadata: dict[str, Any],
+        architecture_version: str,
+        extra_encoders: nn.ModuleDict,
+        extra_order: Sequence[str],
+        extra_dims: dict[str, int],
+        extra_input_dims: dict[str, int],
+        visual_dim: int,
+        num_patches: int,
+        action_key: str = "action",
+        interpolate_pos_encoding: bool = True,
+    ) -> None:
+        super().__init__()
+        self._init_runtime_state(
+            encoder=encoder,
+            projector=projector,
+            transitions=transitions,
+            decoders=decoders,
+            K=K,
+            D=D,
+            action_dim=action_dim,
+            action_block=action_block,
+            image_shape=image_shape,
+            normalize_imagenet=normalize_imagenet,
+            history_size=history_size,
+            num_preds=num_preds,
+            head_architectures=head_architectures,
+            decoder_architectures=decoder_architectures,
+            metadata=metadata,
+            architecture_version=architecture_version,
+        )
+        self._runtime = _PreJEPARuntime(
+            extra_encoders=extra_encoders,
+            extra_order=extra_order,
+            extra_dims=extra_dims,
+            extra_input_dims=extra_input_dims,
+            visual_dim=visual_dim,
+            num_patches=num_patches,
+            action_key=action_key,
+            interpolate_pos_encoding=interpolate_pos_encoding,
+        )
+
+    @property
+    def non_action_extra_order(self) -> list[str]:
+        return self._runtime.non_action_extra_order
+
+    def level_dim(self, level_idx: int) -> int:
+        return self._runtime.level_dim(self, level_idx)
+
+    def encode(self, info: dict[str, torch.Tensor] | torch.Tensor, *, already_preprocessed: bool = False) -> Any:
+        return self._runtime.encode(self, info, already_preprocessed=already_preprocessed)
+
+    def compose_level_embedding(self, encoded: dict[str, torch.Tensor], level_idx: int) -> torch.Tensor:
+        return self._runtime.compose_level_embedding(self, encoded, level_idx)
+
+    def _predict_prefix(self, level_idx: int, emb: torch.Tensor, action: torch.Tensor) -> torch.Tensor:
+        return self._runtime.predict_prefix(self, level_idx, emb, action)
+
+    def decode(self, level_idx: int, latent: torch.Tensor) -> torch.Tensor:
+        return self._runtime.decode(self, level_idx, latent)
+
+    def training_loss(
+        self,
+        batch: dict[str, torch.Tensor],
+        *,
+        level_weights: Sequence[float] | None = None,
+        rollout_weight: float = 1.0,
+        recon_latent_weight: float = 0.0,
+        sigreg: nn.Module | None = None,
+        sigreg_weight: float = 0.0,
+        sigreg_scope: str = "shared_latent",
+    ) -> dict[str, torch.Tensor]:
+        return self._runtime.training_loss(
+            self,
+            batch,
+            level_weights=level_weights,
+            rollout_weight=rollout_weight,
+            recon_latent_weight=recon_latent_weight,
+            sigreg=sigreg,
+            sigreg_weight=sigreg_weight,
+            sigreg_scope=sigreg_scope,
+        )
+
+    def rollout_at_level(self, infos: dict[str, Any], action_sequence: torch.Tensor, level_idx: int) -> dict[str, Any]:
+        return self._runtime.rollout_at_level(self, infos, action_sequence, level_idx)
+
+    def rollout_with_schedule(
+        self,
+        infos: dict[str, Any],
+        action_sequence: torch.Tensor,
+        rollout_levels: Sequence[int],
+        *,
+        flop_accounting: str = "none",
+    ) -> dict[str, Any]:
+        return self._runtime.rollout_with_schedule(
+            self,
+            infos,
+            action_sequence,
+            rollout_levels,
+            flop_accounting=flop_accounting,
+        )
+
+    def _ensure_goal_emb(self, infos: dict[str, Any]) -> None:
+        self._runtime.ensure_goal_emb(self, infos)
+
+    @torch.no_grad()
+    def get_cost_with_fidelity(self, infos: dict[str, Any], candidates: torch.Tensor, decision: Any) -> torch.Tensor:
+        return self._runtime.get_cost_with_fidelity(self, infos, candidates, decision)
+
+
 __all__ = [
     "PreJEPALevelPredictor",
-    "PreJEPARuntimeStrategy",
+    "PreJEPAMatryoshkaWorldModel",
 ]

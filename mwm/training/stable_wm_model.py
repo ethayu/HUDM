@@ -5,10 +5,10 @@ from typing import Any
 
 import torch
 
-from mwm.training.lewm_config import as_container, validate_lewm_loss_config
+from mwm.training.stable_wm_config import as_container, validate_stable_wm_loss_config
 
 
-def resolve_lewm_base_adapter_model_cfg(cfg: Any, dataset: Any) -> dict[str, Any]:
+def resolve_stable_wm_adapter_model_cfg(cfg: Any, dataset: Any) -> dict[str, Any]:
     frameskip = int(cfg.data.get("frameskip", 1))
     action_dim = int(dataset.get_dim(str(cfg.data.action_key))) * frameskip
     image_shape_cfg = cfg.model.get("image_shape", "auto")
@@ -39,7 +39,7 @@ def stable_checkpoint_config_path(checkpoint: str) -> Path:
     return Path(get_cache_dir(None, sub_folder="checkpoints")) / str(checkpoint) / "config.json"
 
 
-def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torch.nn.Module:
+def build_trainable_stable_wm_adapter_model(cfg: Any, model_cfg: dict[str, Any]) -> torch.nn.Module:
     from mwm.adapters.base import ComponentPolicy
     from mwm.adapters.builder import build_mwm_from_stable_config
     from mwm.adapters.registry import canonical_family, family_for_target
@@ -48,7 +48,7 @@ def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torc
     base = cfg.get("base", {}) if hasattr(cfg, "get") else {}
     base = as_container(base)
     if not base:
-        raise ValueError("Trainable Le-WM MWM requires a Stable-WM base checkpoint config.")
+        raise ValueError("Trainable MWM requires a Stable-WM base checkpoint config.")
 
     config_path = stable_checkpoint_config_path(str(base["checkpoint"]))
     source_config, loaded_path = load_stable_wm_config(config_path)
@@ -63,7 +63,7 @@ def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torc
 
     mwm_cfg = as_container(cfg.get("mwm", {}) if hasattr(cfg, "get") else {})
     loss_cfg = as_container(cfg.get("loss", {}) if hasattr(cfg, "get") else {})
-    validate_lewm_loss_config(loss_cfg)
+    validate_stable_wm_loss_config(loss_cfg)
     model_section = cfg.get("model", {}) if hasattr(cfg, "get") else {}
     recipe = {
         **dict(loss_cfg),
@@ -89,7 +89,7 @@ def build_trainable_model_from_base(cfg: Any, model_cfg: dict[str, Any]) -> torc
     )
 
 
-def metadata_for_model(metadata: dict[str, Any], model: torch.nn.Module) -> dict[str, Any]:
+def metadata_for_stable_wm_adapter_model(metadata: dict[str, Any], model: torch.nn.Module) -> dict[str, Any]:
     merged = {**metadata, **dict(getattr(model, "metadata", {}) or {})}
     mwm_config = getattr(model, "mwm_config", None)
     if isinstance(mwm_config, dict):
@@ -98,8 +98,8 @@ def metadata_for_model(metadata: dict[str, Any], model: torch.nn.Module) -> dict
 
 
 __all__ = [
-    "build_trainable_model_from_base",
-    "metadata_for_model",
-    "resolve_lewm_base_adapter_model_cfg",
+    "build_trainable_stable_wm_adapter_model",
+    "metadata_for_stable_wm_adapter_model",
+    "resolve_stable_wm_adapter_model_cfg",
     "stable_checkpoint_config_path",
 ]

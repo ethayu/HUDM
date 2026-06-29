@@ -75,10 +75,10 @@ def as_container(value: Any) -> Any:
     return value
 
 
-def validate_lewm_loss_config(loss_cfg: Any) -> None:
+def validate_stable_wm_loss_config(loss_cfg: Any) -> None:
     loss = as_container(loss_cfg)
     if isinstance(loss, dict) and "recon_weight" in loss:
         raise ValueError("loss.recon_weight has been removed; use loss.recon_latent_weight instead.")
 
 
-__all__ = ["DEFAULTS", "as_container", "make_run_dir", "validate_lewm_loss_config"]
+__all__ = ["DEFAULTS", "as_container", "make_run_dir", "validate_stable_wm_loss_config"]

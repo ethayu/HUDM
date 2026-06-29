@@ -5,11 +5,11 @@ from importlib import import_module
 from typing import Any
 
 _LAZY_EXPORTS = {
-    "DEFAULTS": ("mwm.training.lewm_config", "DEFAULTS"),
-    "make_run_dir": ("mwm.training.lewm_config", "make_run_dir"),
-    "export_lewm_base_adapter_lightning_checkpoint": (
-        "mwm.training.lewm_export",
-        "export_lewm_base_adapter_lightning_checkpoint",
+    "DEFAULTS": ("mwm.training.stable_wm_config", "DEFAULTS"),
+    "make_run_dir": ("mwm.training.stable_wm_config", "make_run_dir"),
+    "export_stable_wm_adapter_lightning_checkpoint": (
+        "mwm.training.stable_wm_export",
+        "export_stable_wm_adapter_lightning_checkpoint",
     ),
 }
 
@@ -19,11 +19,11 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
 
     from mwm.checkpoint_io import save_world_checkpoint
     from mwm.config_cli import load_config
-    from mwm.training import lewm_data, lewm_lightning, lewm_model
-    from mwm.training.lewm_config import DEFAULTS, make_run_dir, validate_lewm_loss_config
+    from mwm.training import stable_wm_data, stable_wm_lightning, stable_wm_model
+    from mwm.training.stable_wm_config import DEFAULTS, make_run_dir, validate_stable_wm_loss_config
 
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
-    validate_lewm_loss_config(cfg.loss)
+    validate_stable_wm_loss_config(cfg.loss)
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
     torch.manual_seed(int(cfg.seed))
     backend = str(cfg.train.backend).lower()
@@ -37,14 +37,18 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
         str(cfg.train.run_name),
         timestamp=bool(cfg.train.get("timestamp_run_dir", False)),
     )
-    tr_ds, va_ds, base_ds, model_cfg, metadata = lewm_data.prepare_lewm_base_adapter_context(cfg)
+    tr_ds, va_ds, base_ds, model_cfg, metadata = stable_wm_data.prepare_stable_wm_adapter_context(cfg)
     try:
-        model = lewm_model.build_trainable_model_from_base(cfg, model_cfg)
-        train_info = lewm_lightning.run_lewm_base_adapter_training(model, tr_ds, va_ds, cfg, run_dir)
-        save_world_checkpoint(model, run_dir, metadata={**lewm_model.metadata_for_model(metadata, model), **train_info})
+        model = stable_wm_model.build_trainable_stable_wm_adapter_model(cfg, model_cfg)
+        train_info = stable_wm_lightning.run_stable_wm_adapter_training(model, tr_ds, va_ds, cfg, run_dir)
+        save_world_checkpoint(
+            model,
+            run_dir,
+            metadata={**stable_wm_model.metadata_for_stable_wm_adapter_model(metadata, model), **train_info},
+        )
     finally:
-        lewm_data.close_dataset_handles(base_ds)
-    print(f"Exact Le-WM training complete. Checkpoints: {run_dir}")
+        stable_wm_data.close_dataset_handles(base_ds)
+    print(f"Stable-WM adapter training complete. Checkpoints: {run_dir}")
 
 
 def _main() -> None:
@@ -57,9 +61,9 @@ def _main() -> None:
     if args.export_from_lightning:
         if args.set:
             parser.error("--set is only supported for training, not --export-from-lightning")
-        from mwm.training.lewm_export import export_lewm_base_adapter_lightning_checkpoint
+        from mwm.training.stable_wm_export import export_stable_wm_adapter_lightning_checkpoint
 
-        export_lewm_base_adapter_lightning_checkpoint(
+        export_stable_wm_adapter_lightning_checkpoint(
             args.config,
             args.export_from_lightning,
             output_dir=args.output_dir,
@@ -86,7 +90,7 @@ def __getattr__(name: str) -> Any:
 
 __all__ = [
     "DEFAULTS",
-    "export_lewm_base_adapter_lightning_checkpoint",
+    "export_stable_wm_adapter_lightning_checkpoint",
     "main",
     "make_run_dir",
 ]

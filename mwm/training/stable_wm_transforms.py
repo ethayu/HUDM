@@ -6,7 +6,7 @@ from mwm.data.transforms import column_normalizer
 from mwm.preprocessing.images import stable_pretraining_image_transforms
 
 
-def build_lewm_base_adapter_dataset_transform(
+def build_stable_wm_adapter_dataset_transform(
     dataset: Any,
     *,
     pixels_key: str,
@@ -24,4 +24,4 @@ def build_lewm_base_adapter_dataset_transform(
     return dt.transforms.Compose(*transforms)
 
 
-__all__ = ["build_lewm_base_adapter_dataset_transform"]
+__all__ = ["build_stable_wm_adapter_dataset_transform"]

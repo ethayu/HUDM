@@ -5,7 +5,7 @@ import torch.nn as nn
 
 
 class TransitionPackage(nn.Module):
-    """Per-level base transition package used by base-adaptive MWM models."""
+    """Per-level transition package used by Stable-WM adapter runtimes."""
 
     def __init__(self, action_encoder: nn.Module, predictor: nn.Module, pred_proj: nn.Module) -> None:
         super().__init__()

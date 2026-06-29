@@ -10,7 +10,7 @@ import torch
 from gymnasium.spaces import Box
 
 from mwm.fidelity import FidelityDecision, FidelityScheduler
-from mwm.models.flops import FLOP_ACCOUNTING_NONE, normalize_flop_accounting
+from mwm.diagnostics.flops import FLOP_ACCOUNTING_NONE, normalize_flop_accounting
 
 
 class MWMScheduledCEMSolver:

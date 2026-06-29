@@ -10,21 +10,21 @@ from lightning.pytorch.callbacks import ModelCheckpoint
 from torch.utils.data import DataLoader
 
 from mwm.data.module import PrebuiltLoaderDataModule
-from mwm.models.base_adaptive import MatryoshkaWorldModel
-from mwm.training.lewm_callbacks import lewm_base_adapter_callbacks, select_lewm_base_adapter_export_checkpoint
-from mwm.training.lewm_config import as_container, validate_lewm_loss_config
-from mwm.training.lewm_runtime import (
+from mwm.models.common import MatryoshkaRuntimeModel
+from mwm.training.stable_wm_callbacks import stable_wm_adapter_callbacks, select_stable_wm_adapter_export_checkpoint
+from mwm.training.stable_wm_config import as_container, validate_stable_wm_loss_config
+from mwm.training.stable_wm_runtime import (
     prepare_trainer_root,
-    resolve_lewm_base_adapter_total_steps,
+    resolve_stable_wm_adapter_total_steps,
     resolve_lightning_trainer_runtime,
 )
 
 
-def lewm_base_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage: str) -> dict[str, torch.Tensor]:
-    cfg = module.lewm_base_adapter_cfg
-    if not isinstance(module.model, MatryoshkaWorldModel):
-        raise RuntimeError("Le-WM training requires the MWM base-adapter model, not a raw Stable-WM object.")
-    validate_lewm_loss_config(cfg.loss)
+def stable_wm_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage: str) -> dict[str, torch.Tensor]:
+    cfg = module.stable_wm_adapter_cfg
+    if not isinstance(module.model, MatryoshkaRuntimeModel):
+        raise RuntimeError("Stable-WM adapter training requires an MWM runtime model, not a raw Stable-WM object.")
+    validate_stable_wm_loss_config(cfg.loss)
     output = module.model.training_loss(
         batch,
         level_weights=cfg.loss.get("level_weights", None),
@@ -39,8 +39,8 @@ def lewm_base_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage
     return output
 
 
-def run_lewm_base_adapter_training(
-    lewm: torch.nn.Module,
+def run_stable_wm_adapter_training(
+    model: torch.nn.Module,
     train_set: Any,
     val_set: Any,
     cfg: Any,
@@ -65,7 +65,7 @@ def run_lewm_base_adapter_training(
         shuffle=False,
         **{k: v for k, v in {**loader_kwargs, "drop_last": False}.items() if v is not None and k != "generator"},
     )
-    total_steps = resolve_lewm_base_adapter_total_steps(cfg, train_loader)
+    total_steps = resolve_stable_wm_adapter_total_steps(cfg, train_loader)
     optimizers = {
         "model_opt": {
             "modules": "model",
@@ -83,7 +83,7 @@ def run_lewm_base_adapter_training(
         },
     }
     trainer_root = prepare_trainer_root(run_dir, cfg)
-    callbacks = lewm_base_adapter_callbacks(cfg)
+    callbacks = stable_wm_adapter_callbacks(cfg)
     checkpoint_cb = next(callback for callback in callbacks if isinstance(callback, ModelCheckpoint))
     trainer_runtime = resolve_lightning_trainer_runtime(cfg)
     trainer = pl.Trainer(
@@ -104,13 +104,13 @@ def run_lewm_base_adapter_training(
         else None,
     )
     module = spt.Module(
-        model=lewm,
+        model=model,
         sigreg=SIGReg(knots=int(cfg.loss.get("sigreg_knots", 17)), num_proj=int(cfg.loss.get("sigreg_num_proj", 1024))),
-        forward=lewm_base_adapter_forward,
+        forward=stable_wm_adapter_forward,
         optim=optimizers,
         hparams=as_container(cfg),
     )
-    module.lewm_base_adapter_cfg = cfg
+    module.stable_wm_adapter_cfg = cfg
     manager = spt.Manager(
         trainer=trainer,
         module=module,
@@ -118,12 +118,12 @@ def run_lewm_base_adapter_training(
         seed=int(cfg.seed),
     )
     manager()
-    selected_checkpoint = select_lewm_base_adapter_export_checkpoint(checkpoint_cb, cfg)
+    selected_checkpoint = select_stable_wm_adapter_export_checkpoint(checkpoint_cb, cfg)
     selected_checkpoint_state: dict[str, Any] = {}
     if selected_checkpoint:
-        from mwm.training.lewm_export import load_lewm_base_adapter_lightning_state
+        from mwm.training.stable_wm_export import load_stable_wm_adapter_lightning_state
 
-        selected_checkpoint_state = load_lewm_base_adapter_lightning_state(lewm, selected_checkpoint)
+        selected_checkpoint_state = load_stable_wm_adapter_lightning_state(model, selected_checkpoint)
     return {
         "epoch": int(selected_checkpoint_state.get("epoch", getattr(trainer, "current_epoch", int(cfg.schedule.max_epochs)))),
         "last_checkpoint": str(checkpoint_cb.last_model_path or "") or None,
@@ -137,4 +137,4 @@ def run_lewm_base_adapter_training(
     }
 
 
-__all__ = ["lewm_base_adapter_forward", "run_lewm_base_adapter_training"]
+__all__ = ["stable_wm_adapter_forward", "run_stable_wm_adapter_training"]

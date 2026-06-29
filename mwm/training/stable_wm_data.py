@@ -4,14 +4,12 @@ from pathlib import Path
 from typing import Any
 
 import torch
-
-from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.data.metadata import load_dataset_metadata
 from mwm.data.paths import local_path
 from mwm.dependency_refs import dependency_refs
 from mwm.swm.restore import validate_restore_columns
-from mwm.training.lewm_model import resolve_lewm_base_adapter_model_cfg
-from mwm.training.lewm_transforms import build_lewm_base_adapter_dataset_transform
+from mwm.training.stable_wm_model import resolve_stable_wm_adapter_model_cfg
+from mwm.training.stable_wm_transforms import build_stable_wm_adapter_dataset_transform
 
 
 def dataset_metadata(path: str | Path) -> dict[str, Any]:
@@ -42,13 +40,13 @@ def close_dataset_handles(*datasets: Any) -> None:
             close()
 
 
-def load_lewm_base_adapter_train_valid_datasets(cfg: Any) -> tuple[Any, Any, Any]:
+def load_stable_wm_adapter_train_valid_datasets(cfg: Any) -> tuple[Any, Any, Any]:
     import stable_pretraining as spt
     from stable_worldmodel.data import load_dataset
 
     data_format = str(cfg.data.get("format", "lance"))
     if data_format != "lance":
-        raise ValueError(f"Exact Le-WM parity training only supports Lance datasets, got format={data_format!r}.")
+        raise ValueError(f"Stable-WM adapter training only supports Lance datasets, got format={data_format!r}.")
     history_size = int(cfg.model.get("history_size", cfg.loss.get("history_size", 3)))
     num_preds = int(cfg.model.get("num_preds", cfg.loss.get("num_preds", 1)))
     keys_to_load = list(cfg.data.get("keys_to_load", ["pixels", "action", "proprio", "state"]))
@@ -63,7 +61,7 @@ def load_lewm_base_adapter_train_valid_datasets(cfg: Any) -> tuple[Any, Any, Any
     )
     pixels_key = str(cfg.data.pixels_key)
     img_size = int(cfg.model.get("image_size", 224))
-    dataset.transform = build_lewm_base_adapter_dataset_transform(
+    dataset.transform = build_stable_wm_adapter_dataset_transform(
         dataset,
         pixels_key=pixels_key,
         image_size=img_size,
@@ -79,13 +77,13 @@ def load_lewm_base_adapter_train_valid_datasets(cfg: Any) -> tuple[Any, Any, Any
     return train_set, val_set, dataset
 
 
-def prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[str, Any], dict[str, Any]]:
+def prepare_stable_wm_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[str, Any], dict[str, Any]]:
     from mwm.adapters.builder import STABLE_CONFIG_TARGET
 
-    tr_ds, va_ds, base_ds = load_lewm_base_adapter_train_valid_datasets(cfg)
+    tr_ds, va_ds, base_ds = load_stable_wm_adapter_train_valid_datasets(cfg)
     restore_import_path = None if cfg.get("restore", None) is None else cfg.restore.get("import_path", None)
     restore_spec = validate_restore_columns(str(cfg.env_id), dataset_available_columns(base_ds), import_path=restore_import_path)
-    model_cfg = resolve_lewm_base_adapter_model_cfg(cfg, base_dataset(base_ds))
+    model_cfg = resolve_stable_wm_adapter_model_cfg(cfg, base_dataset(base_ds))
     dataset_meta = dataset_metadata(str(cfg.data.path))
     base_action_dim = int(dataset_meta.get("action_dim", base_dataset(base_ds).get_dim(str(cfg.data.action_key))))
     metadata = {
@@ -96,7 +94,6 @@ def prepare_lewm_base_adapter_context(cfg: Any) -> tuple[Any, Any, Any, dict[str
         "action_block": int(model_cfg.get("action_block", 1)),
         "action_preprocessing": "standard_scaler",
         "levels": [int(k) for k in model_cfg["K"]],
-        "architecture_version": LEWM_BASE_ADAPTER_ARCH,
         "action_spec": {
             "dim": int(model_cfg["action_dim"]),
             "base_dim": base_action_dim,
@@ -124,6 +121,6 @@ __all__ = [
     "close_dataset_handles",
     "dataset_available_columns",
     "dataset_metadata",
-    "load_lewm_base_adapter_train_valid_datasets",
-    "prepare_lewm_base_adapter_context",
+    "load_stable_wm_adapter_train_valid_datasets",
+    "prepare_stable_wm_adapter_context",
 ]

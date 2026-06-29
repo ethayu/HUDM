@@ -57,7 +57,7 @@ def prepare_trainer_root(run_dir: str | Path, cfg: Any, *, logs_root: str | Path
     return trainer_root
 
 
-def resolve_lewm_base_adapter_total_steps(cfg: Any, train_loader: Any) -> int:
+def resolve_stable_wm_adapter_total_steps(cfg: Any, train_loader: Any) -> int:
     lr_epochs = cfg.schedule.get("lr_max_epochs", None)
     if lr_epochs is None:
         lr_epochs = cfg.schedule.max_epochs
@@ -70,6 +70,6 @@ def resolve_lewm_base_adapter_total_steps(cfg: Any, train_loader: Any) -> int:
 __all__ = [
     "coerce_lightning_devices",
     "prepare_trainer_root",
-    "resolve_lewm_base_adapter_total_steps",
+    "resolve_stable_wm_adapter_total_steps",
     "resolve_lightning_trainer_runtime",
 ]

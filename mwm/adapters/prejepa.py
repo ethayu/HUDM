@@ -10,8 +10,7 @@ import torch.nn as nn
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
 from mwm.adapters.constants import PREJEPA_DINO_ADAPTER_ARCH
 from mwm.adapters.registry import register_adapter
-from mwm.models.base_adaptive import MatryoshkaWorldModel
-from mwm.models.prejepa import PreJEPALevelPredictor, PreJEPARuntimeStrategy
+from mwm.models.prejepa import PreJEPALevelPredictor, PreJEPAMatryoshkaWorldModel
 
 
 @dataclass(frozen=True)
@@ -85,7 +84,7 @@ class PreJEPAStableWMAdapter:
             loss_scope=copy.deepcopy(recipe_copy.get("loss_scope", {"regularizers": "unsupported"})),
         )
 
-    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> MatryoshkaWorldModel:
+    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> PreJEPAMatryoshkaWorldModel:
         return _model_from_prejepa_spec(spec, **runtime)
 
 
@@ -261,7 +260,7 @@ def _model_from_prejepa_spec(
     action_block: int,
     image_shape: Sequence[int],
     normalize_imagenet: bool,
-) -> MatryoshkaWorldModel:
+) -> PreJEPAMatryoshkaWorldModel:
     source_config = copy.deepcopy(spec.source_config)
     shape = _prejepa_shape_spec(source_config)
     _validate_action_dim(source_config, int(action_dim))
@@ -306,16 +305,6 @@ def _model_from_prejepa_spec(
         )
 
     extra_encoders = _instantiate_extra_encoders(source_config)
-    strategy = PreJEPARuntimeStrategy(
-        extra_encoders=extra_encoders,
-        extra_order=shape.extra_order,
-        extra_dims=shape.extra_dims,
-        extra_input_dims=shape.extra_input_dims,
-        visual_dim=shape.D_visual,
-        num_patches=shape.num_patches,
-        action_key="action",
-        interpolate_pos_encoding=bool(source_config.get("interpolate_pos_encoding", True)),
-    )
     history_size = _history_size(source_config, spec.training_recipe)
     num_preds = _num_preds(source_config, spec.training_recipe)
     backbone_name = _backbone_name(source_config, spec.training_recipe)
@@ -365,7 +354,7 @@ def _model_from_prejepa_spec(
             "extra_embedding_dim": int(shape.extra_dims["action"]),
         },
     }
-    return MatryoshkaWorldModel(
+    return PreJEPAMatryoshkaWorldModel(
         encoder=encoder,
         projector=nn.Identity(),
         transitions=predictors,
@@ -382,7 +371,14 @@ def _model_from_prejepa_spec(
         decoder_architectures=decoder_architectures,
         metadata=metadata,
         architecture_version=PREJEPA_DINO_ADAPTER_ARCH,
-        runtime_strategy=strategy,
+        extra_encoders=extra_encoders,
+        extra_order=shape.extra_order,
+        extra_dims=shape.extra_dims,
+        extra_input_dims=shape.extra_input_dims,
+        visual_dim=shape.D_visual,
+        num_patches=shape.num_patches,
+        action_key="action",
+        interpolate_pos_encoding=bool(source_config.get("interpolate_pos_encoding", True)),
     )
 
 

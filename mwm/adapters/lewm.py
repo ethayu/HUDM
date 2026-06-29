@@ -10,7 +10,7 @@ import torch.nn as nn
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
 from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.adapters.registry import register_adapter
-from mwm.models.base_adaptive import MatryoshkaWorldModel
+from mwm.models.lewm import LeWMMatryoshkaWorldModel
 from mwm.models.decoders import ConvImageDecoder
 from mwm.models.transitions import TransitionPackage
 
@@ -98,7 +98,7 @@ class LeWMStableWMAdapter:
             loss_scope=copy.deepcopy(recipe_copy.get("loss_scope", {"regularizers": "shared_latent"})),
         )
 
-    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> MatryoshkaWorldModel:
+    def build_model(self, spec: StableWMBaseSpec, **runtime: Any) -> LeWMMatryoshkaWorldModel:
         return _model_from_base_spec(spec, **runtime)
 
 
@@ -262,7 +262,7 @@ def _model_from_base_spec(
     action_block: int,
     image_shape: Sequence[int],
     normalize_imagenet: bool,
-) -> MatryoshkaWorldModel:
+) -> LeWMMatryoshkaWorldModel:
     source_config = copy.deepcopy(spec.source_config)
     _validate_action_dim_from_source_config(source_config, int(action_dim))
     bundles = [
@@ -315,7 +315,7 @@ def _model_from_base_spec(
             "block": int(action_block),
         },
     }
-    model = MatryoshkaWorldModel(
+    model = LeWMMatryoshkaWorldModel(
         encoder=encoder,
         projector=projector,
         transitions=transitions,

@@ -10,12 +10,12 @@ from mwm.data.metadata import dataset_metadata_path, load_dataset_metadata
 DEFAULT_CONFIGS = [
     "configs/train/mwm_lewm_pusht.yaml",
     "configs/train/mwm_lewm_tworoom.yaml",
-    "configs/train/mwm_scheduled_pusht.yaml",
-    "configs/train/mwm_scheduled_tworoom.yaml",
-    "configs/train/mwm_dense_pusht.yaml",
-    "configs/train/mwm_dense_reacher.yaml",
-    "configs/train/mwm_dense_ogb_cube.yaml",
-    "configs/train/mwm_dense_tworoom.yaml",
+    "configs/train/mwm_lewm_scheduled_pusht.yaml",
+    "configs/train/mwm_lewm_scheduled_tworoom.yaml",
+    "configs/train/mwm_lewm_dense_pusht.yaml",
+    "configs/train/mwm_lewm_dense_reacher.yaml",
+    "configs/train/mwm_lewm_dense_ogb_cube.yaml",
+    "configs/train/mwm_lewm_dense_tworoom.yaml",
     "configs/eval/mwm_lewm_pusht.yaml",
     "configs/eval/mwm_lewm_tworoom.yaml",
 ]

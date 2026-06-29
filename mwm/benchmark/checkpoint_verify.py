@@ -40,7 +40,7 @@ def validate_benchmark_role_checkpoint_contract(row: dict[str, Any], metadata: d
         if d is not None and levels != [d]:
             errors.append(f"upstream role checkpoint must be identity-parity K=[D={d}], got {levels}: {checkpoint_dir}")
         if target != STABLE_CONFIG_TARGET:
-            errors.append(f"upstream role checkpoint must export the generic base-adaptive target: {checkpoint_dir}")
+            errors.append(f"upstream role checkpoint must export the generic Stable-WM builder target: {checkpoint_dir}")
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
             errors.append(f"upstream role checkpoint missing corrected architecture version: {checkpoint_dir}")
     elif role == "retrained_lewm_identity":
@@ -51,21 +51,21 @@ def validate_benchmark_role_checkpoint_contract(row: dict[str, Any], metadata: d
                 f"retrained identity checkpoint must use the Le-WM base-adapter backend, got {backend!r}: {checkpoint_dir}"
             )
         if target != STABLE_CONFIG_TARGET:
-            errors.append(f"retrained identity checkpoint must export the generic base-adaptive target: {checkpoint_dir}")
+            errors.append(f"retrained identity checkpoint must export the generic Stable-WM builder target: {checkpoint_dir}")
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
             errors.append(f"retrained identity checkpoint missing corrected architecture version: {checkpoint_dir}")
     elif role == "mwm_scheduled":
         if levels != [48, 96, 144]:
             errors.append(f"scheduled MWM checkpoint must be K=[48,96,144], got {levels}: {checkpoint_dir}")
         if target != STABLE_CONFIG_TARGET:
-            errors.append(f"scheduled MWM checkpoint must export the generic base-adaptive target: {checkpoint_dir}")
+            errors.append(f"scheduled MWM checkpoint must export the generic Stable-WM builder target: {checkpoint_dir}")
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
             errors.append(f"scheduled MWM checkpoint missing corrected architecture version: {checkpoint_dir}")
     elif role == "mwm_dense":
         if levels != [6, 12, 48, 96, 144, 192]:
             errors.append(f"dense MWM checkpoint must be K=[6,12,48,96,144,192], got {levels}: {checkpoint_dir}")
         if target != STABLE_CONFIG_TARGET:
-            errors.append(f"dense MWM checkpoint must export the generic base-adaptive target: {checkpoint_dir}")
+            errors.append(f"dense MWM checkpoint must export the generic Stable-WM builder target: {checkpoint_dir}")
         if metadata.get("architecture_version") != LEWM_BASE_ADAPTER_ARCH:
             errors.append(f"dense MWM checkpoint missing corrected architecture version: {checkpoint_dir}")
 

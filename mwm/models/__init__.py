@@ -3,7 +3,9 @@
 Import concrete model APIs from their owner modules:
 
 - `mwm.models.core`
-- `mwm.models.base_adaptive`
+- `mwm.models.common`
+- `mwm.models.lewm`
+- `mwm.models.prejepa`
 - `mwm.models.transitions`
 - `mwm.models.losses`
 """
