@@ -21,7 +21,7 @@ else
   echo "Using existing Reacher smoke dataset: $DATASET"
 fi
 
-"$PY" -m mwm.training.lewm configs/local/train_reacher_cpu_smoke.yaml
+"$PY" -m mwm.training.stable_wm configs/local/train_lewm_reacher_cpu_smoke.yaml
 
 CHECKPOINT="checkpoints_mwm/local_reacher_cpu_smoke"
 for name in config.json weights.pt world_metadata.json; do

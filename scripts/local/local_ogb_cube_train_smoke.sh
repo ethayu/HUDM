@@ -21,7 +21,7 @@ else
   echo "Using existing OGBench Cube smoke dataset: $DATASET"
 fi
 
-"$PY" -m mwm.training.lewm configs/local/train_ogb_cube_cpu_smoke.yaml
+"$PY" -m mwm.training.stable_wm configs/local/train_lewm_ogb_cube_cpu_smoke.yaml
 
 CHECKPOINT="checkpoints_mwm/local_ogb_cube_cpu_smoke"
 for name in config.json weights.pt world_metadata.json; do

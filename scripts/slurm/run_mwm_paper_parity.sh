@@ -24,10 +24,10 @@ cd "$ROOT"
 "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
 "$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_tworoom.yaml --roles upstream_lewm_converted
 
-"$PY" -m mwm.training.lewm configs/train/mwm_lewm_pusht_upstream.yaml
-"$PY" -m mwm.training.lewm configs/train/mwm_lewm_reacher_upstream.yaml
-"$PY" -m mwm.training.lewm configs/train/mwm_lewm_ogb_cube_upstream.yaml
-"$PY" -m mwm.training.lewm configs/train/mwm_lewm_tworoom_upstream.yaml
+"$PY" -m mwm.training.stable_wm configs/train/mwm_lewm_pusht_upstream.yaml
+"$PY" -m mwm.training.stable_wm configs/train/mwm_lewm_reacher_upstream.yaml
+"$PY" -m mwm.training.stable_wm configs/train/mwm_lewm_ogb_cube_upstream.yaml
+"$PY" -m mwm.training.stable_wm configs/train/mwm_lewm_tworoom_upstream.yaml
 "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
 "$PY" -m mwm.benchmark.verify configs/benchmark/paper_parity_pusht.yaml --roles upstream_lewm_converted retrained_lewm_identity
 "$PY" -m mwm.benchmark.matrix configs/benchmark/paper_parity_reacher.yaml --roles upstream_lewm_converted retrained_lewm_identity

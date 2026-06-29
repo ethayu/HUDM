@@ -11,16 +11,16 @@ fi
 
 case "${1:-}" in
   pusht)
-    CONFIG="configs/train/mwm_dense_pusht.yaml"
+    CONFIG="configs/train/mwm_lewm_dense_pusht.yaml"
     ;;
   reacher)
-    CONFIG="configs/train/mwm_dense_reacher.yaml"
+    CONFIG="configs/train/mwm_lewm_dense_reacher.yaml"
     ;;
   ogb_cube|cube)
-    CONFIG="configs/train/mwm_dense_ogb_cube.yaml"
+    CONFIG="configs/train/mwm_lewm_dense_ogb_cube.yaml"
     ;;
   tworoom)
-    CONFIG="configs/train/mwm_dense_tworoom.yaml"
+    CONFIG="configs/train/mwm_lewm_dense_tworoom.yaml"
     ;;
   *)
     echo "Usage: scripts/slurm/run_mwm_train_dense_env.sh {pusht|reacher|ogb_cube|tworoom}" >&2
@@ -31,4 +31,4 @@ esac
 cd "$ROOT"
 
 "$PY" -m mwm.data.verify --paper-parity
-"$PY" -m mwm.training.lewm "$CONFIG"
+"$PY" -m mwm.training.stable_wm "$CONFIG"

@@ -31,4 +31,4 @@ esac
 cd "$ROOT"
 
 "$PY" -m mwm.data.verify --paper-parity
-"$PY" -m mwm.training.lewm "$CONFIG"
+"$PY" -m mwm.training.stable_wm "$CONFIG"

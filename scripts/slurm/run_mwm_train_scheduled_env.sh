@@ -11,10 +11,10 @@ fi
 
 case "${1:-}" in
   pusht)
-    CONFIG="configs/train/mwm_scheduled_pusht.yaml"
+    CONFIG="configs/train/mwm_lewm_scheduled_pusht.yaml"
     ;;
   tworoom)
-    CONFIG="configs/train/mwm_scheduled_tworoom.yaml"
+    CONFIG="configs/train/mwm_lewm_scheduled_tworoom.yaml"
     ;;
   *)
     echo "Usage: scripts/slurm/run_mwm_train_scheduled_env.sh {pusht|tworoom}" >&2
@@ -25,4 +25,4 @@ esac
 cd "$ROOT"
 
 "$PY" -m mwm.data.verify --paper-parity
-"$PY" -m mwm.training.lewm "$CONFIG"
+"$PY" -m mwm.training.stable_wm "$CONFIG"
