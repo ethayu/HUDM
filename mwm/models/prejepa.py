@@ -5,6 +5,11 @@ from typing import Any, Sequence
 import torch
 import torch.nn as nn
 
+from mwm.models.flops import (
+    FLOP_ACCOUNTING_DYNAMICS_AUDIT,
+    decision_flop_accounting,
+    profile_dynamics_call,
+)
 from mwm.models.losses import matryoshka_base_loss, weighted_level_mean
 from mwm.models.planning_costs import (
     active_rollout_levels,
@@ -445,6 +450,8 @@ class PreJEPARuntimeStrategy(nn.Module):
         infos: dict[str, Any],
         action_sequence: torch.Tensor,
         rollout_levels: Sequence[int],
+        *,
+        flop_accounting: str = "none",
     ) -> dict[str, Any]:
         if "pixels" not in infos:
             raise KeyError("pixels not in info_dict")
@@ -496,6 +503,9 @@ class PreJEPARuntimeStrategy(nn.Module):
         extra_lists: dict[str, list[torch.Tensor]] = {
             key: list(value.unbind(dim=1)) for key, value in extras_init.items()
         }
+        profile_flops = str(flop_accounting) == FLOP_ACCOUNTING_DYNAMICS_AUDIT
+        dynamics_flops = 0
+        flop_errors: list[str] = []
         for step, level_idx in enumerate(active_levels):
             level_idx = int(level_idx)
             k = int(model.K[level_idx])
@@ -504,7 +514,14 @@ class PreJEPARuntimeStrategy(nn.Module):
             pixels_context = torch.stack(pixels_list[lo:], dim=1)
             extras_context = {key: torch.stack(values[lo:], dim=1) for key, values in extra_lists.items()}
             context = self._compose_level_parts(model, level_idx, pixels_context, extras_context)
-            pred = model.transitions[level_idx](context)[:, -1]
+            pred_all, flop_count, flop_error = profile_dynamics_call(
+                lambda: model.transitions[level_idx](context),
+                enabled=profile_flops,
+            )
+            dynamics_flops += int(flop_count)
+            if flop_error is not None:
+                flop_errors.append(flop_error)
+            pred = pred_all[:, -1]
             pixels_next = pixels_list[-1].clone()
             pixels_next[..., :k] = pred[..., :k]
             extras_next: dict[str, torch.Tensor] = {}
@@ -542,6 +559,10 @@ class PreJEPARuntimeStrategy(nn.Module):
         }
         terminal_idx = terminal_rollout_level([int(x) for x in rollout_levels], horizon=horizon, history=history)
         self._store_scheduled_predicted_parts(model, infos, terminal_idx, pixels, extras)
+        infos["_mwm_dynamics_flops"] = int(dynamics_flops)
+        infos["_mwm_flop_accounting"] = str(flop_accounting)
+        if flop_errors:
+            infos["_mwm_flop_audit_error"] = "; ".join(flop_errors)
         return infos
 
     def ensure_goal_emb(self, model: Any, infos: dict[str, Any]) -> None:
@@ -576,8 +597,15 @@ class PreJEPARuntimeStrategy(nn.Module):
         )
         if int(candidates.shape[-1]) != model.action_dim:
             raise ValueError(f"Expected action_dim={model.action_dim}, got {int(candidates.shape[-1])}")
+        flop_accounting = decision_flop_accounting(decision)
         self.ensure_goal_emb(model, infos)
-        out = self.rollout_with_schedule(model, infos, candidates, rollout_levels)
+        out = self.rollout_with_schedule(
+            model,
+            infos,
+            candidates,
+            rollout_levels,
+            flop_accounting=flop_accounting,
+        )
         history = int(infos["pixels"].shape[2])
         active_levels = active_rollout_levels(rollout_levels, horizon=int(candidates.shape[2]), history=history)
         terminal_idx = terminal_rollout_level(rollout_levels, horizon=int(candidates.shape[2]), history=history)
@@ -603,9 +631,13 @@ class PreJEPARuntimeStrategy(nn.Module):
             "terminal_k": int(k),
             "level_dim": int(self.level_dim(model, int(terminal_idx))),
             "num_patches": int(self.num_patches),
+            "dynamics_flops": int(out.get("_mwm_dynamics_flops", 0)),
+            "flop_accounting": str(out.get("_mwm_flop_accounting", flop_accounting)),
             "prefix_criterion": True,
             "history_size": int(model.history_size),
         }
+        if "_mwm_flop_audit_error" in out:
+            model._last_cost_diagnostics["flop_audit_error"] = str(out["_mwm_flop_audit_error"])
         return cost
 
 

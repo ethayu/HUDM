@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import time
 from typing import Any
 
@@ -9,6 +10,7 @@ import torch
 from gymnasium.spaces import Box
 
 from mwm.fidelity import FidelityDecision, FidelityScheduler
+from mwm.models.flops import FLOP_ACCOUNTING_NONE, normalize_flop_accounting
 
 
 class MWMScheduledCEMSolver:
@@ -31,6 +33,7 @@ class MWMScheduledCEMSolver:
         pop_schedule: dict[str, Any] | None = None,
         elite_frac: float | None = None,
         max_replans: int | None = None,
+        flop_accounting: str | None = None,
     ) -> None:
         self.model = model
         self.batch_size = int(batch_size)
@@ -43,6 +46,7 @@ class MWMScheduledCEMSolver:
         self.elite_frac = float(elite_frac) if elite_frac is not None else None
         self.max_replans = max(1, int(max_replans)) if max_replans is not None else 1
         self._replan_idx = 0
+        self.flop_accounting = normalize_flop_accounting(flop_accounting)
         self.device = torch.device(device)
         self.torch_gen = torch.Generator(device=self.device).manual_seed(int(seed))
         self.clamp_actions = bool(clamp_actions)
@@ -150,6 +154,10 @@ class MWMScheduledCEMSolver:
     def _cost(self, infos: dict[str, Any], candidates: torch.Tensor, decision: FidelityDecision) -> torch.Tensor:
         if not hasattr(self.model, "get_cost_with_fidelity"):
             raise TypeError("MWMScheduledCEMSolver requires get_cost_with_fidelity(...); legacy get_cost fallback is disabled.")
+        if self.flop_accounting != FLOP_ACCOUNTING_NONE:
+            metadata = dict(decision.metadata)
+            metadata["flop_accounting"] = self.flop_accounting
+            decision = replace(decision, metadata=metadata)
         return self.model.get_cost_with_fidelity(infos, candidates, decision)
 
     def _current_mpc_progress(self) -> float:

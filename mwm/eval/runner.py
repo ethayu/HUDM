@@ -48,6 +48,7 @@ DEFAULTS = {
         "warm_start": True,
         "clamp_actions": False,
         "std_unbiased": True,
+        "flop_accounting": "none",
         "scheduler": {
             "enabled": True,
             "mpc": {"mode": "fixed", "level": "finest"},

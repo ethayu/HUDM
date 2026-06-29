@@ -475,6 +475,36 @@ class PreJEPAStableConfigTests(unittest.TestCase):
         self.assertEqual(tuple(infos["predicted_proprio_emb"].shape), (1, 2, 5, 4, 2))
         self.assertEqual(tuple(infos["predicted_action_emb"].shape), (1, 2, 5, 4, 2))
 
+    def test_prejepa_dynamics_flop_audit_profiles_active_predictor(self) -> None:
+        model = build_mwm_from_stable_config(
+            family="prejepa",
+            source_config=self._prejepa_config(),
+            source_config_sha256="prejepa-sha",
+            training_recipe={"history_size": 2, "num_preds": 1},
+            K=(3, 6),
+            action_dim=2,
+            action_block=1,
+            image_shape=(4, 4),
+            normalize_imagenet=False,
+        )
+        infos = {
+            "pixels": torch.zeros(1, 1, 2, 3, 4, 4),
+            "goal": torch.zeros(1, 1, 2, 3, 4, 4),
+            "proprio": torch.zeros(1, 1, 2, 3),
+            "goal_proprio": torch.zeros(1, 1, 2, 3),
+        }
+        candidates = torch.zeros(1, 1, 3, 2)
+        decision = SimpleNamespace(
+            base_level_idx=1,
+            rollout_level_indices=[1, 0, 0],
+            metadata={"flop_accounting": "dynamics_audit"},
+        )
+
+        model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertGreater(model._last_cost_diagnostics["dynamics_flops"], 0)
+        self.assertEqual(model._last_cost_diagnostics["flop_accounting"], "dynamics_audit")
+
     def test_prejepa_checkpoint_round_trips_through_generic_builder(self) -> None:
         import tempfile
 

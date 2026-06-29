@@ -73,6 +73,8 @@ class MWMWorldModelPolicy(WorldModelPolicy):
                 for diag in item.get("mwm_diagnostics", [])
             )
         )
+        total_dynamics_flops = int(sum(int(diag.get("model_dynamics_flops", 0)) for diag in traces))
+        flop_audit_errors = [str(diag["model_flop_audit_error"]) for diag in traces if diag.get("model_flop_audit_error")]
         total_cem_cost_calls = int(sum(int(diag.get("cem_cost_calls", 1)) for diag in traces))
         total_candidate_action_values = int(sum(int(diag.get("candidate_action_values", 0)) for diag in traces))
         return {
@@ -86,6 +88,8 @@ class MWMWorldModelPolicy(WorldModelPolicy):
                 "mean_policy_time_sec": self._policy_time_sec / self._action_calls if self._action_calls else 0.0,
                 "total_bits_used_estimate": total_work * 32,
                 "latent_work_total": total_work,
+                "dynamics_flops_total": total_dynamics_flops,
+                "flop_audit_error_count": int(len(flop_audit_errors)),
                 "cem_cost_calls": total_cem_cost_calls,
                 "candidate_action_values": total_candidate_action_values,
             },

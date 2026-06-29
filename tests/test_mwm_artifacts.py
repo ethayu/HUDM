@@ -65,6 +65,7 @@ def _payload(role: str, env_id: str, seed: int, output_path: Path) -> dict:
             "plans": 2,
             "steps": 10,
             "bits_used_total": 1000 + seed,
+            "dynamics_flops_total": 2000 + seed,
             "plan_time_total_sec": 0.5,
             "schedule_level_counts": {"0": 1, "1": 1},
         },
@@ -526,6 +527,7 @@ runs:
                     "plans": 1,
                     "steps": 1,
                     "bits_used_total": 10,
+                    "dynamics_flops_total": 20,
                     "plan_time_total_sec": 0.1,
                     "summary": {"cem_cost_calls": 1, "candidate_action_values": 1},
                 },
@@ -537,6 +539,7 @@ runs:
             }
             write_json(eval_path, payload)
             row = eval_summary_row("upstream", eval_path, payload)
+            self.assertEqual(row["dynamics_flops_total"], 20)
             write_json(run_dir / "summary.json", {"run": row})
             write_json(run_dir / "dependencies.json", deps)
             write_json(run_dir / "planning_diagnostics.json", payload["planning_diagnostics"])

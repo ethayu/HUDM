@@ -388,10 +388,13 @@ class RecordingFidelityCostModel(nn.Module):
     def get_cost_with_fidelity(self, info_dict: dict, action_candidates: torch.Tensor, decision) -> torch.Tensor:
         del info_dict
         self.decisions.append(decision)
+        flop_mode = dict(getattr(decision, "metadata", {})).get("flop_accounting", "none")
         self._last_cost_diagnostics = {
             "base_level_idx": int(decision.base_level_idx),
             "terminal_level_idx": int(decision.metadata.get("terminal_level_idx", decision.rollout_level_indices[-1])),
             "latent_work": int(action_candidates.shape[0] * action_candidates.shape[1]),
+            "dynamics_flops": 123 if flop_mode == "dynamics_audit" else 0,
+            "flop_accounting": flop_mode,
         }
         return action_candidates.square().sum(dim=(2, 3))
 
@@ -1333,6 +1336,37 @@ train:
         solver.solve({"pixels": torch.zeros(1, 1)})
         self.assertEqual(model.decisions[-1].mpc_progress, 0.0)
 
+    def test_scheduled_cem_forwards_dynamics_flop_audit_mode(self) -> None:
+        model = RecordingFidelityCostModel()
+        solver = MWMScheduledCEMSolver(
+            model,
+            batch_size=1,
+            num_samples=4,
+            n_steps=1,
+            topk=2,
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": "finest"},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
+            flop_accounting="dynamics_audit",
+            seed=0,
+            std_unbiased=False,
+        )
+        solver.configure(
+            action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            n_envs=1,
+            config=PlanConfig(horizon=2, receding_horizon=1, action_block=1),
+        )
+
+        result = solver.solve({"pixels": torch.zeros(1, 1)})
+
+        diagnostics = result["mwm_diagnostics"][0]
+        self.assertEqual(model.decisions[-1].metadata["flop_accounting"], "dynamics_audit")
+        self.assertEqual(diagnostics["model_dynamics_flops"], 123)
+        self.assertEqual(diagnostics["model_flop_accounting"], "dynamics_audit")
+
     def test_lewm_dynamic_rollout_scores_final_active_level(self) -> None:
         model = _base_adaptive_lewm(K=(2, 4), D=4, action_dim=2, history_size=2)
         infos = {
@@ -1350,6 +1384,24 @@ train:
         self.assertEqual(model._last_cost_diagnostics["base_level_idx"], 1)
         self.assertEqual(model._last_cost_diagnostics["terminal_level_idx"], 0)
         self.assertEqual(model._last_cost_diagnostics["terminal_k"], 2)
+
+    def test_lewm_dynamics_flop_audit_profiles_active_rollout(self) -> None:
+        model = _base_adaptive_lewm(K=(2, 4), D=4, action_dim=2, history_size=2)
+        infos = {
+            "pixels": torch.zeros(1, 1, 2, 3, 8, 8),
+            "goal": torch.zeros(1, 1, 2, 3, 8, 8),
+        }
+        candidates = torch.zeros(1, 1, 3, 2)
+        decision = SimpleNamespace(
+            base_level_idx=1,
+            rollout_level_indices=[1, 0, 0],
+            metadata={"flop_accounting": "dynamics_audit"},
+        )
+
+        model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertGreater(model._last_cost_diagnostics["dynamics_flops"], 0)
+        self.assertEqual(model._last_cost_diagnostics["flop_accounting"], "dynamics_audit")
 
 
 if __name__ == "__main__":

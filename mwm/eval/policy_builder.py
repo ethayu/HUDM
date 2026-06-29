@@ -56,6 +56,7 @@ def build_mwm_policy(
         pop_schedule=pop_schedule,
         elite_frac=float(cfg.planner.elite_frac) if pop_schedule is not None else None,
         max_replans=max_replans,
+        flop_accounting=str(cfg.planner.get("flop_accounting", "none")),
     )
     plan_cfg = PlanConfig(
         horizon=int(cfg.planner.horizon),

@@ -6,6 +6,11 @@ import torch
 import torch.nn as nn
 
 from mwm.models.objectives import matryoshka_training_loss
+from mwm.models.flops import (
+    FLOP_ACCOUNTING_DYNAMICS_AUDIT,
+    decision_flop_accounting,
+    profile_dynamics_call,
+)
 from mwm.models.planning_costs import (
     active_rollout_levels,
     latent_work_for_levels,
@@ -223,9 +228,17 @@ class MatryoshkaWorldModel(nn.Module):
         infos: dict[str, Any],
         action_sequence: torch.Tensor,
         rollout_levels: Sequence[int],
+        *,
+        flop_accounting: str = "none",
     ) -> dict[str, Any]:
         if self.runtime_strategy is not None:
-            return self.runtime_strategy.rollout_with_schedule(self, infos, action_sequence, rollout_levels)
+            return self.runtime_strategy.rollout_with_schedule(
+                self,
+                infos,
+                action_sequence,
+                rollout_levels,
+                flop_accounting=flop_accounting,
+            )
         if "pixels" not in infos:
             raise KeyError("pixels not in info_dict")
         pixels = infos["pixels"]
@@ -242,6 +255,9 @@ class MatryoshkaWorldModel(nn.Module):
         emb_init = infos["emb"][..., : self.D].reshape(batch * samples, history, self.D)
         all_actions = action_sequence.reshape(batch * samples, int(horizon), self.action_dim)
         emb_list = list(emb_init.unbind(dim=1))
+        profile_flops = str(flop_accounting) == FLOP_ACCOUNTING_DYNAMICS_AUDIT
+        dynamics_flops = 0
+        flop_errors: list[str] = []
         for step, level_idx in enumerate(active_levels):
             level_idx = int(level_idx)
             k = self.K[level_idx]
@@ -249,12 +265,23 @@ class MatryoshkaWorldModel(nn.Module):
             lo = max(0, pred_time - self.history_size)
             emb_trunc = torch.stack(emb_list[lo:], dim=1)
             act_trunc = all_actions[:, lo:pred_time]
-            pred_k = self._predict_prefix(level_idx, emb_trunc[..., :k], act_trunc)[:, -1]
+            pred, flop_count, flop_error = profile_dynamics_call(
+                lambda: self._predict_prefix(level_idx, emb_trunc[..., :k], act_trunc),
+                enabled=profile_flops,
+            )
+            dynamics_flops += int(flop_count)
+            if flop_error is not None:
+                flop_errors.append(flop_error)
+            pred_k = pred[:, -1]
             next_emb = emb_list[-1].clone()
             next_emb[..., :k] = pred_k
             emb_list.append(next_emb)
         emb = torch.stack(emb_list, dim=1).reshape(batch, samples, history + len(active_levels), self.D)
         infos["predicted_emb"] = emb
+        infos["_mwm_dynamics_flops"] = int(dynamics_flops)
+        infos["_mwm_flop_accounting"] = str(flop_accounting)
+        if flop_errors:
+            infos["_mwm_flop_audit_error"] = "; ".join(flop_errors)
         return infos
 
     def _ensure_goal_emb(self, infos: dict[str, Any]) -> None:
@@ -285,8 +312,9 @@ class MatryoshkaWorldModel(nn.Module):
         )
         if int(candidates.shape[-1]) != self.action_dim:
             raise ValueError(f"Expected action_dim={self.action_dim}, got {int(candidates.shape[-1])}")
+        flop_accounting = decision_flop_accounting(decision)
         self._ensure_goal_emb(infos)
-        out = self.rollout_with_schedule(infos, candidates, rollout_levels)
+        out = self.rollout_with_schedule(infos, candidates, rollout_levels, flop_accounting=flop_accounting)
         pred_emb = out["predicted_emb"]
         goal_emb = out["goal_emb"]
         history = int(infos["pixels"].size(2))
@@ -309,10 +337,14 @@ class MatryoshkaWorldModel(nn.Module):
                 levels=active_levels,
                 level_width=lambda idx: self.K[int(idx)],
             ),
+            "dynamics_flops": int(out.get("_mwm_dynamics_flops", 0)),
+            "flop_accounting": str(out.get("_mwm_flop_accounting", flop_accounting)),
             "terminal_k": int(k),
             "prefix_criterion": True,
             "history_size": int(self.history_size),
         }
+        if "_mwm_flop_audit_error" in out:
+            self._last_cost_diagnostics["flop_audit_error"] = str(out["_mwm_flop_audit_error"])
         return cost
 
 
