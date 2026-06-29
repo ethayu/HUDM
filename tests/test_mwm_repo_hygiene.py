@@ -33,7 +33,7 @@ PACKAGE_CLI_COMMANDS = (
     "-m mwm.data.collection",
     "-m mwm.upstream.lewm_checkpoints",
     "-m mwm.upstream.lewm_data",
-    "-m mwm.training.lewm",
+    "-m mwm.training.stable_wm",
     "-m mwm.eval.runner",
     "-m mwm.benchmark.matrix",
     "-m mwm.data.verify",
@@ -116,6 +116,72 @@ def _active_command_reference_files() -> list[Path]:
 
 
 class MWMRepoHygieneTests(unittest.TestCase):
+    def test_stable_wm_adapter_refactor_public_surface(self) -> None:
+        expected_files = {
+            "mwm/diagnostics/__init__.py",
+            "mwm/diagnostics/flops.py",
+            "mwm/models/common.py",
+            "mwm/models/lewm.py",
+            "mwm/models/prejepa.py",
+            "mwm/training/stable_wm.py",
+            "mwm/training/stable_wm_callbacks.py",
+            "mwm/training/stable_wm_config.py",
+            "mwm/training/stable_wm_data.py",
+            "mwm/training/stable_wm_export.py",
+            "mwm/training/stable_wm_lightning.py",
+            "mwm/training/stable_wm_model.py",
+            "mwm/training/stable_wm_runtime.py",
+            "mwm/training/stable_wm_transforms.py",
+        }
+        retired_files = {
+            "mwm/models/base_adaptive.py",
+            "mwm/models/flops.py",
+            "mwm/training/lewm.py",
+            "mwm/training/lewm_callbacks.py",
+            "mwm/training/lewm_config.py",
+            "mwm/training/lewm_data.py",
+            "mwm/training/lewm_export.py",
+            "mwm/training/lewm_lightning.py",
+            "mwm/training/lewm_model.py",
+            "mwm/training/lewm_runtime.py",
+            "mwm/training/lewm_transforms.py",
+        }
+        for rel in expected_files:
+            with self.subTest(expected=rel):
+                self.assertTrue((ROOT / rel).is_file(), rel)
+        for rel in retired_files:
+            with self.subTest(retired=rel):
+                self.assertFalse((ROOT / rel).exists(), rel)
+
+    def test_no_generic_training_code_uses_lewm_namespace(self) -> None:
+        forbidden = (
+            "mwm.training." + "lewm",
+            "lewm_" + "base_adapter",
+            "validate_" + "lewm_loss_config",
+            "prepare_" + "lewm_base_adapter_context",
+            "build_trainable_" + "model_from_base",
+            "run_" + "lewm_base_adapter_training",
+            "export_" + "lewm_base_adapter_lightning_checkpoint",
+        )
+        paths = sorted((ROOT / "mwm" / "training").glob("*.py"))
+        hits: list[str] = []
+        for path in paths:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            for token in forbidden:
+                if token in text:
+                    hits.append(f"{path.relative_to(ROOT)} contains {token}")
+        self.assertEqual(hits, [])
+
+    def test_flop_accounting_has_diagnostics_owner(self) -> None:
+        self.assertTrue((ROOT / "mwm" / "diagnostics" / "flops.py").is_file())
+        self.assertFalse((ROOT / "mwm" / "models" / "flops.py").exists())
+        hits: list[str] = []
+        for path in [*sorted((ROOT / "mwm").rglob("*.py")), *sorted((ROOT / "tests").glob("test_mwm*.py"))]:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+            if "mwm.models." + "flops" in text:
+                hits.append(str(path.relative_to(ROOT)))
+        self.assertEqual(hits, [])
+
     def test_requirements_pin_stable_worldmodel_to_verified_release(self) -> None:
         requirements = (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
         stable_worldmodel_lines = [
@@ -175,7 +241,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         for folder in ("train", "eval", "benchmark", "manifest"):
             self.assertTrue((ROOT / "configs" / folder).is_dir(), folder)
 
-    def test_lewm_training_configs_follow_base_adaptive_contract(self) -> None:
+    def test_lewm_training_configs_follow_stable_wm_contract(self) -> None:
         expected_levels = {
             "mwm_lewm_pusht.yaml": [192],
             "mwm_lewm_reacher_upstream.yaml": [192],
@@ -183,12 +249,12 @@ class MWMRepoHygieneTests(unittest.TestCase):
             "mwm_lewm_tworoom.yaml": [192],
             "mwm_lewm_pusht_upstream.yaml": [192],
             "mwm_lewm_tworoom_upstream.yaml": [192],
-            "mwm_scheduled_pusht.yaml": [48, 96, 144],
-            "mwm_scheduled_tworoom.yaml": [48, 96, 144],
-            "mwm_dense_pusht.yaml": [6, 12, 48, 96, 144, 192],
-            "mwm_dense_reacher.yaml": [6, 12, 48, 96, 144, 192],
-            "mwm_dense_ogb_cube.yaml": [6, 12, 48, 96, 144, 192],
-            "mwm_dense_tworoom.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_lewm_scheduled_pusht.yaml": [48, 96, 144],
+            "mwm_lewm_scheduled_tworoom.yaml": [48, 96, 144],
+            "mwm_lewm_dense_pusht.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_lewm_dense_reacher.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_lewm_dense_ogb_cube.yaml": [6, 12, 48, 96, 144, 192],
+            "mwm_lewm_dense_tworoom.yaml": [6, 12, 48, 96, 144, 192],
         }
         for name, levels in expected_levels.items():
             cfg = yaml.safe_load((ROOT / "configs" / "train" / name).read_text(encoding="utf-8"))
@@ -213,7 +279,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
             self.assertEqual(set(cfg["schedule"]), {"max_epochs"}, name)
             self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
-            if name.startswith(("mwm_scheduled_", "mwm_dense_")) or name in {
+            if name.startswith(("mwm_lewm_scheduled_", "mwm_lewm_dense_")) or name in {
                 "mwm_lewm_reacher_upstream.yaml",
                 "mwm_lewm_ogb_cube_upstream.yaml",
             }:
@@ -469,7 +535,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "proprio"])
 
     def test_paper_scheduled_tworoom_train_config_matches_upstream_lance_columns(self) -> None:
-        cfg = yaml.safe_load((ROOT / "configs" / "train" / "mwm_scheduled_tworoom.yaml").read_text(encoding="utf-8"))
+        cfg = yaml.safe_load((ROOT / "configs" / "train" / "mwm_lewm_scheduled_tworoom.yaml").read_text(encoding="utf-8"))
 
         self.assertEqual(cfg["data"]["path"], "data/upstream/tworoom.lance")
         self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "proprio"])
@@ -496,7 +562,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_gpu_runner_scripts_require_slurm_allocation(self) -> None:
         work_tokens = (
-            '"$PY" -m mwm.training.lewm',
+            '"$PY" -m mwm.training.stable_wm',
             '"$PY" -m mwm.benchmark.matrix',
             '"$PY" -m mwm.benchmark.verify',
             '"$PY" -m mwm.data.verify',
@@ -546,9 +612,9 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
         dense_runner = (ROOT / "scripts" / "slurm" / "run_mwm_train_dense_env.sh").read_text(encoding="utf-8")
         self.assertIn("reacher)", dense_runner)
-        self.assertIn("configs/train/mwm_dense_reacher.yaml", dense_runner)
+        self.assertIn("configs/train/mwm_lewm_dense_reacher.yaml", dense_runner)
         self.assertIn("ogb_cube|cube)", dense_runner)
-        self.assertIn("configs/train/mwm_dense_ogb_cube.yaml", dense_runner)
+        self.assertIn("configs/train/mwm_lewm_dense_ogb_cube.yaml", dense_runner)
         self.assertIn("{pusht|reacher|ogb_cube|tworoom}", dense_runner)
 
         for name in (
@@ -669,7 +735,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
     def test_desktop_entrypoints_accept_set_overrides(self) -> None:
         entrypoints = [
             ROOT / "mwm" / "data" / "collection.py",
-            ROOT / "mwm" / "training" / "lewm.py",
+            ROOT / "mwm" / "training" / "stable_wm.py",
             ROOT / "mwm" / "eval" / "runner.py",
             ROOT / "mwm" / "benchmark" / "matrix.py",
         ]
@@ -680,7 +746,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
 
     def test_mwm_clis_are_package_modules_without_root_wrappers(self) -> None:
         migrated = {
-            "train_" + "mwm.py": "mwm.training.lewm",
+            "train_" + "mwm.py": "mwm.training.stable_wm",
             "eval_" + "mwm.py": "mwm.eval.runner",
             "benchmark_" + "mwm.py": "mwm.benchmark.matrix",
             "verify_" + "mwm_benchmark.py": "mwm.benchmark.verify",
@@ -835,7 +901,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             "mwm.data.collection": ("config", "--set"),
             "mwm.upstream.lewm_checkpoints": ("config",),
             "mwm.upstream.lewm_data": ("--source-h5",),
-            "mwm.training.lewm": ("config", "--set"),
+            "mwm.training.stable_wm": ("config", "--set"),
             "mwm.eval.runner": ("config", "--set"),
             "mwm.benchmark.matrix": ("config", "--roles"),
             "mwm.data.verify": ("--paper-parity",),
@@ -894,7 +960,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
         runtime_files = [
             ROOT / "mwm" / "adapters" / "lewm.py",
             ROOT / "mwm" / "upstream" / "lewm_checkpoints.py",
-            ROOT / "mwm" / "training" / "lewm.py",
+            ROOT / "mwm" / "training" / "stable_wm.py",
         ]
         self.assertFalse((ROOT / "mwm" / "models" / "world_model.py").exists())
         forbidden = (

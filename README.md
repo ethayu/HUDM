@@ -2,7 +2,7 @@
 
 Matryoshka World Models (MWM) is a Stable-WM-compatible benchmark and evaluation repo for multi-fidelity world models.
 
-The review story is intentionally narrow: every evaluated checkpoint is loaded as a `MatryoshkaWorldModel`, datasets are Lance, and all benchmark roles run through the same scheduled CEM evaluator. Trainable Le-WM MWM keeps a shared Le-WM encoder/projector trunk and adds fresh per-`K` transition heads (`action_encoder`, `predictor`, `pred_proj`) trained with Le-WM loss semantics.
+The review story is intentionally narrow: every evaluated checkpoint is built through the Stable-WM adapter builder, datasets are Lance, and all benchmark roles run through the same scheduled CEM evaluator. Le-WM and PreJEPA/DINO-WM now have explicit MWM runtime classes instead of a single generic shell with family-specific strategy hooks.
 
 ## Quick Start
 
@@ -12,10 +12,10 @@ python -m mwm.data.collection configs/collect/mwm_tworoom.yaml
 python -m mwm.data.verify
 python -m mwm.upstream.lewm_checkpoints
 python -m mwm.upstream.lewm_data
-python -m mwm.training.lewm configs/train/mwm_lewm_pusht.yaml
-python -m mwm.training.lewm configs/train/mwm_lewm_tworoom.yaml
-python -m mwm.training.lewm configs/train/mwm_scheduled_pusht.yaml
-python -m mwm.training.lewm configs/train/mwm_scheduled_tworoom.yaml
+python -m mwm.training.stable_wm configs/train/mwm_lewm_pusht.yaml
+python -m mwm.training.stable_wm configs/train/mwm_lewm_tworoom.yaml
+python -m mwm.training.stable_wm configs/train/mwm_lewm_scheduled_pusht.yaml
+python -m mwm.training.stable_wm configs/train/mwm_lewm_scheduled_tworoom.yaml
 python -m mwm.eval.runner configs/eval/mwm_lewm_pusht.yaml
 python -m mwm.benchmark.matrix configs/benchmark/scheduled_pusht.yaml
 python -m mwm.benchmark.verify configs/benchmark/scheduled_pusht.yaml
@@ -77,18 +77,19 @@ Use `MWM_PYTHON=/path/to/python` if your Python is not named `python`.
 
 ## Architecture
 
-- `mwm.models.base_adaptive.MatryoshkaWorldModel` is the runtime model contract and owns the shared multi-level shell used by base adapters.
+- `mwm.models.common.MatryoshkaRuntimeModel` is the shared runtime marker; concrete family behavior lives in `mwm.models.lewm.LeWMMatryoshkaWorldModel` and `mwm.models.prejepa.PreJEPAMatryoshkaWorldModel`.
 - `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs,
-  registers the Le-WM adapter, then returns the normal `MatryoshkaWorldModel`.
+  registers the Le-WM adapter, then returns `LeWMMatryoshkaWorldModel`.
   `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
   multi-`K` training encodes once and aggregates requested prefix losses only.
+- `mwm.adapters.prejepa` derives transformer patch-backbone and extra-encoder components, then returns `PreJEPAMatryoshkaWorldModel`.
 - `mwm.checkpoint_io` reads and writes canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`;
   `mwm.checkpoint_contract` owns semantic config/metadata validation.
 - `mwm.planning.scheduled_cem` is the active evaluator/planner path.
 - `mwm.data.metadata`, `mwm.data.sampling`, `mwm.data.transforms`, and `mwm.data.manifest` own Lance dataset metadata,
   start/goal sampling, training transforms, and immutable eval manifests.
-- `docs/mwm_adapter_contract.md` is the checklist for implementing another
-  base adapter such as PreJEPA, DINO-WM, or PLDM.
+- `docs/mwm_adapter_contract.md` is the checklist for implementing or extending
+  Stable-WM base adapters such as Le-WM, PreJEPA/DINO-WM, or PLDM.
 
 ## Base-Adaptive MWM
 
@@ -96,12 +97,13 @@ MWM reads Stable-WM `config.json` files for architecture and never copies source
 weights for fair training. The Stable-WM config is the architecture source; the
 training recipe comes from the MWM YAML and is applied across matryoshka levels.
 Adapters declare top-level component groups, then configs choose which groups are
-shared or duplicated. Le-WM is implemented first: `encoder + projector` are the
-shared latent producer, while `action_encoder + predictor + pred_proj` are
-fresh per-`K` transition tails.
+shared or duplicated. Le-WM uses `encoder + projector` as the shared latent
+producer and fresh per-`K` transition tails; PreJEPA/DINO-WM uses a shared image
+patch backbone with per-`K` patch predictors and fixed extra encoders.
 
-Additional bases should be added as real adapters after inspecting their
-Stable-WM config/model. There are no placeholder runtime adapters.
+Additional bases should be added as real adapters and concrete runtime classes
+after inspecting their Stable-WM config/model. There are no placeholder runtime
+adapters.
 
 ## Benchmark Roles
 

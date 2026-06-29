@@ -8,7 +8,7 @@ tests, and reports where they affect the library boundary.
 The repo is now organized substantially better than the initial audit. The P1/P2
 issues from the organization review have been addressed:
 
-1. `MatryoshkaWorldModel` is the single canonical active runtime model.
+1. Runtime ownership is split into explicit family classes under `mwm.models.*`.
 2. `mwm.adapters.builder` no longer imports or returns the concrete model class.
 3. ViT checkpoint key remapping lives outside generic checkpoint I/O.
 4. Le-WM training transform construction lives in training code, not generic
@@ -25,20 +25,24 @@ consolidation.
 
 ### Resolved: Model Runtime Naming And Inheritance
 
-`mwm.models.base_adaptive.MatryoshkaWorldModel` is now the canonical runtime
-model class and inherits directly from `nn.Module`. `mwm.models.core` is a
+`mwm.models.common.MatryoshkaRuntimeModel` is the shared runtime marker, while
+family behavior lives in concrete model classes such as
+`mwm.models.lewm.LeWMMatryoshkaWorldModel` and
+`mwm.models.prejepa.PreJEPAMatryoshkaWorldModel`. `mwm.models.core` is a
 lightweight namespace instead of a second model class with overlapping meaning.
 
 Why this is better: there is no longer a split between an aspirational
 `MWMWorldModel` base and the concrete runtime that bypassed that base's
-initializer. The production path has one model name:
+initializer. The production paths now name the family runtime explicitly:
 
-`build_mwm_from_stable_config -> LeWMStableWMAdapter -> MatryoshkaWorldModel -> MWMWorldModelPolicy -> MWMScheduledCEMSolver`
+`build_mwm_from_stable_config -> LeWMStableWMAdapter -> LeWMMatryoshkaWorldModel -> MWMWorldModelPolicy -> MWMScheduledCEMSolver`
+
+`build_mwm_from_stable_config -> PreJEPAStableWMAdapter -> PreJEPAMatryoshkaWorldModel -> MWMWorldModelPolicy -> MWMScheduledCEMSolver`
 
 ### Resolved: Generic Adapter Builder Coupling
 
-`mwm.adapters.builder` now returns `nn.Module` and no longer imports
-`MatryoshkaWorldModel`. Concrete runtime construction remains adapter-owned.
+`mwm.adapters.builder` now returns `nn.Module` and no longer imports concrete
+runtime classes. Concrete runtime construction remains adapter-owned.
 
 Why this is better: the generic builder can remain the public construction API
 without leaking Le-WM's concrete runtime type into the adapter boundary.
@@ -54,8 +58,8 @@ model-family state-dict compatibility.
 
 ### Resolved: Data/Training Transform Boundary
 
-`build_lewm_base_adapter_dataset_transform` moved to
-`mwm.training.lewm_transforms`. Generic helpers such as `MWMTrainSampleTransform`,
+`build_stable_wm_adapter_dataset_transform` moved to
+`mwm.training.stable_wm_transforms`. Generic helpers such as `MWMTrainSampleTransform`,
 `ZScoreScaler`, and `column_normalizer` remain in `mwm.data.transforms`.
 
 Why this is better: generic data transforms no longer import Le-WM-specific
@@ -65,7 +69,7 @@ stable-pretraining assembly logic.
 
 The following private aliases were removed:
 
-- `mwm.training.lewm_config._as_container`
+- `mwm.training.stable_wm_config._as_container`
 - `mwm.benchmark.io._jsonable`
 - private underscore aliases in `mwm.eval.action_preprocessing`
 

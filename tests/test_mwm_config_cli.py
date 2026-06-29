@@ -48,7 +48,7 @@ class MWMConfigCLITests(unittest.TestCase):
             [
                 sys.executable,
                 "-m",
-                "mwm.training.lewm",
+                "mwm.training.stable_wm",
                 "missing.yaml",
                 "--export-from-lightning",
                 "missing.ckpt",

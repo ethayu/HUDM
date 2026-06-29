@@ -22,22 +22,23 @@ from mwm.checkpoint_io import save_world_checkpoint
 from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
-from mwm.models.base_adaptive import MatryoshkaWorldModel
+from mwm.models.common import MatryoshkaRuntimeModel
+from mwm.models.lewm import LeWMMatryoshkaWorldModel
 from mwm.models.decoders import ConvImageDecoder
 from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
 from mwm.models.transitions import TransitionPackage
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from mwm.training.lewm import main as train_mwm_main
-from mwm.training.lewm_callbacks import (
+from mwm.training.stable_wm import main as train_mwm_main
+from mwm.training.stable_wm_callbacks import (
     AllLevelPlateauEarlyStopping,
-    lewm_base_adapter_checkpoint_callback,
-    select_lewm_base_adapter_export_checkpoint,
+    stable_wm_adapter_checkpoint_callback,
+    select_stable_wm_adapter_export_checkpoint,
 )
-from mwm.training.lewm_export import load_lewm_base_adapter_lightning_state
-from mwm.training.lewm_model import build_trainable_model_from_base
-from mwm.training.lewm_runtime import (
+from mwm.training.stable_wm_export import load_stable_wm_adapter_lightning_state
+from mwm.training.stable_wm_model import build_trainable_stable_wm_adapter_model
+from mwm.training.stable_wm_runtime import (
     prepare_trainer_root,
-    resolve_lewm_base_adapter_total_steps,
+    resolve_stable_wm_adapter_total_steps,
     resolve_lightning_trainer_runtime,
 )
 
@@ -265,7 +266,7 @@ def _build_direct_lewm_reference(model_cfg: dict, cfg: Any) -> nn.Module:
     )
 
 
-def _base_adaptive_lewm(
+def _lewm_matryoshka_model(
     *,
     K: tuple[int, ...] | list[int],
     D: int = 8,
@@ -281,7 +282,7 @@ def _base_adaptive_lewm(
     predictor_mlp_dim: int = 16,
     predictor_dropout: float = 0.0,
     projector_hidden_dim: int = 16,
-) -> MatryoshkaWorldModel:
+) -> LeWMMatryoshkaWorldModel:
     return build_mwm_from_stable_config(
         family="lewm",
         source_config=_lewm_source_config(
@@ -407,7 +408,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertFalse(hasattr(core, "MWMWorldModel"))
 
     def test_matryoshka_world_model_is_direct_nn_module_runtime(self) -> None:
-        self.assertEqual(MatryoshkaWorldModel.__bases__, (nn.Module,))
+        self.assertEqual(LeWMMatryoshkaWorldModel.__bases__, (MatryoshkaRuntimeModel,))
 
     def test_world_model_provides_matryoshka_loss_and_regularizer_routing(self) -> None:
         losses = [torch.tensor(2.0), torch.tensor(6.0)]
@@ -476,13 +477,13 @@ class MWMCoreTests(unittest.TestCase):
             extra_dir = root / "checkpoint"
             extra_dir.mkdir()
             (extra_dir / "notes.txt").write_text("not canonical", encoding="utf-8")
-            model = _base_adaptive_lewm(K=(4,), D=4, action_dim=2)
+            model = _lewm_matryoshka_model(K=(4,), D=4, action_dim=2)
             with self.assertRaisesRegex(ValueError, "non-checkpoint files"):
                 save_world_checkpoint(model, extra_dir, metadata={"env_id": "swm/PushT-v1"})
 
     def test_single_fidelity_k_equals_d_uses_adapter_owned_lewm_loss(self) -> None:
-        model = _base_adaptive_lewm(K=(8,), D=8, action_dim=2)
-        self.assertIsInstance(model, MatryoshkaWorldModel)
+        model = _lewm_matryoshka_model(K=(8,), D=8, action_dim=2)
+        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
         self.assertEqual(model.K, [model.D])
         self.assertEqual(len(model.decoders), 1)
         self.assertEqual(len(model.transitions), 1)
@@ -498,7 +499,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertIn("loss", out)
 
     def test_lewm_matryoshka_head_scaling_and_k_may_omit_d(self) -> None:
-        model = _base_adaptive_lewm(
+        model = _lewm_matryoshka_model(
             K=(4, 8),
             D=8,
             action_dim=10,
@@ -524,7 +525,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertNotIn("pred_loss_l2", out)
 
     def test_lewm_sigreg_is_shared_once_by_default(self) -> None:
-        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         reg = CountingRegularizer()
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
@@ -535,7 +536,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(reg.shapes[0][-1], 8)
 
     def test_lewm_sigreg_can_be_per_level_when_explicit(self) -> None:
-        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         reg = CountingRegularizer()
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
@@ -545,7 +546,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual([shape[-1] for shape in reg.shapes], [4, 8])
 
     def test_reconstruction_trains_decoders_without_latent_gradients_by_default(self) -> None:
-        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
         out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.0)
@@ -559,7 +560,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertNotIn("recon_latent_loss", out)
 
     def test_reconstruction_latent_weight_shapes_encoder_latents(self) -> None:
-        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
         out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.25)
@@ -600,9 +601,9 @@ class MWMCoreTests(unittest.TestCase):
                 "normalize_imagenet": False,
             }
 
-            model = build_trainable_model_from_base(cfg, model_cfg)
+            model = build_trainable_stable_wm_adapter_model(cfg, model_cfg)
 
-            self.assertIsInstance(model, MatryoshkaWorldModel)
+            self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
             self.assertEqual(model.metadata["adapter_family"], "lewm")
             self.assertTrue(model.metadata["fresh_init"])
             self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
@@ -638,7 +639,7 @@ class MWMCoreTests(unittest.TestCase):
             }
 
             with self.assertRaisesRegex(ValueError, "configured D=8.*base latent dimension D=4"):
-                build_trainable_model_from_base(cfg, model_cfg)
+                build_trainable_stable_wm_adapter_model(cfg, model_cfg)
 
     def test_k_equals_d_lewm_init_forward_grad_and_step_match_direct_backend(self) -> None:
         cfg = OmegaConf.create(
@@ -797,13 +798,13 @@ class MWMCoreTests(unittest.TestCase):
         )
 
     def test_action_spec_distinguishes_base_and_block_dims(self) -> None:
-        model = _base_adaptive_lewm(K=(8,), D=8, action_dim=10, action_block=5)
+        model = _lewm_matryoshka_model(K=(8,), D=8, action_dim=10, action_block=5)
 
         self.assertEqual(model.action_dim, 10)
         self.assertEqual(model.metadata["action_spec"], {"dim": 10, "base_dim": 2, "block": 5})
 
     def test_rollout_ignores_raw_history_actions_for_blocked_lewm_heads(self) -> None:
-        model = MatryoshkaWorldModel(
+        model = LeWMMatryoshkaWorldModel(
             encoder=FakeLeWMEncoder(out_dim=4),
             projector=nn.Identity(),
             transitions=[
@@ -1076,15 +1077,15 @@ class MWMCoreTests(unittest.TestCase):
             trainer_root = prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
             self.assertTrue((trainer_root / "keep.ckpt").is_file())
 
-    def test_lewm_base_adapter_checkpoint_callback_can_save_within_large_epochs(self) -> None:
+    def test_stable_wm_adapter_checkpoint_callback_can_save_within_large_epochs(self) -> None:
         cfg = OmegaConf.create({"train": {"checkpoint_every_n_train_steps": 1000}})
-        callback = lewm_base_adapter_checkpoint_callback(cfg)
+        callback = stable_wm_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback._every_n_train_steps, 1000)
         self.assertEqual(callback._every_n_epochs, 0)
         self.assertTrue(callback.save_last)
 
-    def test_lewm_base_adapter_checkpoint_callback_can_monitor_validation_metric(self) -> None:
+    def test_stable_wm_adapter_checkpoint_callback_can_monitor_validation_metric(self) -> None:
         cfg = OmegaConf.create(
             {
                 "train": {
@@ -1095,24 +1096,24 @@ class MWMCoreTests(unittest.TestCase):
                 }
             }
         )
-        callback = lewm_base_adapter_checkpoint_callback(cfg)
+        callback = stable_wm_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback.monitor, "validate/pred_loss_epoch")
         self.assertEqual(callback.mode, "min")
         self.assertEqual(callback.save_top_k, 2)
         self.assertTrue(callback.save_last)
 
-    def test_select_lewm_base_adapter_export_checkpoint_prefers_best_when_requested(self) -> None:
+    def test_select_stable_wm_adapter_export_checkpoint_prefers_best_when_requested(self) -> None:
         cfg = OmegaConf.create({"train": {"export_checkpoint": "best"}})
         callback = SimpleNamespace(best_model_path="best.ckpt", last_model_path="last.ckpt")
 
-        self.assertEqual(select_lewm_base_adapter_export_checkpoint(callback, cfg), "best.ckpt")
+        self.assertEqual(select_stable_wm_adapter_export_checkpoint(callback, cfg), "best.ckpt")
 
-    def test_lewm_base_adapter_total_steps_can_decouple_lr_horizon_from_train_epochs(self) -> None:
+    def test_stable_wm_adapter_total_steps_can_decouple_lr_horizon_from_train_epochs(self) -> None:
         cfg = OmegaConf.create({"schedule": {"max_epochs": 80, "lr_max_epochs": 10}})
         loader = [object()] * 7
 
-        self.assertEqual(resolve_lewm_base_adapter_total_steps(cfg, loader), 70)
+        self.assertEqual(resolve_stable_wm_adapter_total_steps(cfg, loader), 70)
 
     def test_all_level_plateau_stop_waits_until_no_level_improves(self) -> None:
         callback = AllLevelPlateauEarlyStopping(
@@ -1201,7 +1202,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(runtime["accelerator"], "cpu")
         self.assertEqual(runtime["devices"], 1)
 
-    def test_lewm_base_adapter_lightning_state_loader_strips_model_prefix(self) -> None:
+    def test_stable_wm_adapter_lightning_state_loader_strips_model_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "last.ckpt"
             expected = nn.Linear(3, 2)
@@ -1217,7 +1218,7 @@ class MWMCoreTests(unittest.TestCase):
             )
 
             actual = nn.Linear(3, 2)
-            checkpoint = load_lewm_base_adapter_lightning_state(actual, path)
+            checkpoint = load_stable_wm_adapter_lightning_state(actual, path)
 
             self.assertEqual(checkpoint["epoch"], 7)
             self.assertTrue(torch.equal(actual.weight, expected.weight))
@@ -1368,7 +1369,7 @@ train:
         self.assertEqual(diagnostics["model_flop_accounting"], "dynamics_audit")
 
     def test_lewm_dynamic_rollout_scores_final_active_level(self) -> None:
-        model = _base_adaptive_lewm(K=(2, 4), D=4, action_dim=2, history_size=2)
+        model = _lewm_matryoshka_model(K=(2, 4), D=4, action_dim=2, history_size=2)
         infos = {
             "pixels": torch.zeros(1, 2, 2, 3, 8, 8),
             "goal": torch.zeros(1, 2, 2, 3, 8, 8),
@@ -1386,7 +1387,7 @@ train:
         self.assertEqual(model._last_cost_diagnostics["terminal_k"], 2)
 
     def test_lewm_dynamics_flop_audit_profiles_active_rollout(self) -> None:
-        model = _base_adaptive_lewm(K=(2, 4), D=4, action_dim=2, history_size=2)
+        model = _lewm_matryoshka_model(K=(2, 4), D=4, action_dim=2, history_size=2)
         infos = {
             "pixels": torch.zeros(1, 1, 2, 3, 8, 8),
             "goal": torch.zeros(1, 1, 2, 3, 8, 8),

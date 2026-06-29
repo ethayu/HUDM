@@ -321,7 +321,7 @@ class MWMArtifactTests(unittest.TestCase):
         self.assertEqual([pair.start_step for pair in pairs], [0, 1, 2])
         self.assertEqual([pair.goal_step for pair in pairs], [2, 3, 4])
 
-    def test_base_adaptive_checkpoint_metadata_persisted_from_model(self) -> None:
+    def test_stable_wm_checkpoint_metadata_persisted_from_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = build_mwm_from_stable_config(
                 family="lewm",
@@ -346,7 +346,7 @@ class MWMArtifactTests(unittest.TestCase):
             self.assertEqual(metadata["loss_scope"]["regularizers"], "shared_latent")
             self.assertIn("training_recipe", metadata)
 
-    def test_base_adaptive_checkpoint_contract_requires_metadata(self) -> None:
+    def test_stable_wm_checkpoint_contract_requires_metadata(self) -> None:
         policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
         config = {
             "target": STABLE_CONFIG_TARGET,
@@ -1141,10 +1141,10 @@ runs:
         validate_benchmark_role_checkpoint_contract(row, metadata, errors)
 
         self.assertTrue(any("Le-WM base-adapter backend" in error for error in errors), errors)
-        self.assertTrue(any("generic base-adaptive target" in error for error in errors), errors)
+        self.assertTrue(any("generic Stable-WM builder target" in error for error in errors), errors)
         self.assertTrue(any("corrected architecture version" in error for error in errors), errors)
 
-    def test_role_checkpoint_contract_accepts_base_adaptive_lewm_target(self) -> None:
+    def test_role_checkpoint_contract_accepts_lewm_matryoshka_model_target(self) -> None:
         rows = [
             {"role": "upstream_lewm_converted", "checkpoint_run_dir": "checkpoints_mwm/upstream"},
             {"role": "retrained_lewm_identity", "checkpoint_run_dir": "checkpoints_mwm/retrained"},

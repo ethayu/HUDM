@@ -7,10 +7,14 @@ compatibility behavior.
 ## Current Contract
 
 - Runtime construction goes through `mwm.adapters.builder.build_mwm_from_stable_config`.
-- `mwm.adapters.lewm.LeWMStableWMAdapter` is the only implemented base adapter.
-- Le-WM MWM shares the latent producer (`encoder`, `projector`) and duplicates
-  the non-encoder transition tail (`action_encoder`, `predictor`, `pred_proj`)
-  per configured `K`.
+- Implemented base adapters are `mwm.adapters.lewm.LeWMStableWMAdapter` and
+  `mwm.adapters.prejepa.PreJEPAStableWMAdapter`.
+- Le-WM MWM uses `mwm.models.lewm.LeWMMatryoshkaWorldModel`, sharing the latent
+  producer (`encoder`, `projector`) and duplicating the non-encoder transition
+  tail (`action_encoder`, `predictor`, `pred_proj`) per configured `K`.
+- PreJEPA/DINO-WM uses `mwm.models.prejepa.PreJEPAMatryoshkaWorldModel`, sharing
+  the image patch backbone and training per-level patch predictors with fixed
+  extra encoders.
 - The training recipe is inherited from the base and applied at every level;
   MWM only aggregates the per-level losses matryoshka-style.
 - `K=[D]` is an identity-parity check, not a special implementation path.

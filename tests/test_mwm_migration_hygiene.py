@@ -26,17 +26,20 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         for rel in (
             "mwm/models/core.py",
             "mwm/models/transitions.py",
-            "mwm/models/base_adaptive.py",
+            "mwm/models/common.py",
+            "mwm/models/lewm.py",
+            "mwm/models/prejepa.py",
             "mwm/models/objectives.py",
             "mwm/models/planning_costs.py",
-            "mwm/training/lewm_config.py",
-            "mwm/training/lewm_data.py",
-            "mwm/training/lewm_transforms.py",
-            "mwm/training/lewm_model.py",
-            "mwm/training/lewm_runtime.py",
-            "mwm/training/lewm_callbacks.py",
-            "mwm/training/lewm_lightning.py",
-            "mwm/training/lewm_export.py",
+            "mwm/diagnostics/flops.py",
+            "mwm/training/stable_wm_config.py",
+            "mwm/training/stable_wm_data.py",
+            "mwm/training/stable_wm_transforms.py",
+            "mwm/training/stable_wm_model.py",
+            "mwm/training/stable_wm_runtime.py",
+            "mwm/training/stable_wm_callbacks.py",
+            "mwm/training/stable_wm_lightning.py",
+            "mwm/training/stable_wm_export.py",
             "mwm/eval/validation.py",
             "mwm/eval/manifest.py",
             "mwm/eval/policy_builder.py",
@@ -116,7 +119,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         import mwm.models as models
         import mwm.models.core as core
         import mwm.models.losses as losses
-        from mwm.models.base_adaptive import MatryoshkaWorldModel
+        from mwm.models.lewm import LeWMMatryoshkaWorldModel
         from mwm.models.transitions import TransitionPackage
         from mwm.preprocessing.images import ImageNetPreprocess
 
@@ -126,18 +129,18 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         self.assertFalse(hasattr(core, "MWMWorldModel"))
         for module, name in (
             (mwm, "ImageNetPreprocess"),
-            (mwm, "MatryoshkaWorldModel"),
+            (mwm, "LeWMMatryoshkaWorldModel"),
             (mwm, "MWMWorldModel"),
             (mwm, "TransitionPackage"),
             (models, "ImageNetPreprocess"),
-            (models, "MatryoshkaWorldModel"),
+            (models, "LeWMMatryoshkaWorldModel"),
             (models, "MWMWorldModel"),
             (models, "TransitionPackage"),
         ):
             with self.subTest(module=module.__name__, name=name):
                 self.assertFalse(hasattr(module, name), name)
         self.assertIs(ImageNetPreprocess, importlib.import_module("mwm.preprocessing.images").ImageNetPreprocess)
-        self.assertIs(MatryoshkaWorldModel, importlib.import_module("mwm.models.base_adaptive").MatryoshkaWorldModel)
+        self.assertIs(LeWMMatryoshkaWorldModel, importlib.import_module("mwm.models.lewm").LeWMMatryoshkaWorldModel)
         self.assertIs(TransitionPackage, importlib.import_module("mwm.models.transitions").TransitionPackage)
         for name in ("latent_regularizer_loss", "matryoshka_base_loss", "weighted_level_mean"):
             with self.subTest(loss=name):
@@ -147,7 +150,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
 
     def test_builder_does_not_import_concrete_runtime_model(self) -> None:
         source = (ROOT / "mwm" / "adapters" / "builder.py").read_text(encoding="utf-8")
-        self.assertNotIn("MatryoshkaWorldModel", source)
+        self.assertNotIn("LeWMMatryoshkaWorldModel", source)
         self.assertNotIn("mwm.models.base_adaptive", source)
 
     def test_model_package_import_surface_is_light_and_explicit(self) -> None:
@@ -155,8 +158,8 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             "import importlib.util, sys\n"
             "import mwm\n"
             "import mwm.models\n"
-            "print(hasattr(mwm, 'MatryoshkaWorldModel'))\n"
-            "print(hasattr(mwm.models, 'MatryoshkaWorldModel'))\n"
+            "print(hasattr(mwm, 'LeWMMatryoshkaWorldModel'))\n"
+            "print(hasattr(mwm.models, 'LeWMMatryoshkaWorldModel'))\n"
             "print(importlib.util.find_spec('mwm.models.world_model') is None)\n"
             "print('torch' in sys.modules)\n"
             "print('mwm.models.base_adaptive' in sys.modules)\n"
@@ -259,7 +262,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             "render_" + "benchmark_review.py",
         )
         package_modules = (
-            "mwm/training/lewm.py",
+            "mwm/training/stable_wm.py",
             "mwm/eval/runner.py",
             "mwm/benchmark/matrix.py",
             "mwm/benchmark/verify.py",
@@ -276,7 +279,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
                 self.assertIn("if __name__ == \"__main__\"", source, rel)
 
     def test_training_lewm_is_cli_orchestration_not_private_helper_barrel(self) -> None:
-        source = (ROOT / "mwm/training/lewm.py").read_text(encoding="utf-8")
+        source = (ROOT / "mwm/training/stable_wm.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         directly_imported = {
             alias.asname or alias.name
@@ -295,26 +298,26 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             "_ZScoreScaler",
             "_as_container",
             "_base_dataset",
-            "_build_trainable_model_from_base",
+            "_build_trainable_stable_wm_adapter_model",
             "_coerce_lightning_devices",
             "_column_normalizer",
             "_dataset_metadata",
-            "_lewm_base_adapter_callbacks",
-            "_lewm_base_adapter_checkpoint_callback",
-            "_lewm_base_adapter_forward",
-            "_load_lewm_base_adapter_lightning_state",
-            "_load_lewm_base_adapter_train_valid_datasets",
+            "_stable_wm_adapter_callbacks",
+            "_stable_wm_adapter_checkpoint_callback",
+            "_stable_wm_adapter_forward",
+            "_load_stable_wm_adapter_lightning_state",
+            "_load_stable_wm_adapter_train_valid_datasets",
             "_prepare_trainer_root",
-            "_resolve_lewm_base_adapter_model_cfg",
-            "_resolve_lewm_base_adapter_total_steps",
+            "_resolve_stable_wm_adapter_model_cfg",
+            "_resolve_stable_wm_adapter_total_steps",
             "_resolve_lightning_trainer_runtime",
-            "_select_lewm_base_adapter_export_checkpoint",
+            "_select_stable_wm_adapter_export_checkpoint",
             "_stable_checkpoint_config_path",
         ):
             with self.subTest(symbol=symbol):
                 self.assertNotIn(symbol, directly_imported)
                 self.assertNotIn(symbol, exported)
-        module = importlib.import_module("mwm.training.lewm")
+        module = importlib.import_module("mwm.training.stable_wm")
         for symbol in directly_imported:
             if symbol.startswith("_") and symbol not in {"_main"}:
                 self.assertFalse(hasattr(module, symbol), symbol)
@@ -323,7 +326,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             for node in ast.walk(tree)
             if isinstance(node, ast.Attribute)
             and isinstance(node.value, ast.Name)
-            and node.value.id in {"lewm_data", "lewm_model", "lewm_lightning"}
+            and node.value.id in {"stable_wm_data", "stable_wm_model", "stable_wm_lightning"}
             and node.attr.startswith("_")
         ]
         self.assertEqual(private_module_calls, [])
@@ -343,13 +346,13 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         loading_source = (ROOT / "mwm/data/loading.py").read_text(encoding="utf-8")
         self.assertIn("def load_stable_wm_dataset_for_mwm", loading_source)
         transforms_source = (ROOT / "mwm/data/transforms.py").read_text(encoding="utf-8")
-        lewm_data_source = (ROOT / "mwm/training/lewm_data.py").read_text(encoding="utf-8")
+        stable_wm_data_source = (ROOT / "mwm/training/stable_wm_data.py").read_text(encoding="utf-8")
         self.assertNotIn("def load_stable_wm_dataset_for_mwm", transforms_source)
-        self.assertNotIn("build_lewm_base_adapter_dataset_transform", transforms_source)
+        self.assertNotIn("build_stable_wm_adapter_dataset_transform", transforms_source)
         self.assertNotIn("stable_pretraining_image_transforms", transforms_source)
         self.assertNotIn("_ZScoreScaler", transforms_source)
         self.assertNotIn("_column_normalizer", transforms_source)
-        self.assertIn("from mwm.training.lewm_transforms import build_lewm_base_adapter_dataset_transform", lewm_data_source)
+        self.assertIn("from mwm.training.stable_wm_transforms import build_stable_wm_adapter_dataset_transform", stable_wm_data_source)
 
     def test_swm_envs_do_not_expose_noop_restore_wrapper_hook(self) -> None:
         source = (ROOT / "mwm/swm/envs.py").read_text(encoding="utf-8")
@@ -422,9 +425,9 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         ):
             self.assertFalse(hasattr(action_preprocessing, name), name)
 
-        lewm_config = importlib.import_module("mwm.training.lewm_config")
-        self.assertNotIn("_as_container", lewm_config.__all__)
-        self.assertFalse(hasattr(lewm_config, "_as_container"))
+        stable_wm_config = importlib.import_module("mwm.training.stable_wm_config")
+        self.assertNotIn("_as_container", stable_wm_config.__all__)
+        self.assertFalse(hasattr(stable_wm_config, "_as_container"))
 
         benchmark_io = importlib.import_module("mwm.benchmark.io")
         self.assertFalse(hasattr(benchmark_io, "_jsonable"))
@@ -560,7 +563,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
         docs = (ROOT / "docs/mwm_adapter_contract.md").read_text(encoding="utf-8")
         self.assertNotIn("mwm.models.world_model", docs)
         self.assertNotIn("compatibility facade", docs)
-        self.assertIn("mwm.models.base_adaptive.MatryoshkaWorldModel", docs)
+        self.assertIn("mwm.models.lewm.LeWMMatryoshkaWorldModel", docs)
         self.assertNotIn("mwm.models.core.MWMWorldModel", docs)
 
 

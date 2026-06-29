@@ -54,12 +54,12 @@ class MWMDataBoundaryTests(unittest.TestCase):
     def test_transform_helpers_have_canonical_module(self) -> None:
         from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
         from mwm.preprocessing.images import stable_pretraining_image_transforms
-        from mwm.training.lewm_transforms import build_lewm_base_adapter_dataset_transform
+        from mwm.training.stable_wm_transforms import build_stable_wm_adapter_dataset_transform
 
         self.assertEqual(MWMTrainSampleTransform.__name__, "MWMTrainSampleTransform")
         self.assertEqual(ZScoreScaler.__name__, "ZScoreScaler")
         self.assertTrue(callable(stable_pretraining_image_transforms))
-        self.assertTrue(callable(build_lewm_base_adapter_dataset_transform))
+        self.assertTrue(callable(build_stable_wm_adapter_dataset_transform))
 
     def test_image_preprocessing_implementation_lives_in_preprocessing_package(self) -> None:
         eval_policy = (ROOT / "mwm" / "eval" / "policy.py").read_text(encoding="utf-8")

@@ -12,6 +12,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `README.md`: User-facing overview, quick start, architecture, benchmark roles, and local/Slurm workflow notes.
 - `REVIEW_GUIDE.md`: Reviewer contract: current expected runtime surface, removed legacy APIs, and validation commands.
 - `LIBRARY_FILE_REVIEW.md`: This file; a file-by-file orientation map for reviewing the current library surface.
+- `REPO_ORGANIZATION_CRITIQUE.md`: Organization audit summarizing resolved architectural cleanup and remaining low-priority repo-structure concerns.
 - `requirements.txt`: Python dependency list, including pinned `stable-worldmodel[env]==0.1.0`.
 
 ## `mwm` Package
@@ -24,27 +25,36 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/fidelity.py`: Fidelity scheduler and decision objects for fixed, linear-CEM, and table-driven MWM planning.
 - `mwm/checkpoint_contract.py`: Semantic validator for canonical MWM checkpoint configs/metadata, including levels, action specs, component policy, and adapter family.
 - `mwm/checkpoint_io.py`: Reads, writes, validates, instantiates, and loads canonical checkpoint directories containing `config.json`, `weights.pt`, and `world_metadata.json`.
+- `mwm/checkpoint_keymaps.py`: Architecture-specific ViT state-dict key remapping between Hugging Face encoder layouts and custom Le-WM encoder layouts.
 
 ### Adapters
 
 - `mwm/adapters/__init__.py`: Public adapter API barrel; imports the Le-WM adapter for registration.
 - `mwm/adapters/base.py`: Adapter protocol plus `ComponentGroup`, `ComponentPolicy`, `StableWMBaseSpec`, and policy validation.
 - `mwm/adapters/builder.py`: Generic public builder `build_mwm_from_stable_config`; detects family, resolves adapter spec, builds model, and records importable config.
-- `mwm/adapters/constants.py`: Shared adapter architecture version constant for Le-WM base-adaptive checkpoints.
-- `mwm/adapters/lewm.py`: Only concrete adapter; parses Stable-WM Le-WM config, shares encoder/projector, creates per-K transition tails, scales head dimensions, validates action dims, and registers itself.
+- `mwm/adapters/constants.py`: Shared adapter architecture version constants for Le-WM and PreJEPA/DINO Stable-WM adapter checkpoints.
+- `mwm/adapters/lewm.py`: Concrete Le-WM adapter; parses Stable-WM Le-WM config, shares encoder/projector, creates per-K transition tails, scales head dimensions, validates action dims, and registers itself.
+- `mwm/adapters/prejepa.py`: Concrete PreJEPA/DINO-WM adapter; validates transformer patch-backbone configs, fixes extra encoders, creates per-K patch predictors, scales predictor widths, and registers itself.
 - `mwm/adapters/registry.py`: Adapter registry and target-to-family detection for Le-WM, PreJEPA, and PLDM family names.
 - `mwm/adapters/stable_config.py`: Stable-WM `config.json` loading, root target extraction, and config file SHA hashing.
 
 ### Models
 
-- `mwm/models/__init__.py`: Direct package convenience exports imported from canonical model, loss, transition, and preprocessing owners.
+- `mwm/models/__init__.py`: Empty model namespace package that keeps concrete APIs owned by their modules.
 - `mwm/models/core.py`: Lightweight model-core namespace documenting that concrete runtime behavior lives in owner modules.
-- `mwm/models/base_adaptive.py`: Canonical active `MatryoshkaWorldModel`; shared image encoder/projector, per-level transition packages, training loss, fixed-level rollout, and planner cost.
+- `mwm/models/common.py`: Shared `MatryoshkaRuntimeModel` marker and common runtime-state initialization conventions.
+- `mwm/models/lewm.py`: Le-WM concrete MWM runtime; shared image encoder/projector, per-level transition packages, training loss, fixed-level rollout, and planner cost.
 - `mwm/models/transitions.py`: `TransitionPackage(action_encoder, predictor, pred_proj)` wrapper for per-level latent prediction.
 - `mwm/models/decoders.py`: Per-level convolutional image decoder used for reconstruction losses and latent-prefix visualization from each configured `K`.
 - `mwm/models/losses.py`: Level-weighted aggregation, latent regularizer routing, and matryoshka base-loss composition.
 - `mwm/models/objectives.py`: Le-WM-style MWM training objective over encoded latents and per-level prefix predictions.
-- `mwm/models/planning_costs.py`: Helpers that enforce fixed-level rollout decisions for the current base-adaptive evaluator.
+- `mwm/models/planning_costs.py`: Helpers that enforce fixed-level rollout decisions for Stable-WM adapter evaluators.
+- `mwm/models/prejepa.py`: PreJEPA/DINO-WM concrete MWM runtime for patch-latent encoding, fixed extra embeddings, adapter-owned training loss, scheduled rollout, and terminal-level planning costs.
+
+### Diagnostics
+
+- `mwm/diagnostics/__init__.py`: Empty diagnostics package marker.
+- `mwm/diagnostics/flops.py`: FLOP-accounting mode normalization and optional Torch dynamics-call profiling.
 
 ### Data
 
@@ -64,6 +74,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/upstream/__init__.py`: Upstream package marker.
 - `mwm/upstream/lewm_checkpoints.py`: Converts trusted upstream Le-WM checkpoints into canonical MWM identity-parity checkpoints by building an MWM shell and copying upstream weights.
 - `mwm/upstream/lewm_data.py`: Verifies or converts upstream Lance datasets and writes paper-parity metadata sidecars for PushT, Reacher, OGBench Cube, and TwoRoom.
+- `mwm/upstream/paper_parity.py`: Shared registry for paper-parity dataset names, env IDs, restore specs, action dimensions, source artifacts, and metadata rendering.
 - `mwm/upstream/converters/__init__.py`: Upstream converter package marker.
 - `mwm/upstream/converters/reacher.py`: Converts Reacher HDF5 data into Lance format and writes MWM metadata used by paper-parity workflows.
 - `mwm/upstream/converters/ogb_cube.py`: Converts OGBench Cube HDF5 data into Lance format with privileged state columns and metadata.
@@ -113,14 +124,15 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 ### Training
 
 - `mwm/training/__init__.py`: Training package marker.
-- `mwm/training/lewm.py`: Training CLI orchestration: load config, seed, build run dir, prepare data/model, run Lightning, save canonical checkpoint, or dispatch export mode.
-- `mwm/training/lewm_config.py`: Training defaults, run-directory creation, and OmegaConf-to-container conversion.
-- `mwm/training/lewm_data.py`: Lance dataset loading/splitting, transform installation, restore validation, model config resolution, dataset metadata, and checkpoint metadata preparation.
-- `mwm/training/lewm_model.py`: Resolves model dimensions from dataset/base config, locates Stable-WM cached config, builds trainable MWM from base, and merges model metadata.
-- `mwm/training/lewm_lightning.py`: Stable-pretraining/Lightning training loop, DataLoaders, optimizer/scheduler config, callbacks, module forward, selected checkpoint reload, and train-info output.
-- `mwm/training/lewm_callbacks.py`: ModelCheckpoint builder, all-level plateau early stopping, callback assembly, and export checkpoint selection policy.
-- `mwm/training/lewm_export.py`: Loads Lightning `model.*` state into MWM and exports a canonical checkpoint without retraining.
-- `mwm/training/lewm_runtime.py`: Device/strategy resolution, trainer-root cleanup, and total LR scheduler step calculation.
+- `mwm/training/stable_wm.py`: Training CLI orchestration: load config, seed, build run dir, prepare data/model, run Lightning, save canonical checkpoint, or dispatch export mode.
+- `mwm/training/stable_wm_config.py`: Training defaults, run-directory creation, and OmegaConf-to-container conversion.
+- `mwm/training/stable_wm_data.py`: Lance dataset loading/splitting, transform installation, restore validation, model config resolution, dataset metadata, and checkpoint metadata preparation.
+- `mwm/training/stable_wm_model.py`: Resolves model dimensions from dataset/base config, locates Stable-WM cached config, builds trainable MWM from base, and merges model metadata.
+- `mwm/training/stable_wm_lightning.py`: Stable-pretraining/Lightning training loop, DataLoaders, optimizer/scheduler config, callbacks, module forward, selected checkpoint reload, and train-info output.
+- `mwm/training/stable_wm_callbacks.py`: ModelCheckpoint builder, all-level plateau early stopping, callback assembly, and export checkpoint selection policy.
+- `mwm/training/stable_wm_export.py`: Loads Lightning `model.*` state into MWM and exports a canonical checkpoint without retraining.
+- `mwm/training/stable_wm_runtime.py`: Device/strategy resolution, trainer-root cleanup, and total LR scheduler step calculation.
+- `mwm/training/stable_wm_transforms.py`: Le-WM-specific stable-pretraining transform builder that applies image transforms and fitted column normalizers for loaded dataset keys.
 
 ## Config Files
 
@@ -136,10 +148,11 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `configs/local/collect_pusht_smoke.yaml`: Tiny local PushT collection smoke config.
 - `configs/local/collect_reacher_smoke.yaml`: Tiny local Reacher qpos-match collection smoke config with eager Lance writing.
 - `configs/local/eval_pusht_smoke.yaml`: CPU-safe two-episode PushT eval smoke config.
+- `configs/local/eval_pusht_all_axis_fidelity_smoke.yaml`: CPU-safe PushT eval smoke config that exercises all scheduler axes for MPC, CEM, and rollout fidelity.
 - `configs/local/benchmark_pusht_smoke.yaml`: One-role local benchmark wrapper around the PushT smoke eval config.
-- `configs/local/train_ogb_cube_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 OGBench Cube identity model.
-- `configs/local/train_pusht_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 PushT identity model.
-- `configs/local/train_reacher_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 Reacher identity model.
+- `configs/local/train_lewm_ogb_cube_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 OGBench Cube identity model.
+- `configs/local/train_lewm_pusht_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 PushT identity model.
+- `configs/local/train_lewm_reacher_cpu_smoke.yaml`: Opt-in one-epoch CPU training smoke for a single K=192 Reacher identity model.
 - `configs/manifest/ogb_cube_paper_seed42.yaml`: Named manifest location for OGBench Cube paper seed 42.
 - `configs/manifest/pusht_paper_seed42.yaml`: Named manifest location for PushT paper seed 42.
 - `configs/manifest/reacher_paper_seed42.yaml`: Named manifest location for Reacher paper seed 42.
@@ -150,12 +163,12 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `configs/train/mwm_lewm_pusht_upstream.yaml`: PushT identity retraining on upstream paper-parity data.
 - `configs/train/mwm_lewm_reacher_upstream.yaml`: Reacher identity retraining on upstream paper-parity data with qpos-match restore metadata.
 - `configs/train/mwm_lewm_tworoom_upstream.yaml`: TwoRoom identity retraining on upstream paper-parity data.
-- `configs/train/mwm_scheduled_pusht.yaml`: PushT scheduled MWM training with K=[48,96,144].
-- `configs/train/mwm_scheduled_tworoom.yaml`: TwoRoom scheduled MWM training with K=[48,96,144].
-- `configs/train/mwm_dense_ogb_cube.yaml`: OGBench Cube dense-level MWM training with K=[6,12,48,96,144,192].
-- `configs/train/mwm_dense_pusht.yaml`: PushT dense-level MWM training with K=[6,12,48,96,144,192].
-- `configs/train/mwm_dense_reacher.yaml`: Reacher dense-level MWM training with K=[6,12,48,96,144,192].
-- `configs/train/mwm_dense_tworoom.yaml`: TwoRoom dense-level MWM training with K=[6,12,48,96,144,192].
+- `configs/train/mwm_lewm_scheduled_pusht.yaml`: PushT scheduled MWM training with K=[48,96,144].
+- `configs/train/mwm_lewm_scheduled_tworoom.yaml`: TwoRoom scheduled MWM training with K=[48,96,144].
+- `configs/train/mwm_lewm_dense_ogb_cube.yaml`: OGBench Cube dense-level MWM training with K=[6,12,48,96,144,192].
+- `configs/train/mwm_lewm_dense_pusht.yaml`: PushT dense-level MWM training with K=[6,12,48,96,144,192].
+- `configs/train/mwm_lewm_dense_reacher.yaml`: Reacher dense-level MWM training with K=[6,12,48,96,144,192].
+- `configs/train/mwm_lewm_dense_tworoom.yaml`: TwoRoom dense-level MWM training with K=[6,12,48,96,144,192].
 - `configs/benchmark/paper_parity_ogb_cube.yaml`: OGBench Cube paper target benchmark comparing converted upstream and retrained identity checkpoints.
 - `configs/benchmark/paper_parity_pusht.yaml`: PushT paper target benchmark comparing converted upstream and retrained identity checkpoints.
 - `configs/benchmark/paper_parity_reacher.yaml`: Reacher identity/parity benchmark comparing converted upstream and retrained identity checkpoints.
@@ -174,10 +187,10 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `configs/research/identity_delta_tworoom_benchmark.yaml`: TwoRoom seed-sweep benchmark comparing upstream and retrained identity roles.
 - `configs/research/reacher_identity_delta/reacher_eval.yaml`: Artifact-root-parametric Reacher qpos-match eval config for the identity-vs-upstream investigation.
 - `configs/research/reacher_identity_delta/reacher_benchmark_seed42.yaml`: Reacher seed-42 benchmark comparing upstream and retrained identity roles for the identity-delta report.
-- `configs/research/train_mwm_dense_pusht_highk_weighted.yaml`: Research PushT dense training with high-K-weighted level losses into dense debug outputs.
-- `configs/research/train_mwm_dense_tworoom_highk_weighted.yaml`: Research TwoRoom dense training with high-K-weighted level losses into dense debug outputs.
-- `configs/research/train_mwm_dense_pusht_highk_weighted_converge.yaml`: PushT high-K weighted dense training with convergence early stopping and best-checkpoint export.
-- `configs/research/train_mwm_dense_tworoom_highk_weighted_converge.yaml`: TwoRoom high-K weighted dense training with convergence early stopping and best-checkpoint export.
+- `configs/research/train_mwm_lewm_dense_pusht_highk_weighted.yaml`: Research PushT dense training with high-K-weighted level losses into dense debug outputs.
+- `configs/research/train_mwm_lewm_dense_tworoom_highk_weighted.yaml`: Research TwoRoom dense training with high-K-weighted level losses into dense debug outputs.
+- `configs/research/train_mwm_lewm_dense_pusht_highk_weighted_converge.yaml`: PushT high-K weighted dense training with convergence early stopping and best-checkpoint export.
+- `configs/research/train_mwm_lewm_dense_tworoom_highk_weighted_converge.yaml`: TwoRoom high-K weighted dense training with convergence early stopping and best-checkpoint export.
 
 ## Scripts
 
@@ -229,7 +242,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 ## Docs And Reports
 
 - `docs/mwm_adapter_contract.md`: Contract for implementing completed Stable-WM base adapters and keeping generic MWM runtime semantics centralized.
-- `docs/superpowers/specs/2026-05-28-base-adaptive-mwm-design.md`: Design spec for the base-adaptive MWM framework.
+- `docs/superpowers/specs/2026-05-28-base-adaptive-mwm-design.md`: Archival design spec for the earlier base-adaptive MWM framework.
 - `docs/superpowers/specs/2026-05-30-dense-mwm-performance-debug.md`: Research spec for dense MWM performance investigation.
 - `docs/superpowers/specs/2026-05-30-identity-upstream-delta-research.md`: Research spec for identity-vs-upstream delta investigation.
 - `docs/superpowers/plans/2026-05-30-local-desktop-workflow.md`: Implementation plan for local desktop smoke workflow support.
@@ -269,9 +282,9 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 
 ## Quick Review Notes
 
-- The library's current public runtime path is `build_mwm_from_stable_config -> LeWMStableWMAdapter -> MatryoshkaWorldModel -> MWMWorldModelPolicy -> MWMScheduledCEMSolver`.
-- The single active adapter is Le-WM. PreJEPA/PLDM are recognized as families by name, but no runtime adapter is implemented for them.
+- The library's current public runtime path is `build_mwm_from_stable_config -> family adapter -> family Matryoshka runtime -> MWMWorldModelPolicy -> MWMScheduledCEMSolver`.
+- Active concrete adapters are Le-WM and PreJEPA/DINO-WM. PLDM is recognized as a family by name but has no implemented runtime adapter here.
 - Canonical checkpoints are deliberately strict: exactly `config.json`, `weights.pt`, and `world_metadata.json`.
 - Eval and training are Lance-only; HDF5 and legacy source-object checkpoint paths are intentionally absent.
-- Current scheduled planning can choose different base levels across CEM iterations, but `MatryoshkaWorldModel` currently enforces fixed-level rollouts within each plan.
+- Current scheduled planning can choose different base levels across CEM iterations, while family runtimes own the actual scheduled rollout semantics.
 - This review describes tracked source files. Generated datasets, checkpoints, rollouts, logs, caches, and nested worktrees are intentionally out of scope.

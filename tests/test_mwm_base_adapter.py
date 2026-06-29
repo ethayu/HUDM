@@ -15,7 +15,8 @@ from mwm.adapters.lewm import LeWMStableWMAdapter
 from mwm.adapters.registry import family_for_target
 from mwm.adapters.stable_config import load_stable_wm_config, root_target, stable_config_sha256
 from mwm.checkpoint_io import load_world_model_from_checkpoint, save_world_checkpoint, validate_checkpoint_directory
-from mwm.models.base_adaptive import MatryoshkaWorldModel
+from mwm.models.lewm import LeWMMatryoshkaWorldModel
+from mwm.models.prejepa import PreJEPAMatryoshkaWorldModel
 
 
 class FakeDINOBackbone(nn.Module):
@@ -171,7 +172,7 @@ class ConfigResolverTests(unittest.TestCase):
 
 
 class LeWMStableConfigTests(unittest.TestCase):
-    def _lewm_config(self) -> dict:
+    def _stable_wm_config(self) -> dict:
         return {
             "_target_": "stable_worldmodel.wm.lewm.LeWM",
             "encoder": {"_target_": "tests.test_mwm_core.FakeLeWMEncoder", "out_dim": 4},
@@ -195,7 +196,7 @@ class LeWMStableConfigTests(unittest.TestCase):
     def test_generic_builder_dispatches_lewm_adapter_and_exports_generic_target(self) -> None:
         model = build_mwm_from_stable_config(
             family="lewm",
-            source_config=self._lewm_config(),
+            source_config=self._stable_wm_config(),
             source_config_sha256="abc",
             training_recipe={"history_size": 2, "num_preds": 1, "loss": {"sigreg_weight": 0.0}},
             K=(4,),
@@ -205,7 +206,7 @@ class LeWMStableConfigTests(unittest.TestCase):
             normalize_imagenet=False,
         )
 
-        self.assertIsInstance(model, MatryoshkaWorldModel)
+        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
         self.assertEqual(model.metadata["adapter_family"], "lewm")
         self.assertTrue(model.metadata["fresh_init"])
         self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
@@ -227,7 +228,7 @@ class LeWMStableConfigTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "shared latent producer"):
             adapter.resolve_spec(
-                source_config=self._lewm_config(),
+                source_config=self._stable_wm_config(),
                 source_config_sha256="abc",
                 training_recipe={},
                 levels=(4,),
@@ -239,7 +240,7 @@ class LeWMStableConfigTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "only supports"):
             adapter.resolve_spec(
-                source_config=self._lewm_config(),
+                source_config=self._stable_wm_config(),
                 source_config_sha256="abc",
                 training_recipe={},
                 levels=(2, 4),
@@ -248,7 +249,7 @@ class LeWMStableConfigTests(unittest.TestCase):
 
     def test_resolve_spec_requires_base_latent_dimension_not_level_fallback(self) -> None:
         adapter = LeWMStableWMAdapter()
-        source_config = self._lewm_config()
+        source_config = self._stable_wm_config()
         source_config["predictor"].pop("input_dim")
         source_config["predictor"].pop("output_dim")
 
@@ -262,7 +263,7 @@ class LeWMStableConfigTests(unittest.TestCase):
             )
 
     def test_build_rejects_runtime_action_dim_mismatch(self) -> None:
-        bad_config = self._lewm_config()
+        bad_config = self._stable_wm_config()
         bad_config["action_encoder"] = {
             "_target_": "tests.test_mwm_core.FakeLeWMActionEncoder",
             "action_dim": 3,
@@ -285,7 +286,7 @@ class LeWMStableConfigTests(unittest.TestCase):
     def test_config_driven_transition_widths_scale_per_level(self) -> None:
         model = build_mwm_from_stable_config(
             family="lewm",
-            source_config=self._lewm_config(),
+            source_config=self._stable_wm_config(),
             source_config_sha256="abc",
             training_recipe={},
             K=(2, 4),
@@ -307,7 +308,7 @@ class LeWMStableConfigTests(unittest.TestCase):
     def test_k_equals_d_preserves_base_internal_widths_and_top_level_recipe_shape(self) -> None:
         model = build_mwm_from_stable_config(
             family="lewm",
-            source_config=self._lewm_config(),
+            source_config=self._stable_wm_config(),
             source_config_sha256="abc",
             training_recipe={"history_size": 5, "num_preds": 2},
             K=(4,),
@@ -377,7 +378,7 @@ class PreJEPAStableConfigTests(unittest.TestCase):
             normalize_imagenet=False,
         )
 
-        self.assertIsInstance(model, MatryoshkaWorldModel)
+        self.assertIsInstance(model, PreJEPAMatryoshkaWorldModel)
         self.assertEqual(model.metadata["adapter_family"], "prejepa")
         self.assertEqual(model.mwm_config["kwargs"]["family"], "prejepa")
         self.assertEqual(model.D, 6)
