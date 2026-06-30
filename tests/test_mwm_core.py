@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import random
 import tempfile
@@ -31,6 +33,8 @@ from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
 from mwm.training.stable_wm import main as train_mwm_main
 from mwm.training.stable_wm_callbacks import (
     AllLevelPlateauEarlyStopping,
+    TrainingHealthSummary,
+    stable_wm_adapter_callbacks,
     stable_wm_adapter_checkpoint_callback,
     select_stable_wm_adapter_export_checkpoint,
 )
@@ -1103,6 +1107,19 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(callback.save_top_k, 2)
         self.assertTrue(callback.save_last)
 
+    def test_stable_wm_adapter_callbacks_include_health_summary_by_default(self) -> None:
+        cfg = OmegaConf.create(
+            {
+                "train": {"checkpoint_every_n_train_steps": 0},
+                "model": {"K": [6, 12, 192]},
+                "schedule": {},
+            }
+        )
+
+        callbacks = stable_wm_adapter_callbacks(cfg)
+
+        self.assertTrue(any(isinstance(callback, TrainingHealthSummary) for callback in callbacks))
+
     def test_select_stable_wm_adapter_export_checkpoint_prefers_best_when_requested(self) -> None:
         cfg = OmegaConf.create({"train": {"export_checkpoint": "best"}})
         callback = SimpleNamespace(best_model_path="best.ckpt", last_model_path="last.ckpt")
@@ -1158,6 +1175,43 @@ class MWMCoreTests(unittest.TestCase):
         }
         callback.on_validation_epoch_end(trainer, None)
         self.assertTrue(trainer.should_stop)
+
+    def test_training_health_summary_prints_validation_metrics_with_best_marker(self) -> None:
+        callback = TrainingHealthSummary(levels=[6, 12, 192])
+        trainer = SimpleNamespace(
+            callback_metrics={
+                "validate/rollout_loss": torch.tensor(0.1191),
+                "validate/pred_loss": torch.tensor(0.1852),
+                "validate/pred_loss_l0": torch.tensor(0.0163),
+                "validate/pred_loss_l2": torch.tensor(0.5398),
+                "validate/recon_loss": torch.tensor(0.041),
+            },
+            current_epoch=0,
+            sanity_checking=False,
+        )
+
+        first_buffer = io.StringIO()
+        with contextlib.redirect_stdout(first_buffer):
+            callback.on_validation_epoch_end(trainer, None)
+        first_line = first_buffer.getvalue()
+
+        self.assertIn("[mwm-health]", first_line)
+        self.assertIn("epoch=0", first_line)
+        self.assertIn("best=true", first_line)
+        self.assertIn("validate/rollout_loss=0.1191", first_line)
+        self.assertIn("validate/pred_loss_l0(K=6)=0.0163", first_line)
+        self.assertIn("validate/pred_loss_l2(K=192)=0.5398", first_line)
+
+        trainer.current_epoch = 1
+        trainer.callback_metrics = {
+            "validate/rollout_loss": torch.tensor(0.1546),
+            "validate/pred_loss_l0": torch.tensor(0.0089),
+        }
+        second_buffer = io.StringIO()
+        with contextlib.redirect_stdout(second_buffer):
+            callback.on_validation_epoch_end(trainer, None)
+
+        self.assertIn("best=false", second_buffer.getvalue())
 
     def test_lightning_runtime_defaults_to_single_gpu_when_cuda_available(self) -> None:
         cfg = OmegaConf.create({"train": {"no_cuda": False}})
