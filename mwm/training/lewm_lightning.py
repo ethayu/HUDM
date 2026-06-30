@@ -7,6 +7,7 @@ import lightning as pl
 import torch
 from lightning.fabric.plugins.environments import SLURMEnvironment
 from lightning.pytorch.callbacks import ModelCheckpoint
+from lightning.pytorch.loggers import CSVLogger
 from torch.utils.data import DataLoader
 
 from mwm.data.module import PrebuiltLoaderDataModule
@@ -94,7 +95,7 @@ def run_lewm_base_adapter_training(
         limit_val_batches=cfg.train.get("limit_val_batches", 1.0),
         callbacks=callbacks,
         num_sanity_val_steps=1,
-        logger=False,
+        logger=CSVLogger(save_dir=str(trainer_root), name="csv_logs"),
         enable_checkpointing=True,
         enable_progress_bar=True,
         plugins=[SLURMEnvironment(auto_requeue=bool(cfg.train.get("slurm_auto_requeue", False)))]
