@@ -7,6 +7,15 @@ from typing import Any
 import numpy as np
 
 from mwm.benchmark.analysis import env_label, float_metric, mean_metric, paired_rows, role_label, sorted_rows
+from mwm.benchmark.plot_contract import (
+    EFFICIENCY_RATIOS_PLOT,
+    PAIRED_SUCCESS_DELTA_PLOT,
+    SCHEDULE_LEVEL_USAGE_PLOT,
+    SCHEDULE_USAGE_BY_ROLE_PLOT,
+    SUCCESS_BY_ENV_ROLE_PLOT,
+    SUCCESS_VS_COMPUTE_PLOT,
+    SUCCESS_VS_WALL_TIME_PLOT,
+)
 
 
 def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> list[str]:
@@ -62,8 +71,8 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
         ax.grid(True, alpha=0.3)
         _save(fig, name)
 
-    _scatter("bits_used_total", "success_rate", "success_vs_compute.png", "latent work bits")
-    _scatter("wall_time_sec", "success_rate", "success_vs_wall_time.png", "wall time (sec)")
+    _scatter("bits_used_total", "success_rate", SUCCESS_VS_COMPUTE_PLOT, "latent work bits")
+    _scatter("wall_time_sec", "success_rate", SUCCESS_VS_WALL_TIME_PLOT, "wall time (sec)")
 
     envs = _envs()
     roles = _roles()
@@ -96,7 +105,7 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
         ax.set_title("Mean success by environment and role")
         ax.legend(loc="best", fontsize=8)
         ax.grid(True, axis="y", alpha=0.3)
-        _save(fig, "success_by_env_role.png")
+        _save(fig, SUCCESS_BY_ENV_ROLE_PLOT)
 
     pairs = paired_rows(rows)
     if pairs:
@@ -117,7 +126,7 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
         ax.set_ylabel("comparison - upstream success (percentage points)")
         ax.set_title("Paired success delta by seed and role")
         ax.grid(True, axis="y", alpha=0.3)
-        _save(fig, "paired_success_delta.png")
+        _save(fig, PAIRED_SUCCESS_DELTA_PLOT)
 
         ratio_labels = list(labels)
         wall = [float_metric(pair["wall_ratio"], float("nan")) for pair in pairs]
@@ -134,7 +143,7 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
         ax.set_title("Efficiency ratios by paired seed and role")
         ax.legend(loc="best", fontsize=8)
         ax.grid(True, axis="y", alpha=0.3)
-        _save(fig, "efficiency_ratios.png")
+        _save(fig, EFFICIENCY_RATIOS_PLOT)
 
     level_totals: dict[str, int] = {}
     for row in rows:
@@ -154,7 +163,7 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
         ax.set_xlabel("base fidelity level")
         ax.set_ylabel("CEM cost calls")
         ax.grid(True, axis="y", alpha=0.3)
-        _save(fig, "schedule_level_usage.png")
+        _save(fig, SCHEDULE_LEVEL_USAGE_PLOT)
 
         grouped_counts: dict[tuple[str, str], dict[str, int]] = {}
         for row in rows:
@@ -188,7 +197,7 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
             ax.set_title("Schedule level usage by environment and role")
             ax.legend(title="level", loc="best", fontsize=8)
             ax.grid(True, axis="y", alpha=0.3)
-            _save(fig, "schedule_usage_by_role.png")
+            _save(fig, SCHEDULE_USAGE_BY_ROLE_PLOT)
     return plots
 
 

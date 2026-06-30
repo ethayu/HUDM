@@ -36,7 +36,7 @@ The submitted command was:
 sbatch scripts/research_dense_reacher_debug.sbatch
 ```
 
-The reusable committed script path is now `scripts/research/research_dense_reacher_debug.sbatch`; I moved it after the run to satisfy the repo's script grouping hygiene test.
+The reusable committed script path is now `scripts/research/research_dense_reacher_debug.sbatch`; I moved it after the run to satisfy the repo's script grouping hygiene test. Current replay command: `sbatch scripts/research/research_dense_reacher_debug.sbatch`.
 
 Job result:
 
@@ -54,6 +54,8 @@ The script ran:
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python benchmark_mwm.py configs/research/dense_reacher_planner_ablation.yaml
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/research/dense_reacher_planner_ablation.yaml
 ```
+
+Current replay uses `python -m mwm.benchmark.verify` and `python -m mwm.benchmark.matrix` with the same configs.
 
 Raw run artifacts are on disk under:
 
@@ -215,8 +217,8 @@ Result:
 Passed after adding research configs/scripts:
 
 ```bash
-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/research/dense_reacher_planner_ablation.yaml --static-only
-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/research/dense_reacher_planner_ablation.yaml
-/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python verify_mwm_benchmark.py configs/research/dense_reacher_high_fidelity_schedule.yaml --static-only
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.benchmark.verify configs/research/dense_reacher_planner_ablation.yaml --static-only
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.benchmark.verify configs/research/dense_reacher_planner_ablation.yaml
+/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python -m mwm.benchmark.verify configs/research/dense_reacher_high_fidelity_schedule.yaml --static-only
 bash -n scripts/research/research_dense_reacher_debug.sbatch
 ```

@@ -8,7 +8,7 @@ The initial supported paper-parity scope is Push-T and Two-Room with Le-WM. The 
 
 ## Current Findings
 
-The current repository is Le-WM-specific. `mwm.adapters.lewm` builds a fresh Le-WM-shaped model from local config, owns Le-WM loss and rollout behavior, and scales per-K heads directly in the adapter. The generic `MWMWorldModel` can instantiate default MLP dynamics and image decoders, which is not acceptable as production MWM behavior because it silently changes the base.
+The current repository is Le-WM-specific. `mwm.adapters.lewm` builds a fresh Le-WM-shaped model from local config, owns Le-WM loss and rollout behavior, and scales per-K heads directly in the adapter. Earlier generic runtime scaffolding could instantiate default MLP dynamics and image decoders, which is not acceptable as production MWM behavior because it silently changes the base.
 
 Stable-WM checkpoints saved through `stable_worldmodel.wm.utils.save_pretrained` contain a `config.json` next to weights. Stable-WM reloads them by instantiating the config and then loading weights. This is the right architecture source for fresh-init MWM: MWM should instantiate from `config.json` and deliberately skip loading source weights in fair-training mode.
 

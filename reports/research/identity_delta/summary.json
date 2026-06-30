@@ -23,7 +23,7 @@
     "cause_bucket": "Evaluator/manifest variance is the primary bucket for the observed seed-42 PushT delta. Dataset representation contributes to upstream-paper mismatch; training recipe/convergence, checkpoint selection, and code mismatch are not supported as primary causes.",
     "pusht_vs_tworoom": "PushT identity does not generally underperform upstream. Seed 42 is the only swept PushT seed with a negative identity-upstream delta. PushT upstream is highly manifest-sensitive, ranging from 74.0 to 98.0, while identity ranges from 86.0 to 96.0.",
     "tolerance_recommendation": "Split the tolerance into upstream-paper calibration and identity-upstream paired checks. Do not use one 1 percentage point gate for both; 50-episode evals have 2 point resolution.",
-    "next_experiment": "Run a PushT-only paired sweep at 200 episodes over seeds 0,1,2,42,100 using: env MWM_SWEEP_ENVS=pusht MWM_SWEEP_EPISODES=200 MWM_SWEEP_SEEDS=\"0 1 2 42 100\" sbatch scripts/slurm_research_identity_seed_sweep.sbatch"
+    "next_experiment": "Run a PushT-only paired sweep at 200 episodes over seeds 0,1,2,42,100 using: env MWM_SWEEP_ENVS=pusht MWM_SWEEP_EPISODES=200 MWM_SWEEP_SEEDS=\"0 1 2 42 100\" sbatch scripts/research/slurm_research_identity_seed_sweep.sbatch"
   },
   "seed_sweep": {
     "job_id": 6201181,

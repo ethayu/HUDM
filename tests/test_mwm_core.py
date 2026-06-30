@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import random
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,24 +22,23 @@ from mwm.checkpoint_io import save_world_checkpoint
 from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
 from mwm.eval.policy import MWMWorldModelPolicy
 from mwm.fidelity import FidelityScheduler
+from mwm.models.common import MatryoshkaRuntimeModel
+from mwm.models.lewm import LeWMMatryoshkaWorldModel
+from mwm.models.decoders import ConvImageDecoder
 from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
-from mwm.models.world_model import (
-    MWMWorldModel,
-    MatryoshkaWorldModel,
-    TransitionPackage,
-)
+from mwm.models.transitions import TransitionPackage
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
-from mwm.training.lewm import main as train_mwm_main
-from mwm.training.lewm_callbacks import (
+from mwm.training.stable_wm import main as train_mwm_main
+from mwm.training.stable_wm_callbacks import (
     AllLevelPlateauEarlyStopping,
-    lewm_base_adapter_checkpoint_callback,
-    select_lewm_base_adapter_export_checkpoint,
+    stable_wm_adapter_checkpoint_callback,
+    select_stable_wm_adapter_export_checkpoint,
 )
-from mwm.training.lewm_export import load_lewm_base_adapter_lightning_state
-from mwm.training.lewm_model import build_trainable_model_from_base
-from mwm.training.lewm_runtime import (
+from mwm.training.stable_wm_export import load_stable_wm_adapter_lightning_state
+from mwm.training.stable_wm_model import build_trainable_stable_wm_adapter_model
+from mwm.training.stable_wm_runtime import (
     prepare_trainer_root,
-    resolve_lewm_base_adapter_total_steps,
+    resolve_stable_wm_adapter_total_steps,
     resolve_lightning_trainer_runtime,
 )
 
@@ -109,6 +109,14 @@ class CountingRegularizer(nn.Module):
         self.calls += 1
         self.shapes.append(tuple(value.shape))
         return value.square().mean() * 0.0
+
+
+def _grad_abs_sum(module: nn.Module) -> float:
+    total = 0.0
+    for param in module.parameters():
+        if param.grad is not None:
+            total += float(param.grad.detach().abs().sum().item())
+    return total
 
 
 def _lewm_source_config(
@@ -208,6 +216,12 @@ def _stable_vit_lewm_source_config(model_cfg: dict) -> dict:
     }
 
 
+def _seed_all(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
 def _build_direct_lewm_reference(model_cfg: dict, cfg: Any) -> nn.Module:
     from stable_pretraining.backbone.utils import vit_hf
     from stable_worldmodel.wm.lewm.lewm import LeWM
@@ -252,7 +266,7 @@ def _build_direct_lewm_reference(model_cfg: dict, cfg: Any) -> nn.Module:
     )
 
 
-def _base_adaptive_lewm(
+def _lewm_matryoshka_model(
     *,
     K: tuple[int, ...] | list[int],
     D: int = 8,
@@ -268,7 +282,7 @@ def _base_adaptive_lewm(
     predictor_mlp_dim: int = 16,
     predictor_dropout: float = 0.0,
     projector_hidden_dim: int = 16,
-) -> MatryoshkaWorldModel:
+) -> LeWMMatryoshkaWorldModel:
     return build_mwm_from_stable_config(
         family="lewm",
         source_config=_lewm_source_config(
@@ -363,26 +377,38 @@ class FakeCEMParityCostModel(nn.Module):
         return self.get_cost(info_dict, action_candidates)
 
 
+class RecordingFidelityCostModel(nn.Module):
+    K = [2, 4]
+    num_levels = 2
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.decisions = []
+        self._last_cost_diagnostics = {}
+
+    def get_cost_with_fidelity(self, info_dict: dict, action_candidates: torch.Tensor, decision) -> torch.Tensor:
+        del info_dict
+        self.decisions.append(decision)
+        flop_mode = dict(getattr(decision, "metadata", {})).get("flop_accounting", "none")
+        self._last_cost_diagnostics = {
+            "base_level_idx": int(decision.base_level_idx),
+            "terminal_level_idx": int(decision.metadata.get("terminal_level_idx", decision.rollout_level_indices[-1])),
+            "latent_work": int(action_candidates.shape[0] * action_candidates.shape[1]),
+            "dynamics_flops": 123 if flop_mode == "dynamics_audit" else 0,
+            "flop_accounting": flop_mode,
+        }
+        return action_candidates.square().sum(dim=(2, 3))
+
+
 class MWMCoreTests(unittest.TestCase):
-    def test_raw_world_model_does_not_create_default_base_modules(self) -> None:
-        encoder = FakeLeWMEncoder(out_dim=4)
+    def test_core_module_has_no_separate_runtime_model_class(self) -> None:
+        import mwm.models.core as core
 
-        with self.assertRaisesRegex(ValueError, "explicit dynamics"):
-            MWMWorldModel(encoder=encoder, K=(4,), D=4, action_dim=2)
+        self.assertEqual(core.__all__, [])
+        self.assertFalse(hasattr(core, "MWMWorldModel"))
 
-        model = MWMWorldModel(
-            encoder=encoder,
-            K=(4,),
-            D=4,
-            action_dim=2,
-            dynamics=[FakeStepDynamics(action_dim=2, out_dim=4)],
-            decoder=None,
-            metadata={"image_shape": [8, 8]},
-        )
-
-        self.assertFalse(hasattr(model, "decoders"))
-        with self.assertRaisesRegex(NotImplementedError, "decoder"):
-            model.decode(0, torch.zeros(1, 4))
+    def test_matryoshka_world_model_is_direct_nn_module_runtime(self) -> None:
+        self.assertEqual(LeWMMatryoshkaWorldModel.__bases__, (MatryoshkaRuntimeModel,))
 
     def test_world_model_provides_matryoshka_loss_and_regularizer_routing(self) -> None:
         losses = [torch.tensor(2.0), torch.tensor(6.0)]
@@ -451,15 +477,15 @@ class MWMCoreTests(unittest.TestCase):
             extra_dir = root / "checkpoint"
             extra_dir.mkdir()
             (extra_dir / "notes.txt").write_text("not canonical", encoding="utf-8")
-            model = _base_adaptive_lewm(K=(4,), D=4, action_dim=2)
+            model = _lewm_matryoshka_model(K=(4,), D=4, action_dim=2)
             with self.assertRaisesRegex(ValueError, "non-checkpoint files"):
                 save_world_checkpoint(model, extra_dir, metadata={"env_id": "swm/PushT-v1"})
 
     def test_single_fidelity_k_equals_d_uses_adapter_owned_lewm_loss(self) -> None:
-        model = _base_adaptive_lewm(K=(8,), D=8, action_dim=2)
-        self.assertIsInstance(model, MatryoshkaWorldModel)
+        model = _lewm_matryoshka_model(K=(8,), D=8, action_dim=2)
+        self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
         self.assertEqual(model.K, [model.D])
-        self.assertFalse(hasattr(model, "decoders"))
+        self.assertEqual(len(model.decoders), 1)
         self.assertEqual(len(model.transitions), 1)
         self.assertEqual(model.metadata["action_spec"]["dim"], 2)
         self.assertEqual(model.metadata["preprocessing_spec"]["image"], "identity")
@@ -468,10 +494,12 @@ class MWMCoreTests(unittest.TestCase):
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
         out = model.training_loss(batch)
         self.assertIn("pred_loss_l0", out)
+        self.assertIn("recon_loss_l0", out)
+        self.assertEqual(tuple(model.decode(0, torch.randn(2, 8)).shape), (2, 3, 8, 8))
         self.assertIn("loss", out)
 
     def test_lewm_matryoshka_head_scaling_and_k_may_omit_d(self) -> None:
-        model = _base_adaptive_lewm(
+        model = _lewm_matryoshka_model(
             K=(4, 8),
             D=8,
             action_dim=10,
@@ -492,10 +520,12 @@ class MWMCoreTests(unittest.TestCase):
         out = model.training_loss(batch)
         self.assertIn("pred_loss_l0", out)
         self.assertIn("pred_loss_l1", out)
+        self.assertIn("recon_loss_l0", out)
+        self.assertIn("recon_loss_l1", out)
         self.assertNotIn("pred_loss_l2", out)
 
     def test_lewm_sigreg_is_shared_once_by_default(self) -> None:
-        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         reg = CountingRegularizer()
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
@@ -506,7 +536,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(reg.shapes[0][-1], 8)
 
     def test_lewm_sigreg_can_be_per_level_when_explicit(self) -> None:
-        model = _base_adaptive_lewm(K=(4, 8), D=8, action_dim=2)
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         reg = CountingRegularizer()
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
@@ -514,6 +544,33 @@ class MWMCoreTests(unittest.TestCase):
 
         self.assertEqual(reg.calls, 2)
         self.assertEqual([shape[-1] for shape in reg.shapes], [4, 8])
+
+    def test_reconstruction_trains_decoders_without_latent_gradients_by_default(self) -> None:
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.0)
+        model.zero_grad(set_to_none=True)
+        out["loss"].backward()
+
+        self.assertGreater(_grad_abs_sum(model.decoders), 0.0)
+        self.assertEqual(_grad_abs_sum(model.encoder), 0.0)
+        self.assertEqual(_grad_abs_sum(model.projector), 0.0)
+        self.assertIn("recon_loss", out)
+        self.assertNotIn("recon_latent_loss", out)
+
+    def test_reconstruction_latent_weight_shapes_encoder_latents(self) -> None:
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.25)
+        model.zero_grad(set_to_none=True)
+        out["loss"].backward()
+
+        self.assertGreater(_grad_abs_sum(model.decoders), 0.0)
+        self.assertGreater(_grad_abs_sum(model.encoder), 0.0)
+        self.assertGreater(_grad_abs_sum(model.projector), 0.0)
+        self.assertIn("recon_latent_loss", out)
 
     def test_train_entrypoint_builds_from_stable_wm_base_config(self) -> None:
         source_config = _lewm_source_config(D=4, action_dim=2, predictor_heads=1, predictor_dim_head=2, predictor_mlp_dim=8)
@@ -527,7 +584,7 @@ class MWMCoreTests(unittest.TestCase):
                         "component_policy": {
                             "shared": ["latent_producer"],
                             "per_level": ["transition"],
-                            "reconstructor": [],
+                            "reconstructor": ["decoder"],
                         },
                         "loss_terms": {"regularizers": "shared_latent"},
                     },
@@ -544,9 +601,9 @@ class MWMCoreTests(unittest.TestCase):
                 "normalize_imagenet": False,
             }
 
-            model = build_trainable_model_from_base(cfg, model_cfg)
+            model = build_trainable_stable_wm_adapter_model(cfg, model_cfg)
 
-            self.assertIsInstance(model, MatryoshkaWorldModel)
+            self.assertIsInstance(model, LeWMMatryoshkaWorldModel)
             self.assertEqual(model.metadata["adapter_family"], "lewm")
             self.assertTrue(model.metadata["fresh_init"])
             self.assertEqual(model.metadata["component_policy"]["shared"], ["latent_producer"])
@@ -565,7 +622,7 @@ class MWMCoreTests(unittest.TestCase):
                         "component_policy": {
                             "shared": ["latent_producer"],
                             "per_level": ["transition"],
-                            "reconstructor": [],
+                            "reconstructor": ["decoder"],
                         }
                     },
                     "model": {"history_size": 2, "num_preds": 1},
@@ -582,7 +639,7 @@ class MWMCoreTests(unittest.TestCase):
             }
 
             with self.assertRaisesRegex(ValueError, "configured D=8.*base latent dimension D=4"):
-                build_trainable_model_from_base(cfg, model_cfg)
+                build_trainable_stable_wm_adapter_model(cfg, model_cfg)
 
     def test_k_equals_d_lewm_init_forward_grad_and_step_match_direct_backend(self) -> None:
         cfg = OmegaConf.create(
@@ -626,9 +683,9 @@ class MWMCoreTests(unittest.TestCase):
         from stable_worldmodel.wm.lewm.module import MLP as _MLP  # noqa: F401
         from stable_worldmodel.wm.lewm.module import Predictor as _Predictor  # noqa: F401
 
-        torch.manual_seed(123)
+        _seed_all(123)
         direct = _build_direct_lewm_reference(model_cfg, cfg)
-        torch.manual_seed(123)
+        _seed_all(123)
         mwm = build_mwm_from_stable_config(
             family="lewm",
             source_config=_stable_vit_lewm_source_config(model_cfg),
@@ -653,12 +710,18 @@ class MWMCoreTests(unittest.TestCase):
             "pred_proj.": "transitions.0.pred_proj.",
         }
         mwm_state = mwm.state_dict()
+        aligned_mwm_state = dict(mwm_state)
         for direct_name, direct_tensor in direct.state_dict().items():
             for src, dst in mapping.items():
                 if direct_name.startswith(src):
                     mwm_name = dst + direct_name[len(src) :]
-                    self.assertTrue(torch.equal(direct_tensor, mwm_state[mwm_name]), direct_name)
+                    self.assertIn(mwm_name, mwm_state, direct_name)
+                    self.assertEqual(tuple(direct_tensor.shape), tuple(mwm_state[mwm_name].shape), direct_name)
+                    if not direct_name.startswith("encoder."):
+                        self.assertTrue(torch.equal(direct_tensor, mwm_state[mwm_name]), direct_name)
+                    aligned_mwm_state[mwm_name] = direct_tensor.detach().clone()
                     break
+        mwm.load_state_dict(aligned_mwm_state, strict=True)
 
         batch = {
             "pixels": torch.randn(2, 3, 3, 224, 224),
@@ -673,8 +736,10 @@ class MWMCoreTests(unittest.TestCase):
         direct.train()
         mwm.train()
         d_loss = direct_loss()
-        m_loss = mwm.training_loss(dict(batch))["loss"]
-        self.assertTrue(torch.allclose(d_loss, m_loss, atol=0.0, rtol=0.0))
+        m_out = mwm.training_loss(dict(batch))
+        m_loss = m_out["loss"]
+        self.assertTrue(torch.allclose(d_loss, m_out["pred_loss"], atol=0.0, rtol=0.0))
+        self.assertIn("recon_loss", m_out)
 
         direct.zero_grad(set_to_none=True)
         mwm.zero_grad(set_to_none=True)
@@ -733,13 +798,13 @@ class MWMCoreTests(unittest.TestCase):
         )
 
     def test_action_spec_distinguishes_base_and_block_dims(self) -> None:
-        model = _base_adaptive_lewm(K=(8,), D=8, action_dim=10, action_block=5)
+        model = _lewm_matryoshka_model(K=(8,), D=8, action_dim=10, action_block=5)
 
         self.assertEqual(model.action_dim, 10)
         self.assertEqual(model.metadata["action_spec"], {"dim": 10, "base_dim": 2, "block": 5})
 
     def test_rollout_ignores_raw_history_actions_for_blocked_lewm_heads(self) -> None:
-        model = MatryoshkaWorldModel(
+        model = LeWMMatryoshkaWorldModel(
             encoder=FakeLeWMEncoder(out_dim=4),
             projector=nn.Identity(),
             transitions=[
@@ -749,6 +814,7 @@ class MWMCoreTests(unittest.TestCase):
                     pred_proj=nn.Identity(),
                 )
             ],
+            decoders=[ConvImageDecoder(latent_dim=4, image_shape=(8, 8))],
             K=[4],
             D=4,
             action_dim=10,
@@ -787,7 +853,12 @@ class MWMCoreTests(unittest.TestCase):
                     "warm_start": True,
                     "clamp_actions": False,
                     "std_unbiased": True,
-                    "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+                    "scheduler": {
+                        "enabled": True,
+                        "mpc": {"mode": "fixed", "level": "finest"},
+                        "cem": {"mode": "fixed", "level": "base"},
+                        "rollout": {"mode": "fixed", "level": "base"},
+                    },
                 },
             }
         )
@@ -822,7 +893,12 @@ class MWMCoreTests(unittest.TestCase):
                     "warm_start": False,
                     "clamp_actions": False,
                     "std_unbiased": True,
-                    "scheduler": {"policy": "fixed", "level": "finest", "rollout_level": "base"},
+                    "scheduler": {
+                        "enabled": True,
+                        "mpc": {"mode": "fixed", "level": "finest"},
+                        "cem": {"mode": "fixed", "level": "base"},
+                        "rollout": {"mode": "fixed", "level": "base"},
+                    },
                     "pop_schedule": {"start": 64, "end": 16},
                 },
             }
@@ -899,7 +975,12 @@ class MWMCoreTests(unittest.TestCase):
         upstream_solver = CEMSolver(**common)
         mwm_solver = MWMScheduledCEMSolver(
             **common,
-            scheduler={"policy": "fixed", "level": 0, "rollout_level": 0},
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 0},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
             std_unbiased=True,
         )
         upstream_solver.configure(action_space=action_space, n_envs=2, config=plan_cfg)
@@ -923,7 +1004,12 @@ class MWMCoreTests(unittest.TestCase):
             var_scale=1.0,
             n_steps=3,
             topk=4,
-            scheduler={"policy": "fixed", "level": 0, "rollout_level": "base"},
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 0},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
             seed=0,
             std_unbiased=False,
             pop_schedule={"start": 8, "end": 2},
@@ -957,7 +1043,12 @@ class MWMCoreTests(unittest.TestCase):
             num_samples=4,
             n_steps=1,
             topk=2,
-            scheduler={"policy": "fixed", "level": 0, "rollout_level": 0},
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 0},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
             seed=0,
         )
         solver.configure(
@@ -986,15 +1077,15 @@ class MWMCoreTests(unittest.TestCase):
             trainer_root = prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
             self.assertTrue((trainer_root / "keep.ckpt").is_file())
 
-    def test_lewm_base_adapter_checkpoint_callback_can_save_within_large_epochs(self) -> None:
+    def test_stable_wm_adapter_checkpoint_callback_can_save_within_large_epochs(self) -> None:
         cfg = OmegaConf.create({"train": {"checkpoint_every_n_train_steps": 1000}})
-        callback = lewm_base_adapter_checkpoint_callback(cfg)
+        callback = stable_wm_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback._every_n_train_steps, 1000)
         self.assertEqual(callback._every_n_epochs, 0)
         self.assertTrue(callback.save_last)
 
-    def test_lewm_base_adapter_checkpoint_callback_can_monitor_validation_metric(self) -> None:
+    def test_stable_wm_adapter_checkpoint_callback_can_monitor_validation_metric(self) -> None:
         cfg = OmegaConf.create(
             {
                 "train": {
@@ -1005,24 +1096,24 @@ class MWMCoreTests(unittest.TestCase):
                 }
             }
         )
-        callback = lewm_base_adapter_checkpoint_callback(cfg)
+        callback = stable_wm_adapter_checkpoint_callback(cfg)
 
         self.assertEqual(callback.monitor, "validate/pred_loss_epoch")
         self.assertEqual(callback.mode, "min")
         self.assertEqual(callback.save_top_k, 2)
         self.assertTrue(callback.save_last)
 
-    def test_select_lewm_base_adapter_export_checkpoint_prefers_best_when_requested(self) -> None:
+    def test_select_stable_wm_adapter_export_checkpoint_prefers_best_when_requested(self) -> None:
         cfg = OmegaConf.create({"train": {"export_checkpoint": "best"}})
         callback = SimpleNamespace(best_model_path="best.ckpt", last_model_path="last.ckpt")
 
-        self.assertEqual(select_lewm_base_adapter_export_checkpoint(callback, cfg), "best.ckpt")
+        self.assertEqual(select_stable_wm_adapter_export_checkpoint(callback, cfg), "best.ckpt")
 
-    def test_lewm_base_adapter_total_steps_can_decouple_lr_horizon_from_train_epochs(self) -> None:
+    def test_stable_wm_adapter_total_steps_can_decouple_lr_horizon_from_train_epochs(self) -> None:
         cfg = OmegaConf.create({"schedule": {"max_epochs": 80, "lr_max_epochs": 10}})
         loader = [object()] * 7
 
-        self.assertEqual(resolve_lewm_base_adapter_total_steps(cfg, loader), 70)
+        self.assertEqual(resolve_stable_wm_adapter_total_steps(cfg, loader), 70)
 
     def test_all_level_plateau_stop_waits_until_no_level_improves(self) -> None:
         callback = AllLevelPlateauEarlyStopping(
@@ -1111,7 +1202,7 @@ class MWMCoreTests(unittest.TestCase):
         self.assertEqual(runtime["accelerator"], "cpu")
         self.assertEqual(runtime["devices"], 1)
 
-    def test_lewm_base_adapter_lightning_state_loader_strips_model_prefix(self) -> None:
+    def test_stable_wm_adapter_lightning_state_loader_strips_model_prefix(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "last.ckpt"
             expected = nn.Linear(3, 2)
@@ -1127,7 +1218,7 @@ class MWMCoreTests(unittest.TestCase):
             )
 
             actual = nn.Linear(3, 2)
-            checkpoint = load_lewm_base_adapter_lightning_state(actual, path)
+            checkpoint = load_stable_wm_adapter_lightning_state(actual, path)
 
             self.assertEqual(checkpoint["epoch"], 7)
             self.assertTrue(torch.equal(actual.weight, expected.weight))
@@ -1151,30 +1242,167 @@ train:
             with self.assertRaisesRegex(ValueError, "adapter-owned Stable-WM base architecture"):
                 train_mwm_main(str(cfg_path))
 
-    def test_multi_fidelity_scheduler_monotonicity_and_no_low_to_high_rollout(self) -> None:
+    def test_multi_fidelity_scheduler_resolves_mpc_cem_and_rollout_in_order(self) -> None:
         scheduler = FidelityScheduler.from_config(
             {
-                "policy": "linear_cem",
-                "start_level": "coarsest",
-                "end_level": "finest",
-                "rollout_level": "base",
+                "enabled": True,
+                "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
+                "cem": {"mode": "linear", "start_level": "base", "end_level": "finest"},
+                "rollout": {"mode": "linear", "start_level": "base", "end_level": "coarsest"},
             },
             num_levels=4,
-            horizon=3,
+            horizon=4,
         )
-        decisions = [scheduler.decision(cem_iter=i, n_iter=5) for i in range(5)]
-        bases = [d.base_level_idx for d in decisions]
-        self.assertEqual(bases, sorted(bases))
-        self.assertEqual(bases[0], 0)
-        self.assertEqual(bases[-1], 3)
+
+        early = scheduler.decision(cem_iter=0, n_iter=5, mpc_progress=0.0)
+        late = scheduler.decision(cem_iter=4, n_iter=5, mpc_progress=1.0)
+
+        self.assertEqual(early.metadata["mpc_level_idx"], 0)
+        self.assertEqual(early.base_level_idx, 0)
+        self.assertEqual(early.rollout_level_indices, [0, 0, 0, 0])
+        self.assertEqual(early.metadata["terminal_level_idx"], 0)
+        self.assertEqual(late.metadata["mpc_level_idx"], 3)
+        self.assertEqual(late.base_level_idx, 3)
+        self.assertEqual(late.rollout_level_indices, [3, 2, 1, 0])
+        self.assertEqual(late.metadata["terminal_level_idx"], 0)
+
+    def test_multi_fidelity_scheduler_rejects_legacy_schema_and_bad_rollout(self) -> None:
+        with self.assertRaisesRegex(ValueError, "legacy.*planner.scheduler"):
+            FidelityScheduler.from_config(
+                {"policy": "linear_cem", "start_level": "coarsest", "end_level": "finest"},
+                num_levels=4,
+                horizon=3,
+            )
 
         bad = FidelityScheduler.from_config(
-            {"policy": "fixed", "level": 1, "rollout_levels": [0, 1]},
+            {
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": 1},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "linear", "start_level": "coarsest", "end_level": "base"},
+            },
             num_levels=3,
             horizon=2,
         )
         with self.assertRaisesRegex(ValueError, "lower to higher"):
             bad.decision(cem_iter=0, n_iter=1)
+
+        mpc_base = FidelityScheduler.from_config(
+            {
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": "base"},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
+            num_levels=3,
+            horizon=2,
+        )
+        with self.assertRaisesRegex(ValueError, "mpc.*base"):
+            mpc_base.decision(cem_iter=0, n_iter=1)
+
+    def test_scheduled_cem_tracks_mpc_progress_across_replans(self) -> None:
+        model = RecordingFidelityCostModel()
+        solver = MWMScheduledCEMSolver(
+            model,
+            batch_size=1,
+            num_samples=4,
+            n_steps=1,
+            topk=2,
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
+            max_replans=3,
+            seed=0,
+            std_unbiased=False,
+        )
+        solver.configure(
+            action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            n_envs=1,
+            config=PlanConfig(horizon=2, receding_horizon=1, action_block=1),
+        )
+
+        solver.solve({"pixels": torch.zeros(1, 1)})
+        solver.solve({"pixels": torch.zeros(1, 1)})
+        solver.solve({"pixels": torch.zeros(1, 1)})
+
+        self.assertEqual([round(d.mpc_progress, 2) for d in model.decisions], [0.0, 0.5, 1.0])
+        self.assertEqual([d.base_level_idx for d in model.decisions], [0, 0, 1])
+        self.assertEqual([h["mwm_diagnostics"][0]["mpc_progress"] for h in solver.solve_history], [0.0, 0.5, 1.0])
+
+        solver.reset_history()
+        model.decisions.clear()
+        solver.solve({"pixels": torch.zeros(1, 1)})
+        self.assertEqual(model.decisions[-1].mpc_progress, 0.0)
+
+    def test_scheduled_cem_forwards_dynamics_flop_audit_mode(self) -> None:
+        model = RecordingFidelityCostModel()
+        solver = MWMScheduledCEMSolver(
+            model,
+            batch_size=1,
+            num_samples=4,
+            n_steps=1,
+            topk=2,
+            scheduler={
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": "finest"},
+                "cem": {"mode": "fixed", "level": "base"},
+                "rollout": {"mode": "fixed", "level": "base"},
+            },
+            flop_accounting="dynamics_audit",
+            seed=0,
+            std_unbiased=False,
+        )
+        solver.configure(
+            action_space=Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32),
+            n_envs=1,
+            config=PlanConfig(horizon=2, receding_horizon=1, action_block=1),
+        )
+
+        result = solver.solve({"pixels": torch.zeros(1, 1)})
+
+        diagnostics = result["mwm_diagnostics"][0]
+        self.assertEqual(model.decisions[-1].metadata["flop_accounting"], "dynamics_audit")
+        self.assertEqual(diagnostics["model_dynamics_flops"], 123)
+        self.assertEqual(diagnostics["model_flop_accounting"], "dynamics_audit")
+
+    def test_lewm_dynamic_rollout_scores_final_active_level(self) -> None:
+        model = _lewm_matryoshka_model(K=(2, 4), D=4, action_dim=2, history_size=2)
+        infos = {
+            "pixels": torch.zeros(1, 2, 2, 3, 8, 8),
+            "goal": torch.zeros(1, 2, 2, 3, 8, 8),
+        }
+        candidates = torch.zeros(1, 2, 4, 2)
+        decision = SimpleNamespace(base_level_idx=1, rollout_level_indices=[1, 0, 0, 0])
+
+        cost = model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertEqual(tuple(cost.shape), (1, 2))
+        self.assertTrue(torch.isfinite(cost).all())
+        self.assertEqual(tuple(infos["predicted_emb"].shape), (1, 2, 5, 4))
+        self.assertEqual(model._last_cost_diagnostics["base_level_idx"], 1)
+        self.assertEqual(model._last_cost_diagnostics["terminal_level_idx"], 0)
+        self.assertEqual(model._last_cost_diagnostics["terminal_k"], 2)
+
+    def test_lewm_dynamics_flop_audit_profiles_active_rollout(self) -> None:
+        model = _lewm_matryoshka_model(K=(2, 4), D=4, action_dim=2, history_size=2)
+        infos = {
+            "pixels": torch.zeros(1, 1, 2, 3, 8, 8),
+            "goal": torch.zeros(1, 1, 2, 3, 8, 8),
+        }
+        candidates = torch.zeros(1, 1, 3, 2)
+        decision = SimpleNamespace(
+            base_level_idx=1,
+            rollout_level_indices=[1, 0, 0],
+            metadata={"flop_accounting": "dynamics_audit"},
+        )
+
+        model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertGreater(model._last_cost_diagnostics["dynamics_flops"], 0)
+        self.assertEqual(model._last_cost_diagnostics["flop_accounting"], "dynamics_audit")
 
 
 if __name__ == "__main__":

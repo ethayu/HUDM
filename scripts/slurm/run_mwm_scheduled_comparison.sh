@@ -11,7 +11,7 @@ fi
 
 cd "$ROOT"
 
-"$PY" verify_mwm_data.py --paper-parity
+"$PY" -m mwm.data.verify --paper-parity
 
 status=0
 run_step() {
@@ -22,9 +22,9 @@ run_step() {
   fi
 }
 
-run_step "$PY" benchmark_mwm.py configs/benchmark/scheduled_pusht.yaml
-run_step "$PY" verify_mwm_benchmark.py configs/benchmark/scheduled_pusht.yaml
-run_step "$PY" benchmark_mwm.py configs/benchmark/scheduled_tworoom.yaml
-run_step "$PY" verify_mwm_benchmark.py configs/benchmark/scheduled_tworoom.yaml
+run_step "$PY" -m mwm.benchmark.matrix configs/benchmark/scheduled_pusht.yaml
+run_step "$PY" -m mwm.benchmark.verify configs/benchmark/scheduled_pusht.yaml
+run_step "$PY" -m mwm.benchmark.matrix configs/benchmark/scheduled_tworoom.yaml
+run_step "$PY" -m mwm.benchmark.verify configs/benchmark/scheduled_tworoom.yaml
 
 exit "$status"

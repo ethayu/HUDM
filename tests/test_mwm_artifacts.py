@@ -14,9 +14,12 @@ import torch.nn as nn
 from omegaconf import OmegaConf
 
 import mwm.checkpoint_io as checkpoint_io
-from collect_mwm_data import _record_dataset_to_path
+import mwm.checkpoint_keymaps as checkpoint_keymaps
 from mwm.benchmark import matrix as benchmark_mwm
+from mwm.benchmark import output_verify as output_verify_module
 from mwm.benchmark.config import DEFAULTS, merged_run_config, validate_benchmark_matrix
+from mwm.benchmark.html import write_review_html
+from mwm.benchmark.summary import eval_summary_row, write_per_env_table, write_summary_csv
 from mwm.adapters.builder import STABLE_CONFIG_TARGET, build_mwm_from_stable_config
 from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
 from mwm.checkpoint_contract import validate_checkpoint_contract
@@ -30,18 +33,20 @@ from mwm.checkpoint_io import (
     save_world_checkpoint,
     validate_checkpoint_directory,
 )
-from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256
+from mwm.data.manifest import generate_manifest, load_manifest, manifest_file_sha256, write_manifest
+from mwm.data.collection import record_dataset_to_path
 from mwm.data.metadata import write_dataset_metadata
 from mwm.data.sampling import StartGoalPair, sample_start_goal_pairs
-from mwm.eval.runner import _device as eval_device
-from mwm.benchmark.verify import (
-    append_paper_target_errors,
+from mwm.eval.runner import resolve_device as eval_device
+from mwm.benchmark.checkpoint_verify import (
     load_checkpoint_metadata_for_benchmark,
-    required_plots_for_benchmark,
     validate_benchmark_role_checkpoint_contract,
-    validate_paper_targets,
-    verify_benchmark_static,
 )
+from mwm.benchmark.paper_targets import append_paper_target_errors, validate_paper_targets
+from mwm.benchmark.plot_contract import BASE_REQUIRED_PLOTS, required_plots_for_benchmark
+from mwm.benchmark.output_verify import verify_benchmark_output
+from mwm.benchmark.static_verify import verify_benchmark_static
+from mwm.io import file_sha256 as io_file_sha256, write_json, write_metrics_jsonl
 from mwm.data.verify import verify_data_configs
 
 
@@ -60,10 +65,11 @@ def _payload(role: str, env_id: str, seed: int, output_path: Path) -> dict:
             "plans": 2,
             "steps": 10,
             "bits_used_total": 1000 + seed,
+            "dynamics_flops_total": 2000 + seed,
             "plan_time_total_sec": 0.5,
             "schedule_level_counts": {"0": 1, "1": 1},
         },
-        "schedule": {"policy": "linear_cem"},
+        "schedule": {"enabled": True, "mpc": {"mode": "fixed", "level": "finest"}, "cem": {"mode": "linear", "start_level": "coarsest", "end_level": "finest"}, "rollout": {"mode": "fixed", "level": "base"}},
         "role": role,
         "seed": seed,
         "wall_time_sec": 1.0 + seed,
@@ -119,8 +125,8 @@ def _lewm_source_config() -> dict:
 class MWMArtifactTests(unittest.TestCase):
     def test_eval_auto_device_uses_cuda_when_probe_succeeds(self) -> None:
         with (
-            mock.patch("mwm.eval.runner.torch.cuda.is_available", return_value=True),
-            mock.patch("mwm.eval.runner.torch.empty", return_value=torch.empty(1)) as empty,
+            mock.patch.object(torch.cuda, "is_available", return_value=True),
+            mock.patch.object(torch, "empty", return_value=torch.empty(1)) as empty,
         ):
             device = eval_device("auto")
 
@@ -129,8 +135,8 @@ class MWMArtifactTests(unittest.TestCase):
 
     def test_eval_auto_device_falls_back_to_cpu_when_cuda_probe_fails(self) -> None:
         with (
-            mock.patch("mwm.eval.runner.torch.cuda.is_available", return_value=True),
-            mock.patch("mwm.eval.runner.torch.empty", side_effect=RuntimeError("device unavailable")),
+            mock.patch.object(torch.cuda, "is_available", return_value=True),
+            mock.patch.object(torch, "empty", side_effect=RuntimeError("device unavailable")),
             self.assertWarnsRegex(RuntimeWarning, "falling back to CPU"),
         ):
             device = eval_device("auto")
@@ -189,7 +195,7 @@ class MWMArtifactTests(unittest.TestCase):
             output_path = Path(tmp) / "out.lance"
             world = FakeWorld()
 
-            _record_dataset_to_path(
+            record_dataset_to_path(
                 world,
                 output_path,
                 episodes=1,
@@ -206,6 +212,7 @@ class MWMArtifactTests(unittest.TestCase):
 
     def test_hf_vit_encoder_keys_remap_to_custom_vit_layers(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
+        self.assertIs(checkpoint_io.remap_hf_vit_encoder_keys, checkpoint_keymaps.remap_hf_vit_encoder_keys)
         state = {
             "encoder.encoder.layer.2.attention.attention.query.weight": torch.ones(1),
             "encoder.encoder.layer.2.attention.attention.key.bias": torch.ones(1) * 2,
@@ -216,7 +223,7 @@ class MWMArtifactTests(unittest.TestCase):
             "decoder.weight": torch.ones(1) * 7,
         }
 
-        remapped = checkpoint_io.remap_hf_vit_encoder_keys(state)
+        remapped = checkpoint_keymaps.remap_hf_vit_encoder_keys(state)
 
         self.assertEqual(
             set(remapped),
@@ -237,10 +244,11 @@ class MWMArtifactTests(unittest.TestCase):
         self.assertTrue(hasattr(checkpoint_io, "remap_hf_vit_encoder_keys"))
         state = {"encoder.layers.0.attention.q_proj.weight": torch.ones(1)}
 
-        self.assertIs(checkpoint_io.remap_hf_vit_encoder_keys(state), state)
+        self.assertIs(checkpoint_keymaps.remap_hf_vit_encoder_keys(state), state)
 
     def test_custom_vit_encoder_keys_remap_to_hf_vit_layers(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_custom_vit_encoder_keys_to_hf"))
+        self.assertIs(checkpoint_io.remap_custom_vit_encoder_keys_to_hf, checkpoint_keymaps.remap_custom_vit_encoder_keys_to_hf)
         state = {
             "encoder.layers.2.attention.q_proj.weight": torch.ones(1),
             "encoder.layers.2.attention.k_proj.bias": torch.ones(1) * 2,
@@ -251,7 +259,7 @@ class MWMArtifactTests(unittest.TestCase):
             "decoder.weight": torch.ones(1) * 7,
         }
 
-        remapped = checkpoint_io.remap_custom_vit_encoder_keys_to_hf(state)
+        remapped = checkpoint_keymaps.remap_custom_vit_encoder_keys_to_hf(state)
 
         self.assertEqual(
             set(remapped),
@@ -270,13 +278,14 @@ class MWMArtifactTests(unittest.TestCase):
 
     def test_target_aware_vit_key_remap_keeps_matching_hf_keys(self) -> None:
         self.assertTrue(hasattr(checkpoint_io, "remap_vit_encoder_keys_for_model"))
+        self.assertIs(checkpoint_io.remap_vit_encoder_keys_for_model, checkpoint_keymaps.remap_vit_encoder_keys_for_model)
         state = {
             "encoder.encoder.layer.0.attention.attention.query.weight": torch.ones(1),
             "decoder.weight": torch.ones(1) * 2,
         }
         model = SimpleNamespace(state_dict=lambda: dict(state))
 
-        self.assertIs(checkpoint_io.remap_vit_encoder_keys_for_model(state, model), state)
+        self.assertIs(checkpoint_keymaps.remap_vit_encoder_keys_for_model(state, model), state)
 
     def test_target_aware_vit_key_remap_maps_custom_keys_to_hf_model(self) -> None:
         state = {
@@ -290,7 +299,7 @@ class MWMArtifactTests(unittest.TestCase):
             }
         )
 
-        remapped = checkpoint_io.remap_vit_encoder_keys_for_model(state, model)
+        remapped = checkpoint_keymaps.remap_vit_encoder_keys_for_model(state, model)
 
         self.assertIn("encoder.encoder.layer.0.attention.attention.query.weight", remapped)
         self.assertNotIn("encoder.layers.0.attention.q_proj.weight", remapped)
@@ -312,7 +321,7 @@ class MWMArtifactTests(unittest.TestCase):
         self.assertEqual([pair.start_step for pair in pairs], [0, 1, 2])
         self.assertEqual([pair.goal_step for pair in pairs], [2, 3, 4])
 
-    def test_base_adaptive_checkpoint_metadata_persisted_from_model(self) -> None:
+    def test_stable_wm_checkpoint_metadata_persisted_from_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = build_mwm_from_stable_config(
                 family="lewm",
@@ -337,8 +346,79 @@ class MWMArtifactTests(unittest.TestCase):
             self.assertEqual(metadata["loss_scope"]["regularizers"], "shared_latent")
             self.assertIn("training_recipe", metadata)
 
-    def test_base_adaptive_checkpoint_contract_requires_metadata(self) -> None:
-        policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+    def test_legacy_lewm_checkpoint_without_decoder_policy_loads_for_eval(self) -> None:
+        legacy_policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+        with tempfile.TemporaryDirectory() as tmp:
+            model = build_mwm_from_stable_config(
+                family="lewm",
+                source_config=_lewm_source_config(),
+                source_config_sha256="abc",
+                training_recipe={"history_size": 2, "num_preds": 1, "loss_scope": {"regularizers": "shared_latent"}},
+                K=(4,),
+                action_dim=2,
+                action_block=1,
+                image_shape=(8, 8),
+                normalize_imagenet=False,
+            )
+            out_dir = Path(tmp) / "checkpoint"
+            save_world_checkpoint(model, out_dir, metadata={"env_id": "swm/PushT-v1"})
+
+            config_path = out_dir / CONFIG_FILENAME
+            weights_path = out_dir / WEIGHTS_FILENAME
+            metadata_path = out_dir / METADATA_FILENAME
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            config["kwargs"]["component_policy"] = legacy_policy
+            metadata["component_policy"] = legacy_policy
+            state = torch.load(weights_path, map_location="cpu", weights_only=False)
+            state = {key: value for key, value in state.items() if not key.startswith("decoders.")}
+            torch.save(state, weights_path)
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            metadata["artifacts"]["config"]["sha256"] = file_sha256(config_path)
+            metadata["artifacts"]["weights"]["sha256"] = file_sha256(weights_path)
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+            loaded, loaded_metadata, epoch = checkpoint_io.load_world_model_from_checkpoint(
+                out_dir,
+                None,
+                torch.device("cpu"),
+            )
+
+        self.assertEqual(epoch, 0)
+        self.assertEqual(loaded_metadata["component_policy"], legacy_policy)
+        self.assertEqual(loaded.metadata["component_policy"], legacy_policy)
+        self.assertEqual(len(loaded.decoders), 1)
+
+    def test_modern_lewm_checkpoint_requires_decoder_weights(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            model = build_mwm_from_stable_config(
+                family="lewm",
+                source_config=_lewm_source_config(),
+                source_config_sha256="abc",
+                training_recipe={"history_size": 2, "num_preds": 1, "loss_scope": {"regularizers": "shared_latent"}},
+                K=(4,),
+                action_dim=2,
+                action_block=1,
+                image_shape=(8, 8),
+                normalize_imagenet=False,
+            )
+            out_dir = Path(tmp) / "checkpoint"
+            save_world_checkpoint(model, out_dir, metadata={"env_id": "swm/PushT-v1"})
+
+            weights_path = out_dir / WEIGHTS_FILENAME
+            metadata_path = out_dir / METADATA_FILENAME
+            state = torch.load(weights_path, map_location="cpu", weights_only=False)
+            state = {key: value for key, value in state.items() if not key.startswith("decoders.")}
+            torch.save(state, weights_path)
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+            metadata["artifacts"]["weights"]["sha256"] = file_sha256(weights_path)
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+            with self.assertRaisesRegex(RuntimeError, "Missing key.*decoders"):
+                checkpoint_io.load_world_model_from_checkpoint(out_dir, None, torch.device("cpu"))
+
+    def test_stable_wm_checkpoint_contract_requires_metadata(self) -> None:
+        policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
         config = {
             "target": STABLE_CONFIG_TARGET,
             "kwargs": {
@@ -364,7 +444,10 @@ class MWMArtifactTests(unittest.TestCase):
             ("source_config_sha256", {**valid_metadata, "source_config_sha256": "wrong"}),
             ("component_policy", {k: v for k, v in valid_metadata.items() if k != "component_policy"}),
             ("component_policy", {**valid_metadata, "component_policy": "not-a-policy"}),
-            ("missing=.*per_level", {**valid_metadata, "component_policy": {"shared": ["latent_producer"], "reconstructor": []}}),
+            (
+                "missing=.*per_level",
+                {**valid_metadata, "component_policy": {"shared": ["latent_producer"], "reconstructor": ["decoder"]}},
+            ),
             (
                 "unknown=.*extra",
                 {
@@ -372,14 +455,14 @@ class MWMArtifactTests(unittest.TestCase):
                     "component_policy": {
                         "shared": ["latent_producer"],
                         "per_level": ["transition"],
-                        "reconstructor": [],
+                        "reconstructor": ["decoder"],
                         "extra": [],
                     },
                 },
             ),
             (
                 "shared latent producer",
-                {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"], "reconstructor": []}},
+                {**valid_metadata, "component_policy": {"shared": [], "per_level": ["transition"], "reconstructor": ["decoder"]}},
             ),
         ]
         for expected, metadata in invalid_cases:
@@ -415,7 +498,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -436,6 +519,127 @@ planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
             with self.assertRaisesRegex(ValueError, "duplicate cells"):
                 validate_benchmark_matrix(cfg, resolved)
 
+    def test_benchmark_output_verifier_has_public_owner(self) -> None:
+        self.assertTrue(callable(verify_benchmark_output))
+
+    def test_benchmark_output_verifier_checks_minimal_output_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            output_dir = root / "out"
+            run_dir = output_dir / "000_upstream"
+            run_dir.mkdir(parents=True)
+            plots_dir = output_dir / "plots"
+            plots_dir.mkdir(parents=True)
+            eval_cfg = root / "eval.yaml"
+            eval_cfg.write_text(
+                """
+env_id: swm/PushT-v1
+checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
+data: {path: data/pusht_swm.lance, format: lance}
+eval: {seed: 0}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
+""",
+                encoding="utf-8",
+            )
+            manifest_path = root / "manifest.json"
+            bench_cfg = root / "benchmark.yaml"
+            bench_cfg.write_text(
+                f"""
+title: Minimal verifier fixture
+output_dir: {output_dir}
+env_id: swm/PushT-v1
+seed: 0
+eval_config: {eval_cfg}
+manifest: {{group: verifier_fixture, path: {manifest_path}}}
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/example
+""",
+                encoding="utf-8",
+            )
+            deps = {
+                "stable-worldmodel": {"sha256": "stable-worldmodel"},
+                "stable-pretraining": {"sha256": "stable-pretraining"},
+                "torch": {"sha256": "torch"},
+                "local_repo": {"commit_id": "local"},
+            }
+            manifest = generate_manifest(
+                env_id="swm/PushT-v1",
+                dataset_path="data/pusht_swm.lance",
+                pairs=[StartGoalPair(episode=0, start_step=0, goal_step=1, start_row=0, goal_row=1)],
+                goal_offset=1,
+                eval_budget=1,
+                seed=0,
+                restore_spec="pusht_state_goal_state",
+                dependency_shas=deps,
+            )
+            write_manifest(manifest_path, manifest)
+            for plot_name in BASE_REQUIRED_PLOTS:
+                (plots_dir / plot_name).write_bytes(b"png")
+
+            resolved_cfg = run_dir / "resolved_config.yaml"
+            resolved_cfg.write_text("env_id: swm/PushT-v1\n", encoding="utf-8")
+            eval_path = run_dir / "eval.json"
+            payload = {
+                "env_id": "swm/PushT-v1",
+                "checkpoint_epoch": 0,
+                "checkpoint_run_dir": "checkpoints_mwm/example",
+                "config": {"sha256": io_file_sha256(resolved_cfg)},
+                "manifest": {
+                    "path": str(manifest_path),
+                    "manifest_sha256": manifest["manifest_sha256"],
+                    "sha256": manifest_file_sha256(manifest_path),
+                },
+                "episodes": 1,
+                "goal_offset": 1,
+                "swm_results": {"success_rate": 100.0},
+                "planning_diagnostics": {
+                    "plans": 1,
+                    "steps": 1,
+                    "bits_used_total": 10,
+                    "dynamics_flops_total": 20,
+                    "plan_time_total_sec": 0.1,
+                    "summary": {"cem_cost_calls": 1, "candidate_action_values": 1},
+                },
+                "dependencies": deps,
+                "schedule": "fixed",
+                "role": "upstream_lewm_converted",
+                "seed": 0,
+                "wall_time_sec": 0.1,
+            }
+            write_json(eval_path, payload)
+            row = eval_summary_row("upstream", eval_path, payload)
+            self.assertEqual(row["dynamics_flops_total"], 20)
+            write_json(run_dir / "summary.json", {"run": row})
+            write_json(run_dir / "dependencies.json", deps)
+            write_json(run_dir / "planning_diagnostics.json", payload["planning_diagnostics"])
+            write_metrics_jsonl(run_dir / "metrics.jsonl", [row])
+            write_metrics_jsonl(run_dir / "episode_traces.jsonl", [{"episode_index": 0, "success": True}])
+            write_summary_csv(output_dir / "summary.csv", [row])
+            write_metrics_jsonl(output_dir / "metrics.jsonl", [row])
+            write_per_env_table(output_dir / "per_env_summary.csv", [row])
+            plots = [str(plots_dir / name) for name in sorted(BASE_REQUIRED_PLOTS)]
+            write_review_html(output_dir / "review.html", "Minimal verifier fixture", [row], [payload], plots=plots, expected_cells=1)
+            write_json(
+                output_dir / "summary.json",
+                {
+                    "title": "Minimal verifier fixture",
+                    "output_dir": str(output_dir),
+                    "runs": [row],
+                    "manifest": {"group": "verifier_fixture", "path": str(manifest_path), "seed": 0},
+                    "plots": plots,
+                },
+            )
+
+            with mock.patch.object(output_verify_module, "load_checkpoint_metadata_for_benchmark", return_value={}):
+                report = verify_benchmark_output(str(bench_cfg))
+                self.assertEqual(report["runs"], 1)
+
+                (plots_dir / next(iter(BASE_REQUIRED_PLOTS))).unlink()
+                with self.assertRaisesRegex(ValueError, "missing file"):
+                    verify_benchmark_output(str(bench_cfg))
+
     def test_benchmark_run_config_merges_env_overrides(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             cfg_path = Path(tmp) / "eval.yaml"
@@ -450,7 +654,7 @@ env:
   goal_conditioned: true
   kwargs:
     difficulty: base
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -563,7 +767,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -599,7 +803,7 @@ runs:
             config_path = checkpoint / CONFIG_FILENAME
             weights_path = checkpoint / WEIGHTS_FILENAME
             metadata_path = checkpoint / METADATA_FILENAME
-            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
             config_path.write_text(
                 json.dumps(
                     {
@@ -649,7 +853,7 @@ env_id: swm/PushT-v1
 checkpoint: {{run_dir: {checkpoint}, epoch: null}}
 data: {{path: data/pusht_swm.lance, format: lance}}
 eval: {{seed: 0}}
-planner: {{scheduler: {{policy: fixed, level: finest, rollout_level: base}}}}
+planner: {{scheduler: {{enabled: true, mpc: {{mode: fixed, level: finest}}, cem: {{mode: fixed, level: base}}, rollout: {{mode: fixed, level: base}}}}}}
 """,
                 encoding="utf-8",
             )
@@ -700,7 +904,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: missing_checkpoint, epoch: null}
 data: {path: data/upstream/pusht_expert_train.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -723,7 +927,8 @@ runs:
             result = subprocess.run(
                 [
                     sys.executable,
-                    "verify_mwm_benchmark.py",
+                    "-m",
+                    "mwm.benchmark.verify",
                     str(bench_cfg),
                     "--static-only",
                     "--no-checkpoints",
@@ -747,7 +952,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -812,7 +1017,7 @@ env_id: swm/PushT-v1
 checkpoint: {run_dir: checkpoints_mwm/example, epoch: null}
 data: {path: data/pusht_swm.lance, format: lance}
 eval: {seed: 0}
-planner: {scheduler: {policy: fixed, level: finest, rollout_level: base}}
+planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: finest}, cem: {mode: fixed, level: base}, rollout: {mode: fixed, level: base}}}
 """,
                 encoding="utf-8",
             )
@@ -861,7 +1066,7 @@ runs:
             cfg_path = root / CONFIG_FILENAME
             weights_path = root / WEIGHTS_FILENAME
             metadata_path = root / METADATA_FILENAME
-            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": []}
+            policy = {"shared": ["latent_producer"], "per_level": ["transition"], "reconstructor": ["decoder"]}
             cfg_path.write_text(
                 json.dumps(
                     {
@@ -1007,10 +1212,10 @@ runs:
         validate_benchmark_role_checkpoint_contract(row, metadata, errors)
 
         self.assertTrue(any("Le-WM base-adapter backend" in error for error in errors), errors)
-        self.assertTrue(any("generic base-adaptive target" in error for error in errors), errors)
+        self.assertTrue(any("generic Stable-WM builder target" in error for error in errors), errors)
         self.assertTrue(any("corrected architecture version" in error for error in errors), errors)
 
-    def test_role_checkpoint_contract_accepts_base_adaptive_lewm_target(self) -> None:
+    def test_role_checkpoint_contract_accepts_lewm_matryoshka_model_target(self) -> None:
         rows = [
             {"role": "upstream_lewm_converted", "checkpoint_run_dir": "checkpoints_mwm/upstream"},
             {"role": "retrained_lewm_identity", "checkpoint_run_dir": "checkpoints_mwm/retrained"},
@@ -1088,7 +1293,7 @@ runs:
         import lance
 
         from mwm.data.metadata import load_dataset_metadata
-        from scripts.research.convert_reacher_h5_to_lance import convert_reacher_h5_to_lance
+        from mwm.upstream.converters.reacher import convert_reacher_h5_to_lance
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1107,7 +1312,11 @@ runs:
 
             self.assertEqual(dataset.count_rows(), 4)
             self.assertEqual(dataset.schema.names, ["episode_idx", "step_idx", "pixels", "action", "qpos", "qvel", "observation"])
-            self.assertEqual(load_dataset_metadata(output)["restore_spec"], "reacher_qpos_match_qpos_qvel")
+            metadata = load_dataset_metadata(output)
+            self.assertEqual(metadata["restore_spec"], "reacher_qpos_match_qpos_qvel")
+            self.assertEqual(metadata["source"]["format"], "hdf5")
+            self.assertEqual(metadata["source"]["path"], str(source))
+            self.assertEqual(metadata["source"]["hf_dataset"], "quentinll/lewm-reacher")
 
     def test_ogb_cube_hdf5_conversion_writes_lance_dataset_and_metadata(self) -> None:
         import h5py
@@ -1115,7 +1324,7 @@ runs:
 
         from mwm.data.metadata import load_dataset_metadata
         from mwm.swm.restore import validate_restore_columns
-        from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+        from mwm.upstream.converters.ogb_cube import convert_ogb_cube_hdf5_to_lance
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -1172,7 +1381,7 @@ runs:
         import h5py
         import lance
 
-        from scripts.research.convert_ogb_cube_hdf5_to_lance import convert_ogb_cube_hdf5_to_lance
+        from mwm.upstream.converters.ogb_cube import convert_ogb_cube_hdf5_to_lance
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

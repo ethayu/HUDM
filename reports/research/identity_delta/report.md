@@ -35,6 +35,8 @@ Command:
 sbatch scripts/slurm_research_identity_seed_sweep.sbatch
 ```
 
+Current replay command: `sbatch scripts/research/slurm_research_identity_seed_sweep.sbatch`.
+
 Completed job: `6201181`, state `COMPLETED`, exit `0:0`, elapsed `00:23:10`, allocation `gres/gpu:90gb=1`, partition `b200-mig90`.
 
 The first submission, job `6201097`, failed in `00:00:19` before any eval episodes because `OmegaConf.from_dotlist()` cannot merge `runs.0...` overrides into a YAML list. I fixed the research wrapper to generate per-seed configs with OmegaConf and resubmitted as job `6201181`.
@@ -119,7 +121,7 @@ The official PushT upstream reference matrix at `${MWM_ARTIFACT_ROOT}/rollouts/l
 env MWM_SWEEP_ENVS=pusht \
   MWM_SWEEP_EPISODES=200 \
   MWM_SWEEP_SEEDS="0 1 2 42 100" \
-  sbatch scripts/slurm_research_identity_seed_sweep.sbatch
+  sbatch scripts/research/slurm_research_identity_seed_sweep.sbatch
 ```
 
 This directly tests whether the PushT identity advantage/neutrality survives lower sampling noise. Only if this 200-episode paired run shows a stable negative identity delta should we spend GPU time on training variants such as a PushT identity run with best-checkpoint selection and epoch-10/15/20 exports.
@@ -167,6 +169,8 @@ sbatch scripts/slurm_research_identity_seed_sweep.sbatch
 sacct -j 6201181 --format=JobID,JobName%30,State,ExitCode,Elapsed,AllocTRES%80 -P
 /vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python scripts/research_identity_delta_collect.py
 ```
+
+Current replay equivalents use `scripts/research/research_identity_delta_audit.py`, `scripts/research/research_identity_delta_collect.py`, `scripts/research/slurm_research_identity_seed_sweep.sbatch`, and `python -m mwm.benchmark.verify`.
 
 ## Blockers
 

@@ -30,21 +30,21 @@ while true; do
   if [[ "${active:-0}" == "0" ]]; then
     {
       echo "===== $(date -Is) verification ====="
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_pusht.yaml --static-only --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_pusht.yaml --static-only --roles upstream_lewm_converted mwm_dense
       static_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_pusht.yaml --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_pusht.yaml --roles upstream_lewm_converted mwm_dense
       full_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_reacher.yaml --static-only --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_reacher.yaml --static-only --roles upstream_lewm_converted mwm_dense
       static_reacher_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_reacher.yaml --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_reacher.yaml --roles upstream_lewm_converted mwm_dense
       full_reacher_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_ogb_cube.yaml --static-only --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_ogb_cube.yaml --static-only --roles upstream_lewm_converted mwm_dense
       static_ogb_cube_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_ogb_cube.yaml --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_ogb_cube.yaml --roles upstream_lewm_converted mwm_dense
       full_ogb_cube_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml --static-only --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_tworoom.yaml --static-only --roles upstream_lewm_converted mwm_dense
       static_tworoom_status="$?"
-      "$PY" verify_mwm_benchmark.py configs/benchmark/dense_tworoom.yaml --roles upstream_lewm_converted mwm_dense
+      "$PY" -m mwm.benchmark.verify configs/benchmark/dense_tworoom.yaml --roles upstream_lewm_converted mwm_dense
       full_tworoom_status="$?"
       echo "STATIC_VERIFY_PUSHT_EXIT=$static_status"
       echo "FULL_VERIFY_PUSHT_EXIT=$full_status"

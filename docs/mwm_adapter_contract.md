@@ -63,11 +63,11 @@ shared and non-encoder/tail modules should be per-level unless the base design
 requires otherwise:
 
 ```python
-ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
+ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=("decoder",))
 ```
 
-Invalid policies that leave no shared latent producer must be rejected through
-`validate_component_policy`.
+Invalid policies that leave no shared latent producer or select an unknown
+reconstructor component must be rejected through `validate_component_policy`.
 
 `resolve_spec(...)`
 
@@ -127,13 +127,16 @@ The shared builder:
 Adapters should not export family-named builder facades. The generic builder is
 the public construction API.
 
-## Generic Runtime Pieces
+## Runtime Pieces
 
-`mwm.models.world_model` is retained as a compatibility facade for older import
-paths. The shared runtime for Le-WM-shaped latent prediction is implemented in
-`mwm.models.base_adaptive.MatryoshkaWorldModel`, with support types split across
-`mwm.models.transitions`, `mwm.models.objectives`, and
-`mwm.models.planning_costs`:
+Concrete runtime behavior lives in family model modules. Shared runtime typing
+and common conventions live in `mwm.models.common.MatryoshkaRuntimeModel`; family
+semantics live in modules such as `mwm.models.lewm` and `mwm.models.prejepa`.
+Support types remain split across `mwm.models.transitions`, `mwm.models.losses`,
+`mwm.models.objectives`, `mwm.models.planning_costs`, and
+`mwm.diagnostics.flops`.
+
+`mwm.models.lewm.LeWMMatryoshkaWorldModel` owns Le-WM-shaped latent prediction:
 
 - shared encoder/projector latent production;
 - per-level `TransitionPackage(action_encoder, predictor, pred_proj)`;
@@ -143,31 +146,29 @@ paths. The shared runtime for Le-WM-shaped latent prediction is implemented in
 - fidelity-aware rollout/cost for the current evaluator.
 
 If another base has the same latent-transition shape, reuse
-`TransitionPackage` and return `MatryoshkaWorldModel`.
+`TransitionPackage` and add a concrete family runtime class that shares the Le-WM
+implementation where appropriate.
 
-If another base has a different objective or rollout contract, add the generic
-hook in the owning model module for base-provided per-level loss/rollout
-behavior and re-export it from `world_model.py` only if compatibility requires
-it. Do not put special inference behavior or hidden source-model calls in the
-adapter.
+If another base has a different objective or rollout contract, add that behavior
+to the owning family runtime module. Do not put special inference behavior or
+hidden source-model calls in the adapter.
 
 Use this rule of thumb:
 
 - if the base encodes pixels to a latent, encodes actions, predicts next latent
   prefixes, and scores planning rollouts through those predicted latents, the
-  existing `MatryoshkaWorldModel` plus `TransitionPackage` may be enough;
-- if the base has a different per-level objective, the generic model should gain
-  a reusable loss hook such as "call this base loss on each level package, then
-  aggregate";
-- if the base has a different rollout contract, the generic model should gain a
-  reusable rollout hook, while the adapter only supplies the modules and config
-  needed by that hook.
+  Le-WM runtime pattern plus `TransitionPackage` may be enough;
+- if the base has a different per-level objective, implement that objective in
+  the family runtime and aggregate losses there;
+- if the base has a different rollout contract, implement rollout and cost in
+  the family runtime, while the adapter only supplies modules and config.
 
 The framework boundary is: adapters construct base-derived modules and metadata;
-`mwm.models.base_adaptive` owns shared latent reuse, per-level dispatch, loss
+family runtime modules own shared latent reuse, per-level dispatch, loss
 aggregation, and planner-facing runtime behavior. Supporting transition,
-objective, loss, and planning-cost behavior belongs in the corresponding
-`mwm.models.*` modules; checkpoint persistence belongs in `mwm.checkpoint_io`.
+objective, loss, planning-cost, and diagnostic behavior belongs in the
+corresponding `mwm.models.*` or `mwm.diagnostics.*` modules; checkpoint
+persistence belongs in `mwm.checkpoint_io`.
 
 ## Training And Evaluation Wiring
 
@@ -176,11 +177,11 @@ To make a new family trainable:
 - add the family to the Stable-WM registry mapping in `mwm/adapters/registry.py`;
 - add a train config with `base.family`, source checkpoint, data path, `D`, `K`,
   and the base training recipe;
-- route `train_mwm.py` to the generic builder for that family and its dataset
+- route `mwm.training.stable_wm` to the generic builder for that family and its dataset
   shape;
 - export canonical checkpoints with `config.json`, `weights.pt`, and
   `world_metadata.json`;
-- teach `verify_mwm_benchmark.py` the expected checkpoint contract for the new
+- teach `mwm.benchmark.checkpoint_verify` the expected checkpoint contract for the new
   role/family;
 - add benchmark config rows for the relevant environments.
 

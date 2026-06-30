@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Any
 
 import torch
 
 from mwm.checkpoint_contract import validate_checkpoint_contract
+from mwm.checkpoint_keymaps import (
+    remap_custom_vit_encoder_keys_to_hf,
+    remap_hf_vit_encoder_keys,
+    remap_vit_encoder_keys_for_model,
+)
 from mwm.imports import import_object
 from mwm.io import file_sha256, load_json, write_json
 
@@ -72,6 +76,8 @@ def save_world_checkpoint(
     if isinstance(model_metadata, dict):
         for key in (
             "action_spec",
+            "action_dim",
+            "action_block",
             "preprocessing_spec",
             "architecture_version",
             "head_architectures",
@@ -82,6 +88,17 @@ def save_world_checkpoint(
             "fresh_init",
             "loss_scope",
             "training_recipe",
+            "D",
+            "D_visual",
+            "full_dim",
+            "extra_dims",
+            "extra_input_dims",
+            "extra_order",
+            "level_dims",
+            "num_patches",
+            "patch_size",
+            "backbone_name",
+            "fixed_extra_policy",
         ):
             if key in model_metadata and key not in meta:
                 meta[key] = model_metadata[key]
@@ -101,81 +118,6 @@ def instantiate_from_config(config: dict[str, Any]) -> Any:
         raise ValueError("MWM config.json must include `target`.")
     kwargs = dict(config.get("kwargs", {}))
     return import_object(str(target))(**kwargs)
-
-
-def remap_hf_vit_encoder_keys(state_dict: dict[str, Any]) -> dict[str, Any]:
-    """Translate HF ViT encoder keys to the custom ViT key layout."""
-    hf_attention_map = {
-        "attention.attention.query": "attention.q_proj",
-        "attention.attention.key": "attention.k_proj",
-        "attention.attention.value": "attention.v_proj",
-        "attention.output.dense": "attention.o_proj",
-        "intermediate.dense": "mlp.fc1",
-        "output.dense": "mlp.fc2",
-    }
-    hf_layer_re = re.compile(r"^encoder\.encoder\.layer\.(\d+)\.(.*)")
-
-    def remap_key(key: str) -> str:
-        match = hf_layer_re.match(key)
-        if not match:
-            return key
-        idx, rest = match.group(1), match.group(2)
-        for hf_prefix, custom_prefix in hf_attention_map.items():
-            if rest == hf_prefix or rest.startswith(f"{hf_prefix}."):
-                rest = custom_prefix + rest[len(hf_prefix):]
-                break
-        return f"encoder.layers.{idx}.{rest}"
-
-    if not any(hf_layer_re.match(key) for key in state_dict):
-        return state_dict
-    return {remap_key(key): value for key, value in state_dict.items()}
-
-
-def remap_custom_vit_encoder_keys_to_hf(state_dict: dict[str, Any]) -> dict[str, Any]:
-    """Translate custom Le-WM ViT encoder keys to the HF ViT key layout."""
-    custom_attention_map = {
-        "attention.q_proj": "attention.attention.query",
-        "attention.k_proj": "attention.attention.key",
-        "attention.v_proj": "attention.attention.value",
-        "attention.o_proj": "attention.output.dense",
-        "mlp.fc1": "intermediate.dense",
-        "mlp.fc2": "output.dense",
-    }
-    custom_layer_re = re.compile(r"^encoder\.layers\.(\d+)\.(.*)")
-
-    def remap_key(key: str) -> str:
-        match = custom_layer_re.match(key)
-        if not match:
-            return key
-        idx, rest = match.group(1), match.group(2)
-        for custom_prefix, hf_prefix in custom_attention_map.items():
-            if rest == custom_prefix or rest.startswith(f"{custom_prefix}."):
-                rest = hf_prefix + rest[len(custom_prefix):]
-                break
-        return f"encoder.encoder.layer.{idx}.{rest}"
-
-    if not any(custom_layer_re.match(key) for key in state_dict):
-        return state_dict
-    return {remap_key(key): value for key, value in state_dict.items()}
-
-
-def remap_vit_encoder_keys_for_model(state_dict: dict[str, Any], model: Any) -> dict[str, Any]:
-    """Map serialized ViT encoder keys into the instantiated model's key layout."""
-    model_keys = set(model.state_dict())
-    state_keys = set(state_dict)
-    if state_keys <= model_keys:
-        return state_dict
-
-    model_uses_hf = any(key.startswith("encoder.encoder.layer.") for key in model_keys)
-    model_uses_custom = any(key.startswith("encoder.layers.") for key in model_keys)
-    state_uses_hf = any(key.startswith("encoder.encoder.layer.") for key in state_keys)
-    state_uses_custom = any(key.startswith("encoder.layers.") for key in state_keys)
-
-    if state_uses_hf and model_uses_custom:
-        return remap_hf_vit_encoder_keys(state_dict)
-    if state_uses_custom and model_uses_hf:
-        return remap_custom_vit_encoder_keys_to_hf(state_dict)
-    return state_dict
 
 
 def load_checkpoint_config_and_metadata(run_dir: str | Path) -> tuple[dict[str, Any], dict[str, Any]]:
@@ -235,9 +177,43 @@ def load_world_model_from_checkpoint(
     config, metadata = validate_checkpoint_directory(root, strict_artifacts=False, strict_metadata=False)
     model = instantiate_from_config(config).to(device)
     state_dict = torch.load(weights_path, map_location=device, weights_only=False)
-    model.load_state_dict(remap_vit_encoder_keys_for_model(state_dict, model))
+    remapped = remap_vit_encoder_keys_for_model(state_dict, model)
+    incompatible = model.load_state_dict(remapped, strict=False)
+    missing = list(incompatible.missing_keys)
+    unexpected = list(incompatible.unexpected_keys)
+    if missing or unexpected:
+        if not _allow_legacy_lewm_missing_decoders(config, metadata, missing, unexpected):
+            details = []
+            if missing:
+                details.append(f"Missing key(s): {missing}")
+            if unexpected:
+                details.append(f"Unexpected key(s): {unexpected}")
+            raise RuntimeError("Error(s) in loading state_dict for MWM checkpoint: " + "; ".join(details))
     model.eval()
     return model, metadata, 0
+
+
+def _allow_legacy_lewm_missing_decoders(
+    config: dict[str, Any],
+    metadata: dict[str, Any],
+    missing: list[str],
+    unexpected: list[str],
+) -> bool:
+    if unexpected or not missing:
+        return False
+    kwargs = config.get("kwargs", {})
+    if not isinstance(kwargs, dict):
+        return False
+    family = str(kwargs.get("family", metadata.get("adapter_family", ""))).lower()
+    if family != "lewm":
+        return False
+    policy = kwargs.get("component_policy", metadata.get("component_policy", {}))
+    if not isinstance(policy, dict):
+        return False
+    reconstructor = policy.get("reconstructor", None)
+    if reconstructor != []:
+        return False
+    return all(key.startswith("decoders.") for key in missing)
 
 
 __all__ = [

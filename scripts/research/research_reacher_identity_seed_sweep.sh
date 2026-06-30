@@ -48,5 +48,5 @@ for run in cfg.runs:
     run.eval.num_envs = int(num_envs)
 Path(dst).write_text(OmegaConf.to_yaml(cfg), encoding="utf-8")
 PY
-  "$PY" benchmark_mwm.py "$generated_cfg"
+  "$PY" -m mwm.benchmark.matrix "$generated_cfg"
 done

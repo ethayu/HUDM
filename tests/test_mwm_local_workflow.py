@@ -17,14 +17,15 @@ class MWMLocalWorkflowTests(unittest.TestCase):
             "collect_ogb_cube_smoke.yaml",
             "collect_reacher_smoke.yaml",
             "eval_pusht_smoke.yaml",
+            "eval_pusht_all_axis_fidelity_smoke.yaml",
             "benchmark_pusht_smoke.yaml",
-            "train_ogb_cube_cpu_smoke.yaml",
-            "train_pusht_cpu_smoke.yaml",
-            "train_reacher_cpu_smoke.yaml",
+            "train_lewm_ogb_cube_cpu_smoke.yaml",
+            "train_lewm_pusht_cpu_smoke.yaml",
+            "train_lewm_reacher_cpu_smoke.yaml",
         }
         self.assertEqual({path.name for path in local_dir.glob("*.yaml")}, expected)
 
-        train_cfg = yaml.safe_load((local_dir / "train_pusht_cpu_smoke.yaml").read_text(encoding="utf-8"))
+        train_cfg = yaml.safe_load((local_dir / "train_lewm_pusht_cpu_smoke.yaml").read_text(encoding="utf-8"))
         self.assertTrue(train_cfg["train"]["no_cuda"])
         self.assertEqual(train_cfg["train"]["cpu_devices"], 1)
         self.assertLessEqual(train_cfg["train"]["batch_size"], 2)
@@ -53,7 +54,7 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         self.assertEqual(reacher_collect_cfg["keys_to_save"], ["pixels", "action", "qpos", "qvel", "observation"])
         self.assertLessEqual(reacher_collect_cfg["episodes"], 4)
 
-        reacher_train_cfg = yaml.safe_load((local_dir / "train_reacher_cpu_smoke.yaml").read_text(encoding="utf-8"))
+        reacher_train_cfg = yaml.safe_load((local_dir / "train_lewm_reacher_cpu_smoke.yaml").read_text(encoding="utf-8"))
         self.assertEqual(reacher_train_cfg["env_id"], "swm/ReacherDMControl-v0")
         self.assertEqual(reacher_train_cfg["data"]["frameskip"], 5)
         self.assertEqual(reacher_train_cfg["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"])
@@ -78,7 +79,7 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         )
         self.assertLessEqual(cube_collect_cfg["episodes"], 4)
 
-        cube_train_cfg = yaml.safe_load((local_dir / "train_ogb_cube_cpu_smoke.yaml").read_text(encoding="utf-8"))
+        cube_train_cfg = yaml.safe_load((local_dir / "train_lewm_ogb_cube_cpu_smoke.yaml").read_text(encoding="utf-8"))
         self.assertEqual(cube_train_cfg["env_id"], "swm/OGBCube-v0")
         self.assertEqual(cube_train_cfg["base"]["checkpoint"], "models--quentinll--lewm-cube")
         self.assertEqual(cube_train_cfg["data"]["frameskip"], 5)
@@ -115,16 +116,16 @@ class MWMLocalWorkflowTests(unittest.TestCase):
         reacher_text = (ROOT / "scripts" / "local" / "local_reacher_train_smoke.sh").read_text(encoding="utf-8")
         self.assertIn('${MUJOCO_GL:-egl}', reacher_text)
         self.assertIn('${PYOPENGL_PLATFORM:-egl}', reacher_text)
-        self.assertIn("collect_mwm_data.py configs/local/collect_reacher_smoke.yaml", reacher_text)
-        self.assertIn("train_mwm.py configs/local/train_reacher_cpu_smoke.yaml", reacher_text)
+        self.assertIn("-m mwm.data.collection configs/local/collect_reacher_smoke.yaml", reacher_text)
+        self.assertIn("-m mwm.training.stable_wm configs/local/train_lewm_reacher_cpu_smoke.yaml", reacher_text)
         for name in ("config.json", "weights.pt", "world_metadata.json"):
             self.assertIn(name, reacher_text)
 
         cube_text = (ROOT / "scripts" / "local" / "local_ogb_cube_train_smoke.sh").read_text(encoding="utf-8")
         self.assertIn('${MUJOCO_GL:-egl}', cube_text)
         self.assertIn('${PYOPENGL_PLATFORM:-egl}', cube_text)
-        self.assertIn("collect_mwm_data.py configs/local/collect_ogb_cube_smoke.yaml", cube_text)
-        self.assertIn("train_mwm.py configs/local/train_ogb_cube_cpu_smoke.yaml", cube_text)
+        self.assertIn("-m mwm.data.collection configs/local/collect_ogb_cube_smoke.yaml", cube_text)
+        self.assertIn("-m mwm.training.stable_wm configs/local/train_lewm_ogb_cube_cpu_smoke.yaml", cube_text)
         for name in ("config.json", "weights.pt", "world_metadata.json"):
             self.assertIn(name, cube_text)
 

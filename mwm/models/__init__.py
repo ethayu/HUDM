@@ -1,12 +1,13 @@
-from mwm.models.losses import latent_regularizer_loss, matryoshka_base_loss, weighted_level_mean
-from mwm.models.world_model import ImageNetPreprocess, MatryoshkaWorldModel, MWMWorldModel, TransitionPackage
+"""Model namespace package.
 
-__all__ = [
-    "ImageNetPreprocess",
-    "MatryoshkaWorldModel",
-    "MWMWorldModel",
-    "TransitionPackage",
-    "latent_regularizer_loss",
-    "matryoshka_base_loss",
-    "weighted_level_mean",
-]
+Import concrete model APIs from their owner modules:
+
+- `mwm.models.core`
+- `mwm.models.common`
+- `mwm.models.lewm`
+- `mwm.models.prejepa`
+- `mwm.models.transitions`
+- `mwm.models.losses`
+"""
+
+__all__: list[str] = []

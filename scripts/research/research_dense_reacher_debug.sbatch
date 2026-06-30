@@ -46,6 +46,6 @@ torch.cuda.synchronize()
 print("cuda allocation probe ok", probe.device)
 PY
 
-"$PY" verify_mwm_benchmark.py "$CONFIG" --static-only
-"$PY" benchmark_mwm.py "$CONFIG"
-"$PY" verify_mwm_benchmark.py "$CONFIG"
+"$PY" -m mwm.benchmark.verify "$CONFIG" --static-only
+"$PY" -m mwm.benchmark.matrix "$CONFIG"
+"$PY" -m mwm.benchmark.verify "$CONFIG"

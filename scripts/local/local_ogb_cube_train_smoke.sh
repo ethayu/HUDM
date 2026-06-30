@@ -16,12 +16,12 @@ fi
 
 DATASET="data/ogb_cube_smoke.lance"
 if [[ ! -e "$DATASET" ]]; then
-  "$PY" collect_mwm_data.py configs/local/collect_ogb_cube_smoke.yaml
+  "$PY" -m mwm.data.collection configs/local/collect_ogb_cube_smoke.yaml
 else
   echo "Using existing OGBench Cube smoke dataset: $DATASET"
 fi
 
-"$PY" train_mwm.py configs/local/train_ogb_cube_cpu_smoke.yaml
+"$PY" -m mwm.training.stable_wm configs/local/train_lewm_ogb_cube_cpu_smoke.yaml
 
 CHECKPOINT="checkpoints_mwm/local_ogb_cube_cpu_smoke"
 for name in config.json weights.pt world_metadata.json; do

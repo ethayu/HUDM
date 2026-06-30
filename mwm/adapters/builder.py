@@ -3,10 +3,11 @@ from __future__ import annotations
 import copy
 from typing import Any, Sequence
 
+import torch.nn as nn
+
 from mwm.adapters.base import ComponentPolicy
-from mwm.adapters.registry import adapter_for_family, family_for_target
+from mwm.adapters.registry import adapter_for_family, canonical_family, family_for_target
 from mwm.adapters.stable_config import root_target
-from mwm.models.base_adaptive import MatryoshkaWorldModel
 
 
 STABLE_CONFIG_TARGET = "mwm.adapters.builder.build_mwm_from_stable_config"
@@ -16,9 +17,10 @@ def _family_from_source_config(family: str | None, source_config: dict[str, Any]
     detected = family_for_target(root_target(source_config))
     if family is None:
         return detected
-    if str(family) != detected:
+    requested = canonical_family(str(family))
+    if requested != detected:
         raise ValueError(f"Configured Stable-WM base family {family!r} does not match config target family {detected!r}.")
-    return str(family)
+    return requested
 
 
 def _set_model_config(model: Any, target: str, kwargs: dict[str, Any]) -> None:
@@ -38,14 +40,15 @@ def build_mwm_from_stable_config(
     image_shape: Sequence[int] = (224, 224),
     normalize_imagenet: bool = True,
     component_policy: ComponentPolicy | dict[str, Any] | None = None,
-) -> MatryoshkaWorldModel:
+) -> nn.Module:
     resolved_family = _family_from_source_config(family, source_config)
     adapter = adapter_for_family(resolved_family)
-    policy = (
-        component_policy
-        if isinstance(component_policy, ComponentPolicy)
-        else ComponentPolicy.from_mapping(component_policy)
-    )
+    if isinstance(component_policy, ComponentPolicy):
+        policy = component_policy
+    elif component_policy is None:
+        policy = None
+    else:
+        policy = ComponentPolicy.from_mapping(component_policy)
     spec = adapter.resolve_spec(
         source_config=source_config,
         source_config_sha256=source_config_sha256,

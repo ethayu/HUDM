@@ -17,6 +17,7 @@
     ],
     "job_id": 6791697,
     "command": "sbatch scripts/research_dense_reacher_debug.sbatch",
+    "current_replay_command": "sbatch scripts/research/research_dense_reacher_debug.sbatch",
     "partition": "b200-mig90",
     "state": "COMPLETED",
     "elapsed": "00:20:11",

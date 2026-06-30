@@ -358,8 +358,8 @@
       "description": "Train TwoRoom dense with high-K-weighted matryoshka loss, then rerun K monotonicity matrix.",
       "config": "configs/research/train_mwm_dense_tworoom_highk_weighted.yaml",
       "level_weights": [0.25, 0.25, 0.5, 1.0, 2.0, 4.0],
-      "training_command": "sbatch --job-name=mwm_dense_tworoom_highk --output=logs/%x_%j.out --error=logs/%x_%j.err --partition=dgx-b200 --gres=gpu:B200:1 --ntasks=1 --cpus-per-task=16 --mem=128G --time=4-00:00:00 --wrap='cd \"$SLURM_SUBMIT_DIR\" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=/vast/projects/dineshj/lab/ethanyu/code/HUDM && [[ -e data ]] || ln -s \"$ARTIFACT_ROOT/data\" data && $MWM_PYTHON verify_mwm_data.py --paper-parity && $MWM_PYTHON train_mwm.py configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'",
-      "eval_command": "DENSE_K_ENV=tworoom DENSE_K_EXTRA_ARGS='--tworoom-checkpoint <new_checkpoint_dir> --output-root reports/research/dense_debug/rollouts/k_monotonicity_tworoom_highk' sbatch --export=ALL,DENSE_K_ENV,DENSE_K_EXTRA_ARGS scripts/research_dense_k_monotonicity.sbatch"
+      "training_command": "sbatch --job-name=mwm_dense_tworoom_highk --output=logs/%x_%j.out --error=logs/%x_%j.err --partition=dgx-b200 --gres=gpu:B200:1 --ntasks=1 --cpus-per-task=16 --mem=128G --time=4-00:00:00 --wrap='cd \"$SLURM_SUBMIT_DIR\" && export MWM_PYTHON=/vast/projects/dineshj/lab/ethanyu/conda/envs/mwm/bin/python && export PYTHONUNBUFFERED=1 && export TOKENIZERS_PARALLELISM=false && export MPLBACKEND=Agg && export ARTIFACT_ROOT=/vast/projects/dineshj/lab/ethanyu/code/HUDM && [[ -e data ]] || ln -s \"$ARTIFACT_ROOT/data\" data && $MWM_PYTHON -m mwm.data.verify --paper-parity && $MWM_PYTHON -m mwm.training.lewm configs/research/train_mwm_dense_tworoom_highk_weighted.yaml'",
+      "eval_command": "Current replay requires rebuilding the archived K-monotonicity matrix with python -m mwm.benchmark.matrix; no active K-monotonicity sbatch wrapper is checked in."
     }
   },
   "blockers": [

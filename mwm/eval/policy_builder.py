@@ -1,13 +1,15 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import torch
 from omegaconf import OmegaConf
 from stable_worldmodel.policy import PlanConfig
 
-from mwm.eval.policy import MWMWorldModelPolicy, mwm_image_input_transform
 from mwm.planning.scheduled_cem import MWMScheduledCEMSolver
+from mwm.preprocessing.images import mwm_image_input_transform
+from mwm.eval.policy import MWMWorldModelPolicy
 
 
 def build_mwm_policy(
@@ -36,6 +38,9 @@ def build_mwm_policy(
     )
     raw_pop_schedule = cfg.planner.get("pop_schedule", None)
     pop_schedule = OmegaConf.to_container(raw_pop_schedule, resolve=True) if raw_pop_schedule else None
+    replan_interval = max(1, int(cfg.planner.receding_horizon) * int(action_block))
+    eval_budget = int(cfg.eval.get("budget", cfg.planner.horizon))
+    max_replans = max(1, int(math.ceil(eval_budget / replan_interval)))
     solver = MWMScheduledCEMSolver(
         model,
         batch_size=max(1, planner_batch_size),
@@ -50,6 +55,8 @@ def build_mwm_policy(
         std_unbiased=bool(cfg.planner.get("std_unbiased", True)),
         pop_schedule=pop_schedule,
         elite_frac=float(cfg.planner.elite_frac) if pop_schedule is not None else None,
+        max_replans=max_replans,
+        flop_accounting=str(cfg.planner.get("flop_accounting", "none")),
     )
     plan_cfg = PlanConfig(
         horizon=int(cfg.planner.horizon),
