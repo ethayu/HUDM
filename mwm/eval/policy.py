@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from mwm.io import jsonable
+
 try:
     from stable_worldmodel.policy import WorldModelPolicy
 except Exception:  # pragma: no cover - optional dependency
@@ -34,6 +36,7 @@ class MWMWorldModelPolicy(WorldModelPolicy):
         self.config = config
         self._action_calls = 0
         self._policy_time_sec = 0.0
+        self._action_trace: list[list[Any]] = []
         if config is None:
             raise ValueError("MWMWorldModelPolicy requires a Stable-WM PlanConfig.")
         super().__init__(solver=solver, config=config, **kwargs)
@@ -43,11 +46,28 @@ class MWMWorldModelPolicy(WorldModelPolicy):
 
     def get_action(self, info_dict: dict[str, Any], **kwargs: Any) -> Any:
         start = time.perf_counter()
+        action: Any = None
+        recorded = False
         try:
-            return super().get_action(info_dict, **kwargs)
+            action = super().get_action(info_dict, **kwargs)
+            recorded = True
+            return action
         finally:
+            if recorded:
+                self._record_action(action)
             self._action_calls += 1
             self._policy_time_sec += time.perf_counter() - start
+
+    def _record_action(self, action: Any) -> None:
+        data = jsonable(action)
+        if isinstance(data, list) and data and all(isinstance(row, list) for row in data):
+            rows = data
+        else:
+            rows = [data]
+        if len(self._action_trace) < len(rows):
+            self._action_trace.extend([] for _ in range(len(rows) - len(self._action_trace)))
+        for idx, row in enumerate(rows):
+            self._action_trace[idx].append(row)
 
     def set_env(self, env: Any) -> None:
         super().set_env(env)
@@ -57,6 +77,7 @@ class MWMWorldModelPolicy(WorldModelPolicy):
             self.solver.reset_history()
         self._action_calls = 0
         self._policy_time_sec = 0.0
+        self._action_trace = []
         for buf in getattr(self, "_action_buffer", []) or []:
             buf.clear()
         if hasattr(self, "_next_init"):
@@ -94,6 +115,9 @@ class MWMWorldModelPolicy(WorldModelPolicy):
                 "candidate_action_values": total_candidate_action_values,
             },
         }
+
+    def review_trace(self) -> dict[str, Any]:
+        return {"action_trace": jsonable(self._action_trace)}
 
 
 __all__ = [

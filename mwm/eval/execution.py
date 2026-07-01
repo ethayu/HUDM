@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 
 from mwm.data.sampling import StartGoalPair
 from mwm.eval.policy_builder import build_mwm_policy
+from mwm.eval.videos import collect_video_paths
 from mwm.io import jsonable
 from mwm.swm.envs import make_swm_world, parse_env_kwargs, validate_continuous_box_action_space
 
@@ -59,7 +60,9 @@ def run_batch(
             goal_offset=int(cfg.eval.goal_offset),
             video=str(batch_video_path) if bool(cfg.eval.save_video) else None,
         )
-        videos = sorted(str(p) for p in batch_video_path.glob("rollout_*.mp4")) if bool(cfg.eval.save_video) else []
+        videos = [str(p) for p in collect_video_paths(batch_video_path)] if bool(cfg.eval.save_video) else []
+        diagnostics = policy.diagnostics() if hasattr(policy, "diagnostics") else {}
+        review_trace = policy.review_trace() if hasattr(policy, "review_trace") else {}
         return {
             "pairs": [
                 {
@@ -72,7 +75,8 @@ def run_batch(
                 for p in pairs
             ],
             "swm_results": jsonable(swm_results),
-            "planning_diagnostics": policy.diagnostics() if hasattr(policy, "diagnostics") else {},
+            "planning_diagnostics": diagnostics,
+            "review_trace": jsonable(review_trace),
             "videos": videos,
         }
     finally:
