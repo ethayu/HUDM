@@ -1,8 +1,7 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Iterable
-
-import numpy as np
 
 
 def float_metric(value: Any, default: float = 0.0) -> float:
@@ -14,8 +13,8 @@ def float_metric(value: Any, default: float = 0.0) -> float:
 
 def mean_metric(values: Iterable[Any]) -> float:
     vals = [float_metric(v, float("nan")) for v in values]
-    vals = [v for v in vals if not np.isnan(v)]
-    return float(np.mean(vals)) if vals else float("nan")
+    vals = [v for v in vals if not math.isnan(v)]
+    return float(sum(vals) / len(vals)) if vals else float("nan")
 
 
 def role_label(role: str) -> str:

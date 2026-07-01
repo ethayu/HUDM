@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 import html
+import math
 from pathlib import Path
 from typing import Any
-
-import numpy as np
 
 from mwm.benchmark.analysis import env_label, float_metric, outcome_rows, paired_rows, role_label, sorted_rows
 
@@ -16,12 +15,12 @@ def _short(value: Any, chars: int = 10) -> str:
 
 def _pct(value: Any) -> str:
     val = float_metric(value, float("nan"))
-    return "n/a" if np.isnan(val) else f"{val:.1f}%"
+    return "n/a" if math.isnan(val) else f"{val:.1f}%"
 
 
 def _num(value: Any) -> str:
     val = float_metric(value, float("nan"))
-    if np.isnan(val):
+    if math.isnan(val):
         return "n/a"
     if abs(val) >= 1_000_000_000:
         return f"{val / 1_000_000_000:.2f}B"
@@ -34,7 +33,7 @@ def _num(value: Any) -> str:
 
 def _seconds(value: Any) -> str:
     val = float_metric(value, float("nan"))
-    if np.isnan(val):
+    if math.isnan(val):
         return "n/a"
     return f"{val:.1f}s" if val < 120 else f"{val / 60:.1f}m"
 
@@ -60,6 +59,37 @@ def _link(path_text: Any, label: str, base_dir: Path) -> str:
     if not href:
         return html.escape(label)
     return f"<a href='{html.escape(href)}'>{html.escape(label)}</a>"
+
+
+def _rollout_review_href(run_dir: Path, episode_index: int) -> str:
+    return f"rollouts/{html.escape(run_dir.name)}/episode_{int(episode_index):04d}.html"
+
+
+def _payload_rollouts(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    rollouts = payload.get("review_rollouts", [])
+    return [dict(item) for item in rollouts if isinstance(item, dict)]
+
+
+def _review_media_items(payload: dict[str, Any], base_dir: Path) -> list[str]:
+    items: list[str] = []
+    media = payload.get("review_media", {}).get("rollouts", {})
+    if not isinstance(media, dict):
+        return items
+    for rollout_key, entries in sorted(media.items()):
+        if not isinstance(entries, dict):
+            continue
+        for kind, entry in sorted(entries.items()):
+            if not isinstance(entry, dict) or not entry.get("path"):
+                continue
+            href = _href(entry["path"], base_dir)
+            label = f"{rollout_key} {str(kind).replace('_', ' ')}"
+            items.append(
+                "<li>"
+                f"<a href='{html.escape(href)}'>{html.escape(label)}</a>"
+                f"<video controls preload='metadata' src='{html.escape(href)}'></video>"
+                "</li>"
+            )
+    return items
 
 def _benchmark_status_cards(rows: list[dict[str, Any]], plots: list[str], expected_cells: int | None = None) -> tuple[str, list[str]]:
     envs = sorted({str(row.get("env_id", "")) for row in rows})
@@ -153,8 +183,22 @@ def write_review_html(
         )
 
     detail_rows = []
-    for row in rows:
+    payload_by_run_dir: dict[str, dict[str, Any]] = {}
+    for payload in outputs:
+        resolved_path = payload.get("config", {}).get("resolved_path") if isinstance(payload.get("config"), dict) else None
+        if resolved_path:
+            payload_by_run_dir[str(Path(str(resolved_path)).parent)] = payload
+    for row_idx, row in enumerate(rows):
         run_dir = Path(str(row.get("output_json", ""))).parent
+        payload = payload_by_run_dir.get(str(run_dir)) or (outputs[row_idx] if row_idx < len(outputs) else {})
+        rollout_links = []
+        for rollout in _payload_rollouts(payload):
+            if "episode_index" not in rollout:
+                continue
+            idx = int(rollout["episode_index"])
+            rollout_links.append(f"<a href='{_rollout_review_href(run_dir, idx)}'>rollout {idx}</a>")
+        if not rollout_links and int(row.get("episodes", 0)) > 0:
+            rollout_links.append(f"<a href='{_rollout_review_href(run_dir, 0)}'>rollouts</a>")
         links = " ".join(
             _link(run_dir / name, label, base_dir)
             for name, label in (
@@ -166,6 +210,8 @@ def write_review_html(
                 ("run.log", "log"),
             )
         )
+        if rollout_links:
+            links = " ".join([links, *rollout_links])
         detail_rows.append(
             "<tr>"
             f"<td>{html.escape(env_label(str(row.get('env_id', ''))))}</td>"
@@ -187,6 +233,7 @@ def write_review_html(
         for video in payload.get("videos", []):
             path_text = str(video)
             media_links.append(f"<li>{_link(path_text, path_text, base_dir)}</li>")
+        media_links.extend(_review_media_items(payload, base_dir))
 
     body = f"""<!doctype html>
 <html>
@@ -210,6 +257,7 @@ def write_review_html(
     .plots {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }}
     figure {{ margin: 0; background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; }}
     img {{ max-width: 100%; height: auto; display: block; }}
+    video {{ display: block; max-width: 520px; width: 100%; margin-top: 8px; background: #000; }}
     figcaption {{ color: #52616b; font-size: 13px; margin-top: 8px; text-transform: capitalize; }}
     table {{ border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 14px; }}
     th, td {{ border-bottom: 1px solid #d9e2ec; padding: 8px 10px; text-align: left; vertical-align: top; }}

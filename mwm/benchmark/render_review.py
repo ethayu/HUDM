@@ -58,9 +58,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Render plots and a static HTML review for an existing SWM benchmark output directory.")
     parser.add_argument("output_dir", nargs="?", default="rollouts/mwm_benchmark")
     parser.add_argument("--title", default=None)
+    parser.add_argument("--serve", action="store_true", help="Serve the review locally with per-rollout render buttons.")
+    parser.add_argument("--host", default="127.0.0.1", help="Host for --serve.")
+    parser.add_argument("--port", type=int, default=8765, help="Port for --serve.")
     args = parser.parse_args()
     report = render_benchmark_review(args.output_dir, title=args.title)
     print(json.dumps(report, indent=2, sort_keys=True))
+    if args.serve:
+        from mwm.benchmark.review_server import serve_review
+
+        serve_review(args.output_dir, host=args.host, port=args.port)
 
 
 if __name__ == "__main__":
