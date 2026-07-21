@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from contextlib import contextmanager
 from pathlib import Path
 import shutil
-from typing import Any, Iterable
+import math
+from typing import Any, Callable, Iterable
 
 from mwm.eval.videos import collect_video_paths
 from mwm.eval.review_trace import fidelity_trace_from_planning_trace
@@ -13,6 +15,7 @@ from mwm.io import jsonable, load_json, write_json
 
 RENDERER_VERSION = "review_media_v1"
 MEDIA_DIRNAME = "review_media"
+ProgressCallback = Callable[[str], None]
 
 
 class ReviewMediaUnsupported(RuntimeError):
@@ -93,6 +96,47 @@ def existing_media_path(payload: dict[str, Any], episode_index: int, kind: str) 
     return path if path.is_file() else None
 
 
+def _progress(callback: ProgressCallback | None, message: str) -> None:
+    if callback is not None:
+        callback(str(message))
+
+
+def _finite_action(value: Any) -> bool:
+    if isinstance(value, (list, tuple)):
+        return bool(value) and all(_finite_action(item) for item in value)
+    try:
+        return value is not None and math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def valid_action_prefix(action_trace: Iterable[Any]) -> list[Any]:
+    actions: list[Any] = []
+    invalid_seen = False
+    for action in action_trace:
+        if _finite_action(action):
+            if invalid_seen:
+                raise ReviewMediaUnsupported("action_trace contains valid actions after an invalid/masked step")
+            actions.append(action)
+        else:
+            invalid_seen = True
+    return actions
+
+
+@contextmanager
+def _review_render_lock(eval_path: str | Path):
+    import fcntl
+
+    lock_dir = Path(eval_path).parent / MEDIA_DIRNAME
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    with (lock_dir / ".render.lock").open("a+", encoding="utf-8") as handle:
+        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
 class FixedActionPolicy:
     def __init__(self, action_trace: list[Any]) -> None:
         self.action_trace = list(action_trace)
@@ -133,28 +177,58 @@ def render_environment_video(
     *,
     episode_index: int,
     force: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> RenderedMedia:
     eval_file = Path(eval_path)
     payload = load_json(eval_file)
     existing = existing_media_path(payload, episode_index, "env")
     if existing is not None and not force:
+        _progress(progress, "Using existing environment video")
         return RenderedMedia("env", str(existing), "action_trace", [])
     rollout = rollout_by_index(payload, episode_index)
     action_trace = rollout.get("action_trace")
     if not isinstance(action_trace, list) or not action_trace:
         raise ReviewMediaUnsupported("exact environment rendering requires review_rollouts[].action_trace")
+    actions = valid_action_prefix(action_trace)
+    if not actions:
+        raise ReviewMediaUnsupported("action_trace has no executable actions")
+    if rollout.get("start_row") is None or rollout.get("goal_row") is None:
+        raise ReviewMediaUnsupported("targeted environment rendering requires start_row and goal_row")
 
-    from mwm.eval.runtime import load_eval_runtime
+    from mwm.benchmark.replay_runtime import load_review_runtime
     from mwm.swm.envs import make_swm_world, parse_env_kwargs
     from omegaconf import OmegaConf
 
-    runtime = load_eval_runtime(str(_resolved_config_for_eval(eval_file)))
     out_dir = rollout_media_dir(eval_file, episode_index)
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / "env.mp4"
+    if target.is_file() and not force:
+        record_review_media(
+            eval_file,
+            episode_index=episode_index,
+            kind="env",
+            path=target,
+            source_trace_type="action_trace",
+            warnings=["Recovered an existing unindexed environment video."],
+        )
+        _progress(progress, "Recovered existing environment video")
+        return RenderedMedia(
+            "env",
+            str(target),
+            "action_trace",
+            ["Recovered an existing unindexed environment video."],
+        )
+    runtime = load_review_runtime(
+        _resolved_config_for_eval(eval_file),
+        start_row=int(rollout["start_row"]),
+        goal_row=int(rollout["goal_row"]),
+        load_model=False,
+        progress=progress,
+    )
     tmp_video_dir = out_dir / "env_tmp"
     shutil.rmtree(tmp_video_dir, ignore_errors=True)
     try:
+        _progress(progress, "Starting simulator")
         env_kwargs = parse_env_kwargs(OmegaConf.to_container(runtime.cfg.env.get("kwargs", {}), resolve=True))
         world = make_swm_world(
             runtime.env_id,
@@ -165,13 +239,18 @@ def render_environment_video(
             env_kwargs=env_kwargs,
         )
         try:
-            policy = FixedActionPolicy(action_trace)
+            policy = FixedActionPolicy(actions)
             world.set_policy(policy)
+            replay_budget = min(int(runtime.cfg.eval.budget), len(actions))
+            _progress(
+                progress,
+                f"Replaying {replay_budget} stored action(s) and encoding video",
+            )
             world.evaluate(
                 dataset=runtime.dataset,
                 episodes_idx=[int(rollout.get("dataset_episode", rollout.get("episode", 0)))],
                 start_steps=[int(rollout.get("start_step", 0))],
-                eval_budget=min(int(runtime.cfg.eval.budget), len(action_trace)),
+                eval_budget=replay_budget,
                 callables=runtime.eval_callables,
                 goal_offset=int(runtime.cfg.eval.goal_offset),
                 video=str(tmp_video_dir),
@@ -186,6 +265,7 @@ def render_environment_video(
         runtime.close()
         shutil.rmtree(tmp_video_dir, ignore_errors=True)
 
+    _progress(progress, "Recording environment media")
     record_review_media(
         eval_file,
         episode_index=episode_index,
@@ -206,6 +286,12 @@ def _dataset_frame(dataset: Any, row: int, pixels_key: str) -> Any:
             return value[0]
         return value
 
+    if hasattr(dataset, "get_frame"):
+        return first_frame(dataset.get_frame(int(row), str(pixels_key)))
+    if hasattr(dataset, "get_row_data"):
+        item = dataset.get_row_data(int(row))
+        if isinstance(item, dict) and str(pixels_key) in item:
+            return first_frame(item[str(pixels_key)])
     try:
         item = dataset[int(row)]
         if isinstance(item, dict) and str(pixels_key) in item:
@@ -270,15 +356,32 @@ def _label_frame(frame: Any, label: str) -> Any:
 
 
 def _usable_decoder(model: Any, metadata: dict[str, Any]) -> bool:
+    if not latent_decoder_metadata_supported(metadata):
+        return False
     if not callable(getattr(model, "decode", None)):
         return False
+    decoders = getattr(model, "decoders", None)
+    return decoders is None or len(decoders) > 0
+
+
+def latent_decoder_metadata_supported(metadata: dict[str, Any]) -> bool:
     if str(metadata.get("adapter_family", "")).lower() == "prejepa":
         return False
     policy = metadata.get("component_policy", {})
     if isinstance(policy, dict) and policy.get("reconstructor") == []:
         return False
-    decoders = getattr(model, "decoders", None)
-    return decoders is None or len(decoders) > 0
+    return True
+
+
+def rollout_checkpoint_metadata(payload: dict[str, Any]) -> dict[str, Any] | None:
+    checkpoint = payload.get("checkpoint_run_dir")
+    if not checkpoint:
+        return None
+    path = Path(str(checkpoint)).expanduser()
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    metadata_path = path / "world_metadata.json"
+    return load_json(metadata_path) if metadata_path.is_file() else None
 
 
 def render_latent_reconstruction_video(
@@ -286,27 +389,64 @@ def render_latent_reconstruction_video(
     *,
     episode_index: int,
     force: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> RenderedMedia:
     eval_file = Path(eval_path)
     payload = load_json(eval_file)
     existing = existing_media_path(payload, episode_index, "latent_reconstruction")
     if existing is not None and not force:
+        _progress(progress, "Using existing latent reconstruction")
         return RenderedMedia("latent_reconstruction", str(existing), "fidelity_trace", [])
     rollout = rollout_by_index(payload, episode_index)
     fidelity_trace = rollout.get("fidelity_trace")
     if not isinstance(fidelity_trace, list) or not fidelity_trace:
         raise ReviewMediaUnsupported("latent reconstruction requires review_rollouts[].fidelity_trace")
+    action_trace = rollout.get("action_trace")
+    if isinstance(action_trace, list) and action_trace:
+        actions = valid_action_prefix(action_trace)
+        if actions and len(fidelity_trace) > len(actions):
+            # Older vectorized eval artifacts retained masked diagnostics after
+            # an env had terminated. Those slots were never executed.
+            fidelity_trace = fidelity_trace[: len(actions)]
+    if rollout.get("start_row") is None or rollout.get("goal_row") is None:
+        raise ReviewMediaUnsupported("targeted latent rendering requires start_row and goal_row")
 
-    from mwm.eval.runtime import load_eval_runtime
+    checkpoint_metadata = rollout_checkpoint_metadata(payload)
+    if checkpoint_metadata is not None and not latent_decoder_metadata_supported(checkpoint_metadata):
+        raise ReviewMediaUnsupported("checkpoint does not include a latent reconstruction decoder")
 
-    runtime = load_eval_runtime(str(_resolved_config_for_eval(eval_file)))
-    if not _usable_decoder(runtime.model, runtime.metadata):
-        runtime.close()
-        raise ReviewMediaUnsupported("checkpoint does not expose a usable latent decoder")
+    from mwm.benchmark.replay_runtime import load_review_runtime
 
     out_dir = rollout_media_dir(eval_file, episode_index)
     out_dir.mkdir(parents=True, exist_ok=True)
     target = out_dir / "latent_reconstruction.mp4"
+    if target.is_file() and not force:
+        record_review_media(
+            eval_file,
+            episode_index=episode_index,
+            kind="latent_reconstruction",
+            path=target,
+            source_trace_type="fidelity_trace",
+            warnings=["Recovered an existing unindexed latent reconstruction."],
+        )
+        _progress(progress, "Recovered existing latent reconstruction")
+        return RenderedMedia(
+            "latent_reconstruction",
+            str(target),
+            "fidelity_trace",
+            ["Recovered an existing unindexed latent reconstruction."],
+        )
+    runtime = load_review_runtime(
+        _resolved_config_for_eval(eval_file),
+        start_row=int(rollout["start_row"]),
+        goal_row=int(rollout["goal_row"]),
+        load_model=True,
+        progress=progress,
+    )
+    if not _usable_decoder(runtime.model, runtime.metadata):
+        runtime.close()
+        raise ReviewMediaUnsupported("checkpoint does not expose a usable latent decoder")
+
     frames = []
     try:
         import imageio.v2 as imageio
@@ -316,7 +456,10 @@ def render_latent_reconstruction_video(
         pixels_key = str(runtime.cfg.data.get("pixels_key", "pixels"))
         start_row = int(rollout.get("start_row", 0))
         with torch.inference_mode():
-            for item in fidelity_trace:
+            total_frames = len(fidelity_trace)
+            for frame_index, item in enumerate(fidelity_trace):
+                if frame_index == 0 or frame_index % 5 == 0:
+                    _progress(progress, f"Decoding latent frame {frame_index + 1}/{total_frames}")
                 t = int(item.get("t", 0))
                 level_idx = int(item.get("level_idx", 0))
                 actual = _to_bchw_float(_dataset_frame(runtime.dataset, start_row + t, pixels_key), runtime.device)
@@ -338,10 +481,12 @@ def render_latent_reconstruction_video(
                 frames.append(np.concatenate([left, right], axis=1))
         if not frames:
             raise ReviewMediaUnsupported("latent reconstruction produced no frames")
+        _progress(progress, "Encoding latent reconstruction video")
         imageio.mimsave(target, frames, fps=10)
     finally:
         runtime.close()
 
+    _progress(progress, "Recording latent media")
     record_review_media(
         eval_file,
         episode_index=episode_index,
@@ -353,12 +498,13 @@ def render_latent_reconstruction_video(
     return RenderedMedia("latent_reconstruction", str(target), "fidelity_trace", [])
 
 
-def render_rollout_media(
+def _render_rollout_media_unlocked(
     eval_path: str | Path,
     *,
     episode_index: int,
     sources: Iterable[str],
     force: bool = False,
+    progress: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     rendered: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -368,9 +514,19 @@ def render_rollout_media(
     for source in normalized_sources:
         try:
             if source == "env":
-                media = render_environment_video(eval_path, episode_index=episode_index, force=force)
+                media = render_environment_video(
+                    eval_path,
+                    episode_index=episode_index,
+                    force=force,
+                    progress=progress,
+                )
             elif source in {"latent", "latent_reconstruction"}:
-                media = render_latent_reconstruction_video(eval_path, episode_index=episode_index, force=force)
+                media = render_latent_reconstruction_video(
+                    eval_path,
+                    episode_index=episode_index,
+                    force=force,
+                    progress=progress,
+                )
             else:
                 warnings.append(f"unknown media source {source!r}")
                 continue
@@ -387,17 +543,39 @@ def render_rollout_media(
     return {"episode_index": int(episode_index), "rendered": rendered, "warnings": warnings}
 
 
+def render_rollout_media(
+    eval_path: str | Path,
+    *,
+    episode_index: int,
+    sources: Iterable[str],
+    force: bool = False,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    _progress(progress, "Waiting for exclusive render access")
+    with _review_render_lock(eval_path):
+        return _render_rollout_media_unlocked(
+            eval_path,
+            episode_index=episode_index,
+            sources=sources,
+            force=force,
+            progress=progress,
+        )
+
+
 __all__ = [
     "ReviewMediaUnsupported",
     "RenderedMedia",
     "existing_media_path",
     "fidelity_trace_from_planning_trace",
+    "latent_decoder_metadata_supported",
     "record_review_media",
     "render_environment_video",
     "render_latent_reconstruction_video",
     "render_rollout_media",
     "review_media_entry",
     "rollout_by_index",
+    "rollout_checkpoint_metadata",
     "rollout_key",
     "rollout_media_dir",
+    "valid_action_prefix",
 ]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any
 
 
@@ -14,6 +15,24 @@ def _contains_batch_env(diag: dict[str, Any], batch_env: int) -> bool:
     start = _int(diag.get("batch_start", 0))
     end = _int(diag.get("batch_end", start + 1))
     return start <= int(batch_env) < end
+
+
+def _finite_action(value: Any) -> bool:
+    if isinstance(value, (list, tuple)):
+        return bool(value) and all(_finite_action(item) for item in value)
+    try:
+        return value is not None and math.isfinite(float(value))
+    except (TypeError, ValueError):
+        return False
+
+
+def executed_action_prefix(action_trace: list[Any]) -> list[Any]:
+    actions: list[Any] = []
+    for action in action_trace:
+        if not _finite_action(action):
+            break
+        actions.append(action)
+    return actions
 
 
 def _final_cem_by_replan(planning_trace: list[dict[str, Any]], *, batch_env: int) -> dict[int, dict[str, Any]]:
@@ -98,7 +117,10 @@ def review_rollouts_for_batches(
         planning_trace = list(batch.get("planning_diagnostics", {}).get("trace", []))
         action_by_env = list(batch.get("review_trace", {}).get("action_trace", []))
         for batch_env, pair in enumerate(batch.get("pairs", [])):
-            action_trace = action_by_env[batch_env] if batch_env < len(action_by_env) else []
+            raw_action_trace = action_by_env[batch_env] if batch_env < len(action_by_env) else []
+            action_trace = executed_action_prefix(raw_action_trace if isinstance(raw_action_trace, list) else [])
+            executed_steps = min(int(eval_budget), len(action_trace))
+            success = bool(successes[episode_index]) if episode_index < len(successes) else None
             row = {
                 "episode_index": int(episode_index),
                 "batch": int(batch_index),
@@ -108,12 +130,15 @@ def review_rollouts_for_batches(
                 "goal_step": pair.get("goal_step"),
                 "start_row": pair.get("start_row"),
                 "goal_row": pair.get("goal_row"),
-                "success": bool(successes[episode_index]) if episode_index < len(successes) else None,
+                "success": success,
+                "evaluation_budget": int(eval_budget),
+                "actions_recorded": int(executed_steps),
+                "terminated_early": bool(success is True and executed_steps < int(eval_budget)),
                 "action_trace": action_trace,
                 "fidelity_trace": fidelity_trace_from_planning_trace(
                     planning_trace=planning_trace,
                     batch_env=batch_env,
-                    eval_budget=int(eval_budget),
+                    eval_budget=int(executed_steps),
                     action_block=int(action_block),
                     replan_interval=replan_interval,
                     k_values=[int(k) for k in k_values],
@@ -124,4 +149,8 @@ def review_rollouts_for_batches(
     return out
 
 
-__all__ = ["fidelity_trace_from_planning_trace", "review_rollouts_for_batches"]
+__all__ = [
+    "executed_action_prefix",
+    "fidelity_trace_from_planning_trace",
+    "review_rollouts_for_batches",
+]
