@@ -169,6 +169,10 @@ def main(cfg_path: str, *, roles: Any = None, overrides: list[str] | None = None
     write_review_html(output_dir / "review.html", str(cfg.title), rows, outputs, plots=plots, expected_cells=len(resolved))
     print(f"[benchmark] wrote {output_dir / 'summary.json'}")
     print(f"[benchmark] wrote {output_dir / 'review.html'}")
+    print(
+        "[benchmark] inspect rollout videos with: "
+        f"python -m mwm.benchmark.render_review {output_dir} --serve"
+    )
 
 
 if __name__ == "__main__":

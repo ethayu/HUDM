@@ -22,6 +22,34 @@ python -m mwm.benchmark.verify configs/benchmark/scheduled_pusht.yaml
 python -m mwm.benchmark.render_review rollouts/mwm_benchmark
 ```
 
+The generated `review.html` is a static aggregate report. To inspect aligned
+successes and failures episode by episode, play existing videos, or render
+missing environment and latent-reconstruction media on demand, start the local
+review server:
+
+```bash
+python -m mwm.benchmark.render_review rollouts/mwm_benchmark --serve
+```
+
+Open the printed localhost URL, use **Rollout Review** to compare the same
+episode number across benchmark roles, and start with failed episodes before
+sampling successes. Environment videos replay stored actions in the simulator;
+latent videos compare dataset observations with decoded representations and are
+not planner-prediction videos.
+
+The `eval.budget` setting is the benchmark's maximum number of primitive
+environment actions (50 in the paper PushT config). It is distinct from
+`env.max_episode_steps`, which is the simulator safety cap. Successful
+vectorized evaluations may terminate earlier; new review artifacts keep only
+the actions that were actually executed instead of the later masked slots.
+
+On-demand environment replay does not load model weights or fit a dataset-wide
+action scaler. It selects only `goal_offset + 1` rows (26 for PushT) needed for
+the initial state, goal state, and comparison frames. Latent reconstruction
+does require the checkpoint, but a running review server caches it across
+requests. Render requests are serialized and duplicate clicks share the same
+job, while already-rendered videos are served directly.
+
 The upstream paper-parity sanity check is:
 
 ```bash

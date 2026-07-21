@@ -62,12 +62,22 @@ def main() -> None:
     parser.add_argument("--host", default="127.0.0.1", help="Host for --serve.")
     parser.add_argument("--port", type=int, default=8765, help="Port for --serve.")
     args = parser.parse_args()
+    if args.serve:
+        from mwm.benchmark.review_server import validate_server_address
+
+        try:
+            validate_server_address(args.host, args.port)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
     report = render_benchmark_review(args.output_dir, title=args.title)
-    print(json.dumps(report, indent=2, sort_keys=True))
+    print(json.dumps(report, indent=2, sort_keys=True), flush=True)
     if args.serve:
         from mwm.benchmark.review_server import serve_review
 
-        serve_review(args.output_dir, host=args.host, port=args.port)
+        try:
+            serve_review(args.output_dir, host=args.host, port=args.port)
+        except (OSError, ValueError) as exc:
+            parser.error(str(exc))
 
 
 if __name__ == "__main__":
