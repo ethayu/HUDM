@@ -72,6 +72,15 @@ sampling successes. Environment videos replay stored actions in the simulator;
 latent videos compare dataset observations with decoded representations and are
 not planner-prediction videos.
 
+**Latent predictive rollout** is a separate media mode from reconstruction. It
+replays the stored policy actions to capture the actual online observations,
+anchors the model from that exact history at every MPC replan, and calls
+`model.rollout_with_schedule(...)` autoregressively for the complete action
+blocks executed before the next replan. Its left panel is actual replay; its
+right panel shows decoded block-endpoint predictions. Blue frames mark the
+actual-history reset boundary. Incomplete terminal action blocks are reported
+and omitted rather than extrapolated.
+
 The `eval.budget` setting is the benchmark's maximum number of primitive
 environment actions (50 in the paper PushT config). It is distinct from
 `env.max_episode_steps`, which is the simulator safety cap. Successful
@@ -84,6 +93,11 @@ the initial state, goal state, and comparison frames. Latent reconstruction
 does require the checkpoint, but a running review server caches it across
 requests. Render requests are serialized and duplicate clicks share the same
 job, while already-rendered videos are served directly.
+
+New evaluations save both environment-space `action_trace` and the exact
+pre-inverse-transform `model_action_trace`. For older artifacts, predictive
+review scans only the Lance action column to recover the standardization mean
+and scale, caching those statistics by Lance dataset version.
 
 The upstream paper-parity sanity check is:
 

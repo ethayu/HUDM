@@ -98,7 +98,7 @@ def _review_media_items(payload: dict[str, Any], base_dir: Path, run_label: str)
             items.append(
                 "<li>"
                 f"<a href='{html.escape(href)}'>{html.escape(label)}</a>"
-                f"<video controls preload='metadata' src='{html.escape(href)}'></video>"
+                f"<video controls preload='auto' src='{html.escape(href)}'></video>"
                 "</li>"
             )
     return items

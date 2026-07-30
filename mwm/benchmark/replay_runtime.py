@@ -14,6 +14,8 @@ from mwm.io import load_json
 ProgressCallback = Callable[[str], None]
 _MODEL_CACHE: dict[tuple[str, int, str], tuple[Any, dict[str, Any], int]] = {}
 _MODEL_CACHE_LOCK = threading.Lock()
+_ACTION_STATS_CACHE: dict[tuple[str, int, str], "ActionStats"] = {}
+_ACTION_STATS_CACHE_LOCK = threading.Lock()
 
 
 def _progress(callback: ProgressCallback | None, message: str) -> None:
@@ -30,6 +32,80 @@ def _resolve_lance_table(path: str | Path) -> tuple[Path, str]:
         if len(tables) == 1:
             return location, tables[0].stem
     raise ValueError(f"review rendering requires one local .lance table, got {location}")
+
+
+def _open_lance_review_table(path: str | Path) -> Any:
+    import lancedb
+
+    database, table_name = _resolve_lance_table(path)
+    return lancedb.connect(str(database)).open_table(table_name)
+
+
+@dataclass(frozen=True)
+class ActionStats:
+    mean: np.ndarray
+    scale: np.ndarray
+    dataset_path: str
+    dataset_version: int
+    action_key: str
+
+    def transform(self, actions: Any) -> np.ndarray:
+        values = np.asarray(actions, dtype=np.float64)
+        return ((values - self.mean) / self.scale).astype(np.float32)
+
+
+def _numeric_column_array(column: Any) -> np.ndarray:
+    import pyarrow as pa
+
+    if hasattr(column, "combine_chunks"):
+        column = column.combine_chunks()
+    if pa.types.is_fixed_size_list(column.type):
+        values = column.flatten().to_numpy(zero_copy_only=False)
+        return np.asarray(values).reshape(len(column), column.type.list_size)
+    if pa.types.is_list(column.type):
+        return np.asarray(column.to_pylist())
+    return np.asarray(column.to_numpy(zero_copy_only=False))
+
+
+def load_lance_action_stats(
+    path: str | Path,
+    action_key: str,
+    *,
+    progress: ProgressCallback | None = None,
+) -> tuple[ActionStats, bool]:
+    """Fit legacy action normalization from one versioned Lance column."""
+
+    resolved = str(Path(path).resolve())
+    table = _open_lance_review_table(resolved)
+    version = int(table.version)
+    cache_key = (resolved, version, str(action_key))
+    with _ACTION_STATS_CACHE_LOCK:
+        cached = _ACTION_STATS_CACHE.get(cache_key)
+        if cached is not None:
+            _progress(progress, f"Using cached action statistics for Lance version {version}")
+            return cached, True
+
+        if str(action_key) not in {str(name) for name in table.schema.names}:
+            raise KeyError(f"Lance dataset has no action column {action_key!r}")
+        _progress(progress, f"Scanning only Lance column {action_key!r} for legacy action statistics")
+        arrow_table = table.to_lance().scanner(columns=[str(action_key)]).to_table()
+        values = _numeric_column_array(arrow_table.column(str(action_key))).astype(np.float64, copy=False)
+        values = values.reshape(values.shape[0], -1)
+        values = values[np.isfinite(values).all(axis=1)]
+        if values.size == 0:
+            raise ValueError(f"Cannot fit action statistics for empty column {action_key!r}")
+        mean = values.mean(axis=0)
+        scale = values.std(axis=0, ddof=0)
+        scale = np.where(scale == 0.0, 1.0, scale)
+        stats = ActionStats(
+            mean=mean,
+            scale=scale,
+            dataset_path=resolved,
+            dataset_version=version,
+            action_key=str(action_key),
+        )
+        _ACTION_STATS_CACHE[cache_key] = stats
+        return stats, False
 
 
 def _source_columns(callables: list[dict[str, Any]], available: set[str], pixels_key: str) -> list[str]:
@@ -65,12 +141,9 @@ class TargetedLanceReviewDataset:
         env_id: str,
         restore_import_path: str | None,
     ) -> None:
-        import lancedb
-
         from mwm.swm.restore import eval_callables_for_env
 
-        database, table_name = _resolve_lance_table(path)
-        table = lancedb.connect(str(database)).open_table(table_name)
+        table = _open_lance_review_table(path)
         self._lance = table.to_lance()
         self._row_count = int(table.count_rows())
         self._available = {
@@ -111,16 +184,9 @@ class TargetedLanceReviewDataset:
 
     @staticmethod
     def _numeric_tensor(column: Any) -> Any:
-        import pyarrow as pa
         import torch
 
-        if pa.types.is_fixed_size_list(column.type):
-            values = column.flatten().to_numpy(zero_copy_only=False)
-            array = values.reshape(len(column), column.type.list_size)
-        elif pa.types.is_list(column.type):
-            array = np.asarray(column.to_pylist(), dtype=np.float32)
-        else:
-            array = column.to_numpy(zero_copy_only=False)
+        array = _numeric_column_array(column)
         return torch.as_tensor(np.asarray(array).copy())
 
     def _take(self, rows: list[int], columns: list[str]) -> dict[str, Any]:
@@ -261,8 +327,64 @@ def load_review_runtime(
     )
 
 
+def warm_review_runtime(
+    cfg_path: str | Path,
+    *,
+    start_row: int,
+    goal_row: int,
+    progress: ProgressCallback | None = None,
+) -> dict[str, Any]:
+    """Warm heavyweight review dependencies without replaying an episode.
+
+    Models are retained by the process-wide CUDA-aware checkpoint cache.  The
+    simulator is intentionally constructed and closed: episode worlds are
+    stateful, so renders still receive a fresh deterministic environment while
+    benefiting from eager imports and backend initialization.
+    """
+
+    from omegaconf import OmegaConf
+
+    from mwm.swm.envs import make_swm_world, parse_env_kwargs
+
+    runtime = load_review_runtime(
+        cfg_path,
+        start_row=int(start_row),
+        goal_row=int(goal_row),
+        load_model=True,
+        progress=progress,
+    )
+    try:
+        _progress(progress, f"Initializing {runtime.env_id} simulator")
+        env_kwargs = parse_env_kwargs(
+            OmegaConf.to_container(runtime.cfg.env.get("kwargs", {}), resolve=True)
+        )
+        world = make_swm_world(
+            runtime.env_id,
+            num_envs=1,
+            image_shape=runtime.image_shape,
+            max_episode_steps=int(runtime.cfg.env.max_episode_steps),
+            goal_conditioned=bool(runtime.cfg.env.goal_conditioned),
+            env_kwargs=env_kwargs,
+        )
+        try:
+            _progress(progress, f"{runtime.env_id} simulator initialized")
+        finally:
+            world.close()
+        return {
+            "checkpoint": str(Path(str(runtime.cfg.checkpoint.run_dir)).resolve()),
+            "device": str(runtime.device),
+            "env_id": runtime.env_id,
+            "model_cache_hit": bool(runtime.model_cache_hit),
+        }
+    finally:
+        runtime.close()
+
+
 __all__ = [
+    "ActionStats",
     "ReviewRuntime",
     "TargetedLanceReviewDataset",
+    "load_lance_action_stats",
     "load_review_runtime",
+    "warm_review_runtime",
 ]

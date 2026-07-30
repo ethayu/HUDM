@@ -9,6 +9,31 @@ from mwm.io import load_json, write_json
 
 
 class ReviewMediaTests(unittest.TestCase):
+    def test_render_all_expands_to_every_media_mode(self) -> None:
+        from unittest.mock import patch
+
+        from mwm.benchmark.review_media import RenderedMedia, _render_rollout_media_unlocked
+
+        calls: list[str] = []
+
+        def rendered(kind: str) -> RenderedMedia:
+            calls.append(kind)
+            return RenderedMedia(kind, f"/{kind}.mp4", "trace", [])
+
+        with (
+            patch("mwm.benchmark.review_media.render_environment_video", side_effect=lambda *a, **k: rendered("env")),
+            patch("mwm.benchmark.review_media.render_latent_reconstruction_video", side_effect=lambda *a, **k: rendered("latent_reconstruction")),
+            patch("mwm.benchmark.review_media.render_latent_predictive_rollout_video", side_effect=lambda *a, **k: rendered("latent_predictive_rollout")),
+        ):
+            result = _render_rollout_media_unlocked(
+                "/tmp/eval.json",
+                episode_index=4,
+                sources=["all"],
+            )
+
+        self.assertEqual(calls, ["env", "latent_reconstruction", "latent_predictive_rollout"])
+        self.assertEqual([item["kind"] for item in result["rendered"]], calls)
+
     def test_final_cem_trace_expands_rollout_levels_by_action_block(self) -> None:
         from mwm.benchmark.review_media import fidelity_trace_from_planning_trace
 
@@ -139,6 +164,263 @@ class ReviewMediaTests(unittest.TestCase):
         trace = [[0.1, 0.2], [0.3, 0.4], [float("nan"), float("nan")], [0.9, 1.0]]
 
         self.assertEqual(executed_action_prefix(trace), trace[:2])
+
+    def test_review_rollout_persists_aligned_model_action_trace(self) -> None:
+        from mwm.eval.review_trace import review_rollouts_for_batches
+
+        rows = review_rollouts_for_batches(
+            batches=[
+                {
+                    "pairs": [
+                        {
+                            "episode": 2,
+                            "start_step": 1,
+                            "goal_step": 6,
+                            "start_row": 10,
+                            "goal_row": 15,
+                        }
+                    ],
+                    "review_trace": {
+                        "action_trace": [[[10.0], [20.0], [float("nan")]]],
+                        "model_action_trace": [[[1.0], [2.0], [float("nan")]]],
+                    },
+                    "planning_diagnostics": {
+                        "trace": [
+                            {
+                                "mpc_iter": 0,
+                                "cem_iter": 1,
+                                "batch_start": 0,
+                                "batch_end": 1,
+                                "rollout_level_indices": [1],
+                            }
+                        ]
+                    },
+                }
+            ],
+            successes=[True],
+            eval_budget=3,
+            action_block=1,
+            receding_horizon=3,
+            k_values=[8, 16],
+        )
+
+        self.assertEqual(rows[0]["action_trace"], [[10.0], [20.0]])
+        self.assertEqual(rows[0]["model_action_trace"], [[1.0], [2.0]])
+        self.assertEqual(len(rows[0]["fidelity_trace"]), 2)
+
+    def test_level_fallback_prefers_rollout_then_cem_base_then_mpc(self) -> None:
+        from mwm.eval.review_trace import final_cem_rollout_levels
+
+        self.assertEqual(
+            final_cem_rollout_levels(
+                {"rollout_level_indices": [3, 2], "base_level_idx": 1, "mpc_level_idx": 0}
+            ),
+            ([3, 2], "rollout_level_indices"),
+        )
+        self.assertEqual(
+            final_cem_rollout_levels({"base_level_idx": 2, "mpc_level_idx": 1}),
+            ([2], "base_level_idx"),
+        )
+        self.assertEqual(
+            final_cem_rollout_levels({"mpc_level_idx": 1}),
+            ([1], "mpc_level_idx"),
+        )
+        with self.assertRaisesRegex(ValueError, "no rollout_level_indices"):
+            final_cem_rollout_levels({})
+
+    def test_predictive_segments_map_blocks_replans_levels_and_early_tail(self) -> None:
+        from mwm.benchmark.review_media import predictive_replan_segments
+
+        trace = []
+        levels = [[3, 2, 1], [2, 1, 0]]
+        for replan_idx, replan_levels in enumerate(levels):
+            for block_idx, level in enumerate(replan_levels):
+                for primitive in range(2):
+                    trace.append(
+                        {
+                            "t": replan_idx * 6 + block_idx * 2 + primitive,
+                            "replan_idx": replan_idx,
+                            "block_idx": block_idx,
+                            "level_idx": level,
+                            "K": [8, 16, 32, 64][level],
+                        }
+                    )
+
+        segments = predictive_replan_segments(
+            trace,
+            action_count=13,
+            action_block=2,
+            receding_horizon=3,
+        )
+
+        self.assertEqual([segment["anchor_step"] for segment in segments], [0, 6])
+        self.assertEqual(
+            [[block["level_idx"] for block in segment["blocks"]] for segment in segments],
+            levels,
+        )
+        self.assertEqual(segments[1]["blocks"][-1]["primitive_end"], 12)
+        self.assertEqual(segments[1]["blocks"][-1]["distance_since_anchor"], 6)
+        self.assertFalse(any(block["primitive_end"] > 12 for segment in segments for block in segment["blocks"]))
+
+    def test_piecewise_predictions_are_autoregressive_and_reanchor(self) -> None:
+        import numpy as np
+        import torch
+
+        from mwm.benchmark.review_media import (
+            piecewise_predictive_latents,
+            predictive_replan_segments,
+        )
+
+        class FakeScheduledModel:
+            action_dim = 2
+
+            def __init__(self) -> None:
+                self.calls: list[dict[str, object]] = []
+
+            def rollout_with_schedule(self, infos, action_sequence, levels):
+                anchor = float(infos["pixels"].mean())
+                blocks = action_sequence.sum(dim=-1)[0, 0]
+                endpoints = anchor + torch.cumsum(blocks, dim=0)
+                predicted = torch.tensor([anchor], dtype=torch.float32).reshape(1, 1, 1, 1)
+                predicted = torch.cat([predicted, endpoints.reshape(1, 1, -1, 1)], dim=2)
+                self.calls.append(
+                    {
+                        "anchor": anchor,
+                        "actions": action_sequence.detach().cpu().clone(),
+                        "levels": list(levels),
+                    }
+                )
+                return {"predicted_emb": predicted}
+
+        trace = [
+            {
+                "replan_idx": replan,
+                "block_idx": block,
+                "level_idx": replan + block,
+                "K": 10 * (replan + block + 1),
+            }
+            for replan in range(2)
+            for block in range(2)
+        ]
+        segments = predictive_replan_segments(
+            trace,
+            action_count=8,
+            action_block=2,
+            receding_horizon=2,
+        )
+        observations = {
+            0: {"pixels": np.full((1, 1, 2, 2, 3), 10, dtype=np.uint8)},
+            4: {"pixels": np.full((1, 1, 2, 2, 3), 100, dtype=np.uint8)},
+        }
+        model = FakeScheduledModel()
+        outputs = piecewise_predictive_latents(
+            model,
+            observations,
+            np.arange(1, 9, dtype=np.float32).reshape(-1, 1),
+            segments,
+            device=torch.device("cpu"),
+        )
+
+        self.assertEqual(len(model.calls), 2)
+        self.assertEqual(model.calls[0]["levels"], [0, 1])
+        self.assertEqual(model.calls[1]["levels"], [1, 2])
+        first_anchor = float(model.calls[0]["anchor"])
+        second_anchor = float(model.calls[1]["anchor"])
+        self.assertAlmostEqual(first_anchor, 10 / 255.0, places=5)
+        self.assertAlmostEqual(second_anchor, 100 / 255.0, places=5)
+        self.assertAlmostEqual(float(outputs[1]["latent"]), first_anchor + 1 + 2 + 3 + 4, places=5)
+        self.assertAlmostEqual(float(outputs[2]["latent"]), second_anchor + 5 + 6, places=5)
+
+    def test_legacy_action_stats_scan_only_action_and_cache_by_version(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        import pyarrow as pa
+
+        from mwm.benchmark import replay_runtime
+
+        scans: list[list[str]] = []
+        arrow = pa.table(
+            {"action": pa.array([[1.0, 3.0], [3.0, 7.0]], type=pa.list_(pa.float32(), 2))}
+        )
+
+        class FakeLance:
+            def scanner(self, *, columns):
+                scans.append(list(columns))
+                return SimpleNamespace(to_table=lambda: arrow)
+
+        fake_table = SimpleNamespace(
+            version=7,
+            schema=SimpleNamespace(names=["action", "pixels", "state"]),
+            to_lance=lambda: FakeLance(),
+        )
+        replay_runtime._ACTION_STATS_CACHE.clear()
+        with tempfile.TemporaryDirectory() as tmp, patch.object(
+            replay_runtime,
+            "_open_lance_review_table",
+            return_value=fake_table,
+        ):
+            first, first_hit = replay_runtime.load_lance_action_stats(Path(tmp) / "tiny.lance", "action")
+            second, second_hit = replay_runtime.load_lance_action_stats(Path(tmp) / "tiny.lance", "action")
+
+        self.assertEqual(scans, [["action"]])
+        self.assertFalse(first_hit)
+        self.assertTrue(second_hit)
+        self.assertIs(first, second)
+        self.assertEqual(first.mean.tolist(), [2.0, 5.0])
+        self.assertEqual(first.scale.tolist(), [1.0, 2.0])
+        self.assertEqual(first.transform([[3.0, 7.0]]).tolist(), [[1.0, 1.0]])
+
+    def test_model_action_trace_prefers_saved_values_and_transforms_legacy_actions(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        import numpy as np
+        from omegaconf import OmegaConf
+
+        from mwm.benchmark.replay_runtime import ActionStats
+        from mwm.benchmark.review_media import model_actions_for_rollout
+
+        runtime = SimpleNamespace(
+            model=object(),
+            metadata={"action_preprocessing": "standard_scaler"},
+            cfg=OmegaConf.create(
+                {
+                    "eval": {},
+                    "data": {"action_preprocessing": "standard_scaler", "action_key": "action"},
+                }
+            ),
+            dataset=SimpleNamespace(path="dataset.lance"),
+        )
+        saved, source = model_actions_for_rollout(
+            {
+                "action_trace": [[12.0, 26.0], [14.0, 29.0]],
+                "model_action_trace": [[1.0, 2.0], [3.0, 4.0]],
+            },
+            runtime,
+        )
+        self.assertEqual(source, "model_action_trace")
+        self.assertEqual(saved.tolist(), [[1.0, 2.0], [3.0, 4.0]])
+
+        stats = ActionStats(
+            mean=np.array([10.0, 20.0]),
+            scale=np.array([2.0, 3.0]),
+            dataset_path="dataset.lance",
+            dataset_version=4,
+            action_key="action",
+        )
+        with patch(
+            "mwm.benchmark.replay_runtime.load_lance_action_stats",
+            return_value=(stats, False),
+        ) as load_stats:
+            legacy, legacy_source = model_actions_for_rollout(
+                {"action_trace": [[12.0, 26.0], [14.0, 29.0]]},
+                runtime,
+            )
+
+        load_stats.assert_called_once_with("dataset.lance", "action", progress=None)
+        self.assertEqual(legacy.tolist(), [[1.0, 2.0], [2.0, 3.0]])
+        self.assertIn("Lance action statistics v4", legacy_source)
 
     def test_targeted_lance_dataset_reads_only_requested_global_rows(self) -> None:
         import io
@@ -293,6 +575,12 @@ class ReviewMediaTests(unittest.TestCase):
 
             self.assertIn("What to look for", text)
             self.assertIn("not a predicted planner rollout", text)
+            self.assertIn("Latent predictive rollout", text)
+            self.assertIn("complete action-block endpoints", text)
+            self.assertIn("data-source='predictive'", text)
+            self.assertIn("data-source='all'", text)
+            self.assertIn(">Render all</button>", text)
+            self.assertNotIn("Env + reconstruction", text)
             self.assertIn("Compare this episode across runs", text)
             self.assertIn("000_upstream · failure", text)
             self.assertIn("Env ready", text)
@@ -301,6 +589,39 @@ class ReviewMediaTests(unittest.TestCase):
             self.assertIn("later vector slots were masked", text)
             self.assertIn("Re-render existing media", text)
             self.assertIn("window.location.reload(), 700", text)
+            self.assertIn("environment and CUDA checkpoint warm-up", text)
+
+    def test_review_warmup_deduplicates_checkpoints_and_initializes_env(self) -> None:
+        from unittest.mock import patch
+
+        from mwm.benchmark.review_server import warm_review_assets
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for name in ("000_a", "001_b"):
+                run_dir = root / name
+                run_dir.mkdir()
+                (run_dir / "resolved_config.yaml").write_text("device: cuda\n", encoding="utf-8")
+                write_json(
+                    run_dir / "eval.json",
+                    {
+                        "checkpoint_run_dir": "shared_checkpoint",
+                        "review_rollouts": [
+                            {"episode_index": 0, "start_row": 10, "goal_row": 20}
+                        ],
+                    },
+                )
+
+            with patch(
+                "mwm.benchmark.replay_runtime.warm_review_runtime",
+                return_value={"checkpoint": "shared_checkpoint", "device": "cuda", "env_id": "PushT"},
+            ) as warm:
+                report = warm_review_assets(root)
+
+            warm.assert_called_once()
+            self.assertEqual(report["checkpoint_count"], 1)
+            self.assertEqual(report["warmed"][0]["run"], "000_a")
+            self.assertEqual(report["warnings"], [])
 
     def test_server_address_validation_reports_conflicts(self) -> None:
         import socket
@@ -382,7 +703,9 @@ class ReviewMediaTests(unittest.TestCase):
             base = f"http://127.0.0.1:{server.server_port}"
             try:
                 with urlopen(f"{base}/api/status") as response:
-                    self.assertEqual(json.load(response)["ok"], True)
+                    status_payload = json.load(response)
+                    self.assertEqual(status_payload["ok"], True)
+                    self.assertEqual(status_payload["warmup"]["status"], "idle")
 
                 body = json.dumps(
                     {"eval_path": "000_run/eval.json", "episode_index": 0, "sources": ["bogus"]}
