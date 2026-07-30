@@ -106,15 +106,19 @@ def combine_mwm_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
     total_actions = int(sum(int(s.get("actions_recorded", s.get("action_calls", 0))) for s in summaries))
     total_time = float(sum(float(s.get("total_plan_time_sec", 0.0)) for s in summaries))
     total_policy_time = float(sum(float(s.get("total_policy_time_sec", 0.0)) for s in summaries))
+    total_latent_work = int(sum(int(s.get("latent_work_total", 0)) for s in summaries))
     total_bits = int(sum(int(s.get("total_bits_used_estimate", 0)) for s in summaries))
     total_dynamics_flops = int(sum(int(s.get("dynamics_flops_total", 0)) for s in summaries))
     total_flop_audit_errors = int(sum(int(s.get("flop_audit_error_count", 0)) for s in summaries))
     total_cem_cost_calls = int(sum(int(s.get("cem_cost_calls", 0)) for s in summaries))
     total_candidate_action_values = int(sum(int(s.get("candidate_action_values", 0)) for s in summaries))
     level_counts: dict[str, int] = {}
+    k_counts: dict[str, int] = {}
     for diag in traces:
         key = str(diag.get("base_level_idx", "unknown"))
         level_counts[key] = level_counts.get(key, 0) + 1
+        k_key = str(diag.get("base_k", "unknown"))
+        k_counts[k_key] = k_counts.get(k_key, 0) + 1
     return {
         "summary": {
             "actions_recorded": total_actions,
@@ -123,6 +127,7 @@ def combine_mwm_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
             "mean_plan_time_sec": total_time / total_replans if total_replans else 0.0,
             "total_policy_time_sec": total_policy_time,
             "mean_policy_time_sec": total_policy_time / total_actions if total_actions else 0.0,
+            "latent_work_total": total_latent_work,
             "total_bits_used_estimate": total_bits,
             "dynamics_flops_total": total_dynamics_flops,
             "flop_audit_error_count": total_flop_audit_errors,
@@ -131,8 +136,10 @@ def combine_mwm_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "trace": traces,
         "schedule_level_counts": level_counts,
+        "schedule_k_counts": k_counts,
         "plans": total_replans,
         "steps": total_actions,
+        "latent_work_total": total_latent_work,
         "bits_used_total": total_bits,
         "dynamics_flops_total": total_dynamics_flops,
         "flop_audit_error_count": total_flop_audit_errors,

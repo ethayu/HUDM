@@ -17,6 +17,9 @@ except Exception:  # pragma: no cover - optional dependency
 
 def model_accounting(model: Any) -> dict[str, Any]:
     k_values = [int(k) for k in getattr(model, "K", [])]
+    supports_arbitrary_k = bool(getattr(model, "supports_arbitrary_k", False))
+    min_k = int(getattr(model, "min_k", min(k_values) if k_values else 0))
+    max_k = int(getattr(model, "D", max(k_values) if k_values else 0))
     params = 0
     if hasattr(model, "parameters"):
         params = int(sum(p.numel() for p in model.parameters()))
@@ -24,6 +27,12 @@ def model_accounting(model: Any) -> dict[str, Any]:
         "K": k_values,
         "num_levels": int(len(k_values)),
         "D": int(getattr(model, "D", max(k_values) if k_values else 0)),
+        "supports_arbitrary_k": supports_arbitrary_k,
+        "supported_k": (
+            {"min": min_k, "max": max_k, "arbitrary": True}
+            if supports_arbitrary_k
+            else {"values": k_values, "arbitrary": False}
+        ),
         "parameters": params,
     }
 

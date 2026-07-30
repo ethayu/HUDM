@@ -41,6 +41,20 @@ def build_mwm_policy(
     replan_interval = max(1, int(cfg.planner.receding_horizon) * int(action_block))
     eval_budget = int(cfg.eval.get("budget", cfg.planner.horizon))
     max_replans = max(1, int(math.ceil(eval_budget / replan_interval)))
+    scheduler_spec = OmegaConf.to_container(cfg.planner.scheduler, resolve=True)
+    configured_k = cfg.get("K", None)
+    planner_k = cfg.planner.get("K", None)
+    if configured_k is not None and planner_k is not None:
+        if OmegaConf.to_container(OmegaConf.create(configured_k), resolve=True) != OmegaConf.to_container(
+            OmegaConf.create(planner_k), resolve=True
+        ):
+            raise ValueError("Define K either at the eval config root or as planner.K, not both.")
+    k_selection = configured_k if configured_k is not None else planner_k
+    if k_selection is not None:
+        if not isinstance(scheduler_spec, dict):
+            raise ValueError("planner.scheduler must be a mapping when K is configured.")
+        scheduler_spec = dict(scheduler_spec)
+        scheduler_spec["K"] = OmegaConf.to_container(OmegaConf.create(k_selection), resolve=True)
     solver = MWMScheduledCEMSolver(
         model,
         batch_size=max(1, planner_batch_size),
@@ -48,7 +62,7 @@ def build_mwm_policy(
         var_scale=float(cfg.planner.init_std),
         n_steps=int(cfg.planner.n_iter),
         topk=topk,
-        scheduler=OmegaConf.to_container(cfg.planner.scheduler, resolve=True),
+        scheduler=scheduler_spec,
         device=device,
         seed=int(cfg.planner.seed if cfg.planner.get("seed", None) is not None else cfg.eval.seed),
         clamp_actions=bool(cfg.planner.get("clamp_actions", False)),

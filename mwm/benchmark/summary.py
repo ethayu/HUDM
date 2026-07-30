@@ -16,6 +16,7 @@ def eval_summary_row(name: str, output_path: str | Path, payload: dict[str, Any]
     manifest = dict(payload.get("manifest", {}))
     config = dict(payload.get("config", {}))
     level_counts = diagnostics.get("schedule_level_counts", {})
+    k_counts = diagnostics.get("schedule_k_counts", {})
     return {
         "name": str(name),
         "env_id": str(payload.get("env_id", "")),
@@ -29,11 +30,13 @@ def eval_summary_row(name: str, output_path: str | Path, payload: dict[str, Any]
         "success_rate": float(swm_results.get("success_rate", float("nan"))),
         "plans": int(diagnostics.get("plans", 0)),
         "steps": int(diagnostics.get("steps", 0)),
+        "latent_work_total": int(diagnostics.get("latent_work_total", 0)),
         "bits_used_total": int(diagnostics.get("bits_used_total", 0)),
         "dynamics_flops_total": int(diagnostics.get("dynamics_flops_total", 0)),
         "plan_time_total_sec": float(diagnostics.get("plan_time_total_sec", 0.0)),
         "wall_time_sec": float(payload.get("wall_time_sec", 0.0)),
         "schedule_level_counts": json.dumps(jsonable(level_counts), sort_keys=True),
+        "schedule_k_counts": json.dumps(jsonable(k_counts), sort_keys=True),
         "schedule": str(payload.get("schedule", "")),
         "role": str(payload.get("role", "")),
         "seed": int(payload.get("seed", payload.get("eval_seed", 0))),
@@ -58,11 +61,13 @@ def write_summary_csv(path: str | Path, rows: Iterable[dict[str, Any]]) -> None:
         "success_rate",
         "plans",
         "steps",
+        "latent_work_total",
         "bits_used_total",
         "dynamics_flops_total",
         "plan_time_total_sec",
         "wall_time_sec",
         "schedule_level_counts",
+        "schedule_k_counts",
         "schedule",
         "role",
         "seed",

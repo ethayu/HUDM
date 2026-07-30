@@ -35,6 +35,32 @@ def executed_action_prefix(action_trace: list[Any]) -> list[Any]:
     return actions
 
 
+def final_cem_rollout_levels(decision: dict[str, Any]) -> tuple[list[int], str]:
+    """Resolve the saved final-CEM schedule without inventing level zero."""
+
+    value = decision.get("rollout_level_indices")
+    if isinstance(value, list) and value:
+        return [int(item) for item in value], "rollout_level_indices"
+    if decision.get("base_level_idx") is not None:
+        return [int(decision["base_level_idx"])], "base_level_idx"
+    if decision.get("mpc_level_idx") is not None:
+        return [int(decision["mpc_level_idx"])], "mpc_level_idx"
+    raise ValueError(
+        "final CEM diagnostics contain no rollout_level_indices, base_level_idx, or mpc_level_idx"
+    )
+
+
+def final_cem_rollout_ks(decision: dict[str, Any]) -> tuple[list[int], str] | None:
+    value = decision.get("rollout_ks")
+    if isinstance(value, list) and value:
+        return [int(item) for item in value], "rollout_ks"
+    if decision.get("base_k") is not None:
+        return [int(decision["base_k"])], "base_k"
+    if decision.get("mpc_k") is not None:
+        return [int(decision["mpc_k"])], "mpc_k"
+    return None
+
+
 def _final_cem_by_replan(planning_trace: list[dict[str, Any]], *, batch_env: int) -> dict[int, dict[str, Any]]:
     final: dict[int, dict[str, Any]] = {}
     fallback_idx = 0
@@ -83,19 +109,42 @@ def fidelity_trace_from_planning_trace(
             if not previous:
                 continue
             decision = final_by_replan[max(previous)]
-        rollout_levels = decision.get("rollout_level_indices") or decision.get("model_rollout_level_indices")
-        if not isinstance(rollout_levels, list) or not rollout_levels:
-            rollout_levels = [decision.get("base_level_idx", 0)]
         block_idx = int((t - replan_idx * interval) // block)
-        level_idx = _int(rollout_levels[min(block_idx, len(rollout_levels) - 1)])
-        k_value = int(k_values[level_idx]) if 0 <= level_idx < len(k_values) else level_idx
+        rollout_k_result = final_cem_rollout_ks(decision)
+        if rollout_k_result is not None:
+            rollout_ks, level_source = rollout_k_result
+            k_value = int(rollout_ks[min(block_idx, len(rollout_ks) - 1)])
+            rollout_levels = decision.get("rollout_level_indices")
+            raw_level = (
+                rollout_levels[min(block_idx, len(rollout_levels) - 1)]
+                if isinstance(rollout_levels, list) and rollout_levels
+                else None
+            )
+            level_idx = int(raw_level) if raw_level is not None else (k_values.index(k_value) if k_value in k_values else None)
+        else:
+            rollout_levels, level_source = final_cem_rollout_levels(decision)
+            level_idx = _int(rollout_levels[min(block_idx, len(rollout_levels) - 1)])
+            k_value = int(k_values[level_idx]) if 0 <= level_idx < len(k_values) else level_idx
         rows.append(
             {
                 "t": int(t),
                 "replan_idx": int(replan_idx),
                 "block_idx": int(block_idx),
-                "level_idx": int(level_idx),
+                "level_idx": int(level_idx) if level_idx is not None else None,
                 "K": int(k_value),
+                "level_source": str(level_source),
+                "base_level_idx": (
+                    int(decision["base_level_idx"])
+                    if decision.get("base_level_idx") is not None
+                    else None
+                ),
+                "mpc_level_idx": (
+                    int(decision["mpc_level_idx"])
+                    if decision.get("mpc_level_idx") is not None
+                    else None
+                ),
+                "base_k": int(decision["base_k"]) if decision.get("base_k") is not None else None,
+                "mpc_k": int(decision["mpc_k"]) if decision.get("mpc_k") is not None else None,
             }
         )
     return rows
@@ -151,6 +200,8 @@ def review_rollouts_for_batches(
 
 __all__ = [
     "executed_action_prefix",
+    "final_cem_rollout_levels",
+    "final_cem_rollout_ks",
     "fidelity_trace_from_planning_trace",
     "review_rollouts_for_batches",
 ]

@@ -7,6 +7,7 @@ import warnings
 
 
 DEFAULTS = {
+    "K": None,
     "checkpoint": {"run_dir": "checkpoints_mwm/run", "epoch": None},
     "data": {
         "path": "data/swm_dataset.lance",
@@ -101,9 +102,31 @@ def resolve_device(raw: str):
     return torch.device(str(raw))
 
 
+def _load_eval_config(cfg_path: str, overrides: list[str] | None = None):
+    """Load eval config while keeping the scheduler schema closed.
+
+    OmegaConf recursively merges mappings, which would otherwise add the
+    default level selectors back into an explicit literal-K scheduler.
+    """
+    from omegaconf import OmegaConf
+
+    from mwm.config_cli import load_config
+
+    override_values = list(overrides or [])
+    cfg = load_config(DEFAULTS, cfg_path, override_values)
+    explicit = OmegaConf.load(str(cfg_path))
+    if override_values:
+        explicit = OmegaConf.merge(explicit, OmegaConf.from_dotlist(override_values))
+    explicit_scheduler = OmegaConf.select(explicit, "planner.scheduler")
+    if explicit_scheduler is not None:
+        cfg.planner.scheduler = OmegaConf.create(
+            OmegaConf.to_container(explicit_scheduler, resolve=True)
+        )
+    return cfg
+
+
 def load_eval_runtime(cfg_path: str, *, overrides: list[str] | None = None) -> EvalRuntime:
     from mwm.checkpoint_io import load_world_model_from_checkpoint
-    from mwm.config_cli import load_config
     from mwm.data.paths import local_path
     from mwm.eval.action_preprocessing import (
         available_stat_keys_for_action_process,
@@ -118,7 +141,7 @@ def load_eval_runtime(cfg_path: str, *, overrides: list[str] | None = None) -> E
     from mwm.swm.envs import parse_image_shape
     from mwm.swm.restore import eval_callables_for_env
 
-    cfg = load_config(DEFAULTS, cfg_path, overrides or [])
+    cfg = _load_eval_config(cfg_path, overrides)
     device = resolve_device(str(cfg.device))
     data_format = str(cfg.data.get("format", "lance")).lower()
     if data_format != "lance":
@@ -182,4 +205,11 @@ def config_dependency_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-__all__ = ["DEFAULTS", "EvalRuntime", "config_dependency_root", "load_eval_runtime", "resolve_device"]
+__all__ = [
+    "DEFAULTS",
+    "EvalRuntime",
+    "_load_eval_config",
+    "config_dependency_root",
+    "load_eval_runtime",
+    "resolve_device",
+]

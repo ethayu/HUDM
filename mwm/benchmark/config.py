@@ -97,6 +97,14 @@ def merged_run_config(cfg: Any, run: Any) -> tuple[str, Any]:
     planner = run.get("planner", None)
     if planner is not None:
         run_cfg.planner = OmegaConf.merge(run_cfg.get("planner", {}), planner)
+        scheduler = planner.get("scheduler", None)
+        if scheduler is not None:
+            # Scheduler schemas are intentionally closed. Replace this nested
+            # mapping so level selectors from the eval template cannot leak
+            # into a literal-K benchmark cell (or vice versa).
+            run_cfg.planner.scheduler = OmegaConf.create(
+                OmegaConf.to_container(scheduler, resolve=True)
+            )
     run_env = run.get("env", None)
     if run_env is not None:
         run_cfg.env = OmegaConf.merge(run_cfg.get("env", {}), run_env)

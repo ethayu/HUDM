@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import re
 import time
 from typing import Any
 
@@ -11,6 +12,132 @@ from gymnasium.spaces import Box
 
 from mwm.fidelity import FidelityDecision, FidelityScheduler
 from mwm.diagnostics.flops import FLOP_ACCOUNTING_NONE, normalize_flop_accounting
+
+
+_K_RANGE_PATTERN = re.compile(r"^\s*(\d+)\s*-\s*(\d+)\s*$")
+_SHARED_SLIMMABLE_ARCH = "lewm_shared_slimmable_transformer_v1"
+
+
+def parse_k_selection(value: Any) -> tuple[list[int], bool]:
+    """Parse explicit K values or one inclusive range token such as ``[96-192]``."""
+    if isinstance(value, bool) or value is None:
+        raise ValueError("K must be a non-empty list of integers or one inclusive range such as [96-192].")
+    if isinstance(value, (str, int)):
+        items = [value]
+    else:
+        try:
+            items = list(value)
+        except TypeError as exc:
+            raise ValueError(
+                "K must be a non-empty list of integers or one inclusive range such as [96-192]."
+            ) from exc
+    if not items:
+        raise ValueError("K cannot be empty.")
+    range_match = _K_RANGE_PATTERN.fullmatch(str(items[0])) if len(items) == 1 else None
+    if range_match is not None:
+        start, end = (int(part) for part in range_match.groups())
+        if start <= 0 or end <= 0 or start > end:
+            raise ValueError(f"K range must be positive and increasing, got {start}-{end}.")
+        return list(range(start, end + 1)), True
+    values: list[int] = []
+    for item in items:
+        if isinstance(item, bool):
+            raise ValueError("K values must be positive integers, got bool.")
+        if isinstance(item, float) and not item.is_integer():
+            raise ValueError(f"K values must be integers, got {item}.")
+        try:
+            parsed = int(item)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(
+                f"Invalid K value {item!r}; use integers or one inclusive range such as [96-192]."
+            ) from exc
+        if str(item).strip().find("-") >= 0:
+            raise ValueError("A K range must be the only list item, for example K: [96-192].")
+        if parsed <= 0:
+            raise ValueError(f"K values must be positive, got {parsed}.")
+        values.append(parsed)
+    if values != sorted(set(values)):
+        raise ValueError(f"K values must be sorted and unique, got {values}.")
+    return values, False
+
+
+def resolve_model_k_selection(model: Any, value: Any) -> tuple[list[int], bool]:
+    values, used_range = parse_k_selection(value)
+    anchors = [int(k) for k in getattr(model, "K", ())]
+    supports_arbitrary_k = bool(getattr(model, "supports_arbitrary_k", False))
+    architecture = str(getattr(model, "architecture_version", ""))
+    is_shared_slimmable = supports_arbitrary_k and architecture == _SHARED_SLIMMABLE_ARCH
+    if used_range and not is_shared_slimmable:
+        raise ValueError(
+            f"K range syntax requires architecture_version={_SHARED_SLIMMABLE_ARCH!r}; "
+            f"loaded model has {architecture or 'unknown'!r}. Use its explicit K anchors {anchors}."
+        )
+    if not supports_arbitrary_k and values != anchors:
+        raise ValueError(
+            f"Legacy non-slimmable models require K to match checkpoint anchors exactly: {anchors}; got {values}."
+        )
+    min_k = int(getattr(model, "min_k", min(anchors) if anchors else 1))
+    max_k = int(getattr(model, "D", max(anchors) if anchors else 0))
+    if values[0] < min_k or values[-1] > max_k:
+        raise ValueError(f"Configured K values {values} are outside the model-supported range [{min_k}, {max_k}].")
+    return values, used_range
+
+
+def _selector_value_at_k(value: Any, values: list[int], field_name: str) -> Any:
+    if isinstance(value, bool):
+        raise ValueError(f"{field_name} must be a level token or index, got bool.")
+    if isinstance(value, int) or (isinstance(value, float) and value.is_integer()):
+        index = int(value)
+        if index < 0 or index >= len(values):
+            raise ValueError(f"{field_name}={index} is outside configured K index range [0, {len(values) - 1}].")
+        return int(values[index])
+    return value
+
+
+def scheduler_config_for_model(
+    model: Any,
+    scheduler: FidelityScheduler | dict[str, Any] | None,
+) -> tuple[FidelityScheduler | dict[str, Any] | None, list[int] | None]:
+    if isinstance(scheduler, FidelityScheduler) or scheduler is None:
+        return scheduler, None
+    raw = dict(scheduler)
+    if "K" not in raw:
+        return raw, None
+    selected_ks, used_range = resolve_model_k_selection(model, raw.pop("K"))
+    supports_arbitrary_k = bool(getattr(model, "supports_arbitrary_k", False))
+    requested_unit = str(raw.get("fidelity_unit", "")).strip().lower()
+    if not supports_arbitrary_k:
+        if requested_unit == "k":
+            raise ValueError("fidelity_unit=k requires a shared slimmable transformer model.")
+        return raw, None
+    anchors = [int(k) for k in getattr(model, "K", ())]
+    if requested_unit == "level":
+        if used_range or selected_ks != anchors:
+            raise ValueError(
+                "A ranged or non-anchor K selection requires fidelity_unit=k; "
+                "remove fidelity_unit=level or use the checkpoint anchor list."
+            )
+        return raw, None
+    raw["fidelity_unit"] = "k"
+    selector_names = (("level", "k"), ("start_level", "start_k"), ("end_level", "end_k"))
+    for stage_name in ("mpc", "cem", "rollout"):
+        if stage_name not in raw or raw[stage_name] is None:
+            continue
+        stage = dict(raw[stage_name])
+        for old_name, new_name in selector_names:
+            if old_name not in stage:
+                continue
+            if new_name in stage:
+                raise ValueError(
+                    f"planner.scheduler.{stage_name} cannot define both {old_name} and {new_name}."
+                )
+            stage[new_name] = _selector_value_at_k(
+                stage.pop(old_name),
+                selected_ks,
+                f"planner.scheduler.{stage_name}.{old_name}",
+            )
+        raw[stage_name] = stage
+    return raw, selected_ks
 
 
 class MWMScheduledCEMSolver:
@@ -89,7 +216,29 @@ class MWMScheduledCEMSolver:
         if isinstance(self.scheduler_spec, FidelityScheduler):
             self.scheduler = self.scheduler_spec
         else:
-            self.scheduler = FidelityScheduler.from_config(self.scheduler_spec, num_levels=num_levels, horizon=horizon)
+            resolved_scheduler, selectable_ks = scheduler_config_for_model(self.model, self.scheduler_spec)
+            self.scheduler = FidelityScheduler.from_config(
+                resolved_scheduler,
+                num_levels=num_levels,
+                horizon=horizon,
+                levels=tuple(int(k) for k in getattr(self.model, "K", ())),
+                min_k=int(getattr(self.model, "min_k", 1)),
+                max_k=int(getattr(self.model, "D", max(getattr(self.model, "K", (1,))))),
+                supports_arbitrary_k=bool(getattr(self.model, "supports_arbitrary_k", False)),
+                selectable_ks=selectable_ks,
+            )
+        if self.scheduler.fidelity_unit == "k" and not bool(getattr(self.model, "supports_arbitrary_k", False)):
+            raise ValueError("Literal-K scheduling requires a model with supports_arbitrary_k=True.")
+        if self.scheduler.fidelity_unit == "k":
+            model_min_k = int(getattr(self.model, "min_k", 1))
+            model_max_k = int(getattr(self.model, "D"))
+            scheduler_max_k = self.scheduler.max_k
+            if self.scheduler.min_k < model_min_k or scheduler_max_k is None or scheduler_max_k > model_max_k:
+                raise ValueError(
+                    "Literal-K scheduler range "
+                    f"[{self.scheduler.min_k}, {scheduler_max_k}] is outside the model-supported "
+                    f"range [{model_min_k}, {model_max_k}]."
+                )
         self._configured = True
 
     @property
@@ -244,12 +393,38 @@ class MWMScheduledCEMSolver:
                     "cem_progress": float(decision.cem_progress),
                     "mpc_iter": int(replan_idx),
                     "mpc_progress": float(decision.mpc_progress),
-                    "base_level_idx": int(decision.base_level_idx),
-                    "mpc_level_idx": int(decision.metadata.get("mpc_level_idx", decision.base_level_idx)),
-                    "terminal_level_idx": int(
-                        decision.metadata.get("terminal_level_idx", decision.rollout_level_indices[-1])
+                    "base_level_idx": (
+                        int(decision.base_level_idx) if decision.base_level_idx is not None else None
                     ),
-                    "rollout_level_indices": [int(x) for x in decision.rollout_level_indices],
+                    "mpc_level_idx": (
+                        int(decision.metadata["mpc_level_idx"])
+                        if decision.metadata.get("mpc_level_idx") is not None
+                        else None
+                    ),
+                    "terminal_level_idx": (
+                        int(decision.metadata["terminal_level_idx"])
+                        if decision.metadata.get("terminal_level_idx") is not None
+                        else None
+                    ),
+                    "rollout_level_indices": [
+                        int(x) if x is not None else None for x in decision.rollout_level_indices
+                    ],
+                    "mpc_k": (
+                        int(decision.metadata["mpc_k"])
+                        if decision.metadata.get("mpc_k") is not None
+                        else None
+                    ),
+                    "base_k": int(decision.base_k) if decision.base_k is not None else None,
+                    "terminal_k": (
+                        int(decision.metadata["terminal_k"])
+                        if decision.metadata.get("terminal_k") is not None
+                        else None
+                    ),
+                    "rollout_ks": (
+                        [int(k) for k in decision.rollout_ks]
+                        if decision.rollout_ks is not None
+                        else None
+                    ),
                     "cost_time_sec": float(cost_time),
                     "cem_cost_calls": 1,
                     "num_samples": int(current_num_samples),
@@ -290,4 +465,9 @@ class MWMScheduledCEMSolver:
         self._replan_idx = 0
 
 
-__all__ = ["MWMScheduledCEMSolver"]
+__all__ = [
+    "MWMScheduledCEMSolver",
+    "parse_k_selection",
+    "resolve_model_k_selection",
+    "scheduler_config_for_model",
+]
