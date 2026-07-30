@@ -425,8 +425,6 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
         if self.supports_arbitrary_k and rollout_ks_value is not None:
             base_k = self._validated_k(int(getattr(decision, "base_k")))
             rollout_ks = self._validate_k_schedule(rollout_ks_value, horizon=int(candidates.shape[2]))
-            if any(k > base_k for k in rollout_ks):
-                raise ValueError(f"rollout K cannot exceed base K={base_k}: {rollout_ks}.")
             base_level_idx = self.K.index(base_k) if base_k in self.K else None
             rollout_levels = [self.K.index(k) if k in self.K else None for k in rollout_ks]
         else:

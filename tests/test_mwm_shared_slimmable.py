@@ -435,6 +435,27 @@ class SharedSlimmableDynamicsTests(unittest.TestCase):
         self.assertEqual(model._last_cost_diagnostics["terminal_k"], 2)
         self.assertEqual(model._last_cost_diagnostics["latent_work"], 14)
 
+    def test_rollout_k_may_decrease_from_finer_than_cem_base(self) -> None:
+        model = _build_shared().eval()
+        infos = {
+            "pixels": torch.rand(1, 2, 2, 3, 8, 8),
+            "goal": torch.rand(1, 2, 2, 3, 8, 8),
+        }
+        candidates = torch.randn(1, 2, 4, 2)
+        decision = SimpleNamespace(
+            base_level_idx=0,
+            rollout_level_indices=[None, None, 0, 0],
+            base_k=2,
+            rollout_ks=[3, 3, 2, 2],
+            metadata={"mpc_k": 4},
+        )
+
+        cost = model.get_cost_with_fidelity(infos, candidates, decision)
+
+        self.assertEqual(tuple(cost.shape), (1, 2))
+        self.assertEqual(model._last_cost_diagnostics["base_k"], 2)
+        self.assertEqual(model._last_cost_diagnostics["rollout_ks"], [3, 3, 2, 2])
+
     def test_profiled_dynamics_flops_increase_with_k(self) -> None:
         model = _build_shared().eval()
         parameter_count = sum(parameter.numel() for parameter in model.parameters())

@@ -351,8 +351,6 @@ class FidelityScheduler:
                 else [self._interp_k(start, end, step / (self.horizon - 1)) for step in range(self.horizon)]
             )
         out = [self._validated_k(value, "planner.scheduler.rollout.k") for value in values]
-        if any(value > base_k for value in out):
-            raise ValueError(f"rollout K cannot exceed base K={base_k}: {out}.")
         for previous, current in zip(out, out[1:]):
             if current > previous:
                 raise ValueError(f"rollout cannot increase K within one rollout: {out}.")
@@ -425,11 +423,6 @@ class FidelityScheduler:
         out = [self._validated_level(int(level), "planner.scheduler.rollout") for level in levels]
         if len(out) != self.horizon:
             raise ValueError(f"planner.scheduler.rollout must have horizon={self.horizon} entries, got {len(out)}.")
-        for idx in out:
-            if idx > int(base_level_idx):
-                raise ValueError(
-                    f"planner.scheduler.rollout cannot use level {idx} finer than base level {base_level_idx}."
-                )
         for prev, cur in zip(out, out[1:]):
             if cur > prev:
                 raise ValueError(

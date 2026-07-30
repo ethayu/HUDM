@@ -14,9 +14,6 @@ def rollout_schedule_indices(decision: Any, horizon: int, *, num_levels: int | N
         ]:
             if idx < 0 or idx >= int(num_levels):
                 raise ValueError(f"{field_name}={idx} is outside [0, {int(num_levels) - 1}].")
-    for idx in rollout_levels:
-        if idx > base_level_idx:
-            raise ValueError(f"rollout cannot use level {idx} finer than base level {base_level_idx}.")
     for prev, cur in zip(rollout_levels, rollout_levels[1:]):
         if cur > prev:
             raise ValueError(f"rollout cannot move from lower to higher fidelity within one rollout: {rollout_levels}")

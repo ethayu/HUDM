@@ -1320,6 +1320,23 @@ train:
         self.assertEqual(late.rollout_level_indices, [3, 2, 1, 0])
         self.assertEqual(late.metadata["terminal_level_idx"], 0)
 
+    def test_rollout_may_decrease_from_finest_to_cem_base(self) -> None:
+        scheduler = FidelityScheduler.from_config(
+            {
+                "enabled": True,
+                "mpc": {"mode": "fixed", "level": "finest"},
+                "cem": {"mode": "fixed", "level": 1},
+                "rollout": {"mode": "linear", "start_level": "finest", "end_level": "base"},
+            },
+            num_levels=4,
+            horizon=4,
+        )
+
+        decision = scheduler.decision(cem_iter=0, n_iter=1)
+
+        self.assertEqual(decision.base_level_idx, 1)
+        self.assertEqual(decision.rollout_level_indices, [3, 2, 2, 1])
+
     def test_multi_fidelity_scheduler_rejects_legacy_schema_and_bad_rollout(self) -> None:
         with self.assertRaisesRegex(ValueError, "legacy.*planner.scheduler"):
             FidelityScheduler.from_config(
