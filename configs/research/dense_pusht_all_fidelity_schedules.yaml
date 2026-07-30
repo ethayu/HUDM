@@ -16,9 +16,9 @@ run_defaults:
   planner:
     flop_accounting: dynamics_audit
 sweep:
-  planner.pop_size: [100, 300]
-  planner.elite_frac: [0.05, 0.1]
-  planner.n_iter: [5, 10]
+  planner.pop_size: [20, 50, 100, 150, 200]
+  planner.elite_frac: [0.05, 0.1, 0.2, 0.3, 0.5]
+  planner.n_iter: [5, 10, 20, 30, 50]
 
 runs:
   - name: 00_upstream_fixed_finest
