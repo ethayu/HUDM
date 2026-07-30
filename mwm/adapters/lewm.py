@@ -8,11 +8,12 @@ from hydra.utils import instantiate
 import torch.nn as nn
 
 from mwm.adapters.base import ComponentGroup, ComponentPolicy, StableWMBaseSpec, validate_component_policy
-from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH
+from mwm.adapters.constants import LEWM_BASE_ADAPTER_ARCH, LEWM_SHARED_SLIMMABLE_ARCH
 from mwm.adapters.registry import register_adapter
 from mwm.models.lewm import LeWMMatryoshkaWorldModel
 from mwm.models.decoders import ConvImageDecoder
 from mwm.models.transitions import TransitionPackage
+from mwm.models.slimmable import SharedSlimmableTransition
 
 
 @dataclass(frozen=True)
@@ -40,13 +41,29 @@ class LeWMStableWMAdapter:
     def default_policy(self) -> ComponentPolicy:
         return ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=("decoder",))
 
-    def _validate_supported_policy(self, policy: ComponentPolicy) -> None:
+    def _validate_supported_policy(self, policy: ComponentPolicy, training_recipe: dict[str, Any]) -> None:
         expected = self.default_policy()
         legacy_without_decoder = ComponentPolicy(shared=("latent_producer",), per_level=("transition",), reconstructor=())
+        shared_policy = ComponentPolicy(
+            shared=("latent_producer", "transition"),
+            per_level=(),
+            reconstructor=("decoder",),
+        )
+        shared_dynamics = training_recipe.get("shared_dynamics")
+        if policy == shared_policy:
+            if not isinstance(shared_dynamics, dict):
+                raise ValueError("Shared Le-WM transition policy requires mwm.shared_dynamics configuration.")
+            _validate_shared_dynamics_config(shared_dynamics)
+            return
+        if shared_dynamics is not None:
+            raise ValueError(
+                "mwm.shared_dynamics requires shared=[latent_producer, transition], per_level=[], "
+                "reconstructor=[decoder]."
+            )
         if policy not in {expected, legacy_without_decoder}:
             raise ValueError(
-                "Le-WM Stable-WM adapter only supports shared latent_producer, per-level transition, "
-                "and decoder reconstructor policies."
+                "Le-WM adapter only supports either the legacy per-level transition policy or the opt-in "
+                "shared slimmable transition policy."
             )
 
     def _base_latent_dim(self, source_config: dict[str, Any]) -> int:
@@ -82,9 +99,13 @@ class LeWMStableWMAdapter:
         policy = component_policy or self.default_policy()
         groups = self.component_groups()
         validate_component_policy(groups, policy)
-        self._validate_supported_policy(policy)
         source_copy = copy.deepcopy(source_config)
         recipe_copy = copy.deepcopy(training_recipe)
+        self._validate_supported_policy(policy, recipe_copy)
+        if isinstance(recipe_copy.get("shared_dynamics"), dict):
+            recipe_copy["shared_dynamics"] = _validate_shared_dynamics_config(
+                recipe_copy["shared_dynamics"]
+            )
         d = self._base_latent_dim(source_copy)
         return StableWMBaseSpec(
             family=self.family,
@@ -105,6 +126,38 @@ class LeWMStableWMAdapter:
 
 def _instantiate_module(config: dict[str, Any]) -> nn.Module:
     return instantiate(copy.deepcopy(config))
+
+
+def _validate_shared_dynamics_config(value: dict[str, Any]) -> dict[str, Any]:
+    config = copy.deepcopy(value)
+    unknown = set(config) - {"architecture", "min_k", "prefix_sampling"}
+    if unknown:
+        raise ValueError(f"Unknown mwm.shared_dynamics keys: {sorted(unknown)}")
+    architecture = str(config.get("architecture", ""))
+    if architecture != "slimmable_transformer_v1":
+        raise ValueError(
+            f"Unsupported shared dynamics architecture {architecture!r}; expected 'slimmable_transformer_v1'."
+        )
+    min_k = int(config.get("min_k", 1))
+    if min_k <= 0:
+        raise ValueError(f"mwm.shared_dynamics.min_k must be positive, got {min_k}.")
+    sampling = copy.deepcopy(config.get("prefix_sampling", {}))
+    if not isinstance(sampling, dict):
+        raise ValueError("mwm.shared_dynamics.prefix_sampling must be a mapping.")
+    sampling_unknown = set(sampling) - {"mode", "samples_per_batch"}
+    if sampling_unknown:
+        raise ValueError(f"Unknown mwm.shared_dynamics.prefix_sampling keys: {sorted(sampling_unknown)}")
+    mode = str(sampling.get("mode", "discrete_log_uniform_non_anchor"))
+    if mode != "discrete_log_uniform_non_anchor":
+        raise ValueError(f"Unsupported shared dynamics prefix sampling mode {mode!r}.")
+    samples = int(sampling.get("samples_per_batch", 1))
+    if samples != 1:
+        raise ValueError("slimmable_transformer_v1 requires prefix_sampling.samples_per_batch=1.")
+    return {
+        "architecture": architecture,
+        "min_k": min_k,
+        "prefix_sampling": {"mode": mode, "samples_per_batch": samples},
+    }
 
 
 def _scale_positive_int(value: Any, k: int, D: int, minimum: int = 1) -> int:
@@ -256,6 +309,72 @@ def _validate_action_dim_from_source_config(source_config: dict[str, Any], actio
             )
 
 
+def _slimmable_norm_kind(config: Any) -> str:
+    if config is None:
+        return "identity"
+    if not isinstance(config, dict):
+        raise ValueError("Shared Le-WM pred_proj norm_fn must be a Hydra config mapping or null.")
+    target = str(config.get("_target_", ""))
+    if target.endswith("BatchNorm1d"):
+        return "batch_norm"
+    if target.endswith("LayerNorm"):
+        return "layer_norm"
+    if target.endswith("Identity"):
+        return "identity"
+    raise ValueError(f"Unsupported shared Le-WM pred_proj norm target {target!r}.")
+
+
+def _build_shared_slimmable_transition(
+    source_config: dict[str, Any],
+    *,
+    D: int,
+    action_dim: int,
+) -> SharedSlimmableTransition:
+    predictor = source_config.get("predictor")
+    action_encoder = source_config.get("action_encoder")
+    pred_proj = source_config.get("pred_proj")
+    if not isinstance(predictor, dict) or not isinstance(action_encoder, dict) or not isinstance(pred_proj, dict):
+        raise ValueError("Shared Le-WM dynamics requires predictor, action_encoder, and pred_proj config mappings.")
+    predictor_dims = {
+        "input_dim": int(predictor.get("input_dim", D)),
+        "hidden_dim": int(predictor.get("hidden_dim", D)),
+        "output_dim": int(predictor.get("output_dim", predictor.get("input_dim", D))),
+    }
+    if set(predictor_dims.values()) != {int(D)}:
+        raise ValueError(
+            "Shared slimmable Le-WM requires predictor input_dim=hidden_dim=output_dim=D; "
+            f"got {predictor_dims} with D={D}."
+        )
+    if int(action_encoder.get("input_dim", action_dim)) != int(action_dim):
+        raise ValueError(
+            f"Shared Le-WM action encoder input_dim={action_encoder.get('input_dim')} does not match {action_dim}."
+        )
+    if int(action_encoder.get("emb_dim", D)) != int(D):
+        raise ValueError("Shared slimmable Le-WM requires the full-width action emb_dim to equal D.")
+    for key in ("input_dim", "output_dim"):
+        if int(pred_proj.get(key, D)) != int(D):
+            raise ValueError(f"Shared slimmable Le-WM requires pred_proj.{key}=D={D}.")
+    required_predictor = ("num_frames", "depth", "heads", "dim_head", "mlp_dim")
+    missing = [key for key in required_predictor if predictor.get(key) is None]
+    if missing:
+        raise ValueError(f"Shared Le-WM predictor config is missing required values: {missing}.")
+    return SharedSlimmableTransition(
+        D=int(D),
+        action_dim=int(action_dim),
+        num_frames=int(predictor["num_frames"]),
+        depth=int(predictor["depth"]),
+        max_heads=int(predictor["heads"]),
+        max_dim_head=int(predictor["dim_head"]),
+        max_mlp_dim=int(predictor["mlp_dim"]),
+        predictor_dropout=float(predictor.get("dropout", 0.0)),
+        predictor_emb_dropout=float(predictor.get("emb_dropout", 0.0)),
+        action_smoothed_dim=int(action_encoder.get("smoothed_dim", 10)),
+        action_mlp_scale=int(action_encoder.get("mlp_scale", 4)),
+        pred_proj_hidden_dim=int(pred_proj.get("hidden_dim", D)),
+        pred_proj_norm=_slimmable_norm_kind(pred_proj.get("norm_fn")),
+    )
+
+
 def _model_from_base_spec(
     spec: StableWMBaseSpec,
     *,
@@ -266,11 +385,34 @@ def _model_from_base_spec(
 ) -> LeWMMatryoshkaWorldModel:
     source_config = copy.deepcopy(spec.source_config)
     _validate_action_dim_from_source_config(source_config, int(action_dim))
+    shared_dynamics_raw = spec.training_recipe.get("shared_dynamics")
+    shared_dynamics = (
+        _validate_shared_dynamics_config(shared_dynamics_raw)
+        if isinstance(shared_dynamics_raw, dict)
+        else None
+    )
     bundles = [
         _transition_config_bundle_from_stable_config(int(k), int(spec.D), source_config)
         for k in spec.levels
     ]
-    encoder, projector, transitions = _instantiate_components_in_source_order(source_config, bundles)
+    if shared_dynamics is None:
+        encoder, projector, transitions = _instantiate_components_in_source_order(source_config, bundles)
+        shared_transition = None
+        architecture_version = LEWM_BASE_ADAPTER_ARCH
+    else:
+        if tuple(spec.levels) != tuple(sorted(spec.levels)):
+            raise ValueError(f"Shared Le-WM anchors must be sorted, got {list(spec.levels)}.")
+        if not spec.levels or int(spec.levels[-1]) != int(spec.D):
+            raise ValueError(f"Shared Le-WM anchors must include D={spec.D}, got {list(spec.levels)}.")
+        if int(shared_dynamics["min_k"]) > int(spec.D):
+            raise ValueError(f"shared_dynamics.min_k cannot exceed D={spec.D}.")
+        encoder, projector, transitions = _instantiate_components_in_source_order(source_config, ())
+        shared_transition = _build_shared_slimmable_transition(
+            source_config,
+            D=int(spec.D),
+            action_dim=int(action_dim),
+        )
+        architecture_version = LEWM_SHARED_SLIMMABLE_ARCH
     head_architectures = [copy.deepcopy(bundle.arch) for bundle in bundles]
     decoder_architectures = [
         {
@@ -298,7 +440,7 @@ def _model_from_base_spec(
     metadata = {
         "adapter": "lewm",
         "adapter_family": "lewm",
-        "architecture_version": LEWM_BASE_ADAPTER_ARCH,
+        "architecture_version": architecture_version,
         **spec.metadata(),
         "source_config": copy.deepcopy(spec.source_config),
         "training_recipe": copy.deepcopy(spec.training_recipe),
@@ -316,6 +458,16 @@ def _model_from_base_spec(
             "block": int(action_block),
         },
     }
+    if shared_transition is not None and shared_dynamics is not None:
+        metadata.update(
+            {
+                "dynamics_architecture": "slimmable_transformer_v1",
+                "shared_dynamics": copy.deepcopy(shared_dynamics),
+                "supported_k": {"min": int(shared_dynamics["min_k"]), "max": int(spec.D), "arbitrary": True},
+                "prefix_sampling": copy.deepcopy(shared_dynamics["prefix_sampling"]),
+                "shared_transition_architecture": shared_transition.architecture(),
+            }
+        )
     model = LeWMMatryoshkaWorldModel(
         encoder=encoder,
         projector=projector,
@@ -332,7 +484,9 @@ def _model_from_base_spec(
         head_architectures=head_architectures,
         decoder_architectures=decoder_architectures,
         metadata=metadata,
-        architecture_version=LEWM_BASE_ADAPTER_ARCH,
+        architecture_version=architecture_version,
+        shared_transition=shared_transition,
+        shared_dynamics=shared_dynamics,
     )
     return model
 
@@ -342,5 +496,6 @@ register_adapter(LeWMStableWMAdapter())
 
 __all__ = [
     "LEWM_BASE_ADAPTER_ARCH",
+    "LEWM_SHARED_SLIMMABLE_ARCH",
     "LeWMStableWMAdapter",
 ]

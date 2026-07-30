@@ -99,6 +99,11 @@ def save_world_checkpoint(
             "patch_size",
             "backbone_name",
             "fixed_extra_policy",
+            "dynamics_architecture",
+            "shared_dynamics",
+            "supported_k",
+            "prefix_sampling",
+            "shared_transition_architecture",
         ):
             if key in model_metadata and key not in meta:
                 meta[key] = model_metadata[key]

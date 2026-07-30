@@ -40,6 +40,7 @@ def build_mwm_from_stable_config(
     image_shape: Sequence[int] = (224, 224),
     normalize_imagenet: bool = True,
     component_policy: ComponentPolicy | dict[str, Any] | None = None,
+    shared_dynamics: dict[str, Any] | None = None,
 ) -> nn.Module:
     resolved_family = _family_from_source_config(family, source_config)
     adapter = adapter_for_family(resolved_family)
@@ -49,10 +50,18 @@ def build_mwm_from_stable_config(
         policy = None
     else:
         policy = ComponentPolicy.from_mapping(component_policy)
+    resolved_recipe = copy.deepcopy(training_recipe)
+    if shared_dynamics is None:
+        # The explicit builder option is the architecture switch. Keeping it
+        # absent must preserve the legacy per-level implementation even if a
+        # caller reuses a recipe dictionary containing stale experiment data.
+        resolved_recipe.pop("shared_dynamics", None)
+    else:
+        resolved_recipe["shared_dynamics"] = copy.deepcopy(shared_dynamics)
     spec = adapter.resolve_spec(
         source_config=source_config,
         source_config_sha256=source_config_sha256,
-        training_recipe=training_recipe,
+        training_recipe=resolved_recipe,
         levels=tuple(int(k) for k in K),
         component_policy=policy,
     )
@@ -82,6 +91,8 @@ def build_mwm_from_stable_config(
     }
     if expected_D is not None:
         kwargs["expected_D"] = int(expected_D)
+    if shared_dynamics is not None:
+        kwargs["shared_dynamics"] = copy.deepcopy(spec.training_recipe["shared_dynamics"])
     _set_model_config(model, STABLE_CONFIG_TARGET, kwargs)
     return model
 

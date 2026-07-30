@@ -86,6 +86,7 @@ def build_trainable_stable_wm_adapter_model(cfg: Any, model_cfg: dict[str, Any])
         component_policy=ComponentPolicy.from_mapping(mwm_cfg["component_policy"])
         if "component_policy" in mwm_cfg
         else None,
+        shared_dynamics=dict(mwm_cfg["shared_dynamics"]) if "shared_dynamics" in mwm_cfg else None,
     )
 
 

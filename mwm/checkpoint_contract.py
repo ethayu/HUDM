@@ -96,6 +96,92 @@ def _validate_stable_config_checkpoint(config: dict[str, Any], metadata: dict[st
         expected_canonical = _canonical_component_policy(expected_policy, label="config")
         if canonical_policy != expected_canonical:
             raise ValueError("Base-adaptive MWM metadata component_policy does not match config.")
+    shared_dynamics = kwargs.get("shared_dynamics")
+    if shared_dynamics is not None:
+        if family != "lewm":
+            raise ValueError("Shared slimmable dynamics is supported only for Le-WM checkpoints.")
+        if not isinstance(shared_dynamics, dict):
+            raise ValueError("Base-adaptive MWM config shared_dynamics must be a mapping.")
+        training_recipe = kwargs.get("training_recipe", {})
+        if not isinstance(training_recipe, dict):
+            raise ValueError("Base-adaptive MWM config training_recipe must be a mapping.")
+        recipe_shared = training_recipe.get("shared_dynamics")
+        if recipe_shared != shared_dynamics:
+            raise ValueError("Base-adaptive MWM shared_dynamics does not match training_recipe.")
+        if metadata.get("shared_dynamics") != shared_dynamics:
+            raise ValueError("Base-adaptive MWM metadata shared_dynamics does not match config.")
+        expected_shared_policy = {
+            "shared": ["latent_producer", "transition"],
+            "per_level": [],
+            "reconstructor": ["decoder"],
+        }
+        if canonical_policy != _canonical_component_policy(expected_shared_policy, label="shared dynamics"):
+            raise ValueError("Shared dynamics checkpoint has the wrong component_policy.")
+        if metadata.get("architecture_version") != "lewm_shared_slimmable_transformer_v1":
+            raise ValueError("Shared dynamics checkpoint has the wrong architecture_version.")
+        if metadata.get("dynamics_architecture") != "slimmable_transformer_v1":
+            raise ValueError("Shared dynamics checkpoint has the wrong dynamics_architecture.")
+        if metadata.get("prefix_sampling") != shared_dynamics.get("prefix_sampling"):
+            raise ValueError("Shared dynamics checkpoint prefix_sampling does not match config.")
+        predictor = source_config.get("predictor", {})
+        action_encoder = source_config.get("action_encoder", {})
+        pred_proj = source_config.get("pred_proj", {})
+        if not all(isinstance(value, dict) for value in (predictor, action_encoder, pred_proj)):
+            raise ValueError("Shared dynamics source components must be config mappings.")
+        D = _coerce_int(predictor.get("input_dim"), label="shared predictor input_dim")
+        levels = [_coerce_int(k, label="shared anchor K") for k in kwargs.get("K", [])]
+        if not levels or levels != sorted(set(levels)) or levels[-1] != D:
+            raise ValueError(f"Shared dynamics anchors must be sorted, unique, and include D={D}; got {levels}.")
+        min_k = _coerce_int(shared_dynamics.get("min_k"), label="shared_dynamics.min_k")
+        if min_k <= 0 or min_k > D or any(k < min_k for k in levels):
+            raise ValueError(f"Shared dynamics anchors {levels} are outside supported range [{min_k}, {D}].")
+        supported_k = metadata.get("supported_k")
+        expected_supported_k = {"min": min_k, "max": D, "arbitrary": True}
+        if supported_k != expected_supported_k:
+            raise ValueError(
+                f"Shared dynamics checkpoint supported_k must be {expected_supported_k}, got {supported_k}."
+            )
+        maximum_architecture = metadata.get("shared_transition_architecture")
+        if not isinstance(maximum_architecture, dict):
+            raise ValueError("Shared dynamics checkpoint is missing shared_transition_architecture metadata.")
+        expected_architecture = {
+            "D": D,
+            "num_frames": _coerce_int(predictor.get("num_frames"), label="shared predictor num_frames"),
+            "depth": _coerce_int(predictor.get("depth"), label="shared predictor depth"),
+            "max_heads": _coerce_int(predictor.get("heads"), label="shared predictor heads"),
+            "max_dim_head": _coerce_int(predictor.get("dim_head", 64), label="shared predictor dim_head"),
+            "max_mlp_dim": _coerce_int(predictor.get("mlp_dim"), label="shared predictor mlp_dim"),
+            "action_smoothed_dim": _coerce_int(
+                action_encoder.get("smoothed_dim", 10), label="shared action smoothed_dim"
+            ),
+            "action_mlp_scale": _coerce_int(
+                action_encoder.get("mlp_scale", 4), label="shared action mlp_scale"
+            ),
+            "pred_proj_hidden_dim": _coerce_int(
+                pred_proj.get("hidden_dim"), label="shared pred_proj hidden_dim"
+            ),
+            "predictor_dropout": float(predictor.get("dropout", 0.0)),
+            "predictor_emb_dropout": float(predictor.get("emb_dropout", 0.0)),
+        }
+        expected_architecture["attention_project_out"] = not (
+            expected_architecture["max_heads"] == 1
+            and expected_architecture["max_dim_head"] == D
+        )
+        norm_config = pred_proj.get("norm_fn")
+        norm_target = str(norm_config.get("_target_", "")) if isinstance(norm_config, dict) else ""
+        expected_architecture["pred_proj_norm"] = (
+            "SlimmableBatchNorm1d"
+            if norm_target.endswith("BatchNorm1d")
+            else "SlimmableLayerNorm"
+            if norm_target.endswith("LayerNorm")
+            else "Identity"
+        )
+        for key, expected_value in expected_architecture.items():
+            if maximum_architecture.get(key) != expected_value:
+                raise ValueError(
+                    f"Shared dynamics maximum architecture {key} does not match source config: "
+                    f"expected {expected_value!r}, got {maximum_architecture.get(key)!r}."
+                )
     adapter.resolve_spec(
         source_config=source_config,
         source_config_sha256=str(metadata.get("source_config_sha256")),

@@ -7,6 +7,7 @@ Import concrete model APIs from their owner modules:
 - `mwm.models.lewm`
 - `mwm.models.prejepa`
 - `mwm.models.transitions`
+- `mwm.models.slimmable`
 - `mwm.models.losses`
 """
 

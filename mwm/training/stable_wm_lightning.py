@@ -34,9 +34,19 @@ def stable_wm_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage
         sigreg=module.sigreg,
         sigreg_weight=float(cfg.loss.get("sigreg_weight", cfg.loss.get("sigreg", {}).get("weight", 0.0))),
         sigreg_scope=str(cfg.loss.get("sigreg_scope", "shared_latent")),
+        random_prefix_weight=float(cfg.loss.get("random_prefix_weight", 0.0)),
+        sample_random_prefixes=str(stage).strip().lower() in {"fit", "train"},
     )
     if hasattr(module, "log_dict"):
-        module.log_dict({f"{stage}/{k}": v.detach() for k, v in output.items() if "loss" in k}, on_step=True, sync_dist=True)
+        module.log_dict(
+            {
+                f"{stage}/{k}": v.detach().float() if k == "sampled_k" else v.detach()
+                for k, v in output.items()
+                if "loss" in k or k == "sampled_k"
+            },
+            on_step=True,
+            sync_dist=True,
+        )
     return output
 
 
