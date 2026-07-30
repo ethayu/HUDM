@@ -45,6 +45,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/models/common.py`: Shared `MatryoshkaRuntimeModel` marker and common runtime-state initialization conventions.
 - `mwm/models/lewm.py`: Le-WM concrete MWM runtime; shared image encoder/projector, per-level transition packages, training loss, fixed-level rollout, and planner cost.
 - `mwm/models/transitions.py`: `TransitionPackage(action_encoder, predictor, pred_proj)` wrapper for per-level latent prediction.
+- `mwm/models/slimmable.py`: Prefix-sliced Le-WM action encoder, causal transformer, normalization, projection, and shared transition primitives for arbitrary runtime `K`.
 - `mwm/models/decoders.py`: Per-level convolutional image decoder used for reconstruction losses and latent-prefix visualization from each configured `K`.
 - `mwm/models/losses.py`: Level-weighted aggregation, latent regularizer routing, and matryoshka base-loss composition.
 - `mwm/models/objectives.py`: Le-WM-style MWM training objective over encoded latents and per-level prefix predictions.
@@ -191,6 +192,8 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `configs/research/train_mwm_lewm_dense_tworoom_highk_weighted.yaml`: Research TwoRoom dense training with high-K-weighted level losses into dense debug outputs.
 - `configs/research/train_mwm_lewm_dense_pusht_highk_weighted_converge.yaml`: PushT high-K weighted dense training with convergence early stopping and best-checkpoint export.
 - `configs/research/train_mwm_lewm_dense_tworoom_highk_weighted_converge.yaml`: TwoRoom high-K weighted dense training with convergence early stopping and best-checkpoint export.
+- `configs/research/train_mwm_lewm_shared_slimmable_pusht.yaml`: Opt-in PushT training for one arbitrary-prefix, nested-width Le-WM transition.
+- `configs/research/shared_slimmable_pusht_benchmark.yaml`: PushT anchor/non-anchor fixed-K ladder plus literal-K scheduled evaluation for shared slimmable dynamics.
 
 ## Scripts
 

@@ -1,0 +1,82 @@
+seed: 3072
+env_id: swm/PushT-v1
+base:
+  family: lewm
+  checkpoint: models--quentinll--lewm-pusht
+mwm:
+  component_policy:
+    shared: [latent_producer, transition]
+    per_level: []
+    reconstructor: [decoder]
+  shared_dynamics:
+    architecture: slimmable_transformer_v1
+    min_k: 1
+    prefix_sampling:
+      mode: discrete_log_uniform_non_anchor
+      samples_per_batch: 1
+  loss_terms:
+    regularizers: shared_latent
+    reconstructor_detach_encoder: true
+    reconstructor_contributes_to_encoder_loss: false
+data:
+  path: data/upstream/pusht_expert_train.lance
+  format: lance
+  split_ratio: 0.9
+  pixels_key: pixels
+  action_key: action
+  frameskip: 5
+  keys_to_load: [pixels, action, proprio, state]
+  keys_to_cache: [action, proprio, state]
+model:
+  D: 192
+  K: [6, 12, 48, 96, 144, 192]
+  action_dim: auto
+  action_block: 5
+  image_shape: auto
+  history_size: 3
+  num_preds: 1
+train:
+  batch_size: 128
+  horizon: 4
+  num_workers: 6
+  drop_last: true
+  prefetch_factor: 3
+  pin_memory: true
+  precision: bf16
+  no_cuda: false
+  checkpoint_dir: checkpoints_mwm
+  run_name: mwm_shared_slimmable_pusht
+  backend: stable_worldmodel_lewm
+  timestamp_run_dir: false
+  clean_trainer_root: true
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  checkpoint_every_n_train_steps: 0
+  checkpoint_monitor: validate/rollout_loss
+  checkpoint_mode: min
+  save_top_k: 1
+  export_checkpoint: best_if_available
+  gradient_clip_val: 1.0
+  matmul_precision: high
+  slurm_auto_requeue: false
+optim:
+  lr: 0.00005
+  weight_decay: 0.001
+loss:
+  rollout_weight: 1.0
+  recon_latent_weight: 0.0
+  random_prefix_weight: 1.0
+  sigreg_weight: 0.09
+  sigreg_knots: 17
+  sigreg_num_proj: 1024
+  history_size: 3
+  num_preds: 1
+schedule:
+  max_epochs: 30
+  convergence:
+    enabled: true
+    metrics: [validate/rollout_loss]
+    patience: 1
+    min_delta: 0.0
+    relative_min_delta: 0.0
+    warmup_epochs: 10

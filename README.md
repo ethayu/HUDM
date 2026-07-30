@@ -129,6 +129,26 @@ shared or duplicated. Le-WM uses `encoder + projector` as the shared latent
 producer and fresh per-`K` transition tails; PreJEPA/DINO-WM uses a shared image
 patch backbone with per-`K` patch predictors and fixed extra encoders.
 
+Research configs may opt Le-WM into `slimmable_transformer_v1`. That variant
+uses one nested action-conditioned causal transition, trains configured anchor
+prefixes plus a sampled non-anchor prefix, and permits literal `K` selection at
+inference while executing prefix-sliced attention and MLP widths.
+
+Evaluation configs may use the root-level `K` shortcut. An explicit list keeps
+the existing discrete behavior, while one hyphenated item denotes an inclusive
+integer range:
+
+```yaml
+K: [96-192]
+```
+
+For a shared slimmable Le-WM checkpoint this makes every integer width from 96
+through 192 selectable by the existing planner schedule. `K: [96, 144, 192]`
+remains valid and discrete. Range syntax is inference-only and fails during
+planner configuration when the loaded checkpoint is not
+`lewm_shared_slimmable_transformer_v1`; legacy checkpoints continue to use
+their exact explicit anchor list.
+
 Additional bases should be added as real adapters and concrete runtime classes
 after inspecting their Stable-WM config/model. There are no placeholder runtime
 adapters.

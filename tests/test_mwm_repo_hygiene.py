@@ -123,6 +123,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
             "mwm/models/common.py",
             "mwm/models/lewm.py",
             "mwm/models/prejepa.py",
+            "mwm/models/slimmable.py",
             "mwm/training/stable_wm.py",
             "mwm/training/stable_wm_callbacks.py",
             "mwm/training/stable_wm_config.py",
@@ -410,7 +411,11 @@ class MWMRepoHygieneTests(unittest.TestCase):
                         schedulers.append(planner["scheduler"])
                 for scheduler in schedulers:
                     self.assertFalse(legacy_keys & set(scheduler), path)
-                    self.assertEqual(set(scheduler), {"enabled", "mpc", "cem", "rollout"}, path)
+                    expected_keys = {"enabled", "mpc", "cem", "rollout"}
+                    if "fidelity_unit" in scheduler:
+                        expected_keys.add("fidelity_unit")
+                    self.assertEqual(set(scheduler), expected_keys, path)
+                    self.assertIn(scheduler.get("fidelity_unit", "level"), {"level", "k"}, path)
                     self.assertIn(scheduler["mpc"]["mode"], {"fixed", "linear"}, path)
                     self.assertIn(scheduler["cem"]["mode"], {"fixed", "linear"}, path)
                     self.assertIn(scheduler["rollout"]["mode"], {"fixed", "linear"}, path)

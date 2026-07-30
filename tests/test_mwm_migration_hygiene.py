@@ -29,6 +29,7 @@ class MWMMigrationHygieneTests(unittest.TestCase):
             "mwm/models/common.py",
             "mwm/models/lewm.py",
             "mwm/models/prejepa.py",
+            "mwm/models/slimmable.py",
             "mwm/models/objectives.py",
             "mwm/models/planning_costs.py",
             "mwm/diagnostics/flops.py",
