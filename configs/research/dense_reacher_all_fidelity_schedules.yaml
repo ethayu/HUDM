@@ -1,14 +1,14 @@
-# Run 00 is the converted upstream PushT baseline. The source TSV contains 26
+# Run 00 is the converted upstream Reacher baseline. The source TSV contains 26
 # schedule rows (rather than 25), kept below in source order. A dash means that
 # the conceptual outer axis is not varied; the runtime representation still
 # supplies the required fixed stage.
-output_dir: reports/research/dense_pusht_all_fidelity_schedules
-title: Dense PushT All-Axis Fidelity Schedule Matrix
-env_id: swm/PushT-v1
+output_dir: reports/research/dense_reacher_all_fidelity_schedules
+title: Dense Reacher All-Axis Fidelity Schedule Matrix
+env_id: swm/ReacherDMControl-v0
 seed: 42
-eval_config: configs/eval/paper_pusht.yaml
+eval_config: configs/eval/paper_reacher.yaml
 manifest:
-  config: configs/manifest/pusht_paper_seed42.yaml
+  config: configs/manifest/reacher_paper_seed42.yaml
 
 # Every base run below is evaluated for the full Cartesian product (8 cells).
 # The audited dynamics FLOP count is the default cost axis in the Pareto view.
@@ -23,7 +23,7 @@ sweep:
 runs:
   - name: 00_upstream_fixed_finest
     role: upstream_lewm_converted
-    checkpoint: checkpoints_mwm/upstream_lewm_pusht
+    checkpoint: checkpoints_mwm/upstream_lewm_reacher
     schedule: "upstream fixed finest"
     planner:
       scheduler:
@@ -34,7 +34,7 @@ runs:
 
   - name: 01_rollout_fixed
     role: dense_schedule_01_rollout_fixed
-    checkpoint: &dense_pusht_checkpoint checkpoints_mwm/mwm_dense_pusht
+    checkpoint: &dense_reacher_checkpoint checkpoints_mwm/mwm_dense_reacher
     schedule: "MPC=- | CEM=- | Rollout=fixed"
     planner:
       scheduler:
@@ -45,7 +45,7 @@ runs:
 
   - name: 02_rollout_fine_to_coarse
     role: dense_schedule_02_rollout_fine_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=- | Rollout=fine -> coarse"
     planner:
       scheduler:
@@ -56,7 +56,7 @@ runs:
 
   - name: 03_cem_fixed_rollout_base
     role: dense_schedule_03_cem_fixed_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=fixed | Rollout=base"
     planner:
       scheduler:
@@ -67,7 +67,7 @@ runs:
 
   - name: 04_cem_fixed_rollout_fine_to_base
     role: dense_schedule_04_cem_fixed_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=fixed | Rollout=fine -> base"
     planner:
       scheduler:
@@ -78,7 +78,7 @@ runs:
 
   - name: 05_cem_fixed_rollout_base_to_coarse
     role: dense_schedule_05_cem_fixed_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=fixed | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -89,7 +89,7 @@ runs:
 
   - name: 06_cem_coarse_to_fine_rollout_base
     role: dense_schedule_06_cem_coarse_to_fine_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=coarse -> fine | Rollout=base"
     planner:
       scheduler:
@@ -100,7 +100,7 @@ runs:
 
   - name: 07_cem_coarse_to_fine_rollout_fine_to_base
     role: dense_schedule_07_cem_coarse_to_fine_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=coarse -> fine | Rollout=fine -> base"
     planner:
       scheduler:
@@ -111,7 +111,7 @@ runs:
 
   - name: 08_cem_coarse_to_fine_rollout_base_to_coarse
     role: dense_schedule_08_cem_coarse_to_fine_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=- | CEM=coarse -> fine | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -122,7 +122,7 @@ runs:
 
   - name: 09_mpc_fixed_cem_base_rollout_base
     role: dense_schedule_09_mpc_fixed_cem_base_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=base | Rollout=base"
     planner:
       scheduler:
@@ -133,7 +133,7 @@ runs:
 
   - name: 10_mpc_fixed_cem_base_rollout_fine_to_base
     role: dense_schedule_10_mpc_fixed_cem_base_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -144,7 +144,7 @@ runs:
 
   - name: 11_mpc_fixed_cem_base_rollout_base_to_coarse
     role: dense_schedule_11_mpc_fixed_cem_base_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -155,7 +155,7 @@ runs:
 
   - name: 12_mpc_fixed_cem_coarse_to_base_rollout_base
     role: dense_schedule_12_mpc_fixed_cem_coarse_to_base_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=coarse -> base | Rollout=base"
     planner:
       scheduler:
@@ -166,7 +166,7 @@ runs:
 
   - name: 13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
     role: dense_schedule_13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=coarse -> base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -177,7 +177,7 @@ runs:
 
   - name: 14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
     role: dense_schedule_14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=coarse -> base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -188,7 +188,7 @@ runs:
 
   - name: 15_mpc_fixed_cem_base_to_fine_rollout_base
     role: dense_schedule_15_mpc_fixed_cem_base_to_fine_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=base -> fine | Rollout=base"
     planner:
       scheduler:
@@ -199,7 +199,7 @@ runs:
 
   - name: 16_mpc_fixed_cem_base_to_fine_rollout_fine_to_base
     role: dense_schedule_16_mpc_fixed_cem_base_to_fine_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=base -> fine | Rollout=fine -> base"
     planner:
       scheduler:
@@ -210,7 +210,7 @@ runs:
 
   - name: 17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
     role: dense_schedule_17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=fixed | CEM=base -> fine | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -221,7 +221,7 @@ runs:
 
   - name: 18_mpc_coarse_to_fine_cem_base_rollout_base
     role: dense_schedule_18_mpc_coarse_to_fine_cem_base_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base | Rollout=base"
     planner:
       scheduler:
@@ -232,7 +232,7 @@ runs:
 
   - name: 19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
     role: dense_schedule_19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -243,7 +243,7 @@ runs:
 
   - name: 20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
     role: dense_schedule_20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -254,7 +254,7 @@ runs:
 
   - name: 21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
     role: dense_schedule_21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base"
     planner:
       scheduler:
@@ -265,7 +265,7 @@ runs:
 
   - name: 22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
     role: dense_schedule_22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -276,7 +276,7 @@ runs:
 
   - name: 23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
     role: dense_schedule_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -287,7 +287,7 @@ runs:
 
   - name: 24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
     role: dense_schedule_24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=base"
     planner:
       scheduler:
@@ -298,7 +298,7 @@ runs:
 
   - name: 25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
     role: dense_schedule_25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=fine -> base"
     planner:
       scheduler:
@@ -309,7 +309,7 @@ runs:
 
   - name: 26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
     role: dense_schedule_26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
-    checkpoint: *dense_pusht_checkpoint
+    checkpoint: *dense_reacher_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=base -> coarse"
     planner:
       scheduler:

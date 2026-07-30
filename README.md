@@ -22,6 +22,41 @@ python -m mwm.benchmark.verify configs/benchmark/scheduled_pusht.yaml
 python -m mwm.benchmark.render_review rollouts/mwm_benchmark
 ```
 
+## Benchmark Sweeps
+
+A benchmark config can define a Cartesian parameter sweep with dotted keys.
+Every combination is applied to every entry under `runs`, including an
+upstream checkpoint row. For example:
+
+```yaml
+run_defaults:
+  planner:
+    flop_accounting: dynamics_audit
+sweep:
+  planner.pop_size: [100, 300]
+  planner.elite_frac: [0.05, 0.1]
+  planner.n_iter: [5, 10]
+```
+
+Each expanded cell has its own run directory and saved sweep parameters, so an
+interrupted local run can reuse completed cells:
+
+```bash
+python -m mwm.benchmark.matrix CONFIG.yaml --resume
+```
+
+Large matrices can be split deterministically across workers. Run one command
+per zero-based shard, then finalize after all shards have completed:
+
+```bash
+python -m mwm.benchmark.matrix CONFIG.yaml --resume --shard-index 0 --num-shards 4
+python -m mwm.benchmark.matrix CONFIG.yaml --finalize-only
+```
+
+The aggregate `review.html` embeds an interactive success-versus-cost Pareto
+plot. Its default cost axis is audited dynamics FLOPs; legend names use the
+human-readable `schedule` field, and hovering a point shows its sweep parameters.
+
 The generated `review.html` is a static aggregate report. To inspect aligned
 successes and failures episode by episode, play existing videos, or render
 missing environment and latent-reconstruction media on demand, start the local
