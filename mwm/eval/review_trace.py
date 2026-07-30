@@ -165,10 +165,19 @@ def review_rollouts_for_batches(
     for batch_index, batch in enumerate(batches):
         planning_trace = list(batch.get("planning_diagnostics", {}).get("trace", []))
         action_by_env = list(batch.get("review_trace", {}).get("action_trace", []))
+        model_action_by_env = list(batch.get("review_trace", {}).get("model_action_trace", []))
         for batch_env, pair in enumerate(batch.get("pairs", [])):
             raw_action_trace = action_by_env[batch_env] if batch_env < len(action_by_env) else []
             action_trace = executed_action_prefix(raw_action_trace if isinstance(raw_action_trace, list) else [])
             executed_steps = min(int(eval_budget), len(action_trace))
+            raw_model_action_trace = (
+                model_action_by_env[batch_env]
+                if batch_env < len(model_action_by_env)
+                else []
+            )
+            model_action_trace = executed_action_prefix(
+                raw_model_action_trace if isinstance(raw_model_action_trace, list) else []
+            )[:executed_steps]
             success = bool(successes[episode_index]) if episode_index < len(successes) else None
             row = {
                 "episode_index": int(episode_index),
@@ -184,6 +193,7 @@ def review_rollouts_for_batches(
                 "actions_recorded": int(executed_steps),
                 "terminated_early": bool(success is True and executed_steps < int(eval_budget)),
                 "action_trace": action_trace,
+                "model_action_trace": model_action_trace,
                 "fidelity_trace": fidelity_trace_from_planning_trace(
                     planning_trace=planning_trace,
                     batch_env=batch_env,

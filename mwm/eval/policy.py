@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+import numpy as np
+
 from mwm.io import jsonable
 
 try:
@@ -37,6 +39,24 @@ def model_accounting(model: Any) -> dict[str, Any]:
     }
 
 
+class _TracingActionTransform:
+    """Capture model-space actions at the exact inverse-transform boundary."""
+
+    def __init__(self, transform: Any, capture: Any) -> None:
+        self._transform = transform
+        self._capture = capture
+
+    def transform(self, value: Any) -> Any:
+        return self._transform.transform(value)
+
+    def inverse_transform(self, value: Any) -> Any:
+        self._capture(np.asarray(value).copy())
+        return self._transform.inverse_transform(value)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._transform, name)
+
+
 class MWMWorldModelPolicy(WorldModelPolicy):
     """Stable-WM policy wrapper exposing MWM solver diagnostics."""
 
@@ -46,37 +66,54 @@ class MWMWorldModelPolicy(WorldModelPolicy):
         self._action_calls = 0
         self._policy_time_sec = 0.0
         self._action_trace: list[list[Any]] = []
+        self._model_action_trace: list[list[Any]] = []
+        self._pending_model_action: Any = None
         if config is None:
             raise ValueError("MWMWorldModelPolicy requires a Stable-WM PlanConfig.")
         super().__init__(solver=solver, config=config, **kwargs)
         if getattr(self, "cfg", None) is None:
             raise RuntimeError("Stable-WM WorldModelPolicy initialization did not produce a usable policy config.")
         self.model = model
+        if "action" in self.process:
+            self.process = dict(self.process)
+            self.process["action"] = _TracingActionTransform(
+                self.process["action"],
+                self._capture_model_action,
+            )
+
+    def _capture_model_action(self, action: Any) -> None:
+        self._pending_model_action = np.asarray(action).copy()
 
     def get_action(self, info_dict: dict[str, Any], **kwargs: Any) -> Any:
         start = time.perf_counter()
         action: Any = None
         recorded = False
+        self._pending_model_action = None
         try:
             action = super().get_action(info_dict, **kwargs)
             recorded = True
             return action
         finally:
             if recorded:
-                self._record_action(action)
+                self._record_trace(self._action_trace, action)
+                self._record_trace(
+                    self._model_action_trace,
+                    action if self._pending_model_action is None else self._pending_model_action,
+                )
             self._action_calls += 1
             self._policy_time_sec += time.perf_counter() - start
 
-    def _record_action(self, action: Any) -> None:
+    @staticmethod
+    def _record_trace(trace: list[list[Any]], action: Any) -> None:
         data = jsonable(action)
         if isinstance(data, list) and data and all(isinstance(row, list) for row in data):
             rows = data
         else:
             rows = [data]
-        if len(self._action_trace) < len(rows):
-            self._action_trace.extend([] for _ in range(len(rows) - len(self._action_trace)))
+        if len(trace) < len(rows):
+            trace.extend([] for _ in range(len(rows) - len(trace)))
         for idx, row in enumerate(rows):
-            self._action_trace[idx].append(row)
+            trace[idx].append(row)
 
     def set_env(self, env: Any) -> None:
         super().set_env(env)
@@ -87,6 +124,8 @@ class MWMWorldModelPolicy(WorldModelPolicy):
         self._action_calls = 0
         self._policy_time_sec = 0.0
         self._action_trace = []
+        self._model_action_trace = []
+        self._pending_model_action = None
         for buf in getattr(self, "_action_buffer", []) or []:
             buf.clear()
         if hasattr(self, "_next_init"):
@@ -126,7 +165,10 @@ class MWMWorldModelPolicy(WorldModelPolicy):
         }
 
     def review_trace(self) -> dict[str, Any]:
-        return {"action_trace": jsonable(self._action_trace)}
+        return {
+            "action_trace": jsonable(self._action_trace),
+            "model_action_trace": jsonable(self._model_action_trace),
+        }
 
 
 __all__ = [

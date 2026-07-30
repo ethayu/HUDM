@@ -800,6 +800,14 @@ class MWMCoreTests(unittest.TestCase):
                 np.array([[10.0, 23.0], [14.0, 29.0]], dtype=np.float32),
             )
         )
+        review_trace = policy.review_trace()
+        self.assertTrue(
+            np.allclose(
+                np.asarray(review_trace["model_action_trace"]),
+                np.array([[[0.0, 1.0]], [[2.0, 3.0]]], dtype=np.float32),
+            )
+        )
+        self.assertTrue(np.allclose(np.asarray(review_trace["action_trace"]), action[:, None, :]))
 
     def test_action_spec_distinguishes_base_and_block_dims(self) -> None:
         model = _lewm_matryoshka_model(K=(8,), D=8, action_dim=10, action_block=5)
