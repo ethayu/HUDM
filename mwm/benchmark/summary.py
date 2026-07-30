@@ -19,6 +19,11 @@ def eval_summary_row(name: str, output_path: str | Path, payload: dict[str, Any]
     k_counts = diagnostics.get("schedule_k_counts", {})
     return {
         "name": str(name),
+        "cell_id": str(payload.get("cell_id", payload.get("role", ""))),
+        "base_name": str(payload.get("base_name", name)),
+        "strategy": str(payload.get("strategy", payload.get("role", ""))),
+        "sweep_key": str(payload.get("sweep_key", "{}")),
+        "sweep_params": json.dumps(jsonable(payload.get("sweep_params", {})), sort_keys=True),
         "env_id": str(payload.get("env_id", "")),
         "checkpoint_epoch": payload.get("checkpoint_epoch", ""),
         "checkpoint_run_dir": str(payload.get("checkpoint_run_dir", "")),
@@ -33,6 +38,14 @@ def eval_summary_row(name: str, output_path: str | Path, payload: dict[str, Any]
         "latent_work_total": int(diagnostics.get("latent_work_total", 0)),
         "bits_used_total": int(diagnostics.get("bits_used_total", 0)),
         "dynamics_flops_total": int(diagnostics.get("dynamics_flops_total", 0)),
+        "cem_cost_calls": int(diagnostics.get("cem_cost_calls", diagnostics.get("summary", {}).get("cem_cost_calls", 0))),
+        "candidate_action_values": int(
+            diagnostics.get("candidate_action_values", diagnostics.get("summary", {}).get("candidate_action_values", 0))
+        ),
+        "pop_size": int(payload.get("planner_params", {}).get("pop_size", 0)),
+        "elite_frac": float(payload.get("planner_params", {}).get("elite_frac", 0.0)),
+        "topk": int(payload.get("planner_params", {}).get("topk", 0)),
+        "n_iter": int(payload.get("planner_params", {}).get("n_iter", 0)),
         "plan_time_total_sec": float(diagnostics.get("plan_time_total_sec", 0.0)),
         "wall_time_sec": float(payload.get("wall_time_sec", 0.0)),
         "schedule_level_counts": json.dumps(jsonable(level_counts), sort_keys=True),
@@ -50,6 +63,11 @@ def write_summary_csv(path: str | Path, rows: Iterable[dict[str, Any]]) -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
         "name",
+        "cell_id",
+        "base_name",
+        "strategy",
+        "sweep_key",
+        "sweep_params",
         "env_id",
         "checkpoint_epoch",
         "checkpoint_run_dir",
@@ -64,6 +82,12 @@ def write_summary_csv(path: str | Path, rows: Iterable[dict[str, Any]]) -> None:
         "latent_work_total",
         "bits_used_total",
         "dynamics_flops_total",
+        "cem_cost_calls",
+        "candidate_action_values",
+        "pop_size",
+        "elite_frac",
+        "topk",
+        "n_iter",
         "plan_time_total_sec",
         "wall_time_sec",
         "schedule_level_counts",

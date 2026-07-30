@@ -11,7 +11,7 @@ from mwm.benchmark.checkpoint_verify import (
     load_checkpoint_metadata_for_benchmark,
     validate_benchmark_role_checkpoint_contract,
 )
-from mwm.benchmark.config import DEFAULTS as BENCHMARK_DEFAULTS
+from mwm.benchmark.config import DEFAULTS as BENCHMARK_DEFAULTS, role
 from mwm.benchmark.matrix_identity import expected_cells_from_resolved, load_expected_resolved, metric_identity
 from mwm.benchmark.paper_targets import append_paper_target_errors
 from mwm.benchmark.plot_contract import required_plots_for_benchmark
@@ -118,7 +118,8 @@ def verify_benchmark_output(
         errors.append(f"missing benchmark cells: {missing}")
     if extra:
         errors.append(f"unexpected benchmark cells: {extra}")
-    append_paper_target_errors(cfg, rows, errors, roles={cell[2] for cell in expected})
+    expected_roles = {role(run, run_cfg) for run, run_cfg in resolved}
+    append_paper_target_errors(cfg, rows, errors, roles=expected_roles)
 
     manifest_by_cell: dict[tuple[str, int, str], str] = {}
     manifest_by_env_seed: dict[tuple[str, int], set[str]] = {}
@@ -195,10 +196,12 @@ def verify_benchmark_output(
         if len(hashes) != 1:
             errors.append(f"benchmark roles do not share one manifest for {key}: {sorted(hashes)}")
 
-    required_plots = required_plots_for_benchmark(cfg, roles={cell[2] for cell in expected})
+    required_plots = required_plots_for_benchmark(cfg, roles=expected_roles)
     plot_dir = output_dir / "plots"
     for name in required_plots:
         _require_file(plot_dir / name, errors)
+    if cfg.get("sweep", {}):
+        _require_file(plot_dir / "pareto.html", errors)
     summary_plot_names = {Path(str(plot)).name for plot in summary.get("plots", [])}
     missing_summary_plots = sorted(required_plots - summary_plot_names)
     if missing_summary_plots:
@@ -211,6 +214,8 @@ def verify_benchmark_output(
     for name in required_plots:
         if f"plots/{name}" not in review_text:
             errors.append(f"review.html does not embed/link plots/{name}")
+    if cfg.get("sweep", {}) and "plots/pareto.html" not in review_text:
+        errors.append("review.html does not embed plots/pareto.html")
     for row in rows:
         run_output = Path(str(row.get("output_json", "")))
         eval_href = _review_href(run_output, output_dir)
@@ -222,9 +227,10 @@ def verify_benchmark_output(
 
     per_env_rows = _read_csv(per_env_path)
     per_env_cells = {(row.get("env_id", ""), row.get("role", "")) for row in per_env_rows}
-    for env, _, role in sorted(expected):
-        if (str(env), str(role)) not in per_env_cells:
-            errors.append(f"per-env table missing {(str(env), str(role))}")
+    for row in rows:
+        expected_per_env = (str(row.get("env_id", "")), str(row.get("role", "")))
+        if expected_per_env not in per_env_cells:
+            errors.append(f"per-env table missing {expected_per_env}")
 
     errors = list(dict.fromkeys(errors))
     if errors:

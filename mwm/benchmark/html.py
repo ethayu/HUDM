@@ -186,6 +186,7 @@ def write_review_html(
     outputs: list[dict[str, Any]],
     plots: list[str] | None = None,
     expected_cells: int | None = None,
+    pareto_html: str | None = None,
 ) -> None:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -220,6 +221,14 @@ def write_review_html(
         label = Path(str(plot)).stem.replace("_", " ")
         plot_cards.append(
             f"<figure><a href='{html.escape(href)}'><img src='{html.escape(href)}' alt='{html.escape(label)}'></a><figcaption>{html.escape(label)}</figcaption></figure>"
+        )
+    pareto_section = ""
+    if pareto_html:
+        pareto_href = _href(pareto_html, base_dir)
+        pareto_section = (
+            "<h2>Interactive Pareto Frontier</h2>"
+            "<section class='panel'><p class='muted'>Toggle fidelity schedules in the legend and hover points for CEM parameters and compute diagnostics.</p>"
+            f"<iframe src='{html.escape(pareto_href)}' title='Interactive Pareto frontier' style='width:100%;height:720px;border:0'></iframe></section>"
         )
 
     pair_html = []
@@ -383,6 +392,7 @@ def write_review_html(
 
   <h2>Plots</h2>
   <section class="plots">{''.join(plot_cards)}</section>
+  {pareto_section}
 
   <h2>Paired Seed Comparison</h2>
   <section class="panel">

@@ -44,9 +44,14 @@ def sorted_rows(rows: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
     )
 
 
-def row_index(rows: Iterable[dict[str, Any]]) -> dict[tuple[str, int, str], dict[str, Any]]:
+def row_index(rows: Iterable[dict[str, Any]]) -> dict[tuple[str, int, str, str], dict[str, Any]]:
     return {
-        (str(row.get("env_id", "")), int(row.get("seed", 0)), str(row.get("role", ""))): row
+        (
+            str(row.get("env_id", "")),
+            int(row.get("seed", 0)),
+            str(row.get("role", "")),
+            str(row.get("sweep_key", "{}")),
+        ): row
         for row in rows
     }
 
@@ -64,14 +69,14 @@ def comparison_roles(rows: Iterable[dict[str, Any]]) -> list[str]:
 def paired_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     indexed = row_index(rows)
     pairs: list[dict[str, Any]] = []
-    env_seed = sorted({(env, seed) for env, seed, _ in indexed})
+    env_seed_sweep = sorted({(env, seed, sweep) for env, seed, _, sweep in indexed})
     roles = comparison_roles(rows)
-    for env_id, seed in env_seed:
-        baseline = indexed.get((env_id, seed, "upstream_lewm_converted"))
+    for env_id, seed, sweep in env_seed_sweep:
+        baseline = indexed.get((env_id, seed, "upstream_lewm_converted", sweep))
         if not baseline:
             continue
         for role in roles:
-            comparison = indexed.get((env_id, seed, role))
+            comparison = indexed.get((env_id, seed, role, sweep))
             if not comparison:
                 continue
             base_success = float_metric(baseline.get("success_rate"), float("nan"))
@@ -84,6 +89,7 @@ def paired_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 {
                     "env_id": env_id,
                     "seed": seed,
+                    "sweep_key": sweep,
                     "baseline": baseline,
                     "comparison": comparison,
                     "comparison_role": role,

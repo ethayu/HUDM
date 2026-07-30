@@ -14,6 +14,8 @@ DEFAULTS = {
     "seed": 0,
     "eval_config": None,
     "manifest": {},
+    "run_defaults": {},
+    "sweep": {},
     "runs": [],
 }
 
@@ -94,6 +96,10 @@ def merged_run_config(cfg: Any, run: Any) -> tuple[str, Any]:
     name = safe_name(str(run.get("name", run.get("role", "run"))))
     run_cfg = OmegaConf.create(OmegaConf.to_container(benchmark_eval_template(cfg), resolve=True))
     run_cfg.checkpoint = checkpoint_mapping(run)
+    run_defaults = as_plain_dict(cfg.get("run_defaults", {}))
+    default_planner = run_defaults.get("planner")
+    if default_planner is not None:
+        run_cfg.planner = OmegaConf.merge(run_cfg.get("planner", {}), default_planner)
     planner = run.get("planner", None)
     if planner is not None:
         run_cfg.planner = OmegaConf.merge(run_cfg.get("planner", {}), planner)
@@ -105,9 +111,16 @@ def merged_run_config(cfg: Any, run: Any) -> tuple[str, Any]:
             run_cfg.planner.scheduler = OmegaConf.create(
                 OmegaConf.to_container(scheduler, resolve=True)
             )
+    default_env = run_defaults.get("env")
+    if default_env is not None:
+        run_cfg.env = OmegaConf.merge(run_cfg.get("env", {}), default_env)
     run_env = run.get("env", None)
     if run_env is not None:
         run_cfg.env = OmegaConf.merge(run_cfg.get("env", {}), run_env)
+    default_eval = run_defaults.get("eval")
+    if default_eval is not None:
+        run_cfg.eval = OmegaConf.merge(run_cfg.get("eval", {}), default_eval)
+        run_cfg.eval.seed = int(cfg.seed)
     run_eval = run.get("eval", None)
     if run_eval is not None:
         run_cfg.eval = OmegaConf.merge(run_cfg.get("eval", {}), run_eval)
@@ -131,6 +144,10 @@ def role(run: Any, cfg: Any) -> str:
     if run.get("role", None):
         return str(run.role)
     return str(run.get("name", "run"))
+
+
+def cell_id(run: Any, cfg: Any) -> str:
+    return str(run.get("cell_id", role(run, cfg)))
 
 
 def normalize_role_filter(roles: Any = None) -> set[str]:
@@ -163,7 +180,7 @@ def filter_resolved_by_roles(cfg: Any, resolved: list[tuple[Any, Any]], roles: A
 def validate_benchmark_matrix(cfg: Any, resolved: list[tuple[Any, Any]]) -> None:
     require_no_legacy_fields(cfg)
     load_manifest_config(cfg)
-    identities = [(str(run_cfg.get("env_id", "")), int(run_cfg.eval.seed), role(run, run_cfg)) for run, run_cfg in resolved]
+    identities = [(str(run_cfg.get("env_id", "")), int(run_cfg.eval.seed), cell_id(run, run_cfg)) for run, run_cfg in resolved]
     duplicates = sorted({identity for identity in identities if identities.count(identity) > 1})
     if duplicates:
         raise ValueError(f"Benchmark has duplicate cells: {duplicates}")
@@ -180,6 +197,7 @@ __all__ = [
     "as_plain_dict",
     "benchmark_eval_template",
     "checkpoint_mapping",
+    "cell_id",
     "filter_resolved_by_roles",
     "load_manifest_config",
     "manifest_path",

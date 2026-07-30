@@ -15,6 +15,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 def render_benchmark_review(output_dir: str | Path, *, title: str | None = None) -> dict[str, Any]:
     from mwm.benchmark.html import write_review_html
+    from mwm.benchmark.pareto import write_pareto_html
     from mwm.benchmark.plots import write_default_plots
     from mwm.benchmark.summary import write_per_env_table, write_summary_csv
     from mwm.io import load_json, write_json, write_metrics_jsonl
@@ -41,15 +42,18 @@ def render_benchmark_review(output_dir: str | Path, *, title: str | None = None)
     summary["output_dir"] = str(root)
     summary["per_env_table"] = write_per_env_table(root / "per_env_summary.csv", rows)
     plots = write_default_plots(root / "plots", rows)
+    pareto = write_pareto_html(root / "plots" / "pareto.html", rows)
     summary["plots"] = plots
+    summary["pareto_html"] = pareto
     write_json(summary_path, summary)
 
     review_title = str(title or summary.get("title") or "SWM MWM Benchmark Review")
-    write_review_html(root / "review.html", review_title, rows, outputs, plots=plots)
+    write_review_html(root / "review.html", review_title, rows, outputs, plots=plots, pareto_html=pareto)
     return {
         "output_dir": str(root),
         "review": str(root / "review.html"),
         "plots": [str(Path(plot).name) for plot in plots],
+        "pareto_html": str(Path(pareto).name),
         "runs": len(rows),
     }
 
