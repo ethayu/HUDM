@@ -11,6 +11,7 @@ DEFAULTS = {
     "checkpoint": {"run_dir": "checkpoints_mwm/run", "epoch": None},
     "data": {
         "path": "data/swm_dataset.lance",
+        "identity_path": None,
         "format": "lance",
         "split_ratio": 0.8,
         "pixels_key": "pixels",
@@ -21,6 +22,7 @@ DEFAULTS = {
     "eval": {
         "episodes": 4,
         "goal_offset": 30,
+        "goal_indexing": "exact",
         "seed": 0,
         "budget": 50,
         "num_envs": 4,
@@ -35,6 +37,7 @@ DEFAULTS = {
         "max_episode_steps": 100,
         "goal_conditioned": True,
         "kwargs": {},
+        "runtime": {},
     },
     "restore": {"import_path": None},
     "planner": {
@@ -52,6 +55,8 @@ DEFAULTS = {
         "clamp_actions": False,
         "std_unbiased": True,
         "flop_accounting": "none",
+        "rollout_semantics": "optimized",
+        "policy_semantics": "optimized",
         "scheduler": {
             "enabled": True,
             "mpc": {"mode": "fixed", "level": "finest"},
@@ -102,6 +107,47 @@ def resolve_device(raw: str):
     return torch.device(str(raw))
 
 
+def normalize_eval_data_format(raw: str) -> str:
+    data_format = str(raw).lower()
+    if data_format == "h5":
+        data_format = "hdf5"
+    if data_format not in {"lance", "hdf5"}:
+        raise ValueError(
+            "MWM evaluation requires format lance or hdf5, "
+            f"got format={data_format!r}."
+        )
+    return data_format
+
+
+def normalize_goal_indexing(raw: str) -> str:
+    mode = str(raw).lower().replace("-", "_")
+    aliases = {
+        "exact": "exact",
+        "corrected": "exact",
+        "upstream_lewm": "upstream_lewm_end_exclusive",
+        "lewm": "upstream_lewm_end_exclusive",
+        "upstream_lewm_end_exclusive": "upstream_lewm_end_exclusive",
+    }
+    if mode not in aliases:
+        raise ValueError(
+            "eval.goal_indexing must be exact or upstream_lewm_end_exclusive, "
+            f"got {raw!r}."
+        )
+    return aliases[mode]
+
+
+def effective_goal_offset(goal_offset: int, goal_indexing: str) -> int:
+    requested = int(goal_offset)
+    mode = normalize_goal_indexing(goal_indexing)
+    effective = requested - 1 if mode == "upstream_lewm_end_exclusive" else requested
+    if effective < 1:
+        raise ValueError(
+            f"eval.goal_offset={requested} is invalid for goal_indexing={mode!r}; "
+            "the effective offset must be positive."
+        )
+    return effective
+
+
 def _load_eval_config(cfg_path: str, overrides: list[str] | None = None):
     """Load eval config while keeping the scheduler schema closed.
 
@@ -143,9 +189,7 @@ def load_eval_runtime(cfg_path: str, *, overrides: list[str] | None = None) -> E
 
     cfg = _load_eval_config(cfg_path, overrides)
     device = resolve_device(str(cfg.device))
-    data_format = str(cfg.data.get("format", "lance")).lower()
-    if data_format != "lance":
-        raise ValueError(f"MWM evaluation requires format lance, got format={data_format!r}.")
+    data_format = normalize_eval_data_format(str(cfg.data.get("format", "lance")))
     from stable_worldmodel.data import load_dataset
 
     model, metadata, epoch = load_world_model_from_checkpoint(
@@ -211,5 +255,8 @@ __all__ = [
     "_load_eval_config",
     "config_dependency_root",
     "load_eval_runtime",
+    "normalize_eval_data_format",
+    "normalize_goal_indexing",
+    "effective_goal_offset",
     "resolve_device",
 ]

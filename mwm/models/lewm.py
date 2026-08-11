@@ -24,6 +24,10 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
     """Le-WM runtime with either legacy per-level or opt-in shared dynamics."""
 
     architecture_version = "lewm_base_adapter_v1"
+    _SUPPORTED_PLANNING_ROLLOUT_SEMANTICS = {
+        "optimized",
+        "upstream_lewm_historical",
+    }
 
     def __init__(
         self,
@@ -127,6 +131,16 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
             meta.setdefault("supported_k", {"min": int(self.min_k), "max": int(self.D), "arbitrary": True})
         self.metadata = meta
         self._last_cost_diagnostics: dict[str, Any] = {}
+        self.planning_rollout_semantics = "optimized"
+
+    def set_planning_rollout_semantics(self, value: str) -> None:
+        semantics = str(value).strip().lower()
+        if semantics not in self._SUPPORTED_PLANNING_ROLLOUT_SEMANTICS:
+            supported = ", ".join(sorted(self._SUPPORTED_PLANNING_ROLLOUT_SEMANTICS))
+            raise ValueError(
+                f"Unsupported Le-WM planning rollout semantics {value!r}; expected one of {supported}."
+            )
+        self.planning_rollout_semantics = semantics
 
     def _maybe_preprocess_eval_pixels(self, pixels: torch.Tensor, *, already_preprocessed: bool) -> torch.Tensor:
         return maybe_apply_image_preprocess(
@@ -195,6 +209,37 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
             return self.predict_at_k(emb[..., :k], action, k=k)
         return self.transitions[int(level_idx)].predict(emb[..., :k], action)
 
+    def _predict_rollout_prefix(
+        self,
+        level_idx: int,
+        emb: torch.Tensor,
+        all_actions: torch.Tensor,
+        *,
+        lo: int,
+        pred_time: int,
+        k: int | None = None,
+    ) -> torch.Tensor:
+        """Predict one rollout step under the selected executable semantics.
+
+        Initial LeWM ``jepa.py`` embedded the complete growing action prefix on
+        every step and sliced the final history window afterwards.  Embedding
+        only the raw history window is mathematically equivalent, but changes
+        float32 GEMM reduction order and can redirect CEM near elite ties.
+        """
+        if self.planning_rollout_semantics != "upstream_lewm_historical":
+            return self._predict_prefix(level_idx, emb, all_actions[:, lo:pred_time])
+
+        active_k = self.K[int(level_idx)] if k is None else self._validated_k(int(k))
+        if self.supports_arbitrary_k:
+            transition = self.shared_transition
+            action_emb = transition.action_encoder(all_actions[:, :pred_time], k=active_k)
+        else:
+            transition = self.transitions[int(level_idx)]
+            action_emb = transition.action_encoder(all_actions[:, :pred_time])
+        preds = transition.predictor(emb[..., :active_k], action_emb[:, lo:pred_time])
+        flat = preds.reshape(-1, preds.shape[-1])
+        return transition.pred_proj(flat).reshape(*preds.shape[:-1], -1)
+
     def decode(self, level_idx: int, latent: torch.Tensor) -> torch.Tensor:
         idx = int(level_idx)
         k = self.K[idx]
@@ -207,6 +252,7 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
         level_weights: Sequence[float] | None = None,
         rollout_weight: float = 1.0,
         recon_latent_weight: float = 0.0,
+        decoder_training_enabled: bool = True,
         sigreg: nn.Module | None = None,
         sigreg_weight: float = 0.0,
         sigreg_scope: str = "shared_latent",
@@ -219,6 +265,7 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
             level_weights=level_weights,
             rollout_weight=rollout_weight,
             recon_latent_weight=recon_latent_weight,
+            decoder_training_enabled=decoder_training_enabled,
             sigreg=sigreg,
             sigreg_weight=sigreg_weight,
             sigreg_scope=sigreg_scope,
@@ -250,8 +297,16 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
         for t in range(n_steps + 1):
             lo = max(0, history + t - self.history_size)
             emb_trunc = torch.stack(emb_list[lo:], dim=1)
-            act_trunc = all_actions[:, lo : history + t]
-            emb_list.append(self._predict_prefix(int(level_idx), emb_trunc, act_trunc)[:, -1])
+            pred_time = history + t
+            emb_list.append(
+                self._predict_rollout_prefix(
+                    int(level_idx),
+                    emb_trunc,
+                    all_actions,
+                    lo=lo,
+                    pred_time=pred_time,
+                )[:, -1]
+            )
         emb = torch.stack(emb_list, dim=1).reshape(batch, samples, history + n_steps + 1, k)
         infos["predicted_emb"] = emb
         return infos
@@ -300,9 +355,14 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
             pred_time = history + step
             lo = max(0, pred_time - self.history_size)
             emb_trunc = torch.stack(emb_list[lo:], dim=1)
-            act_trunc = all_actions[:, lo:pred_time]
             pred, flop_count, flop_error = profile_dynamics_call(
-                lambda: self._predict_prefix(level_idx, emb_trunc[..., :k], act_trunc),
+                lambda: self._predict_rollout_prefix(
+                    level_idx,
+                    emb_trunc[..., :k],
+                    all_actions,
+                    lo=lo,
+                    pred_time=pred_time,
+                ),
                 enabled=profile_flops,
             )
             dynamics_flops += int(flop_count)
@@ -384,11 +444,24 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
             pred_time = history + step
             lo = max(0, pred_time - self.history_size)
             emb_trunc = torch.stack(emb_list[lo:], dim=1)
-            act_trunc = all_actions[:, lo:pred_time]
-            pred, flop_count, flop_error = profile_dynamics_call(
-                lambda k=int(k): self.predict_at_k(emb_trunc[..., :k], act_trunc, k=k),
-                enabled=profile_flops,
-            )
+            if self.planning_rollout_semantics == "upstream_lewm_historical":
+                pred, flop_count, flop_error = profile_dynamics_call(
+                    lambda: self._predict_rollout_prefix(
+                        0,
+                        emb_trunc[..., :k],
+                        all_actions,
+                        lo=lo,
+                        pred_time=pred_time,
+                        k=int(k),
+                    ),
+                    enabled=profile_flops,
+                )
+            else:
+                act_trunc = all_actions[:, lo:pred_time]
+                pred, flop_count, flop_error = profile_dynamics_call(
+                    lambda k=int(k): self.predict_at_k(emb_trunc[..., :k], act_trunc, k=k),
+                    enabled=profile_flops,
+                )
             dynamics_flops += int(flop_count)
             if flop_error is not None:
                 flop_errors.append(flop_error)
@@ -469,6 +542,7 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
             "flop_accounting": str(out.get("_mwm_flop_accounting", flop_accounting)),
             "prefix_criterion": True,
             "history_size": int(self.history_size),
+            "rollout_semantics": str(self.planning_rollout_semantics),
         }
         if "_mwm_flop_audit_error" in out:
             self._last_cost_diagnostics["flop_audit_error"] = str(out["_mwm_flop_audit_error"])

@@ -13,6 +13,18 @@ from mwm.data.manifest import (
 from mwm.data.sampling import StartGoalPair, sample_start_goal_pairs
 from mwm.dependency_refs import dependency_refs
 from mwm.eval.validation import dataset_path, dataset_runtime_metadata, validate_manifest
+from mwm.eval.runtime import effective_goal_offset, normalize_goal_indexing
+
+
+def _pair_with_goal_offset(pair: StartGoalPair, offset: int) -> StartGoalPair:
+    delta = int(offset) - (int(pair.goal_step) - int(pair.start_step))
+    return StartGoalPair(
+        episode=int(pair.episode),
+        start_step=int(pair.start_step),
+        goal_step=int(pair.goal_step) + delta,
+        start_row=int(pair.start_row),
+        goal_row=int(pair.goal_row) + delta,
+    )
 
 
 def manifest_row_to_pair(row: dict[str, Any]) -> StartGoalPair:
@@ -56,6 +68,10 @@ def pairs_for_eval(
         seed=int(cfg.eval.seed),
         mode=str(cfg.eval.get("sampling", "mwm")),
     )
+    goal_indexing = normalize_goal_indexing(str(cfg.eval.get("goal_indexing", "exact")))
+    effective_offset = effective_goal_offset(int(cfg.eval.goal_offset), goal_indexing)
+    if effective_offset != int(cfg.eval.goal_offset):
+        pairs = [_pair_with_goal_offset(pair, effective_offset) for pair in pairs]
     write_path = cfg.eval.get("write_manifest_path", None)
     if not write_path:
         return pairs, None
@@ -64,6 +80,8 @@ def pairs_for_eval(
         dataset_path=dataset_path(dataset, cfg),
         pairs=pairs,
         goal_offset=int(cfg.eval.goal_offset),
+        goal_indexing=goal_indexing,
+        effective_goal_offset=effective_offset,
         eval_budget=int(cfg.eval.budget),
         seed=int(cfg.eval.seed),
         restore_spec=restore_spec_id,

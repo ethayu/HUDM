@@ -40,7 +40,7 @@ def sample_start_goal_pairs(
     offsets = np.asarray(getattr(dataset, "offsets"), dtype=np.int64)
     rng = np.random.default_rng(int(seed))
     sample_mode = str(mode).lower()
-    if sample_mode in {"stable_worldmodel", "stable-wm", "swm", "upstream"}:
+    if sample_mode in {"stable_worldmodel", "stable-wm", "swm", "upstream", "upstream_lewm", "lewm"}:
         valid_rows: list[np.ndarray] = []
         for ep, length in enumerate(lengths.tolist()):
             max_start = int(length) - int(goal_offset_steps) - 1
@@ -50,6 +50,13 @@ def sample_start_goal_pairs(
             raise ValueError(f"No valid start-goal pairs with goal_offset_steps={goal_offset_steps}.")
         rows = np.concatenate(valid_rows)
         population = len(rows)
+        if sample_mode in {"upstream_lewm", "lewm"}:
+            # Released LeWM eval.py calls choice(len(valid_indices) - 1),
+            # unintentionally excluding the final valid row. Preserve that
+            # historical RNG mapping only under an explicit compatibility mode.
+            population -= 1
+            if population <= 0:
+                raise ValueError("Upstream LeWM sampling requires at least two valid start-goal rows.")
         replace = int(count) > population
         choices = rng.choice(population, size=int(count), replace=replace)
         return [

@@ -22,6 +22,13 @@ def build_mwm_policy(
 ) -> Any:
     if not hasattr(model, "get_cost_with_fidelity"):
         raise TypeError("MWM evaluator requires models with get_cost_with_fidelity(...).")
+    rollout_semantics = str(cfg.planner.get("rollout_semantics", "optimized"))
+    if hasattr(model, "set_planning_rollout_semantics"):
+        model.set_planning_rollout_semantics(rollout_semantics)
+    elif rollout_semantics != "optimized":
+        raise TypeError(
+            f"Model {type(model).__name__} does not support planner.rollout_semantics={rollout_semantics!r}."
+        )
     configured_action_block = int(metadata.get("action_block", metadata.get("model", {}).get("action_block", 1)))
     action_block = int(cfg.planner.get("action_block", configured_action_block))
     raw_batch_size = cfg.planner.get("batch_size", "auto")
@@ -79,7 +86,14 @@ def build_mwm_policy(
         warm_start=bool(cfg.planner.warm_start),
     )
     image_transform = {"pixels": mwm_image_input_transform, "goal": mwm_image_input_transform}
-    return MWMWorldModelPolicy(model=model, solver=solver, config=plan_cfg, process=process, transform=image_transform)
+    return MWMWorldModelPolicy(
+        model=model,
+        solver=solver,
+        config=plan_cfg,
+        process=process,
+        transform=image_transform,
+        policy_semantics=str(cfg.planner.get("policy_semantics", "optimized")),
+    )
 
 
 __all__ = ["build_mwm_policy"]

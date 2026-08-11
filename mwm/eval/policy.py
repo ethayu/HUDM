@@ -60,9 +60,25 @@ class _TracingActionTransform:
 class MWMWorldModelPolicy(WorldModelPolicy):
     """Stable-WM policy wrapper exposing MWM solver diagnostics."""
 
-    def __init__(self, model: Any = None, solver: Any = None, config: Any = None, **kwargs: Any) -> None:
+    _SUPPORTED_POLICY_SEMANTICS = {"optimized", "upstream_lewm_historical"}
+
+    def __init__(
+        self,
+        model: Any = None,
+        solver: Any = None,
+        config: Any = None,
+        *,
+        policy_semantics: str = "optimized",
+        **kwargs: Any,
+    ) -> None:
         self.model = model
         self.config = config
+        self.policy_semantics = str(policy_semantics).strip().lower()
+        if self.policy_semantics not in self._SUPPORTED_POLICY_SEMANTICS:
+            supported = ", ".join(sorted(self._SUPPORTED_POLICY_SEMANTICS))
+            raise ValueError(
+                f"Unsupported planning policy semantics {policy_semantics!r}; expected one of {supported}."
+            )
         self._action_calls = 0
         self._policy_time_sec = 0.0
         self._action_trace: list[list[Any]] = []
@@ -90,6 +106,13 @@ class MWMWorldModelPolicy(WorldModelPolicy):
         recorded = False
         self._pending_model_action = None
         try:
+            if self.policy_semantics == "upstream_lewm_historical":
+                # Paper-era WorldModelPolicy planned every configured env even
+                # after termination.  Current Stable-WM prunes dead envs,
+                # changing shared CEM-generator consumption for the survivors.
+                info_dict = dict(info_dict)
+                info_dict.pop("terminated", None)
+                info_dict.pop("_needs_flush", None)
             action = super().get_action(info_dict, **kwargs)
             recorded = True
             return action
@@ -134,6 +157,8 @@ class MWMWorldModelPolicy(WorldModelPolicy):
     def diagnostics(self) -> dict[str, Any]:
         history = list(getattr(self.solver, "solve_history", []))
         traces = [diag for item in history for diag in item.get("mwm_diagnostics", [])]
+        for diag in traces:
+            diag.setdefault("policy_semantics", str(self.policy_semantics))
         total_time = float(sum(float(item.get("solve_time_sec", 0.0)) for item in history))
         total_work = int(
             sum(

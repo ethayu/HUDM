@@ -63,6 +63,34 @@ def _sweep_axes(cfg: Any) -> list[tuple[str, list[Any]]]:
     return axes
 
 
+def _sweep_exclusions(cfg: Any, sweep_paths: set[str]) -> list[dict[str, Any]]:
+    raw = cfg.get("sweep_exclude", [])
+    if OmegaConf.is_config(raw):
+        raw = OmegaConf.to_container(raw, resolve=True)
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("sweep_exclude must be a list of parameter mappings.")
+
+    exclusions: list[dict[str, Any]] = []
+    for index, item in enumerate(raw):
+        if OmegaConf.is_config(item):
+            item = OmegaConf.to_container(item, resolve=True)
+        if not isinstance(item, dict) or not item:
+            raise ValueError(f"sweep_exclude[{index}] must be a non-empty parameter mapping.")
+        unknown = sorted(set(item) - sweep_paths)
+        if unknown:
+            raise ValueError(
+                f"sweep_exclude[{index}] contains parameters not present in sweep: {unknown}."
+            )
+        exclusions.append(dict(item))
+    return exclusions
+
+
+def _is_excluded(params: dict[str, Any], exclusions: list[dict[str, Any]]) -> bool:
+    return any(all(params[path] == value for path, value in exclusion.items()) for exclusion in exclusions)
+
+
 def sweep_key(params: dict[str, Any]) -> str:
     return json.dumps(params, sort_keys=True, separators=(",", ":"))
 
@@ -76,8 +104,14 @@ def expand_benchmark_runs(cfg: Any) -> list[Any]:
         return [OmegaConf.create(OmegaConf.to_container(run, resolve=True)) for run in base_runs]
 
     paths = [path for path, _ in axes]
-    combinations = itertools.product(*(values for _, values in axes))
-    combinations = list(combinations)
+    exclusions = _sweep_exclusions(cfg, set(paths))
+    combinations = [
+        values
+        for values in itertools.product(*(axis_values for _, axis_values in axes))
+        if not _is_excluded(dict(zip(paths, values)), exclusions)
+    ]
+    if not combinations:
+        raise ValueError("sweep_exclude removes every sweep combination.")
     expanded: list[Any] = []
     matrix_index = 0
     for base_run in base_runs:

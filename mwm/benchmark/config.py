@@ -16,6 +16,7 @@ DEFAULTS = {
     "manifest": {},
     "run_defaults": {},
     "sweep": {},
+    "sweep_exclude": [],
     "runs": [],
 }
 

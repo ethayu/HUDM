@@ -1,27 +1,12 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
-from typing import Any, Iterable, Sequence
+from typing import Any, Sequence
 
 import torch
 import torch.nn as nn
 
 from mwm.models.losses import matryoshka_base_loss, weighted_level_mean
 from mwm.preprocessing.images import image_tensor_to_bchw
-
-
-@contextmanager
-def _temporarily_freeze_parameters(modules: Iterable[nn.Module]):
-    states: list[tuple[nn.Parameter, bool]] = []
-    for module in modules:
-        for param in module.parameters():
-            states.append((param, bool(param.requires_grad)))
-            param.requires_grad_(False)
-    try:
-        yield
-    finally:
-        for param, requires_grad in states:
-            param.requires_grad_(requires_grad)
 
 
 def _reconstruction_target(pixels: torch.Tensor, *, dtype: torch.dtype, device: torch.device) -> torch.Tensor:
@@ -61,6 +46,7 @@ def matryoshka_training_loss(
     level_weights: Sequence[float] | None = None,
     rollout_weight: float = 1.0,
     recon_latent_weight: float = 0.0,
+    decoder_training_enabled: bool = True,
     sigreg: nn.Module | None = None,
     sigreg_weight: float = 0.0,
     sigreg_scope: str = "shared_latent",
@@ -69,6 +55,11 @@ def matryoshka_training_loss(
 ) -> dict[str, torch.Tensor]:
     if float(random_prefix_weight) < 0:
         raise ValueError(f"random_prefix_weight must be non-negative, got {random_prefix_weight}.")
+    if float(recon_latent_weight):
+        raise ValueError(
+            "loss.recon_latent_weight must be 0 with optimizer-isolated decoder training; "
+            "decoder reconstruction cannot contribute gradients to the encoder."
+        )
     batch["action"] = torch.nan_to_num(batch["action"], 0.0)
     emb = model._encode_pixels(batch["pixels"], already_preprocessed=True)
     actions = batch["action"]
@@ -145,28 +136,18 @@ def matryoshka_training_loss(
         logs["rollout_loss"] = combined_prediction_loss.detach()
         logs["pred_loss_random"] = random_loss.detach()
         logs["sampled_k"] = emb.new_tensor(sampled_k, dtype=torch.long)
-    target = _reconstruction_target(batch["pixels"], dtype=emb.dtype, device=emb.device)
-    recon_losses = _decoder_reconstruction_losses(model, emb, target, detach_latents=True)
-    recon_loss, recon_logs = weighted_level_mean(
-        recon_losses,
-        level_weights=level_weights,
-        log_prefix="recon_loss",
-    )
-    logs["loss"] = logs["loss"] + recon_loss
-    logs["recon_loss"] = recon_loss.detach()
-    logs.update(recon_logs)
-
-    if float(recon_latent_weight):
-        with _temporarily_freeze_parameters(model.decoders):
-            latent_recon_losses = _decoder_reconstruction_losses(model, emb, target, detach_latents=False)
-        latent_recon_loss, latent_recon_logs = weighted_level_mean(
-            latent_recon_losses,
+    logs["world_loss"] = logs["loss"].detach()
+    if bool(decoder_training_enabled):
+        target = _reconstruction_target(batch["pixels"], dtype=emb.dtype, device=emb.device)
+        recon_losses = _decoder_reconstruction_losses(model, emb, target, detach_latents=True)
+        decoder_loss, recon_logs = weighted_level_mean(
+            recon_losses,
             level_weights=level_weights,
-            log_prefix="recon_latent_loss",
+            log_prefix="recon_loss",
         )
-        logs["loss"] = logs["loss"] + float(recon_latent_weight) * latent_recon_loss
-        logs["recon_latent_loss"] = latent_recon_loss.detach()
-        logs.update(latent_recon_logs)
+        logs["decoder_loss"] = decoder_loss
+        logs["recon_loss"] = decoder_loss.detach()
+        logs.update(recon_logs)
     return logs
 
 

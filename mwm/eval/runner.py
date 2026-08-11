@@ -18,6 +18,7 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
     from mwm.eval.manifest import pairs_for_eval
     from mwm.eval.policy import model_accounting
     from mwm.eval.review_trace import review_rollouts_for_batches
+    from mwm.eval.runtime import effective_goal_offset, normalize_goal_indexing
     from mwm.eval.validation import (
         dataset_path,
         dataset_runtime_metadata,
@@ -56,6 +57,9 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
         checkpoint_ref = str(cfg.checkpoint.run_dir)
         accounting = model_accounting(runtime.model)
         swm_results = combine_swm_results(all_results)
+        env_runtime = dict(all_results[0].get("env_runtime", {})) if all_results else {}
+        if any(dict(batch.get("env_runtime", {})) != env_runtime for batch in all_results):
+            raise RuntimeError("Environment runtime provenance changed across evaluation batches")
 
         output = {
             "env_id": runtime.env_id,
@@ -64,8 +68,16 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
             "dataset": dataset_path(runtime.dataset, cfg),
             "episodes": int(cfg.eval.episodes),
             "goal_offset": int(cfg.eval.goal_offset),
+            "goal_indexing": {
+                "mode": normalize_goal_indexing(str(cfg.eval.get("goal_indexing", "exact"))),
+                "requested_offset": int(cfg.eval.goal_offset),
+                "effective_offset": effective_goal_offset(
+                    int(cfg.eval.goal_offset), str(cfg.eval.get("goal_indexing", "exact"))
+                ),
+            },
             "eval_budget": int(cfg.eval.budget),
             "restore_spec": runtime.restore_spec_id,
+            "env_runtime": env_runtime,
             "swm_results": swm_results,
             "planning_diagnostics": combine_mwm_diagnostics(all_results),
             "policy_diagnostics": combine_policy_diagnostics(all_results),

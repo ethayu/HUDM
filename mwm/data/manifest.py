@@ -47,6 +47,8 @@ def generate_manifest(
     dataset_path: str,
     pairs: Iterable[Any],
     goal_offset: int,
+    goal_indexing: str = "exact",
+    effective_goal_offset: int | None = None,
     eval_budget: int,
     seed: int,
     restore_spec: str,
@@ -58,6 +60,10 @@ def generate_manifest(
         "env_id": str(env_id),
         "dataset_path": str(dataset_path),
         "goal_offset": int(goal_offset),
+        "goal_indexing": str(goal_indexing),
+        "effective_goal_offset": int(
+            goal_offset if effective_goal_offset is None else effective_goal_offset
+        ),
         "eval_budget": int(eval_budget),
         "seed": int(seed),
         "restore_spec": str(restore_spec),

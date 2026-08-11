@@ -9,9 +9,17 @@ from omegaconf import OmegaConf
 
 from mwm.data.sampling import StartGoalPair
 from mwm.eval.policy_builder import build_mwm_policy
+from mwm.eval.runtime import effective_goal_offset, normalize_goal_indexing
 from mwm.eval.videos import collect_video_paths
 from mwm.io import jsonable
-from mwm.swm.envs import make_swm_world, parse_env_kwargs, validate_continuous_box_action_space
+from mwm.swm.envs import (
+    apply_swm_world_runtime_config,
+    make_swm_world,
+    parse_env_kwargs,
+    swm_runtime_eval_callables,
+    validate_continuous_box_action_space,
+    validate_swm_world_runtime_config,
+)
 
 
 def run_batch(
@@ -38,6 +46,11 @@ def run_batch(
         env_kwargs=env_kwargs,
     )
     try:
+        env_runtime = apply_swm_world_runtime_config(
+            world,
+            env_id,
+            OmegaConf.to_container(cfg.env.get("runtime", {}), resolve=True),
+        )
         low, _ = validate_continuous_box_action_space(world.envs.single_action_space, env_id)
         if "action_dim" not in metadata:
             metadata["action_dim"] = int(low.shape[0])
@@ -48,18 +61,25 @@ def run_batch(
         if hasattr(policy, "reset_trace"):
             policy.reset_trace()
         batch_video_path = Path(str(cfg.eval.video_path)) / f"batch_{int(batch_index):04d}"
+        goal_indexing = normalize_goal_indexing(str(cfg.eval.get("goal_indexing", "exact")))
+        runtime_goal_offset = effective_goal_offset(int(cfg.eval.goal_offset), goal_indexing)
+        runtime_raw = OmegaConf.to_container(cfg.env.get("runtime", {}), resolve=True)
+        runtime_callables = [*swm_runtime_eval_callables(env_id, runtime_raw), *eval_callables]
         eval_kwargs = dict(
             dataset=dataset,
             episodes_idx=[p.episode for p in pairs],
             start_steps=[p.start_step for p in pairs],
             eval_budget=int(cfg.eval.budget),
-            callables=eval_callables,
+            callables=runtime_callables,
         )
         swm_results = world.evaluate(
             **eval_kwargs,
-            goal_offset=int(cfg.eval.goal_offset),
+            goal_offset=runtime_goal_offset,
             video=str(batch_video_path) if bool(cfg.eval.save_video) else None,
         )
+        validate_swm_world_runtime_config(world, env_runtime)
+        if "reacher_qpos_threshold" in env_runtime:
+            env_runtime["post_reset_validation"] = "passed"
         videos = [str(p) for p in collect_video_paths(batch_video_path)] if bool(cfg.eval.save_video) else []
         diagnostics = policy.diagnostics() if hasattr(policy, "diagnostics") else {}
         review_trace = policy.review_trace() if hasattr(policy, "review_trace") else {}
@@ -77,6 +97,12 @@ def run_batch(
             "swm_results": jsonable(swm_results),
             "planning_diagnostics": diagnostics,
             "review_trace": jsonable(review_trace),
+            "env_runtime": env_runtime,
+            "goal_indexing": {
+                "mode": goal_indexing,
+                "requested_offset": int(cfg.eval.goal_offset),
+                "effective_offset": runtime_goal_offset,
+            },
             "videos": videos,
         }
     finally:
@@ -114,11 +140,17 @@ def combine_mwm_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
     total_candidate_action_values = int(sum(int(s.get("candidate_action_values", 0)) for s in summaries))
     level_counts: dict[str, int] = {}
     k_counts: dict[str, int] = {}
+    rollout_semantics_counts: dict[str, int] = {}
+    policy_semantics_counts: dict[str, int] = {}
     for diag in traces:
         key = str(diag.get("base_level_idx", "unknown"))
         level_counts[key] = level_counts.get(key, 0) + 1
         k_key = str(diag.get("base_k", "unknown"))
         k_counts[k_key] = k_counts.get(k_key, 0) + 1
+        semantics_key = str(diag.get("model_rollout_semantics", "unknown"))
+        rollout_semantics_counts[semantics_key] = rollout_semantics_counts.get(semantics_key, 0) + 1
+        policy_key = str(diag.get("policy_semantics", "unknown"))
+        policy_semantics_counts[policy_key] = policy_semantics_counts.get(policy_key, 0) + 1
     return {
         "summary": {
             "actions_recorded": total_actions,
@@ -137,6 +169,8 @@ def combine_mwm_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
         "trace": traces,
         "schedule_level_counts": level_counts,
         "schedule_k_counts": k_counts,
+        "rollout_semantics_counts": rollout_semantics_counts,
+        "policy_semantics_counts": policy_semantics_counts,
         "plans": total_replans,
         "steps": total_actions,
         "latent_work_total": total_latent_work,

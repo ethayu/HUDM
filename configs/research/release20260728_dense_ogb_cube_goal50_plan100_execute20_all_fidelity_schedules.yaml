@@ -1,0 +1,337 @@
+# Run 00 is the converted upstream OGB Cube baseline. The source TSV contains 26
+# schedule rows (rather than 25), kept below in source order. A dash means that
+# the conceptual outer axis is not varied; the runtime representation still
+# supplies the required fixed stage.
+output_dir: reports/research/release20260728_dense_ogb_cube_goal50_plan100_execute20_all_fidelity_schedules
+title: Release 2026-07-28 Dense OGB Cube Goal50 Plan100 Execute20 All-Axis Fidelity Schedule Matrix
+env_id: swm/OGBCube-v0
+seed: 42
+eval_config: configs/eval/paper_ogb_cube.yaml
+manifest:
+  config: configs/manifest/ogb_cube_paper_seed42_goal50_exact.yaml
+
+# Every base run below is evaluated over 120 valid planner cells: the 125-cell
+# Cartesian product minus the five topk=1 cells excluded below. The audited
+# dynamics FLOP count is the default cost axis in the Pareto view.
+run_defaults:
+  eval:
+    episodes: 50
+    num_envs: 50
+    goal_offset: 50
+    goal_indexing: exact
+    budget: 100
+  planner:
+    flop_accounting: dynamics_audit
+    # Twenty model steps x five primitive actions per block = a 100-action plan.
+    # Execute four blocks (20 primitive actions) before replanning.
+    horizon: 20
+    receding_horizon: 4
+    action_block: 5
+sweep:
+  planner.pop_size: [20, 50, 100, 150, 200]
+  planner.elite_frac: [0.05, 0.1, 0.2, 0.3, 0.5]
+  planner.n_iter: [5, 10, 15, 20, 30]
+
+# pop_size=20 and elite_frac=0.05 resolve to one elite. With the paper
+# planner's std_unbiased=true, a one-sample standard deviation is undefined.
+sweep_exclude:
+  - planner.pop_size: 20
+    planner.elite_frac: 0.05
+
+runs:
+  # - name: 00_upstream_fixed_finest
+  #   role: upstream_lewm_converted
+  #   checkpoint: checkpoints_mwm/upstream_lewm_ogb_cube
+  #   schedule: "upstream fixed finest"
+  #   planner:
+  #     scheduler:
+  #       enabled: true
+  #       mpc: {mode: fixed, level: finest}
+  #       cem: {mode: fixed, level: finest}
+  #       rollout: {mode: fixed, level: finest}
+
+  - name: 01_rollout_fixed
+    role: release20260728_goal50_plan100_execute20_dense_schedule_01_rollout_fixed
+    checkpoint: &dense_ogb_cube_checkpoint checkpoints_mwm/mwm_paper10_ogb_cube_k96_120_144_168_192_release20260728
+    schedule: "MPC=- | CEM=- | Rollout=fixed"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: fixed, level: base}
+
+  - name: 02_rollout_fine_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_02_rollout_fine_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=- | Rollout=fine -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: finest, end_level: coarsest}
+
+  - name: 03_cem_fixed_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_03_cem_fixed_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=fixed | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: fixed, level: base}
+
+  - name: 04_cem_fixed_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_04_cem_fixed_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=fixed | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 05_cem_fixed_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_05_cem_fixed_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=fixed | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 06_cem_coarse_to_fine_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_06_cem_coarse_to_fine_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=coarse -> fine | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: finest}
+        rollout: {mode: fixed, level: base}
+
+  - name: 07_cem_coarse_to_fine_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_07_cem_coarse_to_fine_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=coarse -> fine | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: finest}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 08_cem_coarse_to_fine_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_08_cem_coarse_to_fine_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=- | CEM=coarse -> fine | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: finest}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 09_mpc_fixed_cem_base_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_09_mpc_fixed_cem_base_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=base | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: fixed, level: base}
+
+  - name: 10_mpc_fixed_cem_base_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_10_mpc_fixed_cem_base_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=base | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 11_mpc_fixed_cem_base_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_11_mpc_fixed_cem_base_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=base | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 12_mpc_fixed_cem_coarse_to_base_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_12_mpc_fixed_cem_coarse_to_base_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=coarse -> base | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: base}
+        rollout: {mode: fixed, level: base}
+
+  - name: 13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=coarse -> base | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: base}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=coarse -> base | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: base}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 15_mpc_fixed_cem_base_to_fine_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_15_mpc_fixed_cem_base_to_fine_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=base -> fine | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: base, end_level: finest}
+        rollout: {mode: fixed, level: base}
+
+  - name: 16_mpc_fixed_cem_base_to_fine_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_16_mpc_fixed_cem_base_to_fine_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=base -> fine | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: base, end_level: finest}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=fixed | CEM=base -> fine | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: linear, start_level: base, end_level: finest}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 18_mpc_coarse_to_fine_cem_base_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_18_mpc_coarse_to_fine_cem_base_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=base | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: fixed, level: base}
+
+  - name: 19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=base | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=base | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: fixed, level: base}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: base}
+        rollout: {mode: fixed, level: base}
+
+  - name: 22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: base}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: linear, start_level: coarsest, end_level: base}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: linear, start_level: base, end_level: finest}
+        rollout: {mode: fixed, level: base}
+
+  - name: 25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
+    role: release20260728_goal50_plan100_execute20_dense_schedule_25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=fine -> base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: linear, start_level: base, end_level: finest}
+        rollout: {mode: linear, start_level: finest, end_level: base}
+
+  - name: 26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
+    role: release20260728_goal50_plan100_execute20_dense_schedule_26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=base -> coarse"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: coarsest, end_level: finest}
+        cem: {mode: linear, start_level: base, end_level: finest}
+        rollout: {mode: linear, start_level: base, end_level: coarsest}

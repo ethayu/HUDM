@@ -321,6 +321,24 @@ class MWMArtifactTests(unittest.TestCase):
         self.assertEqual([pair.start_step for pair in pairs], [0, 1, 2])
         self.assertEqual([pair.goal_step for pair in pairs], [2, 3, 4])
 
+    def test_upstream_lewm_sampling_reproduces_historical_population_minus_one(self) -> None:
+        class TinyDataset:
+            lengths = np.asarray([5, 5], dtype=np.int64)
+            offsets = np.asarray([0, 5], dtype=np.int64)
+
+        pairs = sample_start_goal_pairs(
+            TinyDataset(),
+            count=4,
+            goal_offset_steps=2,
+            seed=42,
+            mode="upstream_lewm",
+        )
+        rows = np.asarray([0, 1, 2, 5, 6, 7], dtype=np.int64)
+        expected = np.sort(rows[np.random.default_rng(42).choice(len(rows) - 1, size=4, replace=False)])
+
+        self.assertEqual([pair.start_row for pair in pairs], expected.tolist())
+        self.assertNotIn(7, [pair.start_row for pair in pairs])
+
     def test_stable_wm_checkpoint_metadata_persisted_from_model(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             model = build_mwm_from_stable_config(

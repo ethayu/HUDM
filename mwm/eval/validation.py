@@ -32,7 +32,12 @@ def eval_keys_to_load(cfg: Any, model: Any, metadata: dict[str, Any]) -> list[st
 
 
 def dataset_path(dataset: Any, cfg: Any) -> str:
-    return str(cfg.data.path or getattr(dataset, "path", getattr(dataset, "uri", "")))
+    identity_path = cfg.data.get("identity_path", None)
+    return str(
+        identity_path
+        or cfg.data.path
+        or getattr(dataset, "path", getattr(dataset, "uri", ""))
+    )
 
 
 def validate_dataset_metadata(dataset: Any, checkpoint_metadata: dict[str, Any], cfg: Any) -> None:
@@ -110,21 +115,46 @@ def validate_manifest(
     env_id: str,
     restore_spec_id: str,
 ) -> None:
+    from mwm.eval.runtime import effective_goal_offset, normalize_goal_indexing
+
+    goal_indexing = normalize_goal_indexing(str(cfg.eval.get("goal_indexing", "exact")))
+    effective_offset = effective_goal_offset(int(cfg.eval.goal_offset), goal_indexing)
     expected = {
         "env_id": str(env_id),
         "restore_spec": str(restore_spec_id),
         "seed": int(cfg.eval.seed),
         "goal_offset": int(cfg.eval.goal_offset),
+        "goal_indexing": goal_indexing,
+        "effective_goal_offset": effective_offset,
         "eval_budget": int(cfg.eval.budget),
     }
     for key, value in expected.items():
-        if manifest.get(key) != value:
-            raise ValueError(f"Manifest {path} has {key}={manifest.get(key)!r}, expected {value!r}.")
+        # v1 manifests written before goal-indexing provenance was introduced
+        # used corrected/exact semantics. Preserve read compatibility only for
+        # that unambiguous case.
+        fallback = (
+            "exact"
+            if key == "goal_indexing"
+            else int(manifest.get("goal_offset", value))
+            if key == "effective_goal_offset"
+            else None
+        )
+        observed = manifest.get(key, fallback)
+        if observed != value:
+            raise ValueError(f"Manifest {path} has {key}={observed!r}, expected {value!r}.")
     path_for_dataset = dataset_path(dataset, cfg)
     if not same_dataset_ref(str(manifest.get("dataset_path", "")), path_for_dataset):
         raise ValueError(f"Manifest {path} was generated for dataset {manifest.get('dataset_path')!r}, not {path_for_dataset!r}.")
     if len(manifest.get("pairs", [])) != int(cfg.eval.episodes):
         raise ValueError(f"Manifest {path} has {len(manifest.get('pairs', []))} pairs, expected {int(cfg.eval.episodes)}.")
+    for index, pair in enumerate(manifest.get("pairs", [])):
+        observed = int(pair["goal_step"]) - int(pair["start_step"])
+        row_observed = int(pair["goal_row"]) - int(pair["start_row"])
+        if observed != effective_offset or row_observed != effective_offset:
+            raise ValueError(
+                f"Manifest {path} pair {index} has effective goal offsets "
+                f"step={observed}, row={row_observed}; expected {effective_offset}."
+            )
 
 
 def dataset_runtime_metadata(dataset: Any, cfg: Any) -> dict[str, Any]:

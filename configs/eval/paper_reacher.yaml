@@ -16,12 +16,15 @@ data:
 eval:
   episodes: 50
   goal_offset: 25
+  # Paper-era evaluate_from_dataset used an end-exclusive HDF5 slice and then
+  # selected slice[-1], so the executable target was start + 24.
+  goal_indexing: upstream_lewm_end_exclusive
   seed: 42
   budget: 50
   num_envs: 50
   output_path: rollouts/mwm_paper_parity/reacher_upstream/eval.json
   manifest_path: null
-  sampling: stable_worldmodel
+  sampling: upstream_lewm
   write_manifest_path: rollouts/mwm_paper_parity/reacher_seed42_manifest.json
   save_video: false
   video_path: rollouts/mwm_paper_parity/reacher_videos
@@ -30,9 +33,17 @@ env:
   goal_conditioned: true
   kwargs:
     task: qpos_match
+  runtime:
+    # Historical Stable WorldModel commit 2096f6a (2026-03-11), used when the
+    # initial LeWM code appeared, defined qpos-match success at 0.1 radians.
+    # Commit 7259d6f changed this to 0.05 on 2026-03-16.
+    reacher_qpos_threshold: 0.1
 restore:
   import_path: mwm.swm.restore.reacher_qpos_match_restore_spec
 planner:
+  # Reproduce initial LeWM jepa.py's growing-prefix action embedding order.
+  rollout_semantics: upstream_lewm_historical
+  policy_semantics: upstream_lewm_historical
   horizon: 5
   receding_horizon: 5
   action_block: 5
@@ -40,7 +51,8 @@ planner:
   pop_size: 300
   topk: 30
   elite_frac: 0.1
-  n_iter: 30
+  # Paper Appendix D: 30 CEM iterations for PushT, 10 for every other env.
+  n_iter: 10
   init_std: 1.0
   seed: 42
   warm_start: true

@@ -60,10 +60,18 @@ class ZScoreScaler:
         self.eps = float(eps)
 
     def fit(self, values: Any) -> "ZScoreScaler":
-        arr = np.asarray(values).reshape(-1, np.asarray(values).shape[-1])
-        arr = arr[~np.isnan(arr).any(axis=1)]
-        self.mean = arr.mean(axis=0, keepdims=True)
-        self.std = arr.std(axis=0, keepdims=True, ddof=1)
+        # LeWM computes dataset statistics in torch, including its float32
+        # reduction order. NumPy's float32 std diverges measurably on the
+        # two-million-row Reacher dataset, so this is intentionally literal.
+        arr = np.array(values)
+        if arr.ndim == 1:
+            arr = arr.reshape(-1, 1)
+        else:
+            arr = arr.reshape(-1, arr.shape[-1])
+        data = torch.from_numpy(arr)
+        data = data[~torch.isnan(data).any(dim=1)]
+        self.mean = data.mean(0, keepdim=True).clone().numpy()
+        self.std = data.std(0, keepdim=True).clone().numpy()
         return self
 
     def __call__(self, values: Any) -> Any:
@@ -72,8 +80,8 @@ class ZScoreScaler:
         if torch.is_tensor(values):
             mean = torch.as_tensor(self.mean, dtype=values.dtype, device=values.device)
             std = torch.as_tensor(self.std, dtype=values.dtype, device=values.device)
-            return ((values - mean) / std.clamp(min=self.eps)).float()
-        return (values - self.mean) / np.maximum(self.std, self.eps)
+            return ((values - mean) / std).float()
+        return (values - self.mean) / self.std
 
 
 def column_normalizer(dataset: Any, source: str, target: str) -> Any:
