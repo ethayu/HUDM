@@ -15,16 +15,16 @@ manifest:
 # dynamics FLOP count is the default cost axis in the Pareto view.
 run_defaults:
   eval:
-    episodes: 50
+    episodes: 250
     num_envs: 50
     goal_offset: 25
     goal_indexing: exact
     budget: 50
   planner:
     flop_accounting: dynamics_audit
-    # Ten model steps x five primitive actions per block = a 50-action plan.
+    # Five model steps x five primitive actions per block = a 25-action plan.
     # Execute two blocks (10 primitive actions) before replanning.
-    horizon: 10
+    horizon: 5
     receding_horizon: 2
     action_block: 5
 sweep:
