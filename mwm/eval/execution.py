@@ -184,8 +184,4 @@ def combine_mwm_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def combine_policy_diagnostics(batches: list[dict[str, Any]]) -> dict[str, Any]:
-    return combine_mwm_diagnostics(batches)
-
-
-__all__ = ["combine_mwm_diagnostics", "combine_policy_diagnostics", "combine_swm_results", "run_batch"]
+__all__ = ["combine_mwm_diagnostics", "combine_swm_results", "run_batch"]
