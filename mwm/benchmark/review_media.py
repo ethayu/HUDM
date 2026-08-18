@@ -10,7 +10,8 @@ from typing import Any, Callable, Iterable
 
 from mwm.eval.videos import collect_video_paths
 from mwm.eval.review_trace import fidelity_trace_from_planning_trace
-from mwm.io import jsonable, load_json, write_json
+from mwm.benchmark.eval_artifacts import load_eval_artifact, update_eval_capsule
+from mwm.io import jsonable, load_json
 
 
 RENDERER_VERSION = "review_media_v1"
@@ -38,12 +39,6 @@ def rollout_media_dir(eval_path: str | Path, episode_index: int) -> Path:
     return Path(eval_path).parent / MEDIA_DIRNAME / rollout_key(episode_index)
 
 
-def _atomic_write_json(path: Path, payload: dict[str, Any]) -> None:
-    tmp = path.with_name(path.name + ".tmp")
-    write_json(tmp, payload)
-    tmp.replace(path)
-
-
 def rollout_by_index(payload: dict[str, Any], episode_index: int) -> dict[str, Any]:
     for rollout in payload.get("review_rollouts", []):
         if int(rollout.get("episode_index", -1)) == int(episode_index):
@@ -61,22 +56,22 @@ def record_review_media(
     warnings: Iterable[str] | None = None,
 ) -> dict[str, Any]:
     eval_file = Path(eval_path)
-    payload = load_json(eval_file)
-    media = payload.setdefault("review_media", {})
-    media.setdefault("renderer_version", RENDERER_VERSION)
-    media["updated_at"] = datetime.now(timezone.utc).isoformat()
-    rollouts = media.setdefault("rollouts", {})
-    entry = rollouts.setdefault(rollout_key(episode_index), {})
-    entry[str(kind)] = {
-        "kind": str(kind),
-        "path": str(path),
-        "generated_at": datetime.now(timezone.utc).isoformat(),
-        "renderer_version": RENDERER_VERSION,
-        "source_trace_type": str(source_trace_type),
-        "warnings": [str(w) for w in (warnings or [])],
-    }
-    _atomic_write_json(eval_file, payload)
-    return payload
+    def update(payload: dict[str, Any]) -> None:
+        media = payload.setdefault("review_media", {})
+        media.setdefault("renderer_version", RENDERER_VERSION)
+        media["updated_at"] = datetime.now(timezone.utc).isoformat()
+        rollouts = media.setdefault("rollouts", {})
+        entry = rollouts.setdefault(rollout_key(episode_index), {})
+        entry[str(kind)] = {
+            "kind": str(kind),
+            "path": str(path),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "renderer_version": RENDERER_VERSION,
+            "source_trace_type": str(source_trace_type),
+            "warnings": [str(w) for w in (warnings or [])],
+        }
+
+    return update_eval_capsule(eval_file, update)
 
 
 def review_media_entry(payload: dict[str, Any], episode_index: int, kind: str) -> dict[str, Any] | None:
@@ -418,7 +413,7 @@ def render_environment_video(
     progress: ProgressCallback | None = None,
 ) -> RenderedMedia:
     eval_file = Path(eval_path)
-    payload = load_json(eval_file)
+    payload = load_eval_artifact(eval_file)
     existing = existing_media_path(payload, episode_index, "env")
     if existing is not None and not force:
         _progress(progress, "Using existing environment video")
@@ -702,7 +697,7 @@ def render_latent_reconstruction_video(
     progress: ProgressCallback | None = None,
 ) -> RenderedMedia:
     eval_file = Path(eval_path)
-    payload = load_json(eval_file)
+    payload = load_eval_artifact(eval_file)
     existing = existing_media_path(payload, episode_index, "latent_reconstruction")
     if existing is not None and not force:
         _progress(progress, "Using existing latent reconstruction")
@@ -818,7 +813,7 @@ def render_latent_predictive_rollout_video(
     """Render piecewise open-loop model predictions between actual MPC replans."""
 
     eval_file = Path(eval_path)
-    payload = load_json(eval_file)
+    payload = load_eval_artifact(eval_file)
     kind = "latent_predictive_rollout"
     existing = existing_media_path(payload, episode_index, kind)
     if existing is not None and not force:

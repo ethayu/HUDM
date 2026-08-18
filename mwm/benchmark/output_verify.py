@@ -76,7 +76,15 @@ def verify_benchmark_output(
     cfg_path: str | Path = "configs/benchmark/scheduled_pusht.yaml",
     *,
     roles: Any = None,
+    deep_artifacts: bool = False,
 ) -> dict[str, Any]:
+    from mwm.benchmark.eval_artifacts import (
+        load_eval_artifact,
+        load_eval_capsule,
+        load_planning_diagnostics,
+        planning_sidecar_matches_capsule,
+    )
+
     cfg = OmegaConf.merge(BENCHMARK_DEFAULTS, OmegaConf.load(str(cfg_path)))
     resolved = load_expected_resolved(cfg, roles=roles)
     output_dir = Path(str(cfg.output_dir))
@@ -128,7 +136,11 @@ def verify_benchmark_output(
         run_output = Path(str(row.get("output_json", "")))
         if not _require_file(run_output, errors):
             continue
-        payload = load_json(run_output)
+        payload = (
+            load_eval_artifact(run_output, verify="full")
+            if deep_artifacts
+            else load_eval_capsule(run_output, verify="compressed_hash")
+        )
         run_dir = run_output.parent
         sidecar_paths = (
             run_dir / "resolved_config.yaml",
@@ -154,9 +166,17 @@ def verify_benchmark_output(
         dependencies_sidecar = load_json(run_dir / "dependencies.json") if (run_dir / "dependencies.json").is_file() else {}
         if dependencies_sidecar != payload.get("dependencies", {}):
             errors.append(f"dependency sidecar does not match eval payload for {run_dir}")
-        diagnostics_sidecar = load_json(run_dir / "planning_diagnostics.json") if (run_dir / "planning_diagnostics.json").is_file() else {}
-        if diagnostics_sidecar != payload.get("planning_diagnostics", {}):
-            errors.append(f"planning diagnostics sidecar does not match eval payload for {run_dir}")
+        if (run_dir / "planning_diagnostics.json").is_file():
+            try:
+                if deep_artifacts:
+                    diagnostics_sidecar = load_planning_diagnostics(run_dir, verify="full")
+                    diagnostics_match = diagnostics_sidecar == payload.get("planning_diagnostics", {})
+                else:
+                    diagnostics_match = planning_sidecar_matches_capsule(run_dir, payload)
+            except (OSError, RuntimeError, TypeError, ValueError):
+                diagnostics_match = False
+            if not diagnostics_match:
+                errors.append(f"planning diagnostics sidecar does not match eval payload for {run_dir}")
 
         traces = _read_jsonl(run_dir / "episode_traces.jsonl") if (run_dir / "episode_traces.jsonl").is_file() else []
         if len(traces) != int(payload.get("episodes", 0)):

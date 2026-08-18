@@ -22,6 +22,7 @@ from mwm.benchmark.review_media import (
     rollout_checkpoint_metadata,
     rollout_key,
 )
+from mwm.benchmark.eval_artifacts import load_eval_artifact, load_eval_capsule
 from mwm.io import load_json
 
 
@@ -38,10 +39,17 @@ def warm_review_assets(root: str | Path, progress: Any = None) -> dict[str, Any]
     candidates: list[tuple[Path, Path, dict[str, Any], str]] = []
     for eval_path in eval_paths:
         try:
-            payload = load_json(eval_path)
+            capsule = load_eval_capsule(eval_path, verify="metadata")
             cfg_path = eval_path.parent / "resolved_config.yaml"
             if not cfg_path.is_file():
                 raise FileNotFoundError(f"missing {cfg_path.name}")
+            checkpoint = Path(str(capsule.get("checkpoint_run_dir") or cfg_path))
+            if not checkpoint.is_absolute():
+                checkpoint = (Path.cwd() / checkpoint).resolve()
+            checkpoint_key = str(checkpoint)
+            if checkpoint_key in seen_checkpoints:
+                continue
+            payload = load_eval_artifact(eval_path)
             rollout = next(
                 item
                 for item in payload.get("review_rollouts", [])
@@ -49,15 +57,9 @@ def warm_review_assets(root: str | Path, progress: Any = None) -> dict[str, Any]
                 and item.get("start_row") is not None
                 and item.get("goal_row") is not None
             )
-            checkpoint = Path(str(payload.get("checkpoint_run_dir") or cfg_path))
-            if not checkpoint.is_absolute():
-                checkpoint = (Path.cwd() / checkpoint).resolve()
-            checkpoint_key = str(checkpoint)
-            if checkpoint_key in seen_checkpoints:
-                continue
             seen_checkpoints.add(checkpoint_key)
             candidates.append((eval_path, cfg_path, rollout, checkpoint_key))
-        except (OSError, StopIteration, TypeError, ValueError) as exc:
+        except (OSError, RuntimeError, StopIteration, TypeError, ValueError) as exc:
             warnings.append(f"{eval_path.parent.name}: {exc}")
 
     total = len(candidates)
@@ -345,9 +347,20 @@ def _related_episode_links(root: Path, current_eval: Path, episode_index: int) -
     links: list[str] = []
     for candidate in sorted(root.glob("*/eval.json")):
         try:
-            payload = load_json(candidate)
-            rollout = rollout_by_index(payload, episode_index)
-        except (KeyError, OSError, ValueError):
+            payload = load_eval_capsule(candidate, verify="metadata")
+            trace_path = candidate.parent / "episode_traces.jsonl"
+            rollout = None
+            if trace_path.is_file():
+                with trace_path.open("r", encoding="utf-8") as handle:
+                    for line in handle:
+                        if line.strip():
+                            item = json.loads(line)
+                            if isinstance(item, dict) and int(item.get("episode_index", -1)) == int(episode_index):
+                                rollout = item
+                                break
+            if rollout is None:
+                rollout = rollout_by_index(load_eval_artifact(candidate), episode_index)
+        except (KeyError, OSError, RuntimeError, TypeError, ValueError):
             continue
         label = str(payload.get("benchmark_name") or candidate.parent.name)
         success = rollout.get("success")
@@ -401,7 +414,7 @@ def _has_usable_action(value: Any) -> bool:
 
 
 def rollout_page_html(root: Path, eval_path: Path, episode_index: int) -> str:
-    payload = load_json(eval_path)
+    payload = load_eval_artifact(eval_path)
     rollout = rollout_by_index(payload, episode_index)
     rel_eval = eval_path.resolve().relative_to(root.resolve()).as_posix()
     status = "success" if rollout.get("success") else "failure" if rollout.get("success") is False else "unknown"

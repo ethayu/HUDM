@@ -49,7 +49,14 @@ def _normalized_config(value: Any, manifest_path: Path) -> dict[str, Any]:
     return plain
 
 
-def _completed_run(run_dir: Path, run_cfg: Any, manifest_path: Path) -> tuple[dict[str, Any], dict[str, Any]] | None:
+def _completed_run(
+    run_dir: Path,
+    run_cfg: Any,
+    manifest_path: Path,
+    *,
+    materialize: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    from mwm.benchmark.eval_artifacts import load_eval_artifact, load_eval_capsule
     from mwm.io import load_json
 
     required = (
@@ -68,7 +75,15 @@ def _completed_run(run_dir: Path, run_cfg: Any, manifest_path: Path) -> tuple[di
     row = summary.get("run")
     if not isinstance(row, dict):
         return None
-    return row, load_json(run_dir / "eval.json")
+    try:
+        payload = (
+            load_eval_artifact(run_dir / "eval.json", verify="full")
+            if materialize
+            else load_eval_capsule(run_dir / "eval.json", verify="compressed_hash")
+        )
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
+    return row, payload
 
 
 def _configure_run_paths(run_cfg: Any, run_dir: Path, manifest_path: Path) -> None:
@@ -126,7 +141,7 @@ def _finalize(
     for fallback_index, (run, run_cfg) in enumerate(resolved):
         run_dir = _run_dir(output_dir, run, fallback_index)
         _configure_run_paths(run_cfg, run_dir, manifest_path)
-        completed = _completed_run(run_dir, run_cfg, manifest_path)
+        completed = _completed_run(run_dir, run_cfg, manifest_path, materialize=True)
         if completed is None:
             missing.append(str(run.get("cell_id", run.get("name", run_dir.name))))
             continue

@@ -14,6 +14,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def render_benchmark_review(output_dir: str | Path, *, title: str | None = None) -> dict[str, Any]:
+    from mwm.benchmark.eval_artifacts import load_eval_artifact
     from mwm.benchmark.html import write_review_html
     from mwm.benchmark.pareto import write_pareto_html
     from mwm.benchmark.plots import write_default_plots
@@ -34,7 +35,7 @@ def render_benchmark_review(output_dir: str | Path, *, title: str | None = None)
     for row in rows:
         output_json = Path(str(row.get("output_json", "")))
         if output_json.is_file():
-            outputs.append(load_json(output_json))
+            outputs.append(load_eval_artifact(output_json, verify="full"))
 
     write_summary_csv(root / "summary.csv", rows)
     write_metrics_jsonl(root / "metrics.jsonl", rows)
