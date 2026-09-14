@@ -57,6 +57,22 @@ The aggregate `review.html` embeds an interactive success-versus-cost Pareto
 plot. Its default cost axis is audited dynamics FLOPs; legend names use the
 human-readable `schedule` field, and hovering a point shows its sweep parameters.
 
+While a sharded or local matrix is still running, build a lightweight snapshot
+from only the completed cells and open `review.live.html`:
+
+```bash
+python -m mwm.benchmark.live_review CONFIG.yaml --serve --refresh-seconds 60
+```
+
+The live collector resolves the exact matrix in `CONFIG.yaml`, so stale cells
+from older sweeps in the same output directory are excluded. It writes isolated
+`*.live.*` files and `plots/live/` without replacing the canonical final report.
+The success-versus-cost frontier is explicitly provisional until every expected
+cell is complete, and the page offers a refresh when its background watcher
+publishes a new snapshot. The live server skips model/CUDA warm-up because the
+episode grids are intentionally omitted; completed run artifacts remain linked
+from the drilldown table. To render once without serving, omit `--serve`.
+
 The generated `review.html` is a static aggregate report. To inspect aligned
 successes and failures episode by episode, play existing videos, or render
 missing environment and latent-reconstruction media on demand, start the local

@@ -23,7 +23,6 @@ from mwm.benchmark.review_media import (
     rollout_key,
 )
 from mwm.benchmark.eval_artifacts import load_eval_artifact, load_eval_capsule
-from mwm.io import load_json
 
 
 def warm_review_assets(root: str | Path, progress: Any = None) -> dict[str, Any]:
@@ -803,6 +802,7 @@ def validate_server_address(host: str, port: int) -> None:
     family = socket.AF_INET6 if str(host) == "::1" else socket.AF_INET
     probe = socket.socket(family, socket.SOCK_STREAM)
     try:
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         probe.bind((str(host), int(port)))
     except OSError as exc:
         raise OSError(
@@ -813,10 +813,20 @@ def validate_server_address(host: str, port: int) -> None:
         probe.close()
 
 
-def serve_review(output_dir: str | Path, *, host: str = "127.0.0.1", port: int = 8765) -> None:
+def serve_review(
+    output_dir: str | Path,
+    *,
+    host: str = "127.0.0.1",
+    port: int = 8765,
+    review_page: str = "review.html",
+    warmup: bool = True,
+) -> None:
     root = Path(output_dir).resolve()
     if str(host) not in {"127.0.0.1", "localhost", "::1"}:
         raise ValueError("--serve is restricted to localhost hosts")
+    page = Path(str(review_page))
+    if page.name != str(review_page) or page.suffix != ".html":
+        raise ValueError("review_page must be an HTML filename in the benchmark output directory")
 
     render_manager = ReviewRenderManager()
 
@@ -836,8 +846,9 @@ def serve_review(output_dir: str | Path, *, host: str = "127.0.0.1", port: int =
             f"could not start review server on {host}:{int(port)}; the port may already be in use. "
             "Choose another with --port, for example --port 8766"
         ) from exc
-    render_manager.start_warmup(root)
-    print(f"Serving benchmark review at http://{host}:{int(server.server_port)}/review.html", flush=True)
+    if warmup:
+        render_manager.start_warmup(root)
+    print(f"Serving benchmark review at http://{host}:{int(server.server_port)}/{page.name}", flush=True)
     try:
         server.serve_forever()
     finally:

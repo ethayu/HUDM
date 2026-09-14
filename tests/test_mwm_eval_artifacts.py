@@ -26,8 +26,8 @@ from mwm.benchmark import eval_artifacts as artifact_module
 from mwm.benchmark.review_media import record_review_media
 from mwm.benchmark.review_server import rollout_page_html
 from mwm.benchmark.render_review import render_benchmark_review
-from mwm.benchmark.matrix import _completed_run, _configure_run_paths
-from mwm.io import load_json, write_json
+from mwm.benchmark.matrix import _completed_row, _completed_run, _configure_run_paths
+from mwm.io import file_sha256, load_json, write_json
 from scripts.research.compact_release20260728_policy_diagnostics import BENCHMARK_TARGETS
 from scripts.research.compress_release20260728_eval_artifacts import compress_release_outputs
 
@@ -291,6 +291,15 @@ class EvalArtifactTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             run_dir, expected = self._completed_cell(root)
+            trace_keys = ("episode_index", "success", "dataset_episode", "start_step", "goal_step")
+            trace_rows = [
+                {key: rollout[key] for key in trace_keys if key in rollout}
+                for rollout in expected["review_rollouts"]
+            ]
+            (run_dir / "episode_traces.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in trace_rows),
+                encoding="utf-8",
+            )
             compress_completed_eval(run_dir)
             write_json(
                 root / "summary.json",
@@ -316,8 +325,8 @@ class EvalArtifactTests(unittest.TestCase):
                 render_benchmark_review(root)
 
             outputs = write_review.call_args.args[3]
-            self.assertEqual(canonical(outputs[0]["review_rollouts"]), canonical(expected["review_rollouts"]))
-            self.assertEqual(outputs[0]["review_rollouts"][0]["action_trace"], [[1.0]])
+            self.assertEqual(canonical(outputs[0]["review_rollouts"]), canonical(trace_rows))
+            self.assertNotIn("action_trace", outputs[0]["review_rollouts"][0])
 
     def test_matrix_resume_recognizes_valid_archive_and_rejects_missing_archive(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -332,10 +341,14 @@ class EvalArtifactTests(unittest.TestCase):
                 }
             )
             _configure_run_paths(run_cfg, run_dir, manifest_path)
-            (run_dir / "resolved_config.yaml").write_text(OmegaConf.to_yaml(run_cfg), encoding="utf-8")
-            write_json(run_dir / "summary.json", {"run": {"name": "synthetic"}})
+            resolved_path = run_dir / "resolved_config.yaml"
+            resolved_path.write_text(OmegaConf.to_yaml(run_cfg), encoding="utf-8")
+            row = {"name": "synthetic", "config_sha256": file_sha256(resolved_path)}
+            write_json(run_dir / "summary.json", {"run": row})
+            (run_dir / "metrics.jsonl").write_text(json.dumps(row) + "\n", encoding="utf-8")
             compress_completed_eval(run_dir)
 
+            self.assertIsNotNone(_completed_row(run_dir, run_cfg, manifest_path))
             completed = _completed_run(run_dir, run_cfg, manifest_path)
             self.assertIsNotNone(completed)
             self.assertEqual(completed[1]["_artifact"]["version"], 2)
@@ -345,6 +358,7 @@ class EvalArtifactTests(unittest.TestCase):
 
             capsule = load_json(run_dir / "eval.json")
             (run_dir / capsule["_artifact"]["archive"]["path"]).unlink()
+            self.assertIsNone(_completed_row(run_dir, run_cfg, manifest_path))
             self.assertIsNone(_completed_run(run_dir, run_cfg, manifest_path))
 
     def test_archive_first_commit_is_recoverable_at_both_json_boundaries(self) -> None:

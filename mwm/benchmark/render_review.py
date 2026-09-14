@@ -14,8 +14,8 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
 
 
 def render_benchmark_review(output_dir: str | Path, *, title: str | None = None) -> dict[str, Any]:
-    from mwm.benchmark.eval_artifacts import load_eval_artifact
     from mwm.benchmark.html import write_review_html
+    from mwm.benchmark.matrix import DENSE_REVIEW_CELL_LIMIT, _compact_review_payload
     from mwm.benchmark.pareto import write_pareto_html
     from mwm.benchmark.plots import write_default_plots
     from mwm.benchmark.summary import write_per_env_table, write_summary_csv
@@ -32,24 +32,34 @@ def render_benchmark_review(output_dir: str | Path, *, title: str | None = None)
         raise ValueError(f"no benchmark rows found in {summary_path} or {root / 'metrics.jsonl'}")
 
     outputs: list[dict[str, Any]] = []
-    for row in rows:
-        output_json = Path(str(row.get("output_json", "")))
-        if output_json.is_file():
-            outputs.append(load_eval_artifact(output_json, verify="full"))
+    include_rollouts = len(rows) <= DENSE_REVIEW_CELL_LIMIT
+    if include_rollouts:
+        for row in rows:
+            output_json = Path(str(row.get("output_json", "")))
+            if output_json.is_file():
+                outputs.append(_compact_review_payload(output_json.parent, row))
 
     write_summary_csv(root / "summary.csv", rows)
     write_metrics_jsonl(root / "metrics.jsonl", rows)
     summary["runs"] = rows
     summary["output_dir"] = str(root)
     summary["per_env_table"] = write_per_env_table(root / "per_env_summary.csv", rows)
-    plots = write_default_plots(root / "plots", rows)
+    plots = write_default_plots(root / "plots", rows, compact=not include_rollouts)
     pareto = write_pareto_html(root / "plots" / "pareto.html", rows)
     summary["plots"] = plots
     summary["pareto_html"] = pareto
     write_json(summary_path, summary)
 
     review_title = str(title or summary.get("title") or "SWM MWM Benchmark Review")
-    write_review_html(root / "review.html", review_title, rows, outputs, plots=plots, pareto_html=pareto)
+    write_review_html(
+        root / "review.html",
+        review_title,
+        rows,
+        outputs,
+        plots=plots,
+        pareto_html=pareto,
+        include_rollouts=include_rollouts,
+    )
     return {
         "output_dir": str(root),
         "review": str(root / "review.html"),
