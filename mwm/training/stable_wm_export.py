@@ -7,7 +7,7 @@ import torch
 from omegaconf import OmegaConf
 
 from mwm.checkpoint_io import save_world_checkpoint
-from mwm.training.stable_wm_config import DEFAULTS, make_run_dir
+from mwm.training.stable_wm_config import DEFAULTS, make_run_dir, stable_wm_model_init_seed
 from mwm.training.stable_wm_data import close_dataset_handles, prepare_stable_wm_adapter_context
 from mwm.training.stable_wm_model import (
     build_trainable_stable_wm_adapter_model,
@@ -39,15 +39,15 @@ def export_stable_wm_adapter_lightning_checkpoint(
     if str(cfg.train.backend).lower() != "stable_worldmodel_lewm":
         raise ValueError("Lightning export is only supported for the Stable-WM Le-WM training backend.")
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
-    torch.manual_seed(int(cfg.seed))
     run_dir = output_dir or make_run_dir(
         str(cfg.train.checkpoint_dir),
         str(cfg.train.run_name),
         timestamp=bool(cfg.train.get("timestamp_run_dir", False)),
     )
-    tr_ds, va_ds, base_ds, model_cfg, metadata = prepare_stable_wm_adapter_context(cfg)
+    tr_ds, va_ds, base_ds, model_cfg, metadata, _ = prepare_stable_wm_adapter_context(cfg)
     del tr_ds, va_ds
     try:
+        torch.manual_seed(stable_wm_model_init_seed(cfg))
         model = build_trainable_stable_wm_adapter_model(cfg, model_cfg)
         checkpoint = load_stable_wm_adapter_lightning_state(model, checkpoint_path)
         train_info = {

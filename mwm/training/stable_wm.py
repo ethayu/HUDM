@@ -20,12 +20,16 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
     from mwm.checkpoint_io import save_world_checkpoint
     from mwm.config_cli import load_config
     from mwm.training import stable_wm_data, stable_wm_lightning, stable_wm_model
-    from mwm.training.stable_wm_config import DEFAULTS, make_run_dir, validate_stable_wm_loss_config
+    from mwm.training.stable_wm_config import (
+        DEFAULTS,
+        make_run_dir,
+        stable_wm_model_init_seed,
+        validate_stable_wm_loss_config,
+    )
 
     cfg = load_config(DEFAULTS, cfg_path, overrides or [])
-    validate_stable_wm_loss_config(cfg.loss)
+    validate_stable_wm_loss_config(cfg.loss, cfg.decoder_training)
     torch.set_float32_matmul_precision(str(cfg.train.get("matmul_precision", "high")))
-    torch.manual_seed(int(cfg.seed))
     backend = str(cfg.train.backend).lower()
     if backend not in {"stable_worldmodel_lewm", "stable_worldmodel_prejepa", "stable_worldmodel_dino", "stable_worldmodel_dinowm"}:
         raise ValueError(
@@ -37,10 +41,20 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
         str(cfg.train.run_name),
         timestamp=bool(cfg.train.get("timestamp_run_dir", False)),
     )
-    tr_ds, va_ds, base_ds, model_cfg, metadata = stable_wm_data.prepare_stable_wm_adapter_context(cfg)
+    tr_ds, va_ds, base_ds, model_cfg, metadata, train_generator = (
+        stable_wm_data.prepare_stable_wm_adapter_context(cfg)
+    )
     try:
+        torch.manual_seed(stable_wm_model_init_seed(cfg))
         model = stable_wm_model.build_trainable_stable_wm_adapter_model(cfg, model_cfg)
-        train_info = stable_wm_lightning.run_stable_wm_adapter_training(model, tr_ds, va_ds, cfg, run_dir)
+        train_info = stable_wm_lightning.run_stable_wm_adapter_training(
+            model,
+            tr_ds,
+            va_ds,
+            cfg,
+            run_dir,
+            train_generator=train_generator,
+        )
         save_world_checkpoint(
             model,
             run_dir,

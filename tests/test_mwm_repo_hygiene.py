@@ -10,6 +10,7 @@ import unittest
 import yaml
 
 from mwm.swm.restore import eval_callables_for_env, validate_restore_columns
+from mwm.training.stable_wm_config import DEFAULTS as STABLE_WM_TRAIN_DEFAULTS
 from mwm.upstream.paper_parity import paper_parity_dataset_spec
 
 
@@ -270,8 +271,19 @@ class MWMRepoHygieneTests(unittest.TestCase):
             self.assertEqual(cfg["mwm"]["loss_terms"]["regularizers"], "shared_latent", name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_detach_encoder"], True, name)
             self.assertEqual(cfg["mwm"]["loss_terms"]["reconstructor_contributes_to_encoder_loss"], False, name)
-            self.assertIn("recon_latent_weight", cfg["loss"], name)
+            self.assertNotIn("recon_latent_weight", cfg["loss"], name)
             self.assertNotIn("recon_weight", cfg["loss"], name)
+            self.assertEqual(
+                cfg["decoder_training"],
+                {
+                    "enabled": True,
+                    "mode": "separate_optimizer",
+                    "gradient_clip_val": 1.0,
+                    "lr": 0.00005,
+                    "weight_decay": 0.001,
+                },
+                name,
+            )
             self.assertEqual(cfg["data"]["format"], "lance", name)
             self.assertTrue(str(cfg["data"]["path"]).endswith(".lance"), name)
             self.assertEqual(cfg["model"]["D"], 192, name)
@@ -308,6 +320,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
                 self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
 
     def test_all_lewm_training_configs_use_decoder_reconstruction_contract(self) -> None:
+        self.assertIs(STABLE_WM_TRAIN_DEFAULTS["decoder_training"]["enabled"], True)
         paths = [
             *sorted((ROOT / "configs" / "train").glob("*.yaml")),
             *sorted((ROOT / "configs" / "local").glob("train_*.yaml")),
@@ -318,8 +331,10 @@ class MWMRepoHygieneTests(unittest.TestCase):
             cfg = yaml.safe_load(path.read_text(encoding="utf-8"))
             with self.subTest(path=path.relative_to(ROOT)):
                 self.assertEqual(cfg["mwm"]["component_policy"]["reconstructor"], ["decoder"])
-                self.assertIn("recon_latent_weight", cfg["loss"])
+                self.assertNotIn("recon_latent_weight", cfg["loss"])
                 self.assertNotIn("recon_weight", cfg["loss"])
+                self.assertIsInstance(cfg["decoder_training"]["enabled"], bool)
+                self.assertEqual(cfg["decoder_training"]["mode"], "separate_optimizer")
 
     def test_train_configs_do_not_override_base_architecture_knobs(self) -> None:
         forbidden_model_keys = {
