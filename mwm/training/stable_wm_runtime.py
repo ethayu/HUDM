@@ -51,7 +51,8 @@ def resolve_lightning_trainer_runtime(cfg: Any) -> dict[str, Any]:
 
 def prepare_trainer_root(run_dir: str | Path, cfg: Any, *, logs_root: str | Path = "logs") -> Path:
     trainer_root = Path(logs_root) / "mwm_training" / Path(run_dir).name
-    if bool(cfg.train.get("clean_trainer_root", True)) and trainer_root.exists():
+    resuming = cfg.train.get("resume_checkpoint", None) is not None
+    if bool(cfg.train.get("clean_trainer_root", True)) and not resuming and trainer_root.exists():
         shutil.rmtree(trainer_root)
     trainer_root.mkdir(parents=True, exist_ok=True)
     return trainer_root

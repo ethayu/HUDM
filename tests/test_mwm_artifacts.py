@@ -45,6 +45,7 @@ from mwm.benchmark.checkpoint_verify import (
 from mwm.benchmark.paper_targets import append_paper_target_errors, validate_paper_targets
 from mwm.benchmark.plot_contract import BASE_REQUIRED_PLOTS, required_plots_for_benchmark
 from mwm.benchmark.output_verify import verify_benchmark_output
+from mwm.benchmark.eval_artifacts import compress_completed_eval
 from mwm.benchmark.static_verify import verify_benchmark_static
 from mwm.io import file_sha256 as io_file_sha256, write_json, write_metrics_jsonl
 from mwm.data.verify import verify_data_configs
@@ -619,7 +620,10 @@ runs:
                     "dynamics_flops_total": 20,
                     "plan_time_total_sec": 0.1,
                     "summary": {"cem_cost_calls": 1, "candidate_action_values": 1},
+                    "trace": [],
                 },
+                "batches": [],
+                "review_rollouts": [],
                 "dependencies": deps,
                 "schedule": "fixed",
                 "role": "upstream_lewm_converted",
@@ -653,6 +657,9 @@ runs:
             with mock.patch.object(output_verify_module, "load_checkpoint_metadata_for_benchmark", return_value={}):
                 report = verify_benchmark_output(str(bench_cfg))
                 self.assertEqual(report["runs"], 1)
+                self.assertEqual(compress_completed_eval(run_dir)["status"], "compressed")
+                self.assertEqual(verify_benchmark_output(str(bench_cfg))["runs"], 1)
+                self.assertEqual(verify_benchmark_output(str(bench_cfg), deep_artifacts=True)["runs"], 1)
 
                 (plots_dir / next(iter(BASE_REQUIRED_PLOTS))).unlink()
                 with self.assertRaisesRegex(ValueError, "missing file"):

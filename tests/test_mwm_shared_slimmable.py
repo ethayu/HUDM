@@ -371,7 +371,6 @@ class SharedSlimmableDynamicsTests(unittest.TestCase):
                 {
                     "loss": {
                         "rollout_weight": 1.0,
-                        "recon_latent_weight": 0.0,
                         "sigreg_weight": 0.0,
                         "sigreg_scope": "shared_latent",
                         "random_prefix_weight": 1.0,
@@ -389,6 +388,9 @@ class SharedSlimmableDynamicsTests(unittest.TestCase):
         self.assertIn("sampled_k", output)
         self.assertIn("fit/pred_loss_random", logged)
         self.assertIn("fit/sampled_k", logged)
+        self.assertTrue(torch.equal(output["loss"], output["world_loss"] + output["decoder_loss"]))
+        self.assertTrue(torch.equal(logged["fit/loss"], output["world_loss"]))
+        self.assertTrue(torch.equal(logged["fit/decoder_loss"], output["decoder_loss"].detach()))
 
         deterministic = stable_wm_adapter_forward(
             module,

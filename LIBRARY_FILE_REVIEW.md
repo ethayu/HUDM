@@ -129,7 +129,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and 
 - `mwm/training/stable_wm_config.py`: Training defaults, run-directory creation, and OmegaConf-to-container conversion.
 - `mwm/training/stable_wm_data.py`: Lance dataset loading/splitting, transform installation, restore validation, model config resolution, dataset metadata, and checkpoint metadata preparation.
 - `mwm/training/stable_wm_model.py`: Resolves model dimensions from dataset/base config, locates Stable-WM cached config, builds trainable MWM from base, and merges model metadata.
-- `mwm/training/stable_wm_lightning.py`: Stable-pretraining/Lightning training loop, DataLoaders, optimizer/scheduler config, callbacks, module forward, selected checkpoint reload, and train-info output.
+- `mwm/training/stable_wm_lightning.py`: Stable-pretraining/Lightning training loop with disjoint world/decoder optimizers and gradient clipping, DataLoaders, scheduler config, callbacks, checkpoint resume/reload, and train-info output.
 - `mwm/training/stable_wm_callbacks.py`: ModelCheckpoint builder, all-level plateau early stopping, callback assembly, and export checkpoint selection policy.
 - `mwm/training/stable_wm_export.py`: Loads Lightning `model.*` state into MWM and exports a canonical checkpoint without retraining.
 - `mwm/training/stable_wm_runtime.py`: Device/strategy resolution, trainer-root cleanup, and total LR scheduler step calculation.

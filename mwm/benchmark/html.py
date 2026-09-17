@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+import json
 import math
 from pathlib import Path
 import shlex
@@ -147,7 +148,13 @@ def _rollout_review_group(
         "</details>"
     )
 
-def _benchmark_status_cards(rows: list[dict[str, Any]], plots: list[str], expected_cells: int | None = None) -> tuple[str, list[str]]:
+def _benchmark_status_cards(
+    rows: list[dict[str, Any]],
+    plots: list[str],
+    expected_cells: int | None = None,
+    *,
+    in_progress: bool = False,
+) -> tuple[str, list[str]]:
     envs = sorted({str(row.get("env_id", "")) for row in rows})
     seeds = sorted({int(row.get("seed", 0)) for row in rows})
     roles = sorted({str(row.get("role", "")) for row in rows})
@@ -156,8 +163,10 @@ def _benchmark_status_cards(rows: list[dict[str, Any]], plots: list[str], expect
     shared_pairs = sum(1 for pair in pairs if pair["same_manifest"])
     min_episodes = min((int(row.get("episodes", 0)) for row in rows), default=0)
     warnings: list[str] = []
-    if len(rows) != expected:
+    if len(rows) != expected and not in_progress:
         warnings.append(f"Observed {len(rows)} runs but matrix implies {expected}.")
+    if in_progress:
+        warnings.append("This is an in-progress snapshot; plots and Pareto frontiers are provisional.")
     if shared_pairs != len(pairs):
         warnings.append("At least one baseline/MWM pair does not share a manifest hash.")
     if min_episodes and min_episodes < 10:
@@ -167,7 +176,7 @@ def _benchmark_status_cards(rows: list[dict[str, Any]], plots: list[str], expect
         if env_rows and all(float_metric(r.get("success_rate")) == 0.0 for r in env_rows):
             warnings.append(f"{env_label(outcome['env_id'])} has zero success for every role and seed.")
     cards = [
-        ("Runs", f"{len(rows)}/{expected}", "matrix cells present"),
+        ("Runs", f"{len(rows)}/{expected}", "completed matrix cells" if in_progress else "matrix cells present"),
         ("Pairs", f"{shared_pairs}/{len(pairs)}", "shared manifests"),
         ("Plots", str(len(plots)), "embedded figures"),
         ("Seeds", ", ".join(str(seed) for seed in seeds), "per environment"),
@@ -187,13 +196,23 @@ def write_review_html(
     plots: list[str] | None = None,
     expected_cells: int | None = None,
     pareto_html: str | None = None,
+    live_status: dict[str, Any] | None = None,
+    include_rollouts: bool = True,
+    serve_command: str | None = None,
 ) -> None:
     out = Path(path)
     out.parent.mkdir(parents=True, exist_ok=True)
     base_dir = out.parent.resolve()
     rows = sorted_rows(rows)
-    plots = plots or sorted(str(p) for p in (out.parent / "plots").glob("*.png"))
-    status_html, warnings = _benchmark_status_cards(rows, plots, expected_cells=expected_cells)
+    if plots is None:
+        plots = sorted(str(p) for p in (out.parent / "plots").glob("*.png"))
+    in_progress = bool(live_status and not live_status.get("complete", False))
+    status_html, warnings = _benchmark_status_cards(
+        rows,
+        plots,
+        expected_cells=expected_cells,
+        in_progress=in_progress,
+    )
     warning_html = "".join(f"<li>{html.escape(w)}</li>" for w in warnings) or "<li>No structural warnings detected.</li>"
 
     outcome_html = []
@@ -219,15 +238,22 @@ def write_review_html(
     for plot in plots:
         href = _href(plot, base_dir)
         label = Path(str(plot)).stem.replace("_", " ")
+        figure_class = " class='strategy-legend'" if Path(str(plot)).name == "strategy_legend.png" else ""
         plot_cards.append(
-            f"<figure><a href='{html.escape(href)}'><img src='{html.escape(href)}' alt='{html.escape(label)}'></a><figcaption>{html.escape(label)}</figcaption></figure>"
+            f"<figure{figure_class}><a href='{html.escape(href)}'><img src='{html.escape(href)}' alt='{html.escape(label)}'></a><figcaption>{html.escape(label)}</figcaption></figure>"
         )
     pareto_section = ""
     if pareto_html:
         pareto_href = _href(pareto_html, base_dir)
+        pareto_heading = "Provisional Interactive Pareto Frontier" if in_progress else "Interactive Pareto Frontier"
+        pareto_note = (
+            "This frontier uses completed cells only. Toggle fidelity schedules in the legend and hover points for CEM parameters and compute diagnostics."
+            if in_progress
+            else "Toggle fidelity schedules in the legend and hover points for CEM parameters and compute diagnostics."
+        )
         pareto_section = (
-            "<h2>Interactive Pareto Frontier</h2>"
-            "<section class='panel'><p class='muted'>Toggle fidelity schedules in the legend and hover points for CEM parameters and compute diagnostics.</p>"
+            f"<h2>{pareto_heading}</h2>"
+            f"<section class='panel'><p class='muted'>{pareto_note}</p>"
             f"<iframe src='{html.escape(pareto_href)}' title='Interactive Pareto frontier' style='width:100%;height:720px;border:0'></iframe></section>"
         )
 
@@ -257,7 +283,8 @@ def write_review_html(
     for row_idx, row in enumerate(rows):
         run_dir = Path(str(row.get("output_json", ""))).parent
         payload = payload_by_run_dir.get(str(run_dir)) or (outputs[row_idx] if row_idx < len(outputs) else {})
-        rollout_groups.append(_rollout_review_group(row, payload, run_dir))
+        if include_rollouts:
+            rollout_groups.append(_rollout_review_group(row, payload, run_dir))
         links = " ".join(
             _link(run_dir / name, label, base_dir)
             for name, label in (
@@ -293,9 +320,61 @@ def write_review_html(
             media_links.append(f"<li>{_link(path_text, f'{run_label} · {Path(path_text).name}', base_dir)}</li>")
         media_links.extend(_review_media_items(payload, base_dir, run_label))
 
-    serve_command = (
+    serve_command = serve_command or (
         "python -m mwm.benchmark.render_review "
         f"{shlex.quote(str(base_dir))} --serve"
+    )
+    live_banner = ""
+    live_poll_script = ""
+    if live_status:
+        completed_cells = int(live_status.get("completed_cells", len(rows)))
+        expected = int(live_status.get("expected_cells", expected_cells or len(rows)))
+        generated_at = str(live_status.get("generated_at", "unknown"))
+        summary_href = str(live_status.get("summary_href", "summary.live.json"))
+        initial_complete = bool(live_status.get("complete", False))
+        initial_fingerprint = str(live_status.get("fingerprint", ""))
+        state_label = "Complete snapshot" if initial_complete else "Live benchmark snapshot"
+        live_banner = (
+            "<section class='panel live-banner' aria-live='polite'>"
+            f"<strong>{html.escape(state_label)}: {completed_cells}/{expected} cells complete.</strong> "
+            f"<span class='muted'>Generated {html.escape(generated_at)}.</span>"
+            "<button id='live-refresh' type='button' hidden onclick='window.location.reload()'>New results available — refresh</button>"
+            "</section>"
+        )
+        live_poll_script = f"""
+const liveInitialFingerprint = {json.dumps(initial_fingerprint)};
+const liveInitialComplete = {json.dumps(initial_complete)};
+window.setInterval(() => {{
+  fetch({json.dumps(summary_href)}, {{cache: 'no-store'}})
+    .then((response) => {{ if (!response.ok) throw new Error('snapshot unavailable'); return response.json(); }})
+    .then((snapshot) => {{
+      if (String(snapshot.fingerprint || '') !== liveInitialFingerprint || Boolean(snapshot.complete) !== liveInitialComplete) {{
+        document.getElementById('live-refresh').hidden = false;
+      }}
+    }})
+    .catch(() => {{}});
+}}, {max(5, int(live_status.get('refresh_seconds', 60))) * 1000});
+"""
+    rollout_section = (
+        "<h2>Rollout Review</h2>"
+        "<section class='panel'>"
+        "<p><strong>Start with failures</strong> to find systematic mistakes, then sample successes to check that the score matches visually plausible behavior. Aligned episode numbers use the shared manifest, so compare the same number across runs.</p>"
+        "<div class='filter-bar' aria-label='Filter rollout episodes'>"
+        "<span class='muted'>Show:</span>"
+        '<button class="active" type="button" data-filter="all">All</button>'
+        '<button type="button" data-filter="failure">Failures</button>'
+        '<button type="button" data-filter="success">Successes</button>'
+        '<button type="button" data-filter="media">With media</button>'
+        "</div>"
+        f"{''.join(rollout_groups)}"
+        "</section>"
+        if include_rollouts
+        else (
+            "<h2>Rollout Review</h2><section class='panel'>"
+            "<p>Episode grids are omitted for this large or lightweight matrix to keep the report responsive. "
+            "Use the run drilldown links for completed-cell artifacts and targeted episode inspection.</p>"
+            "</section>"
+        )
     )
 
     body = f"""<!doctype html>
@@ -320,6 +399,7 @@ def write_review_html(
     .panel {{ background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 18px; margin-top: 16px; }}
     .table-scroll {{ width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }}
     .plots {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 18px; }}
+    .plots .strategy-legend {{ grid-column: 1 / -1; }}
     figure {{ margin: 0; background: white; border: 1px solid #d9e2ec; border-radius: 8px; padding: 12px; }}
     img {{ max-width: 100%; height: auto; display: block; }}
     video {{ display: block; max-width: 520px; width: 100%; margin-top: 8px; background: #000; }}
@@ -338,6 +418,8 @@ def write_review_html(
     .review-mode.connected {{ border-left-color: #0f7b3f; }}
     .mode-badge {{ display: inline-block; border-radius: 999px; background: #e7f0fa; color: #0b5cad; font-size: 12px; font-weight: 700; padding: 4px 9px; text-transform: uppercase; letter-spacing: .03em; }}
     .review-mode.connected .mode-badge {{ background: #e8f5ed; color: #0f7b3f; }}
+    .live-banner {{ border-left: 4px solid #d97706; display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }}
+    .live-banner button {{ margin-left: auto; border: 1px solid #b45309; background: #fff7ed; color: #9a3412; border-radius: 6px; padding: 7px 10px; cursor: pointer; font-weight: 650; }}
     .command {{ display: block; width: fit-content; max-width: 100%; overflow-x: auto; margin-top: 10px; padding: 8px 10px; }}
     .command[hidden] {{ display: none; }}
     .filter-bar {{ display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0; }}
@@ -367,6 +449,7 @@ def write_review_html(
 <main>
   <h1>{html.escape(title)}</h1>
   <p class="lede">Benchmark results with paired comparisons, run artifacts, and rollout-level review.</p>
+  {live_banner}
 
   <section id="review-mode" class="panel review-mode" aria-live="polite">
     <span class="mode-badge" id="mode-badge">Static report</span>
@@ -390,9 +473,10 @@ def write_review_html(
     </table></div>
   </section>
 
-  <h2>Plots</h2>
-  <section class="plots">{''.join(plot_cards)}</section>
   {pareto_section}
+
+  <h2>Supporting Views</h2>
+  <section class="plots">{''.join(plot_cards)}</section>
 
   <h2>Paired Seed Comparison</h2>
   <section class="panel">
@@ -402,18 +486,7 @@ def write_review_html(
     </table></div>
   </section>
 
-  <h2>Rollout Review</h2>
-  <section class="panel">
-    <p><strong>Start with failures</strong> to find systematic mistakes, then sample successes to check that the score matches visually plausible behavior. Aligned episode numbers use the shared manifest, so compare the same number across runs.</p>
-    <div class="filter-bar" aria-label="Filter rollout episodes">
-      <span class="muted">Show:</span>
-      <button class="active" type="button" data-filter="all">All</button>
-      <button type="button" data-filter="failure">Failures</button>
-      <button type="button" data-filter="success">Successes</button>
-      <button type="button" data-filter="media">With media</button>
-    </div>
-    {''.join(rollout_groups)}
-  </section>
+  {rollout_section}
 
   <details open>
     <summary>Run Drilldown</summary>
@@ -471,6 +544,7 @@ document.querySelectorAll('[data-filter]').forEach((button) => {{
     }});
   }});
 }});
+{live_poll_script}
 </script>
 </body>
 </html>

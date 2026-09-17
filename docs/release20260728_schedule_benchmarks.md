@@ -7,22 +7,23 @@ cells after excluding the invalid one-elite CEM settings.
 
 ## Configurations
 
-Goal 25, plan 50 primitive actions, execute 10, budget 50:
+Goal 25, plan 25 primitive actions, execute 10, budget 50:
 
 - `configs/research/release20260728_dense_pusht_all_fidelity_schedules.yaml`
 - `configs/research/release20260728_dense_reacher_all_fidelity_schedules.yaml`
 - `configs/research/release20260728_dense_ogb_cube_all_fidelity_schedules.yaml`
 - `configs/research/release20260728_dense_tworoom_all_fidelity_schedules.yaml`
 
-Goal 50, plan 100 primitive actions, execute 20, budget 100:
+Goal 50, plan 50 primitive actions, execute 20, budget 100:
 
-- `configs/research/release20260728_dense_pusht_goal50_plan100_execute20_all_fidelity_schedules.yaml`
-- `configs/research/release20260728_dense_reacher_goal50_plan100_execute20_all_fidelity_schedules.yaml`
-- `configs/research/release20260728_dense_ogb_cube_goal50_plan100_execute20_all_fidelity_schedules.yaml`
-- `configs/research/release20260728_dense_tworoom_goal50_plan100_execute20_all_fidelity_schedules.yaml`
+- `configs/research/release20260728_dense_pusht_goal50_plan50_execute20_all_fidelity_schedules.yaml`
+- `configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml`
+- `configs/research/release20260728_dense_ogb_cube_goal50_plan50_execute20_all_fidelity_schedules.yaml`
+- `configs/research/release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml`
 
-All eight use exact goal indexing, 50 episodes, seed 42, dynamics FLOP
-accounting, and CEM iteration values `[5,10,15,20,30]`. Their immutable
+All eight use exact goal indexing, 250 episodes, seed 42, dynamics FLOP
+accounting, and CEM iteration values `[5,10,15,20,30]`. Evaluation is processed
+in five batches of 50 vectorized environments. Their immutable 250-pair
 manifests are tracked under `configs/manifest/data/release20260728/`.
 
 ## External prerequisites

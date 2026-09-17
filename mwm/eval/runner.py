@@ -11,7 +11,6 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
     from mwm.dependency_refs import dependency_refs
     from mwm.eval.execution import (
         combine_mwm_diagnostics,
-        combine_policy_diagnostics,
         combine_swm_results,
         run_batch,
     )
@@ -80,7 +79,6 @@ def main(cfg_path: str, *, overrides: list[str] | None = None) -> None:
             "env_runtime": env_runtime,
             "swm_results": swm_results,
             "planning_diagnostics": combine_mwm_diagnostics(all_results),
-            "policy_diagnostics": combine_policy_diagnostics(all_results),
             "model_accounting": accounting,
             "dataset_metadata": dataset_runtime_metadata(runtime.dataset, cfg),
             "manifest": manifest_info,

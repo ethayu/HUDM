@@ -50,12 +50,35 @@ DEFAULTS = {
         "checkpoint_mode": "min",
         "save_top_k": 0,
         "export_checkpoint": "last",
+        "resume_checkpoint": None,
         "slurm_auto_requeue": False,
+        "gradient_clip_val": 1.0,
+        # Seed applied by SPT immediately before Trainer.fit. None preserves
+        # the historical MWM behavior of reusing the top-level construction
+        # seed; upstream LeWM's Manager(seed=None) resolves this value to 0.
+        "fit_seed": None,
+        # Keep model initialization independently controllable from the
+        # top-level data split/shuffle seed. None preserves historical MWM
+        # behavior by using the top-level seed.
+        "model_init_seed": None,
     },
     "optim": {"lr": 3e-4},
-    "loss": {"rollout_weight": 1.0, "recon_latent_weight": 0.0, "sigreg_weight": 0.0},
+    "decoder_training": {
+        "enabled": True,
+        "mode": "separate_optimizer",
+        "gradient_clip_val": None,
+        "lr": None,
+        "weight_decay": None,
+    },
+    "loss": {"rollout_weight": 1.0, "sigreg_weight": 0.0},
     "schedule": {"max_epochs": 30, "lr_max_epochs": None},
 }
+
+
+def stable_wm_model_init_seed(cfg: Any) -> int:
+    """Resolve the model-construction seed without changing the data seed."""
+    configured = cfg.train.get("model_init_seed", None)
+    return int(cfg.seed) if configured is None else int(configured)
 
 
 def make_run_dir(root: str, tag: str, *, timestamp: bool = False) -> str:
@@ -75,10 +98,41 @@ def as_container(value: Any) -> Any:
     return value
 
 
-def validate_stable_wm_loss_config(loss_cfg: Any) -> None:
+def validate_stable_wm_loss_config(loss_cfg: Any, decoder_training_cfg: Any | None = None) -> None:
     loss = as_container(loss_cfg)
-    if isinstance(loss, dict) and "recon_weight" in loss and loss["recon_weight"] != 0.0:
-        raise ValueError("loss.recon_weight has been removed; use loss.recon_latent_weight instead (or set to 0.0 to disable decoder reconstruction).")
+    if isinstance(loss, dict) and "recon_weight" in loss:
+        raise ValueError(
+            "loss.recon_weight is not supported with optimizer-isolated decoder training; "
+            "use decoder_training.enabled to turn decoder training on or off."
+        )
+    if isinstance(loss, dict) and float(loss.get("recon_latent_weight", 0.0)) != 0.0:
+        raise ValueError(
+            "loss.recon_latent_weight must be 0 with optimizer-isolated decoder training; "
+            "decoder reconstruction cannot contribute gradients to the encoder."
+        )
+    if decoder_training_cfg is None:
+        return
+    decoder_training = as_container(decoder_training_cfg)
+    if not isinstance(decoder_training, dict):
+        raise ValueError("decoder_training must be a mapping.")
+    unknown = set(decoder_training) - {"enabled", "mode", "gradient_clip_val", "lr", "weight_decay"}
+    if unknown:
+        raise ValueError(f"Unknown decoder_training keys: {sorted(unknown)}")
+    mode = str(decoder_training.get("mode", "separate_optimizer"))
+    if mode != "separate_optimizer":
+        raise ValueError(
+            f"Unsupported decoder_training.mode {mode!r}; expected 'separate_optimizer'."
+        )
+    for key in ("gradient_clip_val", "lr", "weight_decay"):
+        value = decoder_training.get(key)
+        if value is not None and float(value) < 0:
+            raise ValueError(f"decoder_training.{key} must be non-negative, got {value}.")
 
 
-__all__ = ["DEFAULTS", "as_container", "make_run_dir", "validate_stable_wm_loss_config"]
+__all__ = [
+    "DEFAULTS",
+    "as_container",
+    "make_run_dir",
+    "stable_wm_model_init_seed",
+    "validate_stable_wm_loss_config",
+]

@@ -57,6 +57,22 @@ The aggregate `review.html` embeds an interactive success-versus-cost Pareto
 plot. Its default cost axis is audited dynamics FLOPs; legend names use the
 human-readable `schedule` field, and hovering a point shows its sweep parameters.
 
+While a sharded or local matrix is still running, build a lightweight snapshot
+from only the completed cells and open `review.live.html`:
+
+```bash
+python -m mwm.benchmark.live_review CONFIG.yaml --serve --refresh-seconds 60
+```
+
+The live collector resolves the exact matrix in `CONFIG.yaml`, so stale cells
+from older sweeps in the same output directory are excluded. It writes isolated
+`*.live.*` files and `plots/live/` without replacing the canonical final report.
+The success-versus-cost frontier is explicitly provisional until every expected
+cell is complete, and the page offers a refresh when its background watcher
+publishes a new snapshot. The live server skips model/CUDA warm-up because the
+episode grids are intentionally omitted; completed run artifacts remain linked
+from the drilldown table. To render once without serving, omit `--serve`.
+
 The generated `review.html` is a static aggregate report. To inspect aligned
 successes and failures episode by episode, play existing videos, or render
 missing environment and latent-reconstruction media on demand, start the local
@@ -157,7 +173,7 @@ Use `MWM_PYTHON=/path/to/python` if your Python is not named `python`.
 - `mwm.models.common.MatryoshkaRuntimeModel` is the shared runtime marker; concrete family behavior lives in `mwm.models.lewm.LeWMMatryoshkaWorldModel` and `mwm.models.prejepa.PreJEPAMatryoshkaWorldModel`.
 - `mwm.adapters.lewm` derives Le-WM components from Stable-WM configs,
   registers the Le-WM adapter, then returns `LeWMMatryoshkaWorldModel`.
-  `K=[192]` is constructor/loss/optimizer exact to the base Le-WM path;
+  `K=[192]` is constructor/world-objective exact to the base Le-WM path;
   multi-`K` training encodes once and aggregates requested prefix losses only.
 - `mwm.adapters.prejepa` derives transformer patch-backbone and extra-encoder components, then returns `PreJEPAMatryoshkaWorldModel`.
 - `mwm.checkpoint_io` reads and writes canonical checkpoints containing `config.json`, `weights.pt`, and `world_metadata.json`;
@@ -177,6 +193,23 @@ Adapters declare top-level component groups, then configs choose which groups ar
 shared or duplicated. Le-WM uses `encoder + projector` as the shared latent
 producer and fresh per-`K` transition tails; PreJEPA/DINO-WM uses a shared image
 patch backbone with per-`K` patch predictors and fixed extra encoders.
+
+Le-WM trains detached-latent image decoders with an optimizer and gradient norm
+that are isolated from the world model. Decoder training is enabled by default:
+
+```yaml
+decoder_training:
+  enabled: true
+  mode: separate_optimizer
+  gradient_clip_val: 1.0
+  lr: 0.00005
+  weight_decay: 0.001
+```
+
+There is no decoder-loss weight: the switch is `decoder_training.enabled`.
+Set it to `false` for strict world-model-only/paper training. Nonzero
+`loss.recon_latent_weight` is rejected because decoder reconstruction cannot
+feed gradients back into the encoder in this mode.
 
 Research configs may opt Le-WM into `slimmable_transformer_v1`. That variant
 uses one nested action-conditioned causal transition, trains configured anchor

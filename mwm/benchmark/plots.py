@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
+import textwrap
 from typing import Any
 
 import numpy as np
 
 from mwm.benchmark.analysis import env_label, float_metric, mean_metric, paired_rows, role_label, sorted_rows
+from mwm.benchmark.pareto import _schedule_label, _strategy_color_map, pareto_frontier
 from mwm.benchmark.plot_contract import (
     EFFICIENCY_RATIOS_PLOT,
     PAIRED_SUCCESS_DELTA_PLOT,
@@ -18,7 +21,12 @@ from mwm.benchmark.plot_contract import (
 )
 
 
-def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> list[str]:
+def write_default_plots(
+    output_dir: str | Path,
+    rows: list[dict[str, Any]],
+    *,
+    compact: bool = False,
+) -> list[str]:
     if not rows:
         return []
     import matplotlib
@@ -30,6 +38,8 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
     root.mkdir(parents=True, exist_ok=True)
     rows = sorted_rows(rows)
     plots: list[str] = []
+    schedules = sorted({_schedule_label(row) for row in rows})
+    strategy_colors = _strategy_color_map(schedules)
     role_order = {"upstream_lewm_converted": 0, "retrained_lewm_identity": 1, "mwm_scheduled": 2, "mwm_dense": 3}
     colors = {
         "upstream_lewm_converted": "#2f6fbb",
@@ -41,7 +51,7 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
     def _save(fig: Any, name: str) -> None:
         path = root / name
         fig.tight_layout()
-        fig.savefig(path, dpi=160)
+        fig.savefig(path, dpi=160, bbox_inches="tight")
         plt.close(fig)
         plots.append(str(path))
 
@@ -52,27 +62,148 @@ def write_default_plots(output_dir: str | Path, rows: list[dict[str, Any]]) -> l
     def _envs() -> list[str]:
         return sorted({str(row.get("env_id", "")) for row in rows if str(row.get("env_id", ""))})
 
-    def _scatter(x_key: str, y_key: str, name: str, xlabel: str) -> None:
-        fig, ax = plt.subplots(figsize=(6, 4))
-        roles = _roles()
-        for role in roles:
-            role_rows = [row for row in rows if str(row.get("role", "")) == role]
-            x = [float_metric(row.get(x_key), float("nan")) for row in role_rows]
-            y = [float_metric(row.get(y_key), float("nan")) for row in role_rows]
-            ax.scatter(x, y, label=role_label(role) if role else "runs", color=colors.get(role), alpha=0.85)
-            if len(rows) <= 18:
-                for row, x_val, y_val in zip(role_rows, x, y):
-                    if not np.isnan(x_val) and not np.isnan(y_val):
-                        label = f"{env_label(str(row.get('env_id', '')))} s{int(row.get('seed', 0))}"
-                        ax.annotate(label, (x_val, y_val), fontsize=7)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel("success rate (%)")
-        ax.legend(loc="best", fontsize=8)
-        ax.grid(True, alpha=0.3)
+    def _pareto_scatter(x_key: str, name: str, xlabel: str, title: str) -> None:
+        valid = [
+            row
+            for row in rows
+            if np.isfinite(float_metric(row.get(x_key), float("nan")))
+            and np.isfinite(float_metric(row.get("success_rate"), float("nan")))
+        ]
+        frontier = pareto_frontier(valid, cost_key=x_key)
+        frontier_objects = {id(row) for row in frontier}
+        dominated = [row for row in valid if id(row) not in frontier_objects]
+        fig, ax = plt.subplots(figsize=(10, 5.6))
+        ax.scatter(
+            [float_metric(row.get(x_key)) for row in dominated],
+            [float_metric(row.get("success_rate")) for row in dominated],
+            s=16,
+            color="#64748b",
+            alpha=0.07,
+            edgecolors="none",
+            rasterized=True,
+            label=f"Dominated cells ({len(dominated):,})",
+            zorder=1,
+        )
+        for schedule in schedules:
+            schedule_rows = [row for row in valid if _schedule_label(row) == schedule]
+            schedule_frontier = pareto_frontier(schedule_rows, cost_key=x_key)
+            if not schedule_frontier:
+                continue
+            ax.plot(
+                [float_metric(row.get(x_key)) for row in schedule_frontier],
+                [float_metric(row.get("success_rate")) for row in schedule_frontier],
+                color=strategy_colors[schedule],
+                linewidth=1.65,
+                alpha=0.78,
+                marker="o",
+                markersize=2.6,
+                markeredgewidth=0,
+                zorder=3,
+            )
+        if frontier:
+            frontier_x = [float_metric(row.get(x_key)) for row in frontier]
+            frontier_y = [float_metric(row.get("success_rate")) for row in frontier]
+            ax.plot(
+                frontier_x,
+                frontier_y,
+                color="#64748b",
+                linewidth=1.35,
+                linestyle=":",
+                marker="o",
+                markersize=4.5,
+                markerfacecolor="none",
+                markeredgecolor="#64748b",
+                markeredgewidth=0.8,
+                alpha=0.68,
+                label=f"Global Pareto frontier · reference ({len(frontier):,})",
+                zorder=2,
+            )
+        positive_x = [float_metric(row.get(x_key)) for row in valid if float_metric(row.get(x_key)) > 0]
+        use_log = bool(positive_x and max(positive_x) / min(positive_x) >= 20)
+        if use_log:
+            ax.set_xscale("log")
+        ax.set_xlabel(f"{xlabel} (log scale)" if use_log else xlabel)
+        ax.set_ylabel("Success rate (%)")
+        ax.set_title(title, loc="left", fontsize=13, fontweight="semibold")
+        ax.set_ylim(-2, 102)
+        ax.grid(True, which="major", color="#cbd5e1", alpha=0.45, linewidth=0.8)
+        ax.grid(False, which="minor")
+        from matplotlib.lines import Line2D
+
+        handles, labels = ax.get_legend_handles_labels()
+        handles.insert(
+            1,
+            Line2D([0], [0], color="#2563eb", linewidth=1.65, marker="o", markersize=3, alpha=0.78),
+        )
+        labels.insert(1, "Per-strategy frontiers (see color key)")
+        ax.legend(
+            handles,
+            labels,
+            loc="upper right",
+            bbox_to_anchor=(1, 1.13),
+            frameon=False,
+            ncol=3,
+            fontsize=9,
+        )
+        ax.spines[["top", "right"]].set_visible(False)
         _save(fig, name)
 
-    _scatter("bits_used_total", "success_rate", SUCCESS_VS_COMPUTE_PLOT, "latent work bits")
-    _scatter("wall_time_sec", "success_rate", SUCCESS_VS_WALL_TIME_PLOT, "wall time (sec)")
+    _pareto_scatter(
+        "dynamics_flops_total",
+        SUCCESS_VS_COMPUTE_PLOT,
+        "Audited dynamics FLOPs (lower is better)",
+        "Success vs audited dynamics compute",
+    )
+    _pareto_scatter(
+        "wall_time_sec",
+        SUCCESS_VS_WALL_TIME_PLOT,
+        "Wall time in seconds (lower is better)",
+        "Success vs wall time",
+    )
+
+    def _strategy_legend() -> None:
+        rows_per_column = max(1, math.ceil(len(schedules) / 2))
+        fig, ax = plt.subplots(figsize=(14, max(4.8, rows_per_column * 0.56)))
+        ax.set_axis_off()
+        ax.text(
+            0.01,
+            1.02,
+            "Strategy color key",
+            transform=ax.transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=13,
+            fontweight="semibold",
+        )
+        for index, schedule in enumerate(schedules):
+            column = index // rows_per_column
+            row_index = index % rows_per_column
+            x = 0.01 + column * 0.5
+            y = 0.94 - row_index * (0.88 / max(1, rows_per_column - 1))
+            ax.plot(
+                [x, x + 0.025],
+                [y, y],
+                transform=ax.transAxes,
+                color=strategy_colors[schedule],
+                linewidth=3.2,
+                solid_capstyle="round",
+            )
+            label = "\n".join(textwrap.wrap(schedule, width=62))
+            ax.text(
+                x + 0.034,
+                y,
+                label,
+                transform=ax.transAxes,
+                ha="left",
+                va="center",
+                fontsize=8.5,
+            )
+        _save(fig, "strategy_legend.png")
+
+    _strategy_legend()
+
+    if compact:
+        return plots
 
     envs = _envs()
     roles = _roles()

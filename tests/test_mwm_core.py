@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import copy
 import io
 import json
 import random
@@ -39,6 +40,8 @@ from mwm.training.stable_wm_callbacks import (
     select_stable_wm_adapter_export_checkpoint,
 )
 from mwm.training.stable_wm_export import load_stable_wm_adapter_lightning_state
+from mwm.training.stable_wm_config import validate_stable_wm_loss_config
+from mwm.training.stable_wm_lightning import WorldOnlySPTModule, stable_wm_parameter_partitions
 from mwm.training.stable_wm_model import build_trainable_stable_wm_adapter_model
 from mwm.training.stable_wm_runtime import (
     prepare_trainer_root,
@@ -553,28 +556,143 @@ class MWMCoreTests(unittest.TestCase):
         model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
-        out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.0)
+        out = model.training_loss(batch, rollout_weight=0.0)
         model.zero_grad(set_to_none=True)
-        out["loss"].backward()
+        out["decoder_loss"].backward()
 
         self.assertGreater(_grad_abs_sum(model.decoders), 0.0)
         self.assertEqual(_grad_abs_sum(model.encoder), 0.0)
         self.assertEqual(_grad_abs_sum(model.projector), 0.0)
         self.assertIn("recon_loss", out)
-        self.assertNotIn("recon_latent_loss", out)
+        self.assertIn("decoder_loss", out)
 
-    def test_reconstruction_latent_weight_shapes_encoder_latents(self) -> None:
+    def test_world_loss_produces_no_decoder_gradients(self) -> None:
         model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
         batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
 
-        out = model.training_loss(batch, rollout_weight=0.0, recon_latent_weight=0.25)
+        out = model.training_loss(batch)
         model.zero_grad(set_to_none=True)
         out["loss"].backward()
 
-        self.assertGreater(_grad_abs_sum(model.decoders), 0.0)
+        self.assertEqual(_grad_abs_sum(model.decoders), 0.0)
         self.assertGreater(_grad_abs_sum(model.encoder), 0.0)
         self.assertGreater(_grad_abs_sum(model.projector), 0.0)
-        self.assertIn("recon_latent_loss", out)
+
+    def test_reconstruction_latent_feedback_is_rejected(self) -> None:
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        with self.assertRaisesRegex(ValueError, "recon_latent_weight must be 0"):
+            model.training_loss(batch, recon_latent_weight=0.25)
+
+    def test_world_and_decoder_optimizer_parameters_are_disjoint(self) -> None:
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+
+        world_parameters, decoder_parameters = stable_wm_parameter_partitions(model)
+        world_ids = {id(param) for param in world_parameters}
+        decoder_ids = {id(param) for param in decoder_parameters}
+
+        self.assertFalse(world_ids & decoder_ids)
+        self.assertEqual(decoder_ids, {id(param) for param in model.decoders.parameters()})
+        self.assertTrue({id(param) for param in model.encoder.parameters()}.issubset(world_ids))
+        self.assertTrue({id(param) for param in model.projector.parameters()}.issubset(world_ids))
+        self.assertTrue({id(param) for param in model.transitions.parameters()}.issubset(world_ids))
+
+    def test_strict_world_optimizer_regex_covers_world_and_excludes_decoders(self) -> None:
+        model = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+        world_parameters, decoder_parameters = stable_wm_parameter_partitions(model)
+        optim = {
+            "world_opt": {
+                "modules": r"^model\.(?!decoders(?:\.|$))",
+                "optimizer": {"type": "AdamW", "lr": 5e-5, "weight_decay": 1e-3},
+                "scheduler": {"type": "LinearWarmupCosineAnnealingLR", "warmup_steps": 1, "max_steps": 2},
+                "interval": "epoch",
+            }
+        }
+        module = WorldOnlySPTModule(
+            model=model,
+            forward=lambda _module, _batch, _stage: {},
+            optim=optim,
+            world_parameters=world_parameters,
+        )
+
+        grouped, _, _ = module._collect_parameters_by_optimizer_groups(list(optim.items()))
+        grouped_ids = {id(parameter) for parameter in grouped["world_opt"]}
+
+        self.assertEqual(grouped_ids, {id(parameter) for parameter in world_parameters})
+        self.assertTrue(grouped_ids.isdisjoint({id(parameter) for parameter in decoder_parameters}))
+
+    def test_decoder_loss_scale_does_not_change_clipped_world_update(self) -> None:
+        torch.manual_seed(19)
+        initial = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        def world_update_trace(decoder_scale: float) -> tuple[list[torch.Tensor], list[torch.Tensor], list[torch.Tensor]]:
+            model = copy.deepcopy(initial)
+            world_parameters, decoder_parameters = stable_wm_parameter_partitions(model)
+            world_optimizer = torch.optim.AdamW(world_parameters, lr=5e-5, weight_decay=1e-3)
+            decoder_optimizer = torch.optim.AdamW(decoder_parameters, lr=5e-5, weight_decay=1e-3)
+            output = model.training_loss({key: value.clone() for key, value in batch.items()})
+            world_optimizer.zero_grad(set_to_none=True)
+            decoder_optimizer.zero_grad(set_to_none=True)
+            (output["loss"] + output["decoder_loss"] * decoder_scale).backward()
+            raw_world_gradients = [param.grad.detach().clone() for param in world_parameters]
+            torch.nn.utils.clip_grad_norm_(world_parameters, 1.0)
+            clipped_world_gradients = [param.grad.detach().clone() for param in world_parameters]
+            world_optimizer.step()
+            torch.nn.utils.clip_grad_norm_(decoder_parameters, 1.0)
+            decoder_optimizer.step()
+            updated_world_parameters = [param.detach().clone() for param in world_parameters]
+            return raw_world_gradients, clipped_world_gradients, updated_world_parameters
+
+        normal = world_update_trace(1.0)
+        huge = world_update_trace(1e12)
+        for normal_values, huge_values in zip(normal, huge):
+            for normal_value, huge_value in zip(normal_values, huge_values):
+                self.assertTrue(torch.equal(normal_value, huge_value))
+
+    def test_disabling_decoder_objective_preserves_world_update(self) -> None:
+        torch.manual_seed(23)
+        initial = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
+        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
+
+        def update(decoder_training_enabled: bool) -> list[torch.Tensor]:
+            model = copy.deepcopy(initial)
+            world_parameters, _ = stable_wm_parameter_partitions(model)
+            optimizer = torch.optim.AdamW(world_parameters, lr=5e-5, weight_decay=1e-3)
+            output = model.training_loss(
+                {key: value.clone() for key, value in batch.items()},
+                decoder_training_enabled=decoder_training_enabled,
+            )
+            optimizer.zero_grad(set_to_none=True)
+            output["loss"].backward()
+            torch.nn.utils.clip_grad_norm_(world_parameters, 1.0)
+            optimizer.step()
+            if decoder_training_enabled:
+                self.assertIn("decoder_loss", output)
+            else:
+                self.assertNotIn("decoder_loss", output)
+            return [param.detach().clone() for param in world_parameters]
+
+        enabled = update(True)
+        disabled = update(False)
+        for enabled_param, disabled_param in zip(enabled, disabled):
+            self.assertTrue(torch.equal(enabled_param, disabled_param))
+
+    def test_optimizer_isolated_decoder_config_rejects_reconstruction_weights(self) -> None:
+        decoder_training = {
+            "enabled": True,
+            "mode": "separate_optimizer",
+            "gradient_clip_val": 1.0,
+            "lr": 5e-5,
+            "weight_decay": 1e-3,
+        }
+        validate_stable_wm_loss_config({"rollout_weight": 1.0}, decoder_training)
+        validate_stable_wm_loss_config({"recon_latent_weight": 0.0}, decoder_training)
+        with self.assertRaisesRegex(ValueError, "recon_weight is not supported"):
+            validate_stable_wm_loss_config({"recon_weight": 1.0}, decoder_training)
+        with self.assertRaisesRegex(ValueError, "recon_latent_weight must be 0"):
+            validate_stable_wm_loss_config({"recon_latent_weight": 0.1}, decoder_training)
 
     def test_train_entrypoint_builds_from_stable_wm_base_config(self) -> None:
         source_config = _lewm_source_config(D=4, action_dim=2, predictor_heads=1, predictor_dim_head=2, predictor_mlp_dim=8)
@@ -1086,6 +1204,11 @@ class MWMCoreTests(unittest.TestCase):
             keep = trainer_root / "keep.ckpt"
             keep.write_text("keep", encoding="utf-8")
             cfg.train.clean_trainer_root = False
+            trainer_root = prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
+            self.assertTrue((trainer_root / "keep.ckpt").is_file())
+
+            cfg.train.clean_trainer_root = True
+            cfg.train.resume_checkpoint = str(keep)
             trainer_root = prepare_trainer_root(root / "checkpoints" / "review_run", cfg, logs_root=root / "logs")
             self.assertTrue((trainer_root / "keep.ckpt").is_file())
 

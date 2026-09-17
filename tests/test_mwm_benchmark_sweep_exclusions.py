@@ -71,7 +71,7 @@ class BenchmarkSweepExclusionTests(unittest.TestCase):
 
 
 class ReleaseScheduleConfigTests(unittest.TestCase):
-    def test_release_sweeps_use_exact_goal25_and_plan50_execute10(self) -> None:
+    def test_release_sweeps_use_exact_goal25_and_plan25_execute10(self) -> None:
         root = Path(__file__).resolve().parents[1]
         for env in ("pusht", "reacher", "ogb_cube", "tworoom"):
             with self.subTest(env=env):
@@ -90,7 +90,7 @@ class ReleaseScheduleConfigTests(unittest.TestCase):
                 )
                 _, run_cfg = merged_run_config(cfg, cfg.runs[0])
 
-                self.assertEqual(int(run_cfg.eval.episodes), 50)
+                self.assertEqual(int(run_cfg.eval.episodes), 250)
                 self.assertEqual(int(run_cfg.eval.num_envs), 50)
                 self.assertEqual(int(run_cfg.eval.goal_offset), 25)
                 self.assertEqual(str(run_cfg.eval.goal_indexing), "exact")
@@ -106,13 +106,15 @@ class ReleaseScheduleConfigTests(unittest.TestCase):
                     run_cfg.planner.action_block
                 )
                 max_replans = math.ceil(int(run_cfg.eval.budget) / execute_actions)
-                self.assertEqual(plan_actions, 50)
+                self.assertEqual(int(run_cfg.planner.horizon), 5)
+                self.assertEqual(int(run_cfg.planner.receding_horizon), 2)
+                self.assertEqual(plan_actions, 25)
                 self.assertEqual(execute_actions, 10)
                 self.assertEqual(max_replans, 5)
 
                 manifest_path = root / load_manifest_config(cfg)["path"]
                 manifest = load_manifest(manifest_path)
-                self.assertEqual(len(manifest["pairs"]), 50)
+                self.assertEqual(len(manifest["pairs"]), 250)
                 self.assertEqual(
                     {
                         int(pair["goal_step"]) - int(pair["start_step"])
@@ -129,7 +131,7 @@ class ReleaseScheduleConfigTests(unittest.TestCase):
                     restore_spec_id=str(manifest["restore_spec"]),
                 )
 
-    def test_goal50_sweeps_plan100_execute20_with_separate_manifests(self) -> None:
+    def test_goal50_sweeps_plan50_execute20_with_separate_manifests(self) -> None:
         root = Path(__file__).resolve().parents[1]
         for env in ("pusht", "reacher", "ogb_cube", "tworoom"):
             with self.subTest(env=env):
@@ -140,7 +142,7 @@ class ReleaseScheduleConfigTests(unittest.TestCase):
                         / "configs"
                         / "research"
                         / (
-                            f"release20260728_dense_{env}_goal50_plan100_execute20_"
+                            f"release20260728_dense_{env}_goal50_plan50_execute20_"
                             "all_fidelity_schedules.yaml"
                         )
                     ),
@@ -150,11 +152,11 @@ class ReleaseScheduleConfigTests(unittest.TestCase):
                     list(cfg.sweep["planner.n_iter"]),
                     [5, 10, 15, 20, 30],
                 )
-                self.assertIn("goal50_plan100_execute20", str(cfg.output_dir))
+                self.assertIn("goal50_plan50_execute20", str(cfg.output_dir))
                 self.assertIn("goal50_exact", str(cfg.manifest.config))
                 _, run_cfg = merged_run_config(cfg, cfg.runs[0])
 
-                self.assertEqual(int(run_cfg.eval.episodes), 50)
+                self.assertEqual(int(run_cfg.eval.episodes), 250)
                 self.assertEqual(int(run_cfg.eval.num_envs), 50)
                 self.assertEqual(int(run_cfg.eval.goal_offset), 50)
                 self.assertEqual(str(run_cfg.eval.goal_indexing), "exact")
@@ -171,13 +173,15 @@ class ReleaseScheduleConfigTests(unittest.TestCase):
                     run_cfg.planner.action_block
                 )
                 max_replans = math.ceil(int(run_cfg.eval.budget) / execute_actions)
-                self.assertEqual(plan_actions, 100)
+                self.assertEqual(int(run_cfg.planner.horizon), 10)
+                self.assertEqual(int(run_cfg.planner.receding_horizon), 4)
+                self.assertEqual(plan_actions, 50)
                 self.assertEqual(execute_actions, 20)
                 self.assertEqual(max_replans, 5)
 
                 manifest_path = root / load_manifest_config(cfg)["path"]
                 manifest = load_manifest(manifest_path)
-                self.assertEqual(len(manifest["pairs"]), 50)
+                self.assertEqual(len(manifest["pairs"]), 250)
                 self.assertEqual(manifest["goal_indexing"], "exact")
                 self.assertEqual(int(manifest["effective_goal_offset"]), 50)
                 self.assertEqual(int(manifest["eval_budget"]), 100)

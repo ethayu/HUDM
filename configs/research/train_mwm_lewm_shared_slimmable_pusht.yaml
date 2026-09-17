@@ -62,9 +62,14 @@ train:
 optim:
   lr: 0.00005
   weight_decay: 0.001
+decoder_training:
+  enabled: true
+  mode: separate_optimizer
+  gradient_clip_val: 1.0
+  lr: 0.00005
+  weight_decay: 0.001
 loss:
   rollout_weight: 1.0
-  recon_latent_weight: 0.0
   random_prefix_weight: 1.0
   sigreg_weight: 0.09
   sigreg_knots: 17

@@ -10,6 +10,7 @@ from typing import Any
 
 
 AGGREGATE_OUTPUTS = ("summary.json", "summary.csv", "metrics.jsonl", "per_env_summary.csv", "review.html")
+DENSE_REVIEW_CELL_LIMIT = 200
 
 
 def run_eval_mwm(cfg_path: str) -> None:
@@ -49,8 +50,11 @@ def _normalized_config(value: Any, manifest_path: Path) -> dict[str, Any]:
     return plain
 
 
-def _completed_run(run_dir: Path, run_cfg: Any, manifest_path: Path) -> tuple[dict[str, Any], dict[str, Any]] | None:
-    from mwm.io import load_json
+def _completed_row(run_dir: Path, run_cfg: Any, manifest_path: Path) -> dict[str, Any] | None:
+    import json
+
+    from mwm.benchmark.eval_artifacts import validate_eval_storage_reference
+    from mwm.io import file_sha256, load_json
 
     required = (
         run_dir / "eval.json",
@@ -62,13 +66,89 @@ def _completed_run(run_dir: Path, run_cfg: Any, manifest_path: Path) -> tuple[di
     )
     if any(not path.is_file() for path in required):
         return None
+    if not validate_eval_storage_reference(run_dir / "eval.json", verify="metadata"):
+        return None
     if _normalized_config(run_dir / "resolved_config.yaml", manifest_path) != _normalized_config(run_cfg, manifest_path):
         return None
     summary = load_json(run_dir / "summary.json")
     row = summary.get("run")
     if not isinstance(row, dict):
         return None
-    return row, load_json(run_dir / "eval.json")
+    metrics_lines = (run_dir / "metrics.jsonl").read_text(encoding="utf-8").splitlines()
+    if len(metrics_lines) != 1 or json.loads(metrics_lines[0]) != row:
+        return None
+    config_sha = str(row.get("config_sha256", ""))
+    if not config_sha or file_sha256(run_dir / "resolved_config.yaml") != config_sha:
+        return None
+    return row
+
+
+def _completed_run(
+    run_dir: Path,
+    run_cfg: Any,
+    manifest_path: Path,
+    *,
+    materialize: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    from mwm.benchmark.eval_artifacts import load_eval_artifact, load_eval_capsule
+
+    row = _completed_row(run_dir, run_cfg, manifest_path)
+    if row is None:
+        return None
+    try:
+        payload = (
+            load_eval_artifact(run_dir / "eval.json", verify="full")
+            if materialize
+            else load_eval_capsule(run_dir / "eval.json", verify="compressed_hash")
+        )
+    except (OSError, RuntimeError, TypeError, ValueError):
+        return None
+    return row, payload
+
+
+def _compact_review_payload(run_dir: Path, row: dict[str, Any]) -> dict[str, Any]:
+    """Load only the small subset of an evaluation used by the HTML review."""
+
+    import json
+
+    from mwm.benchmark.eval_artifacts import load_eval_capsule
+
+    try:
+        full_payload = load_eval_capsule(run_dir / "eval.json", verify="compressed_hash")
+    except (OSError, RuntimeError, TypeError, ValueError):
+        full_payload = {}
+
+    traces: list[dict[str, Any]] = []
+    trace_path = run_dir / "episode_traces.jsonl"
+    if trace_path.is_file():
+        with trace_path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    item = json.loads(line)
+                    if isinstance(item, dict):
+                        traces.append(item)
+
+    source_rollouts = traces or full_payload.get("review_rollouts", [])
+    rollout_keys = ("episode_index", "success", "dataset_episode", "start_step", "goal_step")
+    review_rollouts = [
+        {key: item.get(key) for key in rollout_keys if key in item}
+        for item in source_rollouts
+        if isinstance(item, dict)
+    ]
+    review_media = full_payload.get("review_media", {})
+    if not isinstance(review_media, dict):
+        review_media = {}
+    videos = full_payload.get("videos", [])
+    if not isinstance(videos, list):
+        videos = []
+    return {
+        "benchmark_name": str(full_payload.get("benchmark_name") or row.get("name") or run_dir.name),
+        "role": str(full_payload.get("role") or row.get("role", "")),
+        "config": {"resolved_path": str(run_dir / "resolved_config.yaml")},
+        "review_rollouts": review_rollouts,
+        "review_media": review_media,
+        "videos": videos,
+    }
 
 
 def _configure_run_paths(run_cfg: Any, run_dir: Path, manifest_path: Path) -> None:
@@ -118,21 +198,22 @@ def _finalize(
     from mwm.benchmark.pareto import write_pareto_html
     from mwm.benchmark.plots import write_default_plots
     from mwm.benchmark.summary import write_per_env_table, write_summary_csv
-    from mwm.io import load_json, write_json, write_metrics_jsonl
+    from mwm.io import write_json, write_metrics_jsonl
 
     rows: list[dict[str, Any]] = []
     outputs: list[dict[str, Any]] = []
     missing: list[str] = []
+    include_rollouts = len(resolved) <= DENSE_REVIEW_CELL_LIMIT
     for fallback_index, (run, run_cfg) in enumerate(resolved):
         run_dir = _run_dir(output_dir, run, fallback_index)
         _configure_run_paths(run_cfg, run_dir, manifest_path)
-        completed = _completed_run(run_dir, run_cfg, manifest_path)
-        if completed is None:
+        row = _completed_row(run_dir, run_cfg, manifest_path)
+        if row is None:
             missing.append(str(run.get("cell_id", run.get("name", run_dir.name))))
             continue
-        row, payload = completed
         rows.append(row)
-        outputs.append(payload)
+        if include_rollouts:
+            outputs.append(_compact_review_payload(run_dir, row))
     if missing:
         preview = ", ".join(missing[:10])
         extra = f" (+{len(missing) - 10} more)" if len(missing) > 10 else ""
@@ -159,7 +240,8 @@ def _finalize(
     write_summary_csv(output_dir / "summary.csv", rows)
     write_metrics_jsonl(output_dir / "metrics.jsonl", rows)
     summary["per_env_table"] = write_per_env_table(output_dir / "per_env_summary.csv", rows)
-    plots = write_default_plots(output_dir / "plots", rows)
+    compact_plots = len(rows) > DENSE_REVIEW_CELL_LIMIT
+    plots = write_default_plots(output_dir / "plots", rows, compact=compact_plots)
     pareto = write_pareto_html(output_dir / "plots" / "pareto.html", rows)
     summary["plots"] = plots
     summary["pareto_html"] = pareto
@@ -172,6 +254,7 @@ def _finalize(
         plots=plots,
         expected_cells=len(resolved),
         pareto_html=pareto,
+        include_rollouts=include_rollouts,
     )
     print(f"[benchmark] wrote {output_dir / 'summary.json'}")
     print(f"[benchmark] wrote {output_dir / 'review.html'}")
