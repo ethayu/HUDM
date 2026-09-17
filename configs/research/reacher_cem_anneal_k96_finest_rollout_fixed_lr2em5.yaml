@@ -1,0 +1,384 @@
+output_dir: rollouts/cem_sweep/grid_reacher_dense_lr2em5_anneal_k96_finest_rollout_fixed/reacher
+title: Reacher CEM anneal K96->finest, rollout fixed (pop_size x n_iter) -- mwm_dense_reacher_lr2em5_warm10
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  group: reacher_paper_seed42
+  path: rollouts/mwm_paper_parity/reacher_seed42_manifest.json
+runs:
+- name: anneal_k96_finest_rollout_fixed_pop20_niter5
+  role: anneal_k96_finest_rollout_fixed_pop20_niter5
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 20
+    n_iter: 5
+    topk: 2
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop20_niter10
+  role: anneal_k96_finest_rollout_fixed_pop20_niter10
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 20
+    n_iter: 10
+    topk: 2
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop20_niter20
+  role: anneal_k96_finest_rollout_fixed_pop20_niter20
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 20
+    n_iter: 20
+    topk: 2
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop20_niter30
+  role: anneal_k96_finest_rollout_fixed_pop20_niter30
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 20
+    n_iter: 30
+    topk: 2
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop20_niter50
+  role: anneal_k96_finest_rollout_fixed_pop20_niter50
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 20
+    n_iter: 50
+    topk: 2
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop50_niter5
+  role: anneal_k96_finest_rollout_fixed_pop50_niter5
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 50
+    n_iter: 5
+    topk: 5
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop50_niter10
+  role: anneal_k96_finest_rollout_fixed_pop50_niter10
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 50
+    n_iter: 10
+    topk: 5
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop50_niter20
+  role: anneal_k96_finest_rollout_fixed_pop50_niter20
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 50
+    n_iter: 20
+    topk: 5
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop50_niter30
+  role: anneal_k96_finest_rollout_fixed_pop50_niter30
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 50
+    n_iter: 30
+    topk: 5
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop50_niter50
+  role: anneal_k96_finest_rollout_fixed_pop50_niter50
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 50
+    n_iter: 50
+    topk: 5
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop100_niter5
+  role: anneal_k96_finest_rollout_fixed_pop100_niter5
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 100
+    n_iter: 5
+    topk: 10
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop100_niter10
+  role: anneal_k96_finest_rollout_fixed_pop100_niter10
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 100
+    n_iter: 10
+    topk: 10
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop100_niter20
+  role: anneal_k96_finest_rollout_fixed_pop100_niter20
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 100
+    n_iter: 20
+    topk: 10
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop100_niter30
+  role: anneal_k96_finest_rollout_fixed_pop100_niter30
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 100
+    n_iter: 30
+    topk: 10
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop100_niter50
+  role: anneal_k96_finest_rollout_fixed_pop100_niter50
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 100
+    n_iter: 50
+    topk: 10
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop150_niter5
+  role: anneal_k96_finest_rollout_fixed_pop150_niter5
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 150
+    n_iter: 5
+    topk: 15
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop150_niter10
+  role: anneal_k96_finest_rollout_fixed_pop150_niter10
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 150
+    n_iter: 10
+    topk: 15
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop150_niter20
+  role: anneal_k96_finest_rollout_fixed_pop150_niter20
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 150
+    n_iter: 20
+    topk: 15
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop150_niter30
+  role: anneal_k96_finest_rollout_fixed_pop150_niter30
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 150
+    n_iter: 30
+    topk: 15
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop150_niter50
+  role: anneal_k96_finest_rollout_fixed_pop150_niter50
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 150
+    n_iter: 50
+    topk: 15
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop200_niter5
+  role: anneal_k96_finest_rollout_fixed_pop200_niter5
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 200
+    n_iter: 5
+    topk: 20
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop200_niter10
+  role: anneal_k96_finest_rollout_fixed_pop200_niter10
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 200
+    n_iter: 10
+    topk: 20
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop200_niter20
+  role: anneal_k96_finest_rollout_fixed_pop200_niter20
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 200
+    n_iter: 20
+    topk: 20
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop200_niter30
+  role: anneal_k96_finest_rollout_fixed_pop200_niter30
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 200
+    n_iter: 30
+    topk: 20
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base
+- name: anneal_k96_finest_rollout_fixed_pop200_niter50
+  role: anneal_k96_finest_rollout_fixed_pop200_niter50
+  checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  planner:
+    pop_size: 200
+    n_iter: 50
+    topk: 20
+    scheduler:
+      cem:
+        mode: linear
+        start_level: 3
+        end_level: finest
+      rollout:
+        mode: fixed
+        level: base

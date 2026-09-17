@@ -68,7 +68,7 @@ def write_pareto_html(
                 marker={"size": 9, "opacity": 0.8},
                 hovertemplate=(
                     "<b>%{fullData.name}</b><br>cell=%{customdata[0]}<br>"
-                    "audited dynamics FLOPs=%{x:,.0f}<br>success=%{y:.1%}<br>"
+                    "audited dynamics FLOPs=%{x:,.0f}<br>success=%{y:.1f}%<br>"
                     "population=%{customdata[1]}<br>elite frac=%{customdata[2]:.4g}<br>"
                     "effective topk=%{customdata[3]}<br>CEM iterations=%{customdata[4]}<br>"
                     "candidate action values=%{customdata[5]:,}<br>latent work=%{customdata[6]:,}<br>"
@@ -87,15 +87,15 @@ def write_pareto_html(
                 name="Global Pareto frontier",
                 line={"color": "black", "width": 3},
                 marker={"color": "black", "size": 7},
-                hovertemplate="frontier<br>audited dynamics FLOPs=%{x:,.0f}<br>success=%{y:.1%}<extra></extra>",
+                hovertemplate="frontier<br>audited dynamics FLOPs=%{x:,.0f}<br>success=%{y:.1f}%<extra></extra>",
             )
         )
 
     figure.update_layout(
         title="Success vs audited dynamics compute",
         xaxis_title="Audited dynamics FLOPs (lower is better)",
-        yaxis_title="Success rate (higher is better)",
-        yaxis={"tickformat": ".0%", "range": [0, 1.02]},
+        yaxis_title="Success rate (%, higher is better)",
+        yaxis={"ticksuffix": "%", "range": [0, 102]},
         hovermode="closest",
         template="plotly_white",
         legend={"groupclick": "toggleitem"},

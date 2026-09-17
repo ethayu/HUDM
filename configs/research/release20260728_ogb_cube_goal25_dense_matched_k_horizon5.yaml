@@ -1,0 +1,90 @@
+# Same recipe as release20260728_tworoom_goal25_dense_matched_k_horizon5.yaml,
+# applied to OGB Cube: isolates horizon/receding_horizon 2->5 (fewer,
+# longer replans) at the SAME paper-default CEM budget (pop_size=300,
+# elite_frac=0.1, n_iter=10) and goal_offset=25 task as
+# release20260728_ogb_cube_goal25_k_matched_comparison.yaml, to see whether
+# fewer replanning decision points shifts the dense multi-K checkpoint's
+# per-K success-rate trend.
+#
+# Only the dense-matched-K runs are included (no individually-trained
+# baselines).
+output_dir: reports/research/release20260728_ogb_cube_goal25_dense_matched_k_horizon5
+title: Release 2026-07-28 OGB Cube Goal25 Dense-Matched-K Horizon5
+env_id: swm/OGBCube-v0
+seed: 42
+eval_config: configs/eval/paper_ogb_cube.yaml
+manifest:
+  config: configs/manifest/release20260728_ogb_cube_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: dense_matched_k96
+    role: ogb_cube_goal25_dense_matched_k96_horizon5
+    checkpoint: &dense_ogb_cube_checkpoint checkpoints_mwm/mwm_paper10_ogb_cube_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=96 (level 0) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: dense_matched_k120
+    role: ogb_cube_goal25_dense_matched_k120_horizon5
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=120 (level 1) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: dense_matched_k144
+    role: ogb_cube_goal25_dense_matched_k144_horizon5
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=144 (level 2) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: dense_matched_k168
+    role: ogb_cube_goal25_dense_matched_k168_horizon5
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=168 (level 3) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: dense_matched_k192
+    role: ogb_cube_goal25_dense_matched_k192_horizon5
+    checkpoint: *dense_ogb_cube_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 4) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}
+

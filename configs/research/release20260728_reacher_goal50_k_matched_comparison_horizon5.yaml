@@ -1,0 +1,137 @@
+# goal_offset=50, 100-episode counterpart of release20260728_reacher_goal25_k_matched_comparison_horizon5_n200.yaml.
+# Uses the existing 100-episode goal50 manifest (configs/manifest/reacher_paper_seed42_goal50_exact.yaml).
+# Individually-trained vs. dense-matched-K comparison at horizon=5.
+output_dir: reports/research/release20260728_reacher_goal50_k_matched_comparison_horizon5
+title: Release 2026-07-28 Reacher Goal50 Individual vs Dense-Matched-K, Horizon5, N=100
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/reacher_paper_seed42_goal50_exact.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 50
+    goal_indexing: exact
+    budget: 100
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: individual_k96
+    role: reacher_goal50_individual_k96_horizon5
+    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k96_release20260728
+    schedule: "individually trained K=96 | MPC/CEM/Rollout all fixed finest | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k96
+    role: reacher_goal50_dense_matched_k96_horizon5
+    checkpoint: &dense_reacher_checkpoint checkpoints_mwm/mwm_paper10_reacher_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=96 (level 0) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: individual_k120
+    role: reacher_goal50_individual_k120_horizon5
+    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k120_release20260728
+    schedule: "individually trained K=120 | MPC/CEM/Rollout all fixed finest | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k120
+    role: reacher_goal50_dense_matched_k120_horizon5
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=120 (level 1) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: individual_k144
+    role: reacher_goal50_individual_k144_horizon5
+    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k144_release20260728
+    schedule: "individually trained K=144 | MPC/CEM/Rollout all fixed finest | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k144
+    role: reacher_goal50_dense_matched_k144_horizon5
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=144 (level 2) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: individual_k168
+    role: reacher_goal50_individual_k168_horizon5
+    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k168_release20260728
+    schedule: "individually trained K=168 | MPC/CEM/Rollout all fixed finest | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k168
+    role: reacher_goal50_dense_matched_k168_horizon5
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=168 (level 3) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: individual_k192
+    role: reacher_goal50_individual_k192_horizon5
+    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k192_release20260728
+    schedule: "individually trained K=192 | MPC/CEM/Rollout all fixed finest | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k192
+    role: reacher_goal50_dense_matched_k192_horizon5
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 4) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}

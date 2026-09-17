@@ -1,0 +1,121 @@
+# Evaluates every fidelity level of the new dense K=[12,24,36,48,60,72,84,96]
+# separate-optimizer TwoRoom checkpoint (release hudm-mwm-dense-k12to96-sepopt-20260916,
+# checkpoints_mwm/mwm_paper10_tworoom_k12to96_sepopt_20260915), one CEM run per level,
+# under the SAME fixed eval protocol used for the existing mwm_dense_tworoom /
+# mwm_paper10_tworoom_k96_120_144_168_192_release20260728 curves in
+# plot_tworoom_ogbcube_mwm_dense_vs_paper10_all_levels.py:
+# horizon=5/receding_horizon=5, pop=300/elite_frac=0.1/n_iter=10, goal_offset=25,
+# 200 episodes, same n=200 manifest -- so this curve is directly comparable to
+# those two.
+output_dir: reports/research/tworoom_goal25_k12to96_sepopt_20260916_all_levels_horizon5_n200
+title: TwoRoom Goal25 -- mwm_paper10_tworoom_k12to96_sepopt_20260915 All Levels (K=12..96), Horizon5, N=200
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42_n200.yaml
+
+run_defaults:
+  eval:
+    episodes: 200
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: mwm_k12to96_sepopt_k12
+    role: tworoom_goal25_k12to96_sepopt_k12_horizon5_n200
+    checkpoint: &k12to96_checkpoint checkpoints_dense_k12to96_sepopt_20260916/checkpoints_mwm/mwm_paper10_tworoom_k12to96_sepopt_20260915
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=12 (level 0) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: mwm_k12to96_sepopt_k24
+    role: tworoom_goal25_k12to96_sepopt_k24_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=24 (level 1) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: mwm_k12to96_sepopt_k36
+    role: tworoom_goal25_k12to96_sepopt_k36_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=36 (level 2) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: mwm_k12to96_sepopt_k48
+    role: tworoom_goal25_k12to96_sepopt_k48_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=48 (level 3) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: mwm_k12to96_sepopt_k60
+    role: tworoom_goal25_k12to96_sepopt_k60_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=60 (level 4) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}
+
+  - name: mwm_k12to96_sepopt_k72
+    role: tworoom_goal25_k12to96_sepopt_k72_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=72 (level 5) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 5}
+        cem: {mode: fixed, level: 5}
+        rollout: {mode: fixed, level: 5}
+
+  - name: mwm_k12to96_sepopt_k84
+    role: tworoom_goal25_k12to96_sepopt_k84_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=84 (level 6) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 6}
+        cem: {mode: fixed, level: 6}
+        rollout: {mode: fixed, level: 6}
+
+  - name: mwm_k12to96_sepopt_k96
+    role: tworoom_goal25_k12to96_sepopt_k96_horizon5_n200
+    checkpoint: *k12to96_checkpoint
+    schedule: "mwm_paper10_tworoom_k12to96_sepopt_20260915 (K=[12,24,36,48,60,72,84,96]) | MPC/CEM/Rollout all fixed at K=96 (level 7) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 7}
+        cem: {mode: fixed, level: 7}
+        rollout: {mode: fixed, level: 7}

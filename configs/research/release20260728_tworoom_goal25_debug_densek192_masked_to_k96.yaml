@@ -1,0 +1,58 @@
+# Same probe as release20260728_tworoom_goal25_debug_k192_masked_to_k96.yaml,
+# but using the DENSE multi-K checkpoint's K=192 level (level_idx=4) instead
+# of the individually-trained K=192 checkpoint.
+#
+# Unlike the individually-trained K=192 model (flat latent, no reason for
+# info to concentrate in specific dims -- confirmed: first-96-kept (70%) and
+# last-96-kept (77%) performed almost identically), the dense checkpoint's
+# K=192 tail (transitions[4]/decoders[4]) was trained under a matryoshka
+# objective where dims [:96] ALSO carry their own dedicated K=96 loss. This
+# tests whether that nested-prefix training creates an asymmetry: does the
+# K=192 tail still work well when fed only the (specifically-optimized)
+# first 96 dims, with [96:192] zeroed?
+#
+# Must be run via debug_tworoom_densek192_masked_to_k96.py, which
+# monkeypatches LeWMMatryoshkaWorldModel._encode_pixels to zero dims [96:]
+# right after encoding (keeping the tensor at its native 192-dim shape so
+# the K=192 tail still receives correctly-shaped input).
+#
+# Same eval protocol as release20260728_tworoom_goal25_k_matched_comparison.yaml
+# for direct comparability against:
+#   - dense_matched_k96 (K=96 tail, real K=96 slice, no masking): 97%
+#   - dense_matched_k192 (K=192 tail, full unmasked 192 dims): 82%
+#   - individual_k192, dims[96:] zeroed (individually-trained comparison): 70%
+output_dir: reports/research/release20260728_tworoom_goal25_debug_densek192_masked_to_k96
+title: Release 2026-07-28 TwoRoom Goal25 Debug -- Dense K192 Tail, First 96 Dims Only (rest zeroed)
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 2
+    receding_horizon: 2
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: densek192_masked_to_96dims
+    role: tworoom_goal25_densek192_masked_to_96dims
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | K=192 tail (level 4) | dims [96:192] zeroed at encode time"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}

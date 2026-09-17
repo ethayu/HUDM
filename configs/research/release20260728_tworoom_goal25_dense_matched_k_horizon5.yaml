@@ -1,0 +1,95 @@
+# Follow-up to the k_matched_comparison analysis: TwoRoom's dense multi-K
+# checkpoint shows success rate DECREASING with K at horizon=2/receding_horizon=2
+# (97 -> 96 -> 93 -> 84 -> 82), and episode-level analysis showed the effect is
+# concentrated on the longest start->goal-distance episodes -- consistent with
+# per-replan action-selection noise compounding over many replanning cycles
+# (10 replans over the 100-step episode at horizon=2).
+#
+# This isolates ONE variable: horizon/receding_horizon 2->5 (4 replans of 25
+# actions each, instead of 10 replans of 10 actions each), at the SAME
+# goal_offset=25 task and SAME paper-default CEM budget (pop=300, n_iter=10)
+# as release20260728_tworoom_goal25_k_matched_comparison.yaml, to test whether
+# fewer replanning decision points lets K=192 catch up to or beat K=96.
+#
+# Only the dense-matched-K runs are included (no individually-trained
+# baselines) -- purely about finding whether horizon flips the K trend on the
+# SAME jointly-trained checkpoint.
+output_dir: reports/research/release20260728_tworoom_goal25_dense_matched_k_horizon5
+title: Release 2026-07-28 TwoRoom Goal25 Dense-Matched-K Horizon5 (fewer, longer replans)
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: dense_matched_k96
+    role: tworoom_goal25_dense_matched_k96_horizon5
+    checkpoint: &dense_tworoom_checkpoint checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=96 (level 0) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: dense_matched_k120
+    role: tworoom_goal25_dense_matched_k120_horizon5
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=120 (level 1) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: dense_matched_k144
+    role: tworoom_goal25_dense_matched_k144_horizon5
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=144 (level 2) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: dense_matched_k168
+    role: tworoom_goal25_dense_matched_k168_horizon5
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=168 (level 3) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: dense_matched_k192
+    role: tworoom_goal25_dense_matched_k192_horizon5
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 4, finest) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}

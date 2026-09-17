@@ -1,0 +1,67 @@
+# Completes the full 6-level curve for checkpoints_mwm/mwm_dense_tworoom
+# (K=[6,12,48,96,144,192]) at horizon=5/n=200 -- K=6/12/48 already covered by
+# release20260728_tworoom_goal25_mwm_dense_tworoom_low_k_horizon5_n200.yaml;
+# this adds K=96/144/192 (levels 3/4/5) for the SAME checkpoint, so its own
+# full curve can be plotted alongside the paper10 checkpoint's
+# (mwm_paper10_tworoom_k96_120_144_168_192_release20260728) K=96/144/192
+# points as a separate, independently-evaluated comparison line.
+#
+# Same eval protocol: horizon=5/receding_horizon=5, pop=300/elite=0.1/n_iter=10,
+# goal_offset=25, 200 episodes, same n=200 manifest.
+output_dir: reports/research/release20260728_tworoom_goal25_mwm_dense_tworoom_high_k_horizon5_n200
+title: Release 2026-07-28 TwoRoom Goal25 -- mwm_dense_tworoom High-K (96/144/192), Horizon5, N=200
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42_n200.yaml
+
+run_defaults:
+  eval:
+    episodes: 200
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: mwm_dense_tworoom_k96
+    role: tworoom_goal25_mwm_dense_tworoom_k96_horizon5_n200
+    checkpoint: &mwm_dense_tworoom_checkpoint checkpoints_mwm/mwm_dense_tworoom
+    schedule: "mwm_dense_tworoom checkpoint (K=[6,12,48,96,144,192]) | MPC/CEM/Rollout all fixed at K=96 (level 3) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: mwm_dense_tworoom_k144
+    role: tworoom_goal25_mwm_dense_tworoom_k144_horizon5_n200
+    checkpoint: *mwm_dense_tworoom_checkpoint
+    schedule: "mwm_dense_tworoom checkpoint (K=[6,12,48,96,144,192]) | MPC/CEM/Rollout all fixed at K=144 (level 4) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}
+
+  - name: mwm_dense_tworoom_k192
+    role: tworoom_goal25_mwm_dense_tworoom_k192_horizon5_n200
+    checkpoint: *mwm_dense_tworoom_checkpoint
+    schedule: "mwm_dense_tworoom checkpoint (K=[6,12,48,96,144,192]) | MPC/CEM/Rollout all fixed at K=192 (level 5, finest) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 5}
+        cem: {mode: fixed, level: 5}
+        rollout: {mode: fixed, level: 5}

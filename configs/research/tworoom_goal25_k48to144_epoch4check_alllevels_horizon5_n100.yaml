@@ -1,0 +1,84 @@
+# Refresh of the K=[48,72,96,120,144] sweep for mwm_dense_tworoom_k48to144,
+# exported mid-training from last.ckpt at epoch 4/10 (supersedes the epoch
+# 2/10 snapshot in tworoom_goal25_k48to144_epoch2check_*). Same fixed eval
+# protocol: horizon=5/receding_horizon=5, pop=300/elite_frac=0.1/n_iter=10,
+# goal_offset=25, 100 episodes.
+output_dir: reports/research/tworoom_goal25_k48to144_epoch4check_alllevels_horizon5_n100
+title: TwoRoom Goal25 -- mwm_dense_tworoom_k48to144 (epoch4 in-progress) All Levels, Horizon5, N=100
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: mwm_k48to144_epoch4check_k48
+    role: tworoom_goal25_k48to144_epoch4check_k48_horizon5_n100
+    checkpoint: &k48to144_ckpt checkpoints_mwm/mwm_dense_tworoom_k48to144_epoch4_check
+    schedule: "mwm_dense_tworoom_k48to144 epoch4-in-progress (K=[48,72,96,120,144]) | MPC/CEM/Rollout all fixed at K=48 (level 0) | horizon=5, n=100"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: mwm_k48to144_epoch4check_k72
+    role: tworoom_goal25_k48to144_epoch4check_k72_horizon5_n100
+    checkpoint: *k48to144_ckpt
+    schedule: "mwm_dense_tworoom_k48to144 epoch4-in-progress (K=[48,72,96,120,144]) | MPC/CEM/Rollout all fixed at K=72 (level 1) | horizon=5, n=100"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: mwm_k48to144_epoch4check_k96
+    role: tworoom_goal25_k48to144_epoch4check_k96_horizon5_n100
+    checkpoint: *k48to144_ckpt
+    schedule: "mwm_dense_tworoom_k48to144 epoch4-in-progress (K=[48,72,96,120,144]) | MPC/CEM/Rollout all fixed at K=96 (level 2) | horizon=5, n=100"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: mwm_k48to144_epoch4check_k120
+    role: tworoom_goal25_k48to144_epoch4check_k120_horizon5_n100
+    checkpoint: *k48to144_ckpt
+    schedule: "mwm_dense_tworoom_k48to144 epoch4-in-progress (K=[48,72,96,120,144]) | MPC/CEM/Rollout all fixed at K=120 (level 3) | horizon=5, n=100"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: mwm_k48to144_epoch4check_k144
+    role: tworoom_goal25_k48to144_epoch4check_k144_horizon5_n100
+    checkpoint: *k48to144_ckpt
+    schedule: "mwm_dense_tworoom_k48to144 epoch4-in-progress (K=[48,72,96,120,144]) | MPC/CEM/Rollout all fixed at K=144 (level 4) | horizon=5, n=100"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}

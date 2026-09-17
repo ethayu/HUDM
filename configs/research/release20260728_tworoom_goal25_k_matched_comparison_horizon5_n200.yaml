@@ -1,0 +1,143 @@
+# n=200-episode individually-trained vs. dense-matched-K comparison at
+# horizon=5/receding_horizon=5, TwoRoom. Same recipe as
+# release20260728_tworoom_goal25_k_matched_comparison.yaml (horizon=2) and
+# release20260728_tworoom_goal25_dense_matched_k_horizon5.yaml (horizon=5,
+# dense-only, 100 episodes), combined: BOTH individual and dense-matched
+# baselines, at horizon=5, with a freshly-sampled 200-episode manifest
+# (configs/manifest/data/release20260728/tworoom_goal25_exact_seed42_n200.json)
+# for tighter statistical power on the K=96-vs-K=192 comparison.
+output_dir: reports/research/release20260728_tworoom_goal25_k_matched_comparison_horizon5_n200
+title: Release 2026-07-28 TwoRoom Goal25 Individual vs Dense-Matched-K, Horizon5, N=200
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42_n200.yaml
+
+run_defaults:
+  eval:
+    episodes: 200
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: individual_k96
+    role: tworoom_goal25_individual_k96_horizon5_n200
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k96_release20260728
+    schedule: "individually trained K=96 | MPC/CEM/Rollout all fixed finest | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k96
+    role: tworoom_goal25_dense_matched_k96_horizon5_n200
+    checkpoint: &dense_tworoom_checkpoint checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=96 (level 0) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: individual_k120
+    role: tworoom_goal25_individual_k120_horizon5_n200
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k120_release20260728
+    schedule: "individually trained K=120 | MPC/CEM/Rollout all fixed finest | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k120
+    role: tworoom_goal25_dense_matched_k120_horizon5_n200
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=120 (level 1) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: individual_k144
+    role: tworoom_goal25_individual_k144_horizon5_n200
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k144_release20260728
+    schedule: "individually trained K=144 | MPC/CEM/Rollout all fixed finest | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k144
+    role: tworoom_goal25_dense_matched_k144_horizon5_n200
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=144 (level 2) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: individual_k168
+    role: tworoom_goal25_individual_k168_horizon5_n200
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k168_release20260728
+    schedule: "individually trained K=168 | MPC/CEM/Rollout all fixed finest | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k168
+    role: tworoom_goal25_dense_matched_k168_horizon5_n200
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=168 (level 3) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: individual_k192
+    role: tworoom_goal25_individual_k192_horizon5_n200
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k192_release20260728
+    schedule: "individually trained K=192 | MPC/CEM/Rollout all fixed finest | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k192
+    role: tworoom_goal25_dense_matched_k192_horizon5_n200
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 4) | horizon=5, n=200"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}
+

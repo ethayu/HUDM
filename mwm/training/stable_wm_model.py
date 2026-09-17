@@ -72,7 +72,7 @@ def build_trainable_stable_wm_adapter_model(cfg: Any, model_cfg: dict[str, Any])
         "action_preprocessing": "standard_scaler",
         "loss_scope": dict(mwm_cfg.get("loss_terms", {"regularizers": "shared_latent"})),
     }
-    return build_mwm_from_stable_config(
+    model = build_mwm_from_stable_config(
         family=configured_family,
         source_config=source_config,
         source_config_sha256=stable_config_sha256(loaded_path),
@@ -88,6 +88,13 @@ def build_trainable_stable_wm_adapter_model(cfg: Any, model_cfg: dict[str, Any])
         else None,
         shared_dynamics=dict(mwm_cfg["shared_dynamics"]) if "shared_dynamics" in mwm_cfg else None,
     )
+    train_cfg = cfg.get("train", {}) if hasattr(cfg, "get") else {}
+    if bool(train_cfg.get("gradient_checkpointing", False)):
+        model.gradient_checkpointing = True
+    encode_chunk_size = train_cfg.get("encode_chunk_size", None)
+    if encode_chunk_size is not None:
+        model._encode_chunk_size = int(encode_chunk_size)
+    return model
 
 
 def metadata_for_stable_wm_adapter_model(metadata: dict[str, Any], model: torch.nn.Module) -> dict[str, Any]:

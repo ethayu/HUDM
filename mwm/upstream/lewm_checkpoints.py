@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 
 DEFAULTS = {
@@ -60,6 +62,66 @@ DEFAULTS = {
 EXPECTED_UPSTREAM_CLASS = "stable_worldmodel.wm.lewm.lewm.LeWM"
 
 
+# Upstream Le-WM checkpoints on HF Hub (quentinll/lewm-*) were exported with a
+# `transformers` ViTModel whose encoder layers used the pre-refactor naming
+# ("encoder.layer.{i}.attention.attention.{query,key,value}" for self-attention,
+# "attention.output.dense" for the attention output projection, and separate
+# "intermediate.dense"/"output.dense" Linear layers for the MLP). Newer
+# `transformers` releases flattened this to fused-QKV naming
+# ("layers.{i}.attention.{q,k,v,o}_proj" and "mlp.fc1"/"mlp.fc2"), so loading
+# these checkpoints under a current `transformers` install fails with a full
+# state_dict key mismatch even though the two layouts are parameter-for-parameter
+# identical (same shapes, same 1:1 correspondence). This remap translates the old
+# keys to the new layout on load so upstream fetch keeps working regardless of
+# which `transformers` version happens to be installed; keys that already match
+# the new layout (or aren't part of a ViT encoder at all) pass through unchanged.
+_LEGACY_VIT_LAYER_RE = re.compile(r"^(?P<prefix>.*)\.encoder\.layer\.(?P<idx>\d+)\.(?P<rest>.+)$")
+
+_LEGACY_VIT_SUFFIX_MAP = (
+    ("attention.attention.query.", "attention.q_proj."),
+    ("attention.attention.key.", "attention.k_proj."),
+    ("attention.attention.value.", "attention.v_proj."),
+    ("attention.output.dense.", "attention.o_proj."),
+    ("intermediate.dense.", "mlp.fc1."),
+    ("output.dense.", "mlp.fc2."),
+)
+
+
+def _remap_legacy_vit_key(key: str) -> str:
+    match = _LEGACY_VIT_LAYER_RE.match(key)
+    if match is None:
+        return key
+    rest = match["rest"]
+    for old_suffix, new_suffix in _LEGACY_VIT_SUFFIX_MAP:
+        if rest.startswith(old_suffix):
+            rest = new_suffix + rest[len(old_suffix) :]
+            break
+    return f"{match['prefix']}.layers.{match['idx']}.{rest}"
+
+
+def _remap_legacy_vit_state_dict(state_dict: dict[str, Any]) -> dict[str, Any]:
+    return {_remap_legacy_vit_key(key): value for key, value in state_dict.items()}
+
+
+@contextlib.contextmanager
+def _legacy_vit_state_dict_shim() -> Iterator[None]:
+    """Scoped patch: remap legacy ViT key naming inside any `load_state_dict` call
+    made while this context is active. Restricted to the upstream-fetch call site
+    so it can't mask unrelated state_dict mismatches elsewhere in the codebase."""
+    import torch
+
+    original = torch.nn.Module.load_state_dict
+
+    def patched(self: torch.nn.Module, state_dict: dict[str, Any], *args: Any, **kwargs: Any) -> Any:
+        return original(self, _remap_legacy_vit_state_dict(state_dict), *args, **kwargs)
+
+    torch.nn.Module.load_state_dict = patched
+    try:
+        yield
+    finally:
+        torch.nn.Module.load_state_dict = original
+
+
 def _action_spec(spec: Any) -> dict[str, int]:
     block = int(spec.action_block)
     dim = int(spec.action_dim)
@@ -95,7 +157,8 @@ def _resolve_upstream(repo_or_path: str) -> tuple[Any, dict[str, Any], Path]:
     elif path.is_dir():
         from stable_worldmodel.wm.utils import load_pretrained
 
-        obj = load_pretrained(str(path))
+        with _legacy_vit_state_dict_shim():
+            obj = load_pretrained(str(path))
         config_path = path / "config.json"
         source_config = _read_json(config_path)
     else:
@@ -105,7 +168,8 @@ def _resolve_upstream(repo_or_path: str) -> tuple[Any, dict[str, Any], Path]:
         cache_dir = get_cache_dir(None, sub_folder="checkpoints")
         ensure_dir_exists(cache_dir)
         checkpoint_path, source_config = _resolve(repo_or_path, cache_dir)
-        obj = load_pretrained(repo_or_path)
+        with _legacy_vit_state_dict_shim():
+            obj = load_pretrained(repo_or_path)
         config_path = checkpoint_path.parent / "config.json"
     if not isinstance(obj, torch.nn.Module):
         raise TypeError(f"Expected upstream Le-WM object module, got {type(obj).__name__}")

@@ -77,8 +77,8 @@ def as_container(value: Any) -> Any:
 
 def validate_stable_wm_loss_config(loss_cfg: Any) -> None:
     loss = as_container(loss_cfg)
-    if isinstance(loss, dict) and "recon_weight" in loss:
-        raise ValueError("loss.recon_weight has been removed; use loss.recon_latent_weight instead.")
+    if isinstance(loss, dict) and "recon_weight" in loss and loss["recon_weight"] != 0.0:
+        raise ValueError("loss.recon_weight has been removed; use loss.recon_latent_weight instead (or set to 0.0 to disable decoder reconstruction).")
 
 
 __all__ = ["DEFAULTS", "as_container", "make_run_dir", "validate_stable_wm_loss_config"]

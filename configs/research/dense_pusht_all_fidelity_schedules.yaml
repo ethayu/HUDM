@@ -34,7 +34,7 @@ runs:
 
   - name: 01_rollout_fixed
     role: dense_schedule_01_rollout_fixed
-    checkpoint: &dense_pusht_checkpoint checkpoints_mwm/mwm_dense_pusht
+    checkpoint: &dense_pusht_checkpoint checkpoints_mwm/mwm_paper10_pusht_k96_120_144_168_192_release20260728
     schedule: "MPC=- | CEM=- | Rollout=fixed"
     planner:
       scheduler:

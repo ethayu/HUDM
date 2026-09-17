@@ -1,0 +1,55 @@
+# Debugging probe: does the INDIVIDUALLY-trained K=192 TwoRoom checkpoint
+# carry any useful information in its first 96 latent dimensions, even
+# though it was never trained with K=96 as a declared matryoshka level?
+#
+# This checkpoint (mwm_paper10_tworoom_k192_release20260728) has only ONE
+# declared level (K=192) -- there is no built-in scheduler path to request
+# K=96 from it (see mwm/planning/scheduled_cem.py:resolve_model_k_selection,
+# which rejects non-slimmable models whose requested K isn't a declared
+# anchor). So this config alone does NOT achieve the masking -- it must be
+# run via debug_tworoom_k192_masked_to_k96.py, which monkeypatches
+# LeWMMatryoshkaWorldModel._encode_pixels to zero out dims [96:192] of the
+# embedding right after encoding (keeping the tensor at its native 192-dim
+# shape so the existing K=192 transition/decoder tails still receive
+# correctly-shaped input, just with the tail dims blanked).
+#
+# Same eval protocol as release20260728_tworoom_goal25_k_matched_comparison.yaml
+# (horizon=2/receding_horizon=2, pop=300/elite=0.1/n_iter=10, goal_offset=25)
+# for direct comparability against:
+#   - individual_k96 (dedicated K=96 training): 32% success
+#   - dense_matched_k96 (K=96 slice of the jointly-trained multi-K checkpoint): 97% success
+output_dir: reports/research/release20260728_tworoom_goal25_debug_k192_masked_to_k96
+title: Release 2026-07-28 TwoRoom Goal25 Debug -- Individual K192 Checkpoint, First 96 Dims Only (rest zeroed)
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 2
+    receding_horizon: 2
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: k192_checkpoint_masked_to_96dims
+    role: tworoom_goal25_k192_checkpoint_masked_to_96dims
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k192_release20260728
+    schedule: "individually-trained K=192 checkpoint | dims [96:192] zeroed at encode time | MPC/CEM/Rollout all fixed at the only declared level (K=192, now effectively K=96-informative)"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}

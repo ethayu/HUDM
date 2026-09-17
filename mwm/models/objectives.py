@@ -45,6 +45,7 @@ def matryoshka_training_loss(
     *,
     level_weights: Sequence[float] | None = None,
     rollout_weight: float = 1.0,
+    recon_weight: float = 1.0,
     recon_latent_weight: float = 0.0,
     decoder_training_enabled: bool = True,
     sigreg: nn.Module | None = None,
@@ -61,16 +62,28 @@ def matryoshka_training_loss(
             "decoder reconstruction cannot contribute gradients to the encoder."
         )
     batch["action"] = torch.nan_to_num(batch["action"], 0.0)
-    emb = model._encode_pixels(batch["pixels"], already_preprocessed=True)
+    pixels = batch["pixels"]
+    chunk_size = getattr(model, "_encode_chunk_size", None)
+    if chunk_size and pixels.shape[0] > chunk_size:
+        emb = torch.cat(
+            [model._encode_pixels(pixels[i : i + chunk_size], already_preprocessed=True)
+             for i in range(0, pixels.shape[0], chunk_size)],
+            dim=0,
+        )
+    else:
+        emb = model._encode_pixels(pixels, already_preprocessed=True)
     actions = batch["action"]
+    use_ckpt = getattr(model, "gradient_checkpointing", False)
     pred_losses: list[torch.Tensor] = []
     for level_idx in range(model.num_levels):
         k = model.K[level_idx]
-        pred_emb = model._predict_prefix(
-            level_idx,
-            emb[:, : model.history_size, :k],
-            actions[:, : model.history_size],
-        )
+        emb_in = emb[:, : model.history_size, :k]
+        act_in = actions[:, : model.history_size]
+        if use_ckpt:
+            from torch.utils.checkpoint import checkpoint
+            pred_emb = checkpoint(model._predict_prefix, level_idx, emb_in, act_in, use_reentrant=False)
+        else:
+            pred_emb = model._predict_prefix(level_idx, emb_in, act_in)
         tgt_emb = emb[:, model.num_preds :, :k]
         pred_losses.append((pred_emb - tgt_emb).pow(2).mean())
 
@@ -139,15 +152,16 @@ def matryoshka_training_loss(
     logs["world_loss"] = logs["loss"].detach()
     if bool(decoder_training_enabled):
         target = _reconstruction_target(batch["pixels"], dtype=emb.dtype, device=emb.device)
-        recon_losses = _decoder_reconstruction_losses(model, emb, target, detach_latents=True)
-        decoder_loss, recon_logs = weighted_level_mean(
-            recon_losses,
-            level_weights=level_weights,
-            log_prefix="recon_loss",
-        )
-        logs["decoder_loss"] = decoder_loss
-        logs["recon_loss"] = decoder_loss.detach()
-        logs.update(recon_logs)
+        if float(recon_weight):
+            recon_losses = _decoder_reconstruction_losses(model, emb, target, detach_latents=True)
+            decoder_loss, recon_logs = weighted_level_mean(
+                recon_losses,
+                level_weights=level_weights,
+                log_prefix="recon_loss",
+            )
+            logs["decoder_loss"] = decoder_loss
+            logs["recon_loss"] = decoder_loss.detach()
+            logs.update(recon_logs)
     return logs
 
 

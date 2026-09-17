@@ -1,0 +1,21 @@
+output_dir: rollouts/checkpoint_comparison_k192/dense_lr_sweep
+title: Dense Reacher LR Sweep — Fixed CEM at K=192
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  group: reacher_paper_seed42
+  path: rollouts/mwm_paper_parity/reacher_seed42_manifest.json
+runs:
+  - name: lr1e-6
+    role: mwm_dense_lr1e-6
+    checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr1em6_warm10_20260702_070021
+  - name: lr1e-5
+    role: mwm_dense_lr1e-5
+    checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr1em5_warm10_20260702_070021
+  - name: lr2e-5
+    role: mwm_dense_lr2e-5
+    checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr2em5_warm10_20260702_070021
+  - name: lr5e-5
+    role: mwm_dense_lr5e-5
+    checkpoint: checkpoints_dense_lr_sweep_20260704/checkpoints_mwm/mwm_dense_reacher_lr5em5_warm10_20260702_070021

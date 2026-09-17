@@ -1,0 +1,64 @@
+# goal_offset=50, 100-episode counterpart of release20260728_ogb_cube_goal25_mwm_dense_ogb_cube_high_k_horizon5_n200.yaml.
+# Uses the existing 100-episode goal50 manifest (configs/manifest/ogb_cube_paper_seed42_goal50_exact.yaml).
+# Completes the full 6-level curve for checkpoints_mwm/mwm_dense_ogb_cube: K=96/144/192
+# (levels 3/4/5), alongside the low_k config's K=6/12/48.
+#
+# Same eval protocol: horizon=5/receding_horizon=5, pop=300/elite=0.1/n_iter=10,
+# goal_offset=50/budget=100, 100 episodes.
+output_dir: reports/research/release20260728_ogb_cube_goal50_mwm_dense_ogb_cube_high_k_horizon5
+title: Release 2026-07-28 OGB Cube Goal50 -- mwm_dense_ogb_cube High-K (96/144/192), Horizon5, N=100
+env_id: swm/OGBCube-v0
+seed: 42
+eval_config: configs/eval/paper_ogb_cube.yaml
+manifest:
+  config: configs/manifest/ogb_cube_paper_seed42_goal50_exact.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 50
+    goal_indexing: exact
+    budget: 100
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: mwm_dense_ogb_cube_k96
+    role: ogb_cube_goal50_mwm_dense_ogb_cube_k96_horizon5
+    checkpoint: &mwm_dense_ogb_cube_checkpoint checkpoints_mwm/mwm_dense_ogb_cube
+    schedule: "mwm_dense_ogb_cube checkpoint (K=[6,12,48,96,144,192]) | MPC/CEM/Rollout all fixed at K=96 (level 3) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: mwm_dense_ogb_cube_k144
+    role: ogb_cube_goal50_mwm_dense_ogb_cube_k144_horizon5
+    checkpoint: *mwm_dense_ogb_cube_checkpoint
+    schedule: "mwm_dense_ogb_cube checkpoint (K=[6,12,48,96,144,192]) | MPC/CEM/Rollout all fixed at K=144 (level 4) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}
+
+  - name: mwm_dense_ogb_cube_k192
+    role: ogb_cube_goal50_mwm_dense_ogb_cube_k192_horizon5
+    checkpoint: *mwm_dense_ogb_cube_checkpoint
+    schedule: "mwm_dense_ogb_cube checkpoint (K=[6,12,48,96,144,192]) | MPC/CEM/Rollout all fixed at K=192 (level 5) | horizon=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 5}
+        cem: {mode: fixed, level: 5}
+        rollout: {mode: fixed, level: 5}

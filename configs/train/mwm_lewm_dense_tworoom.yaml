@@ -27,7 +27,7 @@ model:
   action_dim: auto
   action_block: 5
   image_shape: auto
-  history_size: 3
+  history_size: 1
   num_preds: 1
 train:
   batch_size: 128
@@ -55,10 +55,10 @@ optim:
 loss:
   rollout_weight: 1.0
   recon_latent_weight: 0.0
-  sigreg_weight: 0.09
+  sigreg_weight: 0.1
   sigreg_knots: 17
   sigreg_num_proj: 1024
-  history_size: 3
+  history_size: 1
   num_preds: 1
 schedule:
   max_epochs: 10

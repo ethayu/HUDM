@@ -15,7 +15,7 @@ manifest:
 # dynamics FLOP count is the default cost axis in the Pareto view.
 run_defaults:
   eval:
-    episodes: 50
+    episodes: 100
     num_envs: 50
     goal_offset: 25
     goal_indexing: exact
@@ -24,12 +24,12 @@ run_defaults:
     flop_accounting: dynamics_audit
     # Ten model steps x five primitive actions per block = a 50-action plan.
     # Execute two blocks (10 primitive actions) before replanning.
-    horizon: 10
+    horizon: 2
     receding_horizon: 2
     action_block: 5
 sweep:
   planner.pop_size: [20, 50, 100, 150, 200]
-  planner.elite_frac: [0.05, 0.1, 0.2, 0.3, 0.5]
+  planner.elite_frac: [0.1]
   planner.n_iter: [5, 10, 15, 20, 30]
 
 # pop_size=20 and elite_frac=0.05 resolve to one elite. With the paper
@@ -50,20 +50,9 @@ runs:
   #       cem: {mode: fixed, level: finest}
   #       rollout: {mode: fixed, level: finest}
 
-  - name: 01_rollout_fixed
-    role: release20260728_dense_schedule_01_rollout_fixed
-    checkpoint: &dense_ogb_cube_checkpoint checkpoints_mwm/mwm_paper10_ogb_cube_k96_120_144_168_192_release20260728
-    schedule: "MPC=- | CEM=- | Rollout=fixed"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: fixed, level: base}
-        rollout: {mode: fixed, level: base}
-
   - name: 02_rollout_fine_to_coarse
     role: release20260728_dense_schedule_02_rollout_fine_to_coarse
-    checkpoint: *dense_ogb_cube_checkpoint
+    checkpoint: &dense_ogb_cube_checkpoint checkpoints_mwm/mwm_paper10_ogb_cube_k96_120_144_168_192_release20260728
     schedule: "MPC=- | CEM=- | Rollout=fine -> coarse"
     planner:
       scheduler:
@@ -71,28 +60,6 @@ runs:
         mpc: {mode: fixed, level: finest}
         cem: {mode: fixed, level: base}
         rollout: {mode: linear, start_level: finest, end_level: coarsest}
-
-  - name: 03_cem_fixed_rollout_base
-    role: release20260728_dense_schedule_03_cem_fixed_rollout_base
-    checkpoint: *dense_ogb_cube_checkpoint
-    schedule: "MPC=- | CEM=fixed | Rollout=base"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: fixed, level: base}
-        rollout: {mode: fixed, level: base}
-
-  - name: 04_cem_fixed_rollout_fine_to_base
-    role: release20260728_dense_schedule_04_cem_fixed_rollout_fine_to_base
-    checkpoint: *dense_ogb_cube_checkpoint
-    schedule: "MPC=- | CEM=fixed | Rollout=fine -> base"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: fixed, level: base}
-        rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 05_cem_fixed_rollout_base_to_coarse
     role: release20260728_dense_schedule_05_cem_fixed_rollout_base_to_coarse
@@ -138,28 +105,6 @@ runs:
         cem: {mode: linear, start_level: coarsest, end_level: finest}
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
-  - name: 09_mpc_fixed_cem_base_rollout_base
-    role: release20260728_dense_schedule_09_mpc_fixed_cem_base_rollout_base
-    checkpoint: *dense_ogb_cube_checkpoint
-    schedule: "MPC=fixed | CEM=base | Rollout=base"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: fixed, level: base}
-        rollout: {mode: fixed, level: base}
-
-  - name: 10_mpc_fixed_cem_base_rollout_fine_to_base
-    role: release20260728_dense_schedule_10_mpc_fixed_cem_base_rollout_fine_to_base
-    checkpoint: *dense_ogb_cube_checkpoint
-    schedule: "MPC=fixed | CEM=base | Rollout=fine -> base"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: fixed, level: base}
-        rollout: {mode: linear, start_level: finest, end_level: base}
-
   - name: 11_mpc_fixed_cem_base_rollout_base_to_coarse
     role: release20260728_dense_schedule_11_mpc_fixed_cem_base_rollout_base_to_coarse
     checkpoint: *dense_ogb_cube_checkpoint
@@ -203,28 +148,6 @@ runs:
         mpc: {mode: fixed, level: finest}
         cem: {mode: linear, start_level: coarsest, end_level: base}
         rollout: {mode: linear, start_level: base, end_level: coarsest}
-
-  - name: 15_mpc_fixed_cem_base_to_fine_rollout_base
-    role: release20260728_dense_schedule_15_mpc_fixed_cem_base_to_fine_rollout_base
-    checkpoint: *dense_ogb_cube_checkpoint
-    schedule: "MPC=fixed | CEM=base -> fine | Rollout=base"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: linear, start_level: base, end_level: finest}
-        rollout: {mode: fixed, level: base}
-
-  - name: 16_mpc_fixed_cem_base_to_fine_rollout_fine_to_base
-    role: release20260728_dense_schedule_16_mpc_fixed_cem_base_to_fine_rollout_fine_to_base
-    checkpoint: *dense_ogb_cube_checkpoint
-    schedule: "MPC=fixed | CEM=base -> fine | Rollout=fine -> base"
-    planner:
-      scheduler:
-        enabled: true
-        mpc: {mode: fixed, level: finest}
-        cem: {mode: linear, start_level: base, end_level: finest}
-        rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
     role: release20260728_dense_schedule_17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
@@ -335,3 +258,58 @@ runs:
         mpc: {mode: linear, start_level: coarsest, end_level: finest}
         cem: {mode: linear, start_level: base, end_level: finest}
         rollout: {mode: linear, start_level: base, end_level: coarsest}
+
+  - name: 27_all_fixed_finest
+    role: release20260728_dense_schedule_27_all_fixed_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k192_release20260728
+    schedule: "single K=192 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: 28_single_k168_all_finest
+    role: release20260728_dense_schedule_28_single_k168_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k168_release20260728
+    schedule: "single K=168 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: 29_single_k144_all_finest
+    role: release20260728_dense_schedule_29_single_k144_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k144_release20260728
+    schedule: "single K=144 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: 30_single_k120_all_finest
+    role: release20260728_dense_schedule_30_single_k120_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k120_release20260728
+    schedule: "single K=120 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: 31_single_k96_all_finest
+    role: release20260728_dense_schedule_31_single_k96_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k96_release20260728
+    schedule: "single K=96 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}

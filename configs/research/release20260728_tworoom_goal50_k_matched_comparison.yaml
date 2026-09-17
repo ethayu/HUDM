@@ -1,0 +1,140 @@
+# Compares each individually-trained single-K TwoRoom checkpoint against the
+# same K level sliced out of the jointly-trained dense multi-K checkpoint, at
+# one fixed paper-default CEM setting (no pop_size/elite_frac/n_iter sweep).
+output_dir: reports/research/release20260728_tworoom_goal50_k_matched_comparison
+title: Release 2026-07-28 TwoRoom Goal50 Individually-Trained vs Dense-Matched-K Comparison
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/tworoom_paper_seed42_goal50_exact.yaml
+
+# Same eval protocol as the goal50/plan100/execute20 fidelity-schedule matrix,
+# but a single paper-default CEM setting (configs/eval/paper_tworoom.yaml:
+# pop_size=300, topk=30, elite_frac=0.1, n_iter=10) instead of a sweep.
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 50
+    goal_indexing: exact
+    budget: 100
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 4
+    receding_horizon: 4
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: individual_k96
+    role: tworoom_goal50_individual_k96
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k96_release20260728
+    schedule: "individually trained K=96 | MPC/CEM/Rollout all fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k96
+    role: tworoom_goal50_dense_matched_k96
+    checkpoint: &dense_tworoom_checkpoint checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=96 (level 0)"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: individual_k120
+    role: tworoom_goal50_individual_k120
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k120_release20260728
+    schedule: "individually trained K=120 | MPC/CEM/Rollout all fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k120
+    role: tworoom_goal50_dense_matched_k120
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=120 (level 1)"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: individual_k144
+    role: tworoom_goal50_individual_k144
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k144_release20260728
+    schedule: "individually trained K=144 | MPC/CEM/Rollout all fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k144
+    role: tworoom_goal50_dense_matched_k144
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=144 (level 2)"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: individual_k168
+    role: tworoom_goal50_individual_k168
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k168_release20260728
+    schedule: "individually trained K=168 | MPC/CEM/Rollout all fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k168
+    role: tworoom_goal50_dense_matched_k168
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=168 (level 3)"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: individual_k192
+    role: tworoom_goal50_individual_k192
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k192_release20260728
+    schedule: "individually trained K=192 | MPC/CEM/Rollout all fixed finest"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: finest}
+        cem: {mode: fixed, level: finest}
+        rollout: {mode: fixed, level: finest}
+
+  - name: dense_matched_k192
+    role: tworoom_goal50_dense_matched_k192
+    checkpoint: *dense_tworoom_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 4, finest)"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}

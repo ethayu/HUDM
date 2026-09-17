@@ -1,0 +1,126 @@
+# Epoch-over-epoch CEM success-rate trend for the released
+# mwm_paper10_tworoom_k96_120_144_168_192_sepopt_retrain_20260916 checkpoint,
+# using its bundled per-epoch exports (epoch_003/006/009), across all 5
+# fidelity levels K=[96,120,144,168,192]. Uses the SAME fixed eval protocol
+# as every other checkpoint evaluated this session (tworoom_goal25_k48to144/
+# k48to192 epoch-in-progress sweeps) for direct comparability within this
+# repo: horizon=5/receding_horizon=5, pop=300/elite_frac=0.1/n_iter=10,
+# goal_offset=25, 100 episodes. NOTE: this differs from the release-note
+# "quick n=50" protocol (n_iter=30, CEM/rollout pinned to the base/coarsest
+# level rather than the tested level, different manifest) -- these numbers
+# will not exactly match the 100/98/98/94/96 quoted for the final epoch in
+# the GitHub release notes.
+output_dir: reports/research/tworoom_goal25_k96to192_retrain_epoch3_6_9_alllevels_horizon5_n100
+title: TwoRoom Goal25 -- mwm_paper10_tworoom_k96_120_144_168_192_sepopt_retrain_20260916, epochs 3/6/9, All Levels, Horizon5, N=100
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 5
+    receding_horizon: 5
+    action_block: 5
+    pop_size: 300
+    elite_frac: 0.1
+    n_iter: 10
+
+runs:
+  - name: k96to192_retrain_ep03_k96
+    role: tworoom_goal25_k96to192_retrain_ep03_k96_horizon5_n100
+    checkpoint: &ep03 checkpoints_dense_k96to192_sepopt_retrain_20260916/checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_sepopt_retrain_20260916_epoch_exports/epoch_003
+    schedule: "epoch_003 (K=[96,120,144,168,192]) | fixed at K=96 (level 0) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 0}, cem: {mode: fixed, level: 0}, rollout: {mode: fixed, level: 0}}}
+
+  - name: k96to192_retrain_ep03_k120
+    role: tworoom_goal25_k96to192_retrain_ep03_k120_horizon5_n100
+    checkpoint: *ep03
+    schedule: "epoch_003 (K=[96,120,144,168,192]) | fixed at K=120 (level 1) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 1}, cem: {mode: fixed, level: 1}, rollout: {mode: fixed, level: 1}}}
+
+  - name: k96to192_retrain_ep03_k144
+    role: tworoom_goal25_k96to192_retrain_ep03_k144_horizon5_n100
+    checkpoint: *ep03
+    schedule: "epoch_003 (K=[96,120,144,168,192]) | fixed at K=144 (level 2) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 2}, cem: {mode: fixed, level: 2}, rollout: {mode: fixed, level: 2}}}
+
+  - name: k96to192_retrain_ep03_k168
+    role: tworoom_goal25_k96to192_retrain_ep03_k168_horizon5_n100
+    checkpoint: *ep03
+    schedule: "epoch_003 (K=[96,120,144,168,192]) | fixed at K=168 (level 3) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 3}, cem: {mode: fixed, level: 3}, rollout: {mode: fixed, level: 3}}}
+
+  - name: k96to192_retrain_ep03_k192
+    role: tworoom_goal25_k96to192_retrain_ep03_k192_horizon5_n100
+    checkpoint: *ep03
+    schedule: "epoch_003 (K=[96,120,144,168,192]) | fixed at K=192 (level 4) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 4}, cem: {mode: fixed, level: 4}, rollout: {mode: fixed, level: 4}}}
+
+  - name: k96to192_retrain_ep06_k96
+    role: tworoom_goal25_k96to192_retrain_ep06_k96_horizon5_n100
+    checkpoint: &ep06 checkpoints_dense_k96to192_sepopt_retrain_20260916/checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_sepopt_retrain_20260916_epoch_exports/epoch_006
+    schedule: "epoch_006 (K=[96,120,144,168,192]) | fixed at K=96 (level 0) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 0}, cem: {mode: fixed, level: 0}, rollout: {mode: fixed, level: 0}}}
+
+  - name: k96to192_retrain_ep06_k120
+    role: tworoom_goal25_k96to192_retrain_ep06_k120_horizon5_n100
+    checkpoint: *ep06
+    schedule: "epoch_006 (K=[96,120,144,168,192]) | fixed at K=120 (level 1) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 1}, cem: {mode: fixed, level: 1}, rollout: {mode: fixed, level: 1}}}
+
+  - name: k96to192_retrain_ep06_k144
+    role: tworoom_goal25_k96to192_retrain_ep06_k144_horizon5_n100
+    checkpoint: *ep06
+    schedule: "epoch_006 (K=[96,120,144,168,192]) | fixed at K=144 (level 2) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 2}, cem: {mode: fixed, level: 2}, rollout: {mode: fixed, level: 2}}}
+
+  - name: k96to192_retrain_ep06_k168
+    role: tworoom_goal25_k96to192_retrain_ep06_k168_horizon5_n100
+    checkpoint: *ep06
+    schedule: "epoch_006 (K=[96,120,144,168,192]) | fixed at K=168 (level 3) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 3}, cem: {mode: fixed, level: 3}, rollout: {mode: fixed, level: 3}}}
+
+  - name: k96to192_retrain_ep06_k192
+    role: tworoom_goal25_k96to192_retrain_ep06_k192_horizon5_n100
+    checkpoint: *ep06
+    schedule: "epoch_006 (K=[96,120,144,168,192]) | fixed at K=192 (level 4) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 4}, cem: {mode: fixed, level: 4}, rollout: {mode: fixed, level: 4}}}
+
+  - name: k96to192_retrain_ep09_k96
+    role: tworoom_goal25_k96to192_retrain_ep09_k96_horizon5_n100
+    checkpoint: &ep09 checkpoints_dense_k96to192_sepopt_retrain_20260916/checkpoints_mwm/mwm_paper10_tworoom_k96_120_144_168_192_sepopt_retrain_20260916_epoch_exports/epoch_009
+    schedule: "epoch_009 (K=[96,120,144,168,192]) | fixed at K=96 (level 0) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 0}, cem: {mode: fixed, level: 0}, rollout: {mode: fixed, level: 0}}}
+
+  - name: k96to192_retrain_ep09_k120
+    role: tworoom_goal25_k96to192_retrain_ep09_k120_horizon5_n100
+    checkpoint: *ep09
+    schedule: "epoch_009 (K=[96,120,144,168,192]) | fixed at K=120 (level 1) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 1}, cem: {mode: fixed, level: 1}, rollout: {mode: fixed, level: 1}}}
+
+  - name: k96to192_retrain_ep09_k144
+    role: tworoom_goal25_k96to192_retrain_ep09_k144_horizon5_n100
+    checkpoint: *ep09
+    schedule: "epoch_009 (K=[96,120,144,168,192]) | fixed at K=144 (level 2) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 2}, cem: {mode: fixed, level: 2}, rollout: {mode: fixed, level: 2}}}
+
+  - name: k96to192_retrain_ep09_k168
+    role: tworoom_goal25_k96to192_retrain_ep09_k168_horizon5_n100
+    checkpoint: *ep09
+    schedule: "epoch_009 (K=[96,120,144,168,192]) | fixed at K=168 (level 3) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 3}, cem: {mode: fixed, level: 3}, rollout: {mode: fixed, level: 3}}}
+
+  - name: k96to192_retrain_ep09_k192
+    role: tworoom_goal25_k96to192_retrain_ep09_k192_horizon5_n100
+    checkpoint: *ep09
+    schedule: "epoch_009 (K=[96,120,144,168,192]) | fixed at K=192 (level 4) | horizon=5, n=100"
+    planner: {scheduler: {enabled: true, mpc: {mode: fixed, level: 4}, cem: {mode: fixed, level: 4}, rollout: {mode: fixed, level: 4}}}

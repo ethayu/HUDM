@@ -1,0 +1,92 @@
+# Set 2 ("starve the CEM search") of a hyperparameter search for a CEM
+# configuration where the dense multi-K checkpoint's success rate increases
+# monotonically with K, instead of the near-ceiling/flat pattern seen at the
+# paper-default CEM setting in release20260728_reacher_goal25_k_matched_comparison.yaml.
+#
+# Only the dense-matched-K runs are included (no individually-trained
+# baselines) -- this sweep is purely about finding a CEM setting that
+# differentiates K's on the SAME jointly-trained checkpoint.
+#
+# Lever: cut CEM search budget hard (pop_size 300->50, n_iter 10->5) at the
+# same goal_offset=25 task, so planning quality depends more on model
+# quality (K) instead of being masked by a large enough search to find a
+# good plan regardless of K.
+output_dir: reports/research/release20260728_reacher_goal25_dense_matched_k_cem_set2_starved
+title: Release 2026-07-28 Reacher Goal25 Dense-Matched-K CEM Set2 (Starved Search)
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/release20260728_reacher_goal25_exact_seed42.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 2
+    receding_horizon: 2
+    action_block: 5
+    pop_size: 50
+    elite_frac: 0.1
+    n_iter: 5
+
+runs:
+  - name: dense_matched_k96
+    role: reacher_goal25_dense_matched_k96_cem_set2
+    checkpoint: &dense_reacher_checkpoint checkpoints_mwm/mwm_paper10_reacher_k96_120_144_168_192_release20260728
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=96 (level 0) | starved CEM pop=50 iter=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 0}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: 0}
+
+  - name: dense_matched_k120
+    role: reacher_goal25_dense_matched_k120_cem_set2
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=120 (level 1) | starved CEM pop=50 iter=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 1}
+        cem: {mode: fixed, level: 1}
+        rollout: {mode: fixed, level: 1}
+
+  - name: dense_matched_k144
+    role: reacher_goal25_dense_matched_k144_cem_set2
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=144 (level 2) | starved CEM pop=50 iter=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: fixed, level: 2}
+        rollout: {mode: fixed, level: 2}
+
+  - name: dense_matched_k168
+    role: reacher_goal25_dense_matched_k168_cem_set2
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=168 (level 3) | starved CEM pop=50 iter=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 3}
+        cem: {mode: fixed, level: 3}
+        rollout: {mode: fixed, level: 3}
+
+  - name: dense_matched_k192
+    role: reacher_goal25_dense_matched_k192_cem_set2
+    checkpoint: *dense_reacher_checkpoint
+    schedule: "dense K=[96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 4, finest) | starved CEM pop=50 iter=5"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 4}
+        cem: {mode: fixed, level: 4}
+        rollout: {mode: fixed, level: 4}

@@ -57,7 +57,7 @@ optim:
 loss:
   rollout_weight: 1.0
   recon_latent_weight: 0.0
-  sigreg_weight: 0.09
+  sigreg_weight: 0.1
   sigreg_knots: 17
   sigreg_num_proj: 1024
   history_size: 3
