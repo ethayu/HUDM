@@ -1,52 +1,48 @@
-# Run 00 is the converted upstream Reacher baseline. The source TSV contains 26
+# Run 00 is the converted upstream TwoRoom baseline. The source TSV contains 26
 # schedule rows (rather than 25), kept below in source order. A dash means that
 # the conceptual outer axis is not varied; the runtime representation still
 # supplies the required fixed stage.
-output_dir: reports/research/release20260728_sepopt_k48to192_reacher_all_fidelity_schedules
-title: Release 2026-07-28 Sepopt K48-192 Reacher All-Axis Fidelity Schedule Matrix
-env_id: swm/ReacherDMControl-v0
+output_dir: reports/research/release20260728_sepopt_k48to192_tworoom_goal50_plan100_execute20_all_fidelity_schedules
+title: Release 2026-07-28 Sepopt K48-192 TwoRoom Goal50 Plan100 Execute20 All-Axis Fidelity Schedule Matrix
+env_id: swm/TwoRoom-v1
 seed: 42
-eval_config: configs/eval/paper_reacher.yaml
+eval_config: configs/eval/paper_tworoom.yaml
 manifest:
-  # Switched to the _n100 manifest: the unsuffixed one now has 250 pairs in
-  # this repo state, which no longer matches episodes: 100 below.
-  config: configs/manifest/release20260728_reacher_goal25_exact_seed42_n100.yaml
+  # Switched to the _n200 manifest: the unsuffixed one now has 250 pairs in
+  # this repo state, and there's no _n100 manifest for tworoom goal50, so
+  # episodes below is 200 (not 100) to match.
+  config: configs/manifest/release20260728_tworoom_goal50_exact_seed42_n200.yaml
 
 # Every base run below is evaluated over 120 valid planner cells: the 125-cell
 # Cartesian product minus the five topk=1 cells excluded below. The audited
 # dynamics FLOP count is the default cost axis in the Pareto view.
 run_defaults:
   eval:
-    episodes: 100
+    episodes: 200
     num_envs: 50
-    goal_offset: 25
+    goal_offset: 50
     goal_indexing: exact
-    budget: 50
+    budget: 100
   planner:
     flop_accounting: dynamics_audit
-    # Ten model steps x five primitive actions per block = a 50-action plan.
-    # Execute two blocks (10 primitive actions) before replanning.
-    horizon: 2
-    receding_horizon: 2
+    # Twenty model steps x five primitive actions per block = a 100-action plan.
+    # Execute four blocks (20 primitive actions) before replanning.
+    horizon: 4
+    receding_horizon: 4
     action_block: 5
 sweep:
   planner.pop_size: [20, 50, 100, 150, 200]
   planner.elite_frac: [0.1]
   planner.n_iter: [5, 10, 15, 20, 30]
 
-# pop_size=20 and elite_frac=0.1 resolve to two elites, which is fine; this
-# exclusion is kept for parity with the other envs' sweep configs.
-#
-# The next three exclusions drop the highest-cost pop_size x n_iter corners
-# (bits/episode ~245-369M, vs. ~184M for everything else) -- based on
-# reports/research/release20260728_dense_reacher_all_fidelity_schedules/summary.json,
-# these three cells account for the sparse, far-right outlier points in
-# rollouts/reacher_release20260728_goal25_100ep_all_configs.png without
-# improving success rate over cheaper combos, so they're pruned to keep the
-# grid focused on the informative range.
+# pop_size=20 and elite_frac=0.05 resolve to one elite. With the paper
+# planner's std_unbiased=true, a one-sample standard deviation is undefined.
 sweep_exclude:
   - planner.pop_size: 20
     planner.elite_frac: 0.05
+  # High-cost pop_size x n_iter corners pruned as far-right outliers (bits/episode
+  # roughly 1.3-2x the next tier down in every release20260728 sweep) -- see
+  # release20260728_dense_reacher_all_fidelity_schedules.yaml for the analysis.
   - planner.pop_size: 200
     planner.n_iter: 30
   - planner.pop_size: 150
@@ -57,7 +53,7 @@ sweep_exclude:
 runs:
   # - name: 00_upstream_fixed_finest
   #   role: upstream_lewm_converted
-  #   checkpoint: checkpoints_mwm/upstream_lewm_reacher
+  #   checkpoint: checkpoints_mwm/upstream_lewm_tworoom
   #   schedule: "upstream fixed finest"
   #   planner:
   #     scheduler:
@@ -67,8 +63,8 @@ runs:
   #       rollout: {mode: fixed, level: finest}
 
   - name: 02_rollout_fine_to_coarse
-    role: release20260728_dense_schedule_02_rollout_fine_to_coarse
-    checkpoint: &sepopt_k48to192_reacher_checkpoint checkpoints_dense_k48to192_sepopt_20260917_reacher/checkpoints_mwm/mwm_paper10_reacher_k48_72_96_120_144_168_192_sepopt_actckpt_20260917
+    role: release20260728_goal50_plan100_execute20_dense_schedule_02_rollout_fine_to_coarse
+    checkpoint: &sepopt_k48to192_tworoom_checkpoint checkpoints_dense_k12to96_sepopt_20260916_tworoom_k48to192/checkpoints_mwm/mwm_paper10_tworoom_k48_72_96_120_144_168_192_sepopt_20260917
     schedule: "MPC=- | CEM=- | Rollout=fine -> coarse"
     planner:
       scheduler:
@@ -78,8 +74,8 @@ runs:
         rollout: {mode: linear, start_level: finest, end_level: coarsest}
 
   - name: 05_cem_fixed_rollout_base_to_coarse
-    role: release20260728_dense_schedule_05_cem_fixed_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_05_cem_fixed_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=- | CEM=fixed | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -89,8 +85,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 06_cem_coarse_to_fine_rollout_base
-    role: release20260728_dense_schedule_06_cem_coarse_to_fine_rollout_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_06_cem_coarse_to_fine_rollout_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=- | CEM=coarse -> fine | Rollout=base"
     planner:
       scheduler:
@@ -100,8 +96,8 @@ runs:
         rollout: {mode: fixed, level: base}
 
   - name: 07_cem_coarse_to_fine_rollout_fine_to_base
-    role: release20260728_dense_schedule_07_cem_coarse_to_fine_rollout_fine_to_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_07_cem_coarse_to_fine_rollout_fine_to_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=- | CEM=coarse -> fine | Rollout=fine -> base"
     planner:
       scheduler:
@@ -111,8 +107,8 @@ runs:
         rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 08_cem_coarse_to_fine_rollout_base_to_coarse
-    role: release20260728_dense_schedule_08_cem_coarse_to_fine_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_08_cem_coarse_to_fine_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=- | CEM=coarse -> fine | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -122,8 +118,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 11_mpc_fixed_cem_base_rollout_base_to_coarse
-    role: release20260728_dense_schedule_11_mpc_fixed_cem_base_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_11_mpc_fixed_cem_base_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=fixed | CEM=base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -133,8 +129,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 12_mpc_fixed_cem_coarse_to_base_rollout_base
-    role: release20260728_dense_schedule_12_mpc_fixed_cem_coarse_to_base_rollout_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_12_mpc_fixed_cem_coarse_to_base_rollout_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=fixed | CEM=coarse -> base | Rollout=base"
     planner:
       scheduler:
@@ -144,8 +140,8 @@ runs:
         rollout: {mode: fixed, level: base}
 
   - name: 13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
-    role: release20260728_dense_schedule_13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_13_mpc_fixed_cem_coarse_to_base_rollout_fine_to_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=fixed | CEM=coarse -> base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -155,8 +151,8 @@ runs:
         rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
-    role: release20260728_dense_schedule_14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_14_mpc_fixed_cem_coarse_to_base_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=fixed | CEM=coarse -> base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -166,8 +162,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
-    role: release20260728_dense_schedule_17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_17_mpc_fixed_cem_base_to_fine_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=fixed | CEM=base -> fine | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -177,8 +173,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 18_mpc_coarse_to_fine_cem_base_rollout_base
-    role: release20260728_dense_schedule_18_mpc_coarse_to_fine_cem_base_rollout_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_18_mpc_coarse_to_fine_cem_base_rollout_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base | Rollout=base"
     planner:
       scheduler:
@@ -188,8 +184,8 @@ runs:
         rollout: {mode: fixed, level: base}
 
   - name: 19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
-    role: release20260728_dense_schedule_19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_19_mpc_coarse_to_fine_cem_base_rollout_fine_to_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -199,8 +195,8 @@ runs:
         rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
-    role: release20260728_dense_schedule_20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_20_mpc_coarse_to_fine_cem_base_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -210,8 +206,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
-    role: release20260728_dense_schedule_21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_21_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base"
     planner:
       scheduler:
@@ -221,8 +217,8 @@ runs:
         rollout: {mode: fixed, level: base}
 
   - name: 22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
-    role: release20260728_dense_schedule_22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_22_mpc_coarse_to_fine_cem_coarse_to_base_rollout_fine_to_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=fine -> base"
     planner:
       scheduler:
@@ -232,8 +228,8 @@ runs:
         rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
-    role: release20260728_dense_schedule_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -243,8 +239,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
-    role: release20260728_dense_schedule_24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=base"
     planner:
       scheduler:
@@ -254,8 +250,8 @@ runs:
         rollout: {mode: fixed, level: base}
 
   - name: 25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
-    role: release20260728_dense_schedule_25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_25_mpc_coarse_to_fine_cem_base_to_fine_rollout_fine_to_base
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=fine -> base"
     planner:
       scheduler:
@@ -265,8 +261,8 @@ runs:
         rollout: {mode: linear, start_level: finest, end_level: base}
 
   - name: 26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
-    role: release20260728_dense_schedule_26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
-    checkpoint: *sepopt_k48to192_reacher_checkpoint
+    role: release20260728_goal50_plan100_execute20_dense_schedule_26_mpc_coarse_to_fine_cem_base_to_fine_rollout_base_to_coarse
+    checkpoint: *sepopt_k48to192_tworoom_checkpoint
     schedule: "MPC=coarse -> fine | CEM=base -> fine | Rollout=base -> coarse"
     planner:
       scheduler:
@@ -276,8 +272,8 @@ runs:
         rollout: {mode: linear, start_level: base, end_level: coarsest}
 
   - name: 27_all_fixed_finest
-    role: release20260728_dense_schedule_27_all_fixed_finest
-    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k192_release20260728
+    role: release20260728_goal50_plan100_execute20_dense_schedule_27_all_fixed_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k192_release20260728
     schedule: "single K=192 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
     planner:
       scheduler:
@@ -287,8 +283,8 @@ runs:
         rollout: {mode: fixed, level: finest}
 
   - name: 28_single_k168_all_finest
-    role: release20260728_dense_schedule_28_single_k168_all_finest
-    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k168_release20260728
+    role: release20260728_goal50_plan100_execute20_dense_schedule_28_single_k168_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k168_release20260728
     schedule: "single K=168 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
     planner:
       scheduler:
@@ -298,8 +294,8 @@ runs:
         rollout: {mode: fixed, level: finest}
 
   - name: 29_single_k144_all_finest
-    role: release20260728_dense_schedule_29_single_k144_all_finest
-    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k144_release20260728
+    role: release20260728_goal50_plan100_execute20_dense_schedule_29_single_k144_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k144_release20260728
     schedule: "single K=144 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
     planner:
       scheduler:
@@ -309,8 +305,8 @@ runs:
         rollout: {mode: fixed, level: finest}
 
   - name: 30_single_k120_all_finest
-    role: release20260728_dense_schedule_30_single_k120_all_finest
-    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k120_release20260728
+    role: release20260728_goal50_plan100_execute20_dense_schedule_30_single_k120_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k120_release20260728
     schedule: "single K=120 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
     planner:
       scheduler:
@@ -320,8 +316,8 @@ runs:
         rollout: {mode: fixed, level: finest}
 
   - name: 31_single_k96_all_finest
-    role: release20260728_dense_schedule_31_single_k96_all_finest
-    checkpoint: checkpoints_mwm/mwm_paper10_reacher_k96_release20260728
+    role: release20260728_goal50_plan100_execute20_dense_schedule_31_single_k96_all_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k96_release20260728
     schedule: "single K=96 | MPC=fixed finest | CEM=fixed finest | Rollout=fixed finest"
     planner:
       scheduler:
