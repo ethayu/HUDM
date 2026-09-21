@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import TypeVar
 
+import torch
+
 
 T = TypeVar("T")
 
@@ -36,8 +38,14 @@ def profile_dynamics_call(fn: Callable[[], T], *, enabled: bool) -> tuple[T, int
     except Exception as exc:  # pragma: no cover - depends on torch build
         return fn(), 0, f"{type(exc).__name__}: {exc}"
     try:
-        with FlopCounterMode(display=False) as counter:
-            out = fn()
+        # FlopCounterMode intercepts ops via __torch_dispatch__, which
+        # torch.inference_mode() tensors bypass -- callers typically run the
+        # whole CEM solve under inference_mode(), which would otherwise make
+        # this silently count 0 flops with no error. Step out of inference
+        # mode (keeping grad tracking off) just for the profiled call.
+        with torch.inference_mode(False), torch.no_grad():
+            with FlopCounterMode(display=False) as counter:
+                out = fn()
         return out, int(counter.get_total_flops()), None
     except Exception as exc:  # pragma: no cover - profiler fallback guard
         return fn(), 0, f"{type(exc).__name__}: {exc}"
