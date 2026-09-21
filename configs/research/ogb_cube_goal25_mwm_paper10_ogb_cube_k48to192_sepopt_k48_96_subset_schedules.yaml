@@ -1,0 +1,55 @@
+# Same probe pattern as tworoom_goal25_mwm_paper10_tworoom_k48to192_sepopt_k48_96_subset_schedules.yaml,
+# but for OGB-Cube on checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/
+# checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917
+# (K=[48,72,96,120,144,168,192], 7 levels), restricted to the low end K=48-96
+# (levels 0-2) instead of K=48-192, per request -- checking whether a
+# K=48-96-restricted adaptive schedule can extend the OGB-Cube Pareto
+# frontier's cheap end past the Fixed K=96 (sepopt) baseline.
+output_dir: reports/research/ogb_cube_goal25_mwm_paper10_ogb_cube_k48to192_sepopt_k48_96_subset_schedules
+title: OGB-Cube Goal25 -- mwm_paper10_ogb_cube_k48to192_sepopt K48-96 Subset (CEM-coarse and MPC-coarse ramps)
+env_id: swm/OGBCube-v0
+seed: 42
+eval_config: configs/eval/paper_ogb_cube.yaml
+manifest:
+  config: configs/manifest/release20260728_ogb_cube_goal25_exact_seed42_n100.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 2
+    receding_horizon: 2
+    action_block: 5
+
+sweep:
+  planner.pop_size: [20, 100, 200]
+  planner.elite_frac: [0.1]
+  planner.n_iter: [5, 15]
+
+runs:
+  - name: cem_coarse48_to_fine96
+    role: ogb_cube_goal25_mwm_paper10_ogb_cube_k48to192_sepopt_cem_coarse48_to_fine96
+    checkpoint: &sepopt_k48to192_ogb_cube_checkpoint checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917
+    schedule: "mwm_paper10_ogb_cube_k48to192_sepopt (K=[48,72,96,120,144,168,192]) | MPC=fixed K96 | CEM=K48 -> K96 | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 2}
+        cem: {mode: linear, start_level: 0, end_level: 2}
+        rollout: {mode: fixed, level: base}
+
+  - name: mpc48_to_96_cem_fixed_k48
+    role: ogb_cube_goal25_mwm_paper10_ogb_cube_k48to192_sepopt_mpc48_to_96_cem_fixed_k48
+    checkpoint: *sepopt_k48to192_ogb_cube_checkpoint
+    schedule: "mwm_paper10_ogb_cube_k48to192_sepopt (K=[48,72,96,120,144,168,192]) | MPC=K48 -> K96 | CEM=fixed K48 | Rollout=base"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: linear, start_level: 0, end_level: 2}
+        cem: {mode: fixed, level: 0}
+        rollout: {mode: fixed, level: base}

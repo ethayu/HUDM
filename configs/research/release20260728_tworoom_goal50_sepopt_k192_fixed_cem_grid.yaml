@@ -1,0 +1,51 @@
+# Goal50 counterpart of release20260728_tworoom_goal25_sepopt_k192_fixed_cem_grid.yaml,
+# at horizon=4/receding_horizon=4 -- matching the horizon used by
+# release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml,
+# so results are directly comparable to that sweep. Manifest is the 100-pair
+# n100 file (episodes=100), matching that sweep's now-fixed 100-episode setup.
+output_dir: reports/research/release20260728_tworoom_goal50_sepopt_k192_fixed_cem_grid
+title: Release 2026-07-28 TwoRoom Goal50 -- Fixed K=192 (Sepopt K48-192 Checkpoint) CEM Grid
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal50_exact_seed42_n100.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 50
+    goal_indexing: exact
+    budget: 100
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 4
+    receding_horizon: 4
+    action_block: 5
+
+sweep:
+  planner.pop_size: [20, 50, 100, 150, 200]
+  planner.elite_frac: [0.1]
+  planner.n_iter: [5, 10, 15, 20, 30]
+sweep_exclude:
+  - planner.pop_size: 20
+    planner.elite_frac: 0.05
+  - planner.pop_size: 200
+    planner.n_iter: 30
+  - planner.pop_size: 150
+    planner.n_iter: 30
+  - planner.pop_size: 200
+    planner.n_iter: 20
+
+runs:
+  - name: sepopt_k192_fixed
+    role: tworoom_goal50_sepopt_k192_fixed_horizon4
+    checkpoint: checkpoints_dense_k12to96_sepopt_20260916_tworoom_k48to192/checkpoints_mwm/mwm_paper10_tworoom_k48_72_96_120_144_168_192_sepopt_20260917
+    schedule: "sepopt K=[48,72,96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 6, finest), no transitions | horizon=4"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 6}
+        cem: {mode: fixed, level: 6}
+        rollout: {mode: fixed, level: 6}

@@ -3,32 +3,36 @@
 Same structure as the tworoom_goal25_sepopt_k48to192_all_configs figure, for
 TwoRoom goal_offset=50 (horizon=4, budget=100) instead of goal25.
 
-IMPORTANT CAVEATS -- read before using this for the paper:
+IMPORTANT CAVEAT -- read before using this for the paper:
 
-1. PARTIAL DATA: the sepopt K48-192 adaptive-schedule sweep was still running
-   when this was generated (131/418 cells complete -- see the "note" field in
-   data/sepopt_k48to192_adaptive_summary.json). The Pareto frontier and any
-   "best result" numbers here will likely shift as more schedules complete.
-   Regenerate once the sweep finishes for the final numbers.
+PARTIAL DATA: the sepopt K48-192 adaptive-schedule sweep was still running
+when this was generated (see the "note" field in
+data/sepopt_k48to192_adaptive_summary.json for the completed/target count).
+The Pareto frontier and any "best result" numbers here will likely shift as
+more schedules complete. Regenerate once the sweep finishes for the final
+numbers.
 
-2. EPISODE COUNT: the adaptive sweep was actually run at episodes=200 (the
-   only manifest available for TwoRoom goal50 with an exact matching pair
-   count is the 200-pair one). To match the three reused reference series
-   (Fixed K=192, Fixed K<192, Fixed K=96 dense), which all come from an
-   earlier run at episodes=100, data/sepopt_k48to192_adaptive_summary.json
-   has been TRIMMED, not rerun: each row's success_rate is recomputed over
-   just the first 100 of its 200 evaluated episodes (a deterministic subset,
-   not a resample), and bits_used_total is halved (linear in episode count
-   for a fixed CEM budget/episode). See each row's "_trim_note" field. All
-   four series are therefore episodes=100 in this file.
+(An earlier version of this data was trimmed down from a 200-episode run to
+match the other three series at episodes=100 -- see git history / the
+K48-192 sepopt subset probe earlier in this project. The adaptive sweep was
+since relaunched at a native episodes=100 using a purpose-built manifest
+(configs/manifest/release20260728_tworoom_goal50_exact_seed42_n100.yaml), so
+the current data/sepopt_k48to192_adaptive_summary.json is NOT trimmed -- all
+four series are natively episodes=100.)
 
 Checkpoint swap: adaptive-schedule runs (02-26) use the sepopt K48-192
 checkpoint (checkpoints_dense_k12to96_sepopt_20260916_tworoom_k48to192/
 checkpoints_mwm/mwm_paper10_tworoom_k48_72_96_120_144_168_192_sepopt_20260917,
 K=[48,72,96,120,144,168,192], epoch 9). Fixed K=192 / Fixed K<192 use
 individually-trained single-K checkpoints (untouched by the swap, reused from
-the original sweep). Fixed K=96 (dense) uses the *original* paper10 dense
-checkpoint (K=[96,120,144,168,192]) held fixed at K=96 for the whole plan.
+the original sweep). Fixed K=192 (sepopt) uses the SAME sepopt checkpoint as
+the adaptive frontier, held fixed at K=192 (its own finest level) for the
+whole plan -- a NEW eval, not reused, see
+data/sepopt_k192_fixed_cem_grid_summary.json.
+
+(An earlier version of this plot had a "Fixed K=96, original dense
+checkpoint" series here instead -- removed since it wasn't a fair comparison
+against the sepopt checkpoint's own frontier.)
 
 Usage: python generate_plot.py  (writes plot.png in this directory)
 """
@@ -70,7 +74,7 @@ def pareto_frontier(points: list[tuple[float, float]]) -> list[tuple[float, floa
 def main() -> None:
     adaptive = json.load(open(HERE / "data" / "sepopt_k48to192_adaptive_summary.json"))
     baselines = json.load(open(HERE / "data" / "fixed_k_baselines_summary.json"))
-    dense_k96 = json.load(open(HERE / "data" / "dense_k96_fixed_cem_grid_summary.json"))
+    sepopt_k192 = json.load(open(HERE / "data" / "sepopt_k192_fixed_cem_grid_summary.json"))
 
     n_done = adaptive.get("runs_completed", len(adaptive["runs"]))
     n_target = adaptive.get("runs_target", len(adaptive["runs"]))
@@ -89,25 +93,29 @@ def main() -> None:
         for r in baselines["runs"]
         if r.get("checkpoint_run_dir") != k192_ckpt
     ]
-    dense_k96_pts = [(bits_per_ep(r), r["success_rate"]) for r in dense_k96["runs"]]
+    sepopt_k192_pts = [(bits_per_ep(r), r["success_rate"]) for r in sepopt_k192["runs"]]
 
     fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
     ax.set_facecolor("#fcfcfb")
     fig.patch.set_facecolor("#fcfcfb")
 
-    ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=2, linewidths=0)
-    ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=3)
-    ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=4, linewidths=0,
-               label=f"Winning adaptive schedules (Pareto frontier, PARTIAL {n_done}/{n_target}, n=100 trimmed)")
-
+    # zorder is deliberately layered so blue (adaptive) always draws on top of
+    # green (sepopt fixed K=192), which draws on top of black/orange
+    # (baselines) -- otherwise overlapping points hide the adaptive-schedule
+    # result.
     ax.scatter(*zip(*fixedsub_pts), s=14, color=ORANGE, alpha=0.35, marker="o", zorder=2,
                linewidths=0, label="Fixed K<192 (96/120/144/168, individually-trained, n=100)")
 
     ax.scatter(*zip(*fixed192_pts), s=28, color=BLACK, alpha=0.55, marker="s", zorder=3,
                linewidths=0, label="Fixed K=192 (baseline, individually-trained, n=100)")
 
-    ax.scatter(*zip(*dense_k96_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
-               label="Fixed K=96 (dense checkpoint, no scheduling, n=100)")
+    ax.scatter(*zip(*sepopt_k192_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
+               label="Fixed K=192 (sepopt checkpoint, no scheduling, n=100)")
+
+    ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=5, linewidths=0)
+    ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=6)
+    ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=7, linewidths=0,
+               label=f"Winning adaptive schedules (Pareto frontier, PARTIAL {n_done}/{n_target})")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)

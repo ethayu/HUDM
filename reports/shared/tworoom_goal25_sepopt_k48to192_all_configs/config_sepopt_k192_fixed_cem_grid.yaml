@@ -1,0 +1,62 @@
+# Sepopt-checkpoint counterpart of release20260728_tworoom_goal25_densek96_fixed_cem_grid.yaml.
+# Builds the "fixed K=192, sepopt K48-192 checkpoint" Pareto frontier across
+# the SAME pop_size x n_iter grid used by
+# release20260728_dense_tworoom_all_fidelity_schedules.yaml (22 combos after
+# pruning), so it can be compared frontier-to-frontier against the sepopt
+# adaptive-schedule Pareto frontier from that sweep -- does simply fixing
+# K=192 (the checkpoint's own finest/native level, no fidelity transitions
+# at all) dominate every adaptive schedule at matched compute, or does the
+# best adaptive schedule still win somewhere on the frontier?
+#
+# Same env/manifest/horizon/episodes as the all_fidelity_schedules sweep
+# (horizon=2/receding_horizon=2, goal_offset=25, 100 episodes, same 100-pair
+# manifest) so bits_used_total/success_rate are directly comparable.
+output_dir: reports/research/release20260728_tworoom_goal25_sepopt_k192_fixed_cem_grid
+title: Release 2026-07-28 TwoRoom Goal25 -- Fixed K=192 (Sepopt K48-192 Checkpoint) CEM Grid
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/release20260728_tworoom_goal25_exact_seed42_n100.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 2
+    receding_horizon: 2
+    action_block: 5
+
+sweep:
+  planner.pop_size: [20, 50, 100, 150, 200]
+  planner.elite_frac: [0.1]
+  planner.n_iter: [5, 10, 15, 20, 30]
+sweep_exclude:
+  - planner.pop_size: 20
+    planner.elite_frac: 0.05
+  # High-cost pop_size x n_iter corners pruned as far-right outliers (bits/episode
+  # roughly 1.3-2x the next tier down in every release20260728 sweep) -- see
+  # release20260728_dense_reacher_all_fidelity_schedules.yaml for the analysis.
+  - planner.pop_size: 200
+    planner.n_iter: 30
+  - planner.pop_size: 150
+    planner.n_iter: 30
+  - planner.pop_size: 200
+    planner.n_iter: 20
+
+runs:
+  - name: sepopt_k192_fixed
+    role: tworoom_goal25_sepopt_k192_fixed
+    checkpoint: checkpoints_dense_k12to96_sepopt_20260916_tworoom_k48to192/checkpoints_mwm/mwm_paper10_tworoom_k48_72_96_120_144_168_192_sepopt_20260917
+    schedule: "sepopt K=[48,72,96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 6, finest), no transitions"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 6}
+        cem: {mode: fixed, level: 6}
+        rollout: {mode: fixed, level: 6}

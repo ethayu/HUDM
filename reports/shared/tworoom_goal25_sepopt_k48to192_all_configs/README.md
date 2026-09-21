@@ -13,13 +13,17 @@ from a new checkpoint that extends the K range down to 48:
   single-K checkpoints that the new checkpoint doesn't touch, so their
   results were reused from the original sweep rather than recomputed. See
   `data/fixed_k_baselines_summary.json`.
-- A fourth series, **Fixed K=96 (dense checkpoint, no scheduling)**, reuses
-  `release20260728_tworoom_goal25_densek96_fixed_cem_grid`: the *original*
-  paper10 dense checkpoint (K=[96,120,144,168,192] -- the same checkpoint the
-  original adaptive frontier used) held fixed at K=96 for the entire plan
-  (no fidelity transitions), across the same CEM grid. See
-  `data/dense_k96_fixed_cem_grid_summary.json` and
-  `config_dense_k96_fixed_cem_grid.yaml`.
+- A fourth series, **Fixed K=192 (sepopt checkpoint, no scheduling)**, is a
+  NEW eval (not reused): the SAME sepopt checkpoint as the adaptive frontier,
+  held fixed at K=192 (its own finest/native level) for the entire plan (no
+  fidelity transitions at all), across the same CEM grid. This is a true
+  within-checkpoint ablation -- "does scheduling help *this* checkpoint, or
+  would just running it at max fidelity the whole time be just as good?" --
+  unlike an earlier version of this series which compared against the
+  *original* dense checkpoint fixed at K=96 instead (removed, since that
+  wasn't a fair same-model comparison). See
+  `data/sepopt_k192_fixed_cem_grid_summary.json` and
+  `config_sepopt_k192_fixed_cem_grid.yaml`.
 
 ## Contents
 
@@ -31,15 +35,15 @@ from a new checkpoint that extends the K range down to 48:
   in the [HUDM-mwm-ethan](.) repo). Contains all 24 schedule definitions;
   runs `02`-`26` use the new sepopt checkpoint, runs `27`-`31` are the
   (reused, not rerun) fixed-K baselines.
-- `config_dense_k96_fixed_cem_grid.yaml` -- the config for the fourth
-  (dense-checkpoint, fixed K=96) series.
+- `config_sepopt_k192_fixed_cem_grid.yaml` -- the config for the fourth
+  (sepopt-checkpoint, fixed K=192) series.
 - `data/sepopt_k48to192_adaptive_summary.json` -- full results (418 runs: 19
   adaptive schedules x 22 CEM pop_size/n_iter combos) for the new checkpoint.
 - `data/fixed_k_baselines_summary.json` -- the 125 fixed-K baseline runs
   (K=192, K=168, K=144, K=120, K=96; 25 CEM combos each) reused from the
   original sweep.
-- `data/dense_k96_fixed_cem_grid_summary.json` -- the 25 fixed-K=96
-  dense-checkpoint runs.
+- `data/sepopt_k192_fixed_cem_grid_summary.json` -- the 22 fixed-K=192
+  sepopt-checkpoint runs.
 
 ## Reproducing
 
@@ -77,12 +81,13 @@ ceiling (92-98%), while the new checkpoint's frontier also reaches much
 cheaper operating points (as low as ~2M bits/episode at 33% success) than the
 K=96-floor checkpoint could access at all.
 
-**But the "Fixed K=96, dense checkpoint, no scheduling" series is fully
-competitive with it**: 97% at just 7.7M bits/episode, and 98% at 124.4M
-bits/episode -- matching the best adaptive schedule's peak while sitting at
-or above the blue frontier through most of the cheap-to-mid cost range (see
-plot). At goal25/horizon=2 on TwoRoom, simply fixing K=96 on the *original*
-dense checkpoint (no fidelity scheduling, no K=48-192 retraining) already
-gets most of the way to what the new checkpoint's best adaptive schedule
-achieves -- worth flagging before claiming the wider K range or the
-scheduling itself is what's driving the win here.
+**The within-checkpoint ablation is decisive, though**: "Fixed K=192, sepopt
+checkpoint, no scheduling" only reaches 70-81% success across its whole CEM
+grid, well below the same checkpoint's own adaptive-scheduling frontier
+(89-98%). Adaptive scheduling beats fixed-K=192-no-scheduling in **22/22
+(100%)** of matched cells. So while a *different*, individually-trained
+K=192 checkpoint can still match the adaptive frontier at high cost (the
+black "Fixed K=192 (baseline)" series does, see plot), simply running the
+*same* sepopt checkpoint without scheduling leaves a lot of performance on
+the table -- for this checkpoint specifically, the scheduling is doing real
+work, not just riding on the wider K range or the retraining alone.

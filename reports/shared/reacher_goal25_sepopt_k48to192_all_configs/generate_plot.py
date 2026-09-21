@@ -15,9 +15,13 @@ mwm_paper10_reacher_k48_72_96_120_144_168_192_sepopt_actckpt_20260917,
 K=[48,72,96,120,144,168,192], epoch 9) instead of the original paper10 dense
 checkpoint (K=[96,120,144,168,192]). Fixed K=192 / Fixed K<192 use
 individually-trained single-K checkpoints (untouched by the swap, reused from
-the original sweep). Fixed K=96 (dense) uses the *original* paper10 dense
-checkpoint held fixed at K=96 for the whole plan (also reused, not rerun).
-All four series use episodes=100.
+the original sweep). Fixed K=192 (sepopt) uses the SAME sepopt checkpoint as
+the adaptive frontier, held fixed at K=192 (its own finest level) for the
+whole plan -- a NEW eval, not reused. All four series use episodes=100.
+
+(An earlier version of this plot had a "Fixed K=96, original dense
+checkpoint" series here instead -- removed since it wasn't a fair comparison
+against the sepopt checkpoint's own frontier.)
 
 Usage: python generate_plot.py  (writes plot.png in this directory)
 """
@@ -61,10 +65,11 @@ def pareto_frontier(points: list[tuple[float, float]]) -> list[tuple[float, floa
 def main() -> None:
     adaptive = json.load(open(HERE / "data" / "sepopt_k48to192_adaptive_summary.json"))
     baselines = json.load(open(HERE / "data" / "fixed_k_baselines_summary.json"))
-    dense_k96 = json.load(open(HERE / "data" / "dense_k96_fixed_cem_grid_summary.json"))
+    sepopt_k192 = json.load(open(HERE / "data" / "sepopt_k192_fixed_cem_grid_summary.json"))
 
     n_done = adaptive.get("runs_completed", len(adaptive["runs"]))
     n_target = adaptive.get("runs_target", len(adaptive["runs"]))
+    status_tag = "COMPLETE" if n_done >= n_target else f"PARTIAL {n_done}/{n_target}"
 
     adaptive_pts = [(bits_per_ep(r), r["success_rate"]) for r in adaptive["runs"]]
     frontier = pareto_frontier(adaptive_pts)
@@ -80,19 +85,23 @@ def main() -> None:
         for r in baselines["runs"]
         if r.get("checkpoint_run_dir") != k192_ckpt
     ]
-    dense_k96_pts = [(bits_per_ep(r), r["success_rate"]) for r in dense_k96["runs"]]
+    sepopt_k192_pts = [(bits_per_ep(r), r["success_rate"]) for r in sepopt_k192["runs"]]
 
+    # zorder is deliberately layered so blue (adaptive) always draws on top of
+    # green (sepopt fixed K=192), which draws on top of black/orange
+    # (baselines) -- otherwise overlapping points hide the adaptive-schedule
+    # result.
     def draw_series(target_ax, marker_scale=1.0):
-        target_ax.scatter(*zip(*adaptive_pts), s=14 * marker_scale, color=BLUE, alpha=0.25,
-                           zorder=2, linewidths=0)
-        target_ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=3)
-        target_ax.scatter(*zip(*frontier), s=45 * marker_scale, color=BLUE, zorder=4, linewidths=0)
         target_ax.scatter(*zip(*fixedsub_pts), s=14 * marker_scale, color=ORANGE, alpha=0.35,
                            marker="o", zorder=2, linewidths=0)
         target_ax.scatter(*zip(*fixed192_pts), s=28 * marker_scale, color=BLACK, alpha=0.55,
                            marker="s", zorder=3, linewidths=0)
-        target_ax.scatter(*zip(*dense_k96_pts), s=40 * marker_scale, color=AQUA, marker="^",
+        target_ax.scatter(*zip(*sepopt_k192_pts), s=40 * marker_scale, color=AQUA, marker="^",
                            zorder=4, linewidths=0)
+        target_ax.scatter(*zip(*adaptive_pts), s=14 * marker_scale, color=BLUE, alpha=0.25,
+                           zorder=5, linewidths=0)
+        target_ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=6)
+        target_ax.scatter(*zip(*frontier), s=45 * marker_scale, color=BLUE, zorder=7, linewidths=0)
 
     fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
     ax.set_facecolor("#fcfcfb")
@@ -101,20 +110,19 @@ def main() -> None:
     draw_series(ax)
     # Re-add labelled (invisible-duplicate-free) legend handles on the main axes.
     ax.scatter([], [], s=45, color=BLUE, linewidths=0,
-               label=f"Winning adaptive schedules (Pareto frontier, PARTIAL {n_done}/{n_target})")
+               label=f"Winning adaptive schedules (Pareto frontier, {status_tag})")
     ax.scatter([], [], s=14, color=ORANGE, alpha=0.35, marker="o", linewidths=0,
                label="Fixed K<192 (96/120/144/168, individually-trained)")
     ax.scatter([], [], s=28, color=BLACK, alpha=0.55, marker="s", linewidths=0,
                label="Fixed K=192 (baseline, individually-trained)")
     ax.scatter([], [], s=40, color=AQUA, marker="^", linewidths=0,
-               label="Fixed K=96 (dense checkpoint, no scheduling)")
+               label="Fixed K=192 (sepopt checkpoint, no scheduling)")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)
     ax.set_title(
         "Reacher  goal_offset=25  100 episodes  horizon 2\n"
-        "adaptive fidelity scheduling vs. fixed-K -- sepopt K48-192 checkpoint\n"
-        f"(adaptive sweep PARTIAL: {n_done}/{n_target} cells complete)",
+        "adaptive fidelity scheduling vs. fixed-K -- sepopt K48-192 checkpoint",
         fontsize=13, fontweight="bold",
     )
     ax.set_ylim(0, 102)

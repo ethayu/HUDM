@@ -15,15 +15,19 @@ individually-trained single-K checkpoints that were never touched by the
 checkpoint swap, so their results were reused rather than recomputed (see
 data/fixed_k_baselines_summary.json and the note field in that file).
 
-A fourth series, Fixed K=96 (dense checkpoint, no scheduling), reuses the
-existing release20260728_tworoom_goal25_densek96_fixed_cem_grid sweep: the
-*original* paper10 dense checkpoint (K=[96,120,144,168,192], same checkpoint
-the original "winning adaptive schedules" frontier used) with mpc/cem/rollout
-all fixed at K=96 for the whole plan (no fidelity transitions at all), across
-the same pop_size x n_iter grid. This answers "does simply fixing K=96 on the
-dense checkpoint already dominate, or does adaptive scheduling (and/or the
-wider K=48-192 checkpoint) actually buy something?" -- see
-data/dense_k96_fixed_cem_grid_summary.json.
+A fourth series, Fixed K=192 (sepopt checkpoint, no scheduling), is a NEW
+eval (not reused): the *sepopt* K48-192 checkpoint -- same checkpoint the
+adaptive frontier uses -- with mpc/cem/rollout all fixed at K=192 (its own
+finest/native level) for the whole plan, no fidelity transitions at all,
+across the same pop_size x n_iter grid. This answers "does simply fixing the
+new checkpoint at its finest level already dominate, or does adaptive
+scheduling actually buy something on top of it?" -- see
+data/sepopt_k192_fixed_cem_grid_summary.json and
+config_sepopt_k192_fixed_cem_grid.yaml.
+
+(An earlier version of this plot had a "Fixed K=96, original dense
+checkpoint" series here instead -- removed since it wasn't a fair comparison
+against the sepopt checkpoint's own frontier.)
 
 Usage: python generate_plot.py  (writes plot.png in this directory)
 """
@@ -65,7 +69,7 @@ def pareto_frontier(points: list[tuple[float, float]]) -> list[tuple[float, floa
 def main() -> None:
     adaptive = json.load(open(HERE / "data" / "sepopt_k48to192_adaptive_summary.json"))
     baselines = json.load(open(HERE / "data" / "fixed_k_baselines_summary.json"))
-    dense_k96 = json.load(open(HERE / "data" / "dense_k96_fixed_cem_grid_summary.json"))
+    sepopt_k192 = json.load(open(HERE / "data" / "sepopt_k192_fixed_cem_grid_summary.json"))
 
     adaptive_pts = [(bits_per_ep(r), r["success_rate"]) for r in adaptive["runs"]]
     frontier = pareto_frontier(adaptive_pts)
@@ -81,25 +85,29 @@ def main() -> None:
         for r in baselines["runs"]
         if r.get("checkpoint_run_dir") != k192_ckpt
     ]
-    dense_k96_pts = [(bits_per_ep(r), r["success_rate"]) for r in dense_k96["runs"]]
+    sepopt_k192_pts = [(bits_per_ep(r), r["success_rate"]) for r in sepopt_k192["runs"]]
 
     fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
     ax.set_facecolor("#fcfcfb")
     fig.patch.set_facecolor("#fcfcfb")
 
-    ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=2, linewidths=0)
-    ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=3)
-    ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=4, linewidths=0,
-               label="Winning adaptive schedules (Pareto frontier, changing fidelity)")
-
+    # zorder is deliberately layered so blue (adaptive) always draws on top of
+    # green (sepopt fixed K=192), which draws on top of black/orange
+    # (baselines) -- otherwise overlapping points hide the adaptive-schedule
+    # result.
     ax.scatter(*zip(*fixedsub_pts), s=14, color=ORANGE, alpha=0.35, marker="o", zorder=2,
                linewidths=0, label="Fixed K<192 (96/120/144/168, individually-trained)")
 
     ax.scatter(*zip(*fixed192_pts), s=28, color=BLACK, alpha=0.55, marker="s", zorder=3,
                linewidths=0, label="Fixed K=192 (baseline, individually-trained)")
 
-    ax.scatter(*zip(*dense_k96_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
-               label="Fixed K=96 (dense checkpoint, no scheduling)")
+    ax.scatter(*zip(*sepopt_k192_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
+               label="Fixed K=192 (sepopt checkpoint, no scheduling)")
+
+    ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=5, linewidths=0)
+    ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=6)
+    ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=7, linewidths=0,
+               label="Winning adaptive schedules (Pareto frontier, changing fidelity)")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)

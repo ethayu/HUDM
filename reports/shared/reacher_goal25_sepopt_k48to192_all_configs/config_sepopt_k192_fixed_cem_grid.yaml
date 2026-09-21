@@ -1,0 +1,51 @@
+# Sepopt-checkpoint counterpart of release20260728_reacher_goal25_densek96_fixed_cem_grid.yaml.
+# Same pattern as release20260728_tworoom_goal25_sepopt_k192_fixed_cem_grid.yaml,
+# for Reacher: fixed K=192 (finest, no scheduling) on the sepopt K48-192
+# checkpoint, same 22-cell CEM grid, same 100-pair manifest/episodes as
+# release20260728_dense_reacher_all_fidelity_schedules.yaml.
+output_dir: reports/research/release20260728_reacher_goal25_sepopt_k192_fixed_cem_grid
+title: Release 2026-07-28 Reacher Goal25 -- Fixed K=192 (Sepopt K48-192 Checkpoint) CEM Grid
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/release20260728_reacher_goal25_exact_seed42_n100.yaml
+
+run_defaults:
+  eval:
+    episodes: 100
+    num_envs: 50
+    goal_offset: 25
+    goal_indexing: exact
+    budget: 50
+  planner:
+    flop_accounting: dynamics_audit
+    horizon: 2
+    receding_horizon: 2
+    action_block: 5
+
+sweep:
+  planner.pop_size: [20, 50, 100, 150, 200]
+  planner.elite_frac: [0.1]
+  planner.n_iter: [5, 10, 15, 20, 30]
+sweep_exclude:
+  - planner.pop_size: 20
+    planner.elite_frac: 0.05
+  - planner.pop_size: 200
+    planner.n_iter: 30
+  - planner.pop_size: 150
+    planner.n_iter: 30
+  - planner.pop_size: 200
+    planner.n_iter: 20
+
+runs:
+  - name: sepopt_k192_fixed
+    role: reacher_goal25_sepopt_k192_fixed
+    checkpoint: checkpoints_dense_k48to192_sepopt_20260917_reacher/checkpoints_mwm/mwm_paper10_reacher_k48_72_96_120_144_168_192_sepopt_actckpt_20260917
+    schedule: "sepopt K=[48,72,96,120,144,168,192] checkpoint | MPC/CEM/Rollout all fixed at K=192 (level 6, finest), no transitions"
+    planner:
+      scheduler:
+        enabled: true
+        mpc: {mode: fixed, level: 6}
+        cem: {mode: fixed, level: 6}
+        rollout: {mode: fixed, level: 6}
