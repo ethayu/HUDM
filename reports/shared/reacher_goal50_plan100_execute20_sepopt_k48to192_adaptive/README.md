@@ -1,63 +1,111 @@
-# Reacher goal50 (plan20/execute4) -- sepopt K48-192 adaptive vs. fixed K=192
+# Reacher goal50 (plan20/execute4) -- sepopt K48-192 checkpoint: adaptive scheduling vs. fixed-K, shared vs. individually-trained
 
 Same sepopt K48-192 checkpoint as `reacher_goal25_sepopt_k48to192_all_configs`,
 different benchmark config: `goal_offset=50`, 100 episodes, horizon=4
 (20-step plan blocks, execute 4 steps / replan).
 
-Both series are **COMPLETE**.
+`plot.png` now plots **four** series, all **COMPLETE**, covering every
+reacher-goal50 sweep run on this checkpoint so far:
 
-## What's in it
+| # | Series | Cells | Config | Checkpoint |
+|---|---|---|---|---|
+| 1 | Runs 02-26, K48-192: adaptive schedules (blue) | 475 | `release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml` | shared sepopt, scheduler ranges K48-192 |
+| 2 | Runs 27-31: individually-trained fixed-K (orange) | 125 | same config as #1 | 5 separate checkpoints, one per K |
+| 3 | Runs 02-26, K96-192 floor: adaptive schedules (purple) | 475 | `..._k96to192slice_sepopt_all_fidelity_schedules.yaml` | shared sepopt, scheduler's "coarsest" floored at K=96 |
+| 4 | Dense checkpoint, individual fixed levels (teal) | 175 | `..._dense_checkpoint_individual_levels.yaml` | shared sepopt, sliced to one fixed level at a time (no scheduling) |
 
-- **Checkpoint**: `checkpoints_mwm/mwm_paper10_reacher_k48_72_96_120_144_168_192_sepopt_actckpt_20260917`
-  (K=[48,72,96,120,144,168,192], epoch 9) -- same checkpoint used by both
-  series below, so this is a clean adaptive-vs-no-scheduling comparison
-  rather than a checkpoint-quality comparison.
-- **Adaptive schedules** (475/475 cells): 19 schedules x 25 CEM combos
-  (pop_size x n_iter sweep), from
-  `configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml`
-  (`config_sepopt_k48to192.yaml` in this folder). Note the fixed-K baseline
-  runs are commented out of *this* config -- they don't ship in the same
-  file as the goal25 example.
-- **Fixed K=192, no scheduling** (25/25 cells): the same checkpoint held at
-  full fidelity (finest level) for the whole plan, swept over the same 25
-  CEM combos, from a separate config,
-  `configs/research/release20260728_dense_reacher_goal50_plan50_execute20_fixed_k192_sepopt.yaml`.
-  This isolates the effect of *scheduling* from the effect of *checkpoint
-  choice* -- unlike the goal25 example's "Fixed K=192" series, which used a
-  different, individually-trained K192 checkpoint.
+All four use the same checkpoint,
+`checkpoints_mwm/mwm_paper10_reacher_k48_72_96_120_144_168_192_sepopt_actckpt_20260917`
+(K=[48,72,96,120,144,168,192], epoch 9), **except** series #2, which uses 5
+separately-trained single-fidelity checkpoints
+(`checkpoints_mwm/mwm_paper10_reacher_k{192,168,144,120,96}_release20260728`,
+each verified via `config.json` to declare `K=[<single value>]` only -- not
+slices of the shared checkpoint). That's the key axis series #2 and #4 test:
+same fixed K, shared/scheduled-capable checkpoint (#4) vs. a checkpoint
+dedicated to that one K (#2).
+
+All four were run end-to-end at
+`/vast/projects/dineshj/lab/aurora/reports/research/` (see each config's
+`output_dir` for the exact subdirectory), 40/40 or 14/14 shards each.
 
 ## Contents
 
-- `plot.png` -- adaptive scatter + Pareto frontier (blue) with the fixed-K192
-  baseline overlaid (black squares).
-- `generate_plot.py` -- self-contained, regenerates `plot.png` from `data/`.
-- `config_sepopt_k48to192.yaml` -- the adaptive-sweep config actually used.
-- `data/sepopt_k48to192_adaptive_summary.json` -- 475/475 completed runs;
-  built by walking every `eval.json` under
-  `reports/research/release20260728_dense_reacher_goal50_plan100_execute20_all_fidelity_schedules/`
-  through `mwm.benchmark.summary.eval_summary_row`.
-- `data/fixed_k192_sepopt_summary.json` -- 25/25 completed runs from
-  `reports/research/release20260728_dense_reacher_goal50_plan100_execute20_fixed_k192_sepopt/`,
-  built the same way.
+- `plot.png` / `generate_plot.py` -- the four-series plot.
+- `data/new_sweep_partial_adaptive_summary.json` (475/475, series #1) and
+  `data/new_sweep_partial_singlek_summary.json` (125/125, series #2), built
+  by `build_new_sweep_partial_summary.py` (despite the "partial" filename,
+  both complete).
+- `data/k96to192_slice_summary.json` (600/600, series #3 + a redundant
+  re-run of series #2's cells, filtered out in the plot) and
+  `data/dense_checkpoint_individual_levels_summary.json` (175/175, series
+  #4), built by `build_k96to192_and_dense_levels_summary.py`.
+
+Rebuild with:
+
+```bash
+python build_new_sweep_partial_summary.py           # refresh series #1/#2
+python build_k96to192_and_dense_levels_summary.py   # refresh series #3/#4
+python generate_plot.py                             # redraw plot.png
+```
 
 ## Headline numbers
 
-- The adaptive Pareto frontier reaches its max observed success, **92%**, at
-  just **~50M bits/episode** (cell
-  `24_mpc_coarse_to_fine_cem_base_to_fine_rollout_base__pop100__elite0p1__iter5`)
-  -- no completed adaptive cell anywhere in the sweep (up to ~690M
-  bits/episode) beats 92%.
-- Fixed K=192 (no scheduling) success ranges **63%-83%** across the 25 CEM
-  combos, at costs from **~12M to ~737M bits/episode**.
-- **Win-rate check** (does fixed K=192 beat the adaptive frontier at
-  matched-or-cheaper cost?): fixed K=192 wins **0/25** cells. Every single
-  fixed-K192 point is dominated by some adaptive-schedule cell that gets
-  equal-or-better success at equal-or-lower cost. Same qualitative result as
-  the goal25 sweep, where the sepopt checkpoint's adaptive scheduling was
-  also decisively ahead.
+**Adaptive scheduling: K48-192 floor vs. K96-192 floor (series #1 vs #3).**
+Both reach the same max success, **92%**, but the K96-192 floor pays **4.3x**
+the cost to get there: 50M bits/episode (K48-192) vs. 215M bits/episode
+(K96-192). Forcing the scheduler to never drop below K96 doesn't cost
+success -- it costs budget, because the scheduler's cheapest good schedules
+spend real time below K96 when the K48-192 floor allows it. Win-rate check:
+only 33/475 K96-192-floor cells (7%) beat the K48-192 frontier at
+matched-or-cheaper cost, and those are marginal (noise-level, not a
+systematic win).
 
-**Bottom line**: on this checkpoint, adaptive fidelity scheduling strictly
-dominates running the same model at fixed full fidelity -- it's never worse
-and typically much cheaper for the same success rate (the frontier's whole
-useful range sits in the 0-50M bits/episode region; the fixed-K192 baseline
-spends up to ~15x that for worse-or-equal success).
+**Fixed-K, no scheduling: individually-trained (#2) vs. dense-sliced (#4)
+-- the shared checkpoint's low-K slices are dramatically more robust than a
+checkpoint trained from scratch at that K:**
+
+| K   | Individually-trained (#2) | Dense-sliced (#4) |
+|-----|---------------------------|--------------------|
+| 192 | 57%-86%, mean 75.4%       | 63%-83%, mean 75.2% |
+| 168 | 53%-82%, mean 71.0%       | 59%-81%, mean 71.6% |
+| 144 | **22%-41%, mean 29.5%**   | **61%-86%, mean 73.8%** |
+| 120 | **7%-20%, mean 13.5%**    | **60%-83%, mean 75.1%** |
+| 96  | **8%-21%, mean 15.1%**    | **61%-75%, mean 67.0%** |
+
+At K192/K168 the two are about equal (the individually-trained model has no
+disadvantage there). But at K144 and below, the individually-trained models
+collapse to near-floor success while the *same shared checkpoint*, sliced to
+that exact level, keeps performing about as well as it does at K192. This
+strongly suggests joint multi-K (matryoshka) training produces far more
+robust low-K representations than training a dedicated low-K model from
+scratch -- the shared encoder/latent space learned at K=192 doesn't degrade
+when truncated to K=96, but a model trained to only ever see K=96 apparently
+learns something much weaker.
+
+**Win-rate vs. the K48-192 adaptive frontier (series #1):**
+K96-192-floor 33/475 (7%, marginal) > dense-sliced fixed-K 3/175 (1.7%) >
+individually-trained fixed-K 1/125 (0.8%). Adaptive scheduling on the shared
+checkpoint remains strictly the best option; the gap between "beats it
+occasionally" (K96-192 floor) and "essentially never beats it" (either
+flavor of fixed-K) tracks how much of the scheduler's freedom each series
+gives up.
+
+**Bottom line**: (1) scheduling freedom below K96 is what buys the K48-192
+frontier's ~4x cost advantage over a K96-192 floor, at matched success; (2)
+fixed-K success or failure depends much more on *whether the checkpoint was
+jointly trained across K* than on which single K a checkpoint targets --
+individually-trained low-K checkpoints are much weaker than the same low K
+sliced from a jointly-trained checkpoint.
+
+## Older, separate-config reference data (not plotted)
+
+Two more files sit in `data/` from earlier, independently-collected runs,
+not drawn in the current `plot.png` (superseded by series #1/#2 above, which
+come from one unified config and are the current source of truth):
+
+- `data/sepopt_k48to192_adaptive_summary.json` (475/475): an earlier
+  complete run of the same 19 adaptive schedules, same checkpoint --
+  reproduces series #1 almost exactly.
+- `data/fixed_k192_sepopt_summary.json` (25/25): the shared sepopt
+  checkpoint held at fixed K=192 (no scheduling), from a separate config.
+  Consistent with series #4's K=192 row (63%-83% here vs. 63%-83% there).
