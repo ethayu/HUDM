@@ -1,4 +1,4 @@
-# OGB-Cube goal25 -- sepopt K48-192 all-configs sweep (PARTIAL)
+# OGB-Cube goal25 -- sepopt K48-192 all-configs sweep
 
 Same structure as `tworoom_goal25_sepopt_k48to192_all_configs`, for OGB-Cube
 (swm/OGBCube-v0) instead of TwoRoom. goal_offset=25, 100 episodes,
@@ -6,21 +6,18 @@ horizon=2. All series use episodes=100.
 
 ## Read this before using it for the paper
 
-**The adaptive-schedule sweep is PARTIAL.** Only 262/418 cells were complete
-when this was generated (19 adaptive schedules x 22 CEM combos = 418
-target, ~63%). It's running as two concurrent `--roles`-filtered halves on
-separate GPUs -- `data/sepopt_k48to192_adaptive_summary.json` is built
-directly from individual per-cell `summary.json` sidecars rather than any
-top-level aggregate (the aggregate gets overwritten by whichever half
+**The adaptive-schedule sweep is COMPLETE** (418/418 cells: 19 adaptive
+schedules x 22 CEM combos). It ran as two concurrent `--roles`-filtered
+halves on separate GPUs -- `data/sepopt_k48to192_adaptive_summary.json` is
+built directly from individual per-cell `summary.json` sidecars rather than
+any top-level aggregate (the aggregate gets overwritten by whichever half
 finishes last; see the reacher folder's README for the full story on that
-bug). Regenerate (`python generate_plot.py`) once `runs_completed` reaches
-418, or ask for a refresh.
+bug), then re-run once more after the sweep's last 9 cells landed.
 
 **The Fixed K=192 (sepopt checkpoint, no scheduling) series still doesn't
-exist.** That eval is queued behind ogb_cube's adaptive half A on GPU 0
-(0/22 at time of writing). `generate_plot.py` skips it gracefully if
-`data/sepopt_k192_fixed_cem_grid_summary.json` is absent -- rerun once it
-lands for the full 5-series plot.
+exist and isn't currently queued.** `generate_plot.py` skips it gracefully
+if `data/sepopt_k192_fixed_cem_grid_summary.json` is absent -- run it and
+regenerate for the full 5-series plot if this matters.
 
 **The Fixed K=96 (sepopt checkpoint, no scheduling) series IS present** --
 complete (22/22), added on request to directly compare against the
@@ -43,6 +40,13 @@ pattern). **Answer: yes.** See headline numbers below.
 - **Fixed K=192 / Fixed K<192**: individually-trained single-K checkpoints,
   untouched by the checkpoint swap, reused from the original
   `release20260728_dense_ogb_cube_all_fidelity_schedules` sweep.
+  **Caveat**: this reused sweep recorded manifest path
+  `ogb_cube_goal25_exact_seed42.json` (the unsuffixed manifest, which had
+  100 pairs at the time it ran), while the adaptive sweep uses the pinned
+  `ogb_cube_goal25_exact_seed42_n100.json`. Same seed=42/goal_offset=25/
+  episodes=100 protocol, but not byte-identical episodes -- the unsuffixed
+  file has since drifted to 250 pairs in this repo, which is exactly why
+  the adaptive sweep was pointed at the pinned `_n100` file instead.
 - **Fixed K=96 (sepopt checkpoint, no scheduling)**: the SAME sepopt
   checkpoint as the adaptive frontier, held fixed at K=96 (level 2, NOT its
   finest level) for the whole plan -- both a within-checkpoint ablation
@@ -55,15 +59,15 @@ pattern). **Answer: yes.** See headline numbers below.
 
 ## Contents
 
-- `plot.png` -- the figure (title states the partial-completion fraction).
+- `plot.png` -- the figure.
 - `generate_plot.py` -- self-contained, regenerates `plot.png` from `data/`.
 - `config_sepopt_k48to192.yaml` -- the benchmark config for the adaptive sweep.
 - `config_sepopt_k96_fixed_cem_grid.yaml` -- the config for the Fixed K=96
   (sepopt) series.
 - `config_sepopt_k192_fixed_cem_grid.yaml` -- the config for the Fixed K=192
   (sepopt) series (not yet run).
-- `data/sepopt_k48to192_adaptive_summary.json` -- 262 completed runs so far
-  (of 418 target); has `runs_completed` / `runs_target` fields.
+- `data/sepopt_k48to192_adaptive_summary.json` -- all 418 completed runs;
+  has `runs_completed` / `runs_target` fields (both 418).
 - `data/fixed_k_baselines_summary.json` -- 125 fixed-K baseline runs (K=192,
   168, 144, 120, 96; 25 CEM combos each).
 - `data/sepopt_k96_fixed_cem_grid_summary.json` -- the 22 fixed-K=96
@@ -72,20 +76,61 @@ pattern). **Answer: yes.** See headline numbers below.
   restricted adaptive-schedule probe.
 - `data/sepopt_k48_96_probe_summary.json` -- the 12 K=48-96 probe runs
   (complete).
+- `plot_flops.png` / `generate_plot_flops.py` -- same data, real audited
+  dynamics-FLOPs cost axis instead of bits (see "Real FLOPs vs. bits"
+  below). The K=48-96 probe series is excluded from this plot.
 
-## Current (partial) headline numbers
+## Real FLOPs vs. bits (post-hoc reconstruction)
+
+`flop_accounting: dynamics_audit` was set correctly on every run here, but a
+bug meant `dynamics_flops_total` was silently recorded as 0 everywhere in
+this repo (`torch.inference_mode()` tensors bypass the `FlopCounterMode`
+dispatch hook the audit relies on -- fixed in `mwm/diagnostics/flops.py`).
+Real FLOPs were reconstructed post-hoc from each `eval.json`'s saved
+per-CEM-iteration trace (shape-only calibration against the real
+checkpoints, no re-execution of the benchmark/env/data pipeline needed --
+see the Reacher shared folder's README for the full method writeup). All
+565 cells here (418 adaptive, complete + 125 fixed-K baselines + 22 Fixed
+K=96 sepopt) reconstructed with **zero** shape-match mismatches. The
+K=48-96 probe (12 cells) was intentionally left unreconstructed/unplotted
+(excluded on request).
+
+**Does the story change?** No, and unlike Reacher/TwoRoom this was already
+the tightest of the three envs, so it's worth checking carefully rather
+than assuming: **zero win/loss flips** between bits and FLOPs axes across
+all 22 Fixed K=96 (sepopt) cells. Adaptive still wins 21/22 matched cells
+either way (1 cell -- pop20/iter5, the cheapest -- still goes to Fixed
+K=96 under both metrics). The margin distribution barely moves:
+
+| | bits-based | FLOPs-based |
+|---|---|---|
+| Fixed K=96 wins (of 22) | 1 | 1 |
+| Mean margin (adaptive advantage) | -3.64pt | -4.00pt |
+| Cells within noise (\|margin\|<=2pt) | 11/22 | 10/22 |
+
+So the original, already-honest "adaptive wins narrowly, with about half
+the cells statistically indistinguishable from noise" read on OGB-Cube
+holds under real FLOPs too -- this is not a case where switching cost
+metrics reveals a bigger gap (as it did for Reacher/TwoRoom's more
+lopsided K=192 comparisons). OGB-Cube's Fixed K=96 baseline never strays
+far from K=192 in cost terms (it's already at the cheap end of the K
+range), so the bits-vs-FLOPs scaling difference that mattered for the
+K=192 comparisons has much less room to bite here.
+
+## Headline numbers (final, 418/418)
 
 - **OGB-Cube is a notably harder task than TwoRoom/Reacher for this
   checkpoint family** -- nothing in this plot approaches the 90-100%
   ceilings seen there. All series cluster in the 40-80% range.
-- Best adaptive-schedule point so far: **79.0%** at 20.2M bits/episode --
-  likely to shift as the remaining ~37% of cells finish.
+- Best adaptive-schedule point across the full sweep: **79.0%** at
+  20.16M bits/episode -- unchanged from the partial-sweep read; the last
+  ~9 cells to finish didn't move the frontier at all.
 - **Win-rate check** (does Fixed K=96-sepopt-no-scheduling beat the
   adaptive frontier on the *same checkpoint* at matched-or-cheaper cost?):
-  **2/22 (9%)** -- adaptive scheduling wins 20/22 cells. Same qualitative
+  **1/22 (5%)** -- adaptive scheduling wins 21/22 cells. Same qualitative
   result as TwoRoom and Reacher: scheduling is winning, though the margin
-  here (max ~79% either way) is much tighter in absolute terms than the
-  100%-ceiling story on Reacher.
+  here (mean -3.64pt, 11/22 cells within plausible n=100 noise) is much
+  tighter than the 100%-ceiling story on Reacher.
 - **Old vs. new checkpoint at matched K=96, no scheduling** (a separate,
   cleaner ablation isolating retraining from scheduling): the sepopt
   checkpoint wins **16/22 matched CEM cells**, the original paper10

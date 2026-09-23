@@ -26,7 +26,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "7a224f9b809a2b63a46d441e54b9d1f5e6dfe7e72376eceba4d18a2f49a52af2",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 703179000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -51,7 +51,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":20}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 5, \"planner.pop_size\": 20}",
       "topk": 2,
-      "wall_time_sec": 287.79275327175856
+      "wall_time_sec": 287.79275327175856,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -62,7 +63,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "5ff9ceab25f2939088967ce0e17882033306f4cf706b431f9455ffb1c3e98002",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 1406358000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -87,7 +88,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":20}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 10, \"planner.pop_size\": 20}",
       "topk": 2,
-      "wall_time_sec": 341.7951543694362
+      "wall_time_sec": 341.7951543694362,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -98,7 +100,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "dd2977f3109ad05f6da491ded58de86aa83d75f5f73a4d965d24a94ae8a5fa35",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 2109537000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -123,7 +125,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":20}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 15, \"planner.pop_size\": 20}",
       "topk": 2,
-      "wall_time_sec": 411.5518347909674
+      "wall_time_sec": 411.5518347909674,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -134,7 +137,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "b473e4c87803f19b77a4e70e51e6a1f5b59dd7810ef33a9faf4fa72b46d6a1ca",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 2812716000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -159,7 +162,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":20}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 20, \"planner.pop_size\": 20}",
       "topk": 2,
-      "wall_time_sec": 485.9960981346667
+      "wall_time_sec": 485.9960981346667,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -170,7 +174,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "86e2be73acf0044b1c3afe7d6e49c69eb03f0062a3de02dca87fc1a27bf2ac07",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 4219074000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -195,7 +199,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":20}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 30, \"planner.pop_size\": 20}",
       "topk": 2,
-      "wall_time_sec": 603.0872331457213
+      "wall_time_sec": 603.0872331457213,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -206,7 +211,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "7849d68244dbdaa2cfdb9ba179bb0869163dafee3556a63a2a6bd02c5160a409",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 1757947500000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -231,7 +236,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":50}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 5, \"planner.pop_size\": 50}",
       "topk": 5,
-      "wall_time_sec": 279.47675899975
+      "wall_time_sec": 279.47675899975,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -242,7 +248,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "4fd47f2a9dbbc76256e76190a2a713be8120f6f6fbefc965b3843d721ab6e0c1",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 3515895000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -267,7 +273,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":50}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 10, \"planner.pop_size\": 50}",
       "topk": 5,
-      "wall_time_sec": 356.93091520573944
+      "wall_time_sec": 356.93091520573944,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -278,7 +285,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "e2ad883e46fd9b33ab235c12983a8b94f73a73a5b0ffec0a4f284554eb8c34cf",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 5273842500000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -303,7 +310,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":50}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 15, \"planner.pop_size\": 50}",
       "topk": 5,
-      "wall_time_sec": 419.89765996299684
+      "wall_time_sec": 419.89765996299684,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -314,7 +322,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "b2e4a5afd4e190e5882253b0f4f75f9401dfe97f144645d0a1a4e3233024b1e9",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 7031790000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -339,7 +347,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":50}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 20, \"planner.pop_size\": 50}",
       "topk": 5,
-      "wall_time_sec": 491.0361865302548
+      "wall_time_sec": 491.0361865302548,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -350,7 +359,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "aeb1115bf7a287b1f87d67e72ecffa4d930886fca6f966f3762db6a7fe715a5f",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 10547685000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -375,7 +384,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":50}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 30, \"planner.pop_size\": 50}",
       "topk": 5,
-      "wall_time_sec": 611.1818261574954
+      "wall_time_sec": 611.1818261574954,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -386,7 +396,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "d16c1b5877756977982f0a0da6a982d0a56cf37b40cfebec800d83b0e9928a7a",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 3515895000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -411,7 +421,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":100}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 5, \"planner.pop_size\": 100}",
       "topk": 10,
-      "wall_time_sec": 281.9619259899482
+      "wall_time_sec": 281.9619259899482,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -422,7 +433,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "ef36677fe8059657f0b7ba5b7edfc37746989567bceb29889f85eabdd8ddf9ef",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 7031790000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -447,7 +458,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":100}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 10, \"planner.pop_size\": 100}",
       "topk": 10,
-      "wall_time_sec": 353.40202451031655
+      "wall_time_sec": 353.40202451031655,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -458,7 +470,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "65c4781fcc5bc2fe1d892feb1ef511790ab324c07bc256a835affb908d741469",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 10547685000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -483,7 +495,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":100}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 15, \"planner.pop_size\": 100}",
       "topk": 10,
-      "wall_time_sec": 424.0020141955465
+      "wall_time_sec": 424.0020141955465,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -494,7 +507,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "9fcea3104ac14955fa835b43ca622a79567acc0c3fe4cbaeb191f50e794813a7",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 14063580000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -519,7 +532,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":100}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 20, \"planner.pop_size\": 100}",
       "topk": 10,
-      "wall_time_sec": 484.37067690864205
+      "wall_time_sec": 484.37067690864205,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -530,7 +544,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "a85e7e4de78042d57ac7ed63b9b8c2d74700771242b218f81f86ba56b5f10620",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 21095370000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -555,7 +569,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":100}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 30, \"planner.pop_size\": 100}",
       "topk": 10,
-      "wall_time_sec": 607.1532664373517
+      "wall_time_sec": 607.1532664373517,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -566,7 +581,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "7a306d9a872ee95809c9d212d586cd9e3ac6185c500fae93022f45574843ce3a",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 5273842500000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -591,7 +606,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":150}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 5, \"planner.pop_size\": 150}",
       "topk": 15,
-      "wall_time_sec": 281.40304046310484
+      "wall_time_sec": 281.40304046310484,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -602,7 +618,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "2bc9e32845f0efda5d59ba2356f67f6e09e59377c30d2d3c08390c18c8481285",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 10547685000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -627,7 +643,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":150}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 10, \"planner.pop_size\": 150}",
       "topk": 15,
-      "wall_time_sec": 354.93456775229424
+      "wall_time_sec": 354.93456775229424,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -638,7 +655,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "eee847e3150c70a582d66a0cff3b197435b114884267c8c152b0c425205e1bbb",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 15821527500000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -663,7 +680,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":150}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 15, \"planner.pop_size\": 150}",
       "topk": 15,
-      "wall_time_sec": 418.57000897452235
+      "wall_time_sec": 418.57000897452235,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -674,7 +692,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "af5e5e04d54dc92a9ba54a84421d42e9e9a388bb7377bf40cb38e869b2671604",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 21095370000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -699,7 +717,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":150}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 20, \"planner.pop_size\": 150}",
       "topk": 15,
-      "wall_time_sec": 488.24817941430956
+      "wall_time_sec": 488.24817941430956,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -710,7 +729,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "a07dad58056bc4f0ee151e2d817a96143b5988eb236d38794fc8de9cdd7bdb12",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 7031790000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -735,7 +754,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":200}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 5, \"planner.pop_size\": 200}",
       "topk": 20,
-      "wall_time_sec": 277.19117615465075
+      "wall_time_sec": 277.19117615465075,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -746,7 +766,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "3ca239fa4d16a5e23d9202e89fce24718b475b0660390deec7210233b0125f6c",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 14063580000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -771,7 +791,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":200}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 10, \"planner.pop_size\": 200}",
       "topk": 20,
-      "wall_time_sec": 350.5248386496678
+      "wall_time_sec": 350.5248386496678,
+      "dynamics_flops_reconstructed_posthoc": true
     },
     {
       "base_name": "sepopt_k96_fixed",
@@ -782,7 +803,7 @@
       "checkpoint_epoch": 0,
       "checkpoint_run_dir": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
       "config_sha256": "634ab7338b0a0ddb65337a8185d5fb225c7d159bcfdc8f74530d1f72bc0fce25",
-      "dynamics_flops_total": 0,
+      "dynamics_flops_total": 21095370000000,
       "elite_frac": 0.1,
       "env_id": "swm/OGBCube-v0",
       "episodes": 100,
@@ -807,7 +828,8 @@
       "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":200}",
       "sweep_params": "{\"planner.elite_frac\": 0.1, \"planner.n_iter\": 15, \"planner.pop_size\": 200}",
       "topk": 20,
-      "wall_time_sec": 425.7289351262152
+      "wall_time_sec": 425.7289351262152,
+      "dynamics_flops_reconstructed_posthoc": true
     }
   ],
   "sweep": {
