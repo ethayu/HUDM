@@ -96,10 +96,10 @@ def main() -> None:
     # (baselines) -- otherwise overlapping points hide the adaptive-schedule
     # result.
     ax.scatter(*zip(*fixedsub_pts), s=14, color=ORANGE, alpha=0.35, marker="o", zorder=2,
-               linewidths=0, label="Fixed K<192 (96/120/144/168, Baseline)")
+               linewidths=0, label="Single-$d$ (K<192)")
 
     ax.scatter(*zip(*fixed192_pts), s=28, color=BLACK, alpha=0.55, marker="s", zorder=3,
-               linewidths=0, label="Fixed K=192 (Baseline)")
+               linewidths=0, label="Single-$d$ (K=192)")
 
     ax.scatter(*zip(*sepopt_k192_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
                label="MWM (fixed) (K=192)")
@@ -107,19 +107,20 @@ def main() -> None:
     ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=5, linewidths=0)
     ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=6)
     ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=7, linewidths=0,
-               label="MWM (scheduled) (Pareto frontier, changing fidelity)")
+               label="MWM (scheduled) (Pareto frontier)")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
-    ax.set_ylabel("Success rate (%)", fontsize=13)
+    ax.set_ylabel("Success rate (%)", fontsize=18)
     ax.set_title(
         r"TwoRoom  $\Delta$=25",
-        fontsize=16, fontweight="bold",
+        fontsize=20, fontweight="bold",
     )
     ax.set_ylim(0, 102)
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
     for spine in ax.spines.values():
         spine.set_color(GRID)
-    ax.legend(loc="lower right", fontsize=9, framealpha=0.95)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(loc="lower right", fontsize=14, framealpha=0.95)
     fig.tight_layout()
 
     out = HERE / "plot.png"

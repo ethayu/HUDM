@@ -125,29 +125,30 @@ def main() -> None:
 
     draw_series(ax)
     ax.scatter([], [], s=45, color=PURPLE, marker="D", linewidths=0,
-               label=f"K96-192 floor: MWM (scheduled) (Pareto frontier, {k96_done}/{k96_target})")
+               label="MWM (scheduled) (Pareto frontier)")
     ax.scatter([], [], s=14, color=PURPLE, alpha=0.25, linewidths=0,
-               label="K96-192 floor: MWM (scheduled) (all cells)")
+               label="MWM (scheduled) (all cells)")
     ax.scatter([], [], s=45, color=ORANGE, marker="^", linewidths=0,
-               label=f"Baseline (Pareto frontier, {s_done}/{s_target})")
+               label="Single-$d$ (Pareto frontier)")
     ax.scatter([], [], s=14, color=ORANGE, alpha=0.25, marker="^", linewidths=0,
-               label="Baseline (all cells)")
+               label="Single-$d$ (all cells)")
     ax.scatter([], [], s=40, color=TEAL, marker="s", linewidths=0,
-               label=f"MWM (fixed) (Pareto frontier, {d_done}/{d_target})")
+               label="MWM (fixed) (Pareto frontier)")
     ax.scatter([], [], s=14, color=TEAL, alpha=0.25, marker="s", linewidths=0,
                label="MWM (fixed) (all cells)")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
-    ax.set_ylabel("Success rate (%)", fontsize=13)
+    ax.set_ylabel("Success rate (%)", fontsize=18)
     ax.set_title(
         r"Reacher  $\Delta$=25",
-        fontsize=16, fontweight="bold",
+        fontsize=20, fontweight="bold",
     )
     ax.set_ylim(0, 102)
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
     for spine in ax.spines.values():
         spine.set_color(GRID)
-    ax.legend(loc="lower right", fontsize=8.5, framealpha=0.95)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(loc="lower right", fontsize=14, framealpha=0.95)
 
     # Inset: zoom on the low-cost region where almost every point sits (goal25
     # success rates saturate near 100% at very low cost).
@@ -159,7 +160,7 @@ def main() -> None:
     axins.set_xlim(0, x_hi)
     axins.set_ylim(0, 102)
     axins.grid(True, color=GRID, lw=0.6, zorder=0)
-    axins.tick_params(labelsize=8)
+    axins.tick_params(labelsize=11)
     for spine in axins.spines.values():
         spine.set_color(GRID)
     mark_inset(ax, axins, loc1=2, loc2=3, fc="none", ec="#888888", lw=0.8)

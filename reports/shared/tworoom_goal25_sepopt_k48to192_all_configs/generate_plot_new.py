@@ -18,6 +18,7 @@ Usage: python generate_plot_new.py  (writes plot_new.png and plot_flops.png)
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import matplotlib
@@ -74,26 +75,38 @@ def count(summary: dict, runs: list[dict] | None = None) -> str:
 
 
 def plot(series: list[tuple], cost_fn, xlabel: str, subtitle: str, out_name: str) -> None:
+    # plot_flops.png only: zoom the y-axis to the actual data range. The
+    # bits-axis plot_new.png output (out_name != "plot_flops.png") is left
+    # exactly as before -- same hardcoded ylim.
+    is_flops = out_name == "plot_flops.png"
     fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
     ax.set_facecolor("#fcfcfb")
     fig.patch.set_facecolor("#fcfcfb")
+    all_success_rates: list[float] = []
     for z, (runs, color, marker, label) in enumerate(series):
         pts = [(cost_fn(r), r["success_rate"]) for r in runs]
+        all_success_rates.extend(sr for _, sr in pts)
         frontier = pareto_frontier(pts)
         ax.scatter(*zip(*pts), s=14, color=color, alpha=0.25, marker=marker, zorder=2 + z, linewidths=0)
         ax.plot(*zip(*frontier), color=color, lw=2, zorder=10 + z)
         ax.scatter(*zip(*frontier), s=42, color=color, marker=marker, zorder=20 + z, linewidths=0,
-                   label=f"{label} -- frontier, max {max(p[1] for p in pts):.0f}%")
+                   label=label)
 
-    ax.set_xlabel(xlabel, fontsize=13)
-    ax.set_ylabel("Success rate (%)", fontsize=13)
-    ax.set_title(TITLE, fontsize=16, fontweight="bold")
-    ax.set_ylim(0, 102)
+    ax.set_xlabel(xlabel, fontsize=18)
+    ax.set_ylabel("Success rate (%)", fontsize=18)
+    ax.set_title(TITLE, fontsize=20, fontweight="bold")
+    if is_flops and all_success_rates:
+        y_min = max(0, min(all_success_rates) - 5)
+        y_max = min(102, max(all_success_rates) + 5)
+        ax.set_ylim(y_min, y_max)
+    else:
+        ax.set_ylim(0, 102)
     ax.set_xscale("log")
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
     for spine in ax.spines.values():
         spine.set_color(GRID)
-    ax.legend(loc="lower right", fontsize=8, framealpha=0.95)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(loc="lower right", fontsize=14, framealpha=0.95)
     fig.tight_layout()
 
     out = HERE / out_name
@@ -111,13 +124,11 @@ def main() -> None:
     singlek_runs = [r for r in singlek["runs"] if fixed_k(r) >= FIXED_K_MIN]
 
     flops_series = [
-        (dense_runs, TEAL, "s", f"MWM (fixed), sepopt ckpt, K{FIXED_K_MIN}-192 ({count(dense, dense_runs)})"),
-        (singlek_runs, ORANGE, "^", f"Baseline, K{FIXED_K_MIN}-192 ({count(singlek, singlek_runs)})"),
-        (k96["runs"], PURPLE, "D", f"Joint K96-192 ckpt, MWM (scheduled) ({count(k96)})"),
+        (dense_runs, TEAL, "s", "MWM (fixed)"),
+        (singlek_runs, ORANGE, "^", "Single-$d$"),
+        (k96["runs"], PURPLE, "D", "MWM (scheduled) (K96-192)"),
     ]
-    sepopt_series = (sepopt["runs"], BLUE, "o",
-                     f"Sepopt K48-192 ckpt, MWM (scheduled) ({sepopt.get('runs_completed', len(sepopt['runs']))}"
-                     f"/{sepopt.get('runs_target', 418)})")
+    sepopt_series = (sepopt["runs"], BLUE, "o", "MWM (scheduled) (K48-192)")
 
     plot([flops_series[0], flops_series[1], sepopt_series, flops_series[2]], bits_per_ep,
          "Bits per episode (×10$^6$)",

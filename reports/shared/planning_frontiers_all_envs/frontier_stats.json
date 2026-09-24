@@ -1,0 +1,274 @@
+{
+ "tworoom_goal25": {
+  "cells": {
+   "baseline": 110,
+   "fixed": 154,
+   "scheduled": 418
+  },
+  "baseline": {
+   "max_success": 88.0,
+   "cost_at_max": 42.90459,
+   "min_cost": 4.724268
+  },
+  "fixed": {
+   "max_success": 96.0,
+   "cost_at_max": 14.172804,
+   "min_cost": 1.036716
+  },
+  "scheduled": {
+   "max_success": 98.0,
+   "cost_at_max": 295.58790951853996,
+   "min_cost": 2.860383596
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 88.0,
+   "cost_ratio_ref_over_scheduled": 4.362246809415718,
+   "matched_compute_gflops": 42.90459,
+   "success_gain_at_ref_peak_cost": 5.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 96.0,
+   "cost_ratio_ref_over_scheduled": 0.05680764909425142,
+   "matched_compute_gflops": 14.172804,
+   "success_gain_at_ref_peak_cost": -7.0
+  }
+ },
+ "pusht_goal25": {
+  "cells": {
+   "baseline": 110,
+   "fixed": 88,
+   "scheduled": 572
+  },
+  "baseline": {
+   "max_success": 94.0,
+   "cost_at_max": 1695.964752,
+   "min_cost": 11.3138544
+  },
+  "fixed": {
+   "max_success": 85.0,
+   "cost_at_max": 925.200252,
+   "min_cost": 18.77628
+  },
+  "scheduled": {
+   "max_success": 84.0,
+   "cost_at_max": 343.6381536,
+   "min_cost": 5.6800368
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 84.0,
+   "cost_ratio_ref_over_scheduled": 1.6451071514545583,
+   "matched_compute_gflops": 1695.964752,
+   "success_gain_at_ref_peak_cost": -10.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 84.0,
+   "cost_ratio_ref_over_scheduled": 2.6923676614702887,
+   "matched_compute_gflops": 925.200252,
+   "success_gain_at_ref_peak_cost": -1.0
+  }
+ },
+ "ogb_goal25": {
+  "cells": {
+   "baseline": 110,
+   "fixed": 154,
+   "scheduled": 418
+  },
+  "baseline": {
+   "max_success": 75.0,
+   "cost_at_max": 534.07818,
+   "min_cost": 7.03179
+  },
+  "fixed": {
+   "max_success": 79.0,
+   "cost_at_max": 210.9537,
+   "min_cost": 1.540206
+  },
+  "scheduled": {
+   "max_success": 79.0,
+   "cost_at_max": 44.291385,
+   "min_cost": 3.35244024
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 75.0,
+   "cost_ratio_ref_over_scheduled": 31.86205520549413,
+   "matched_compute_gflops": 534.07818,
+   "success_gain_at_ref_peak_cost": 4.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 79.0,
+   "cost_ratio_ref_over_scheduled": 4.762860768521914,
+   "matched_compute_gflops": 210.9537,
+   "success_gain_at_ref_peak_cost": 0.0
+  }
+ },
+ "reacher_goal25": {
+  "cells": {
+   "baseline": 110,
+   "fixed": 154,
+   "scheduled": 418
+  },
+  "baseline": {
+   "max_success": 83.0,
+   "cost_at_max": 255.81996,
+   "min_cost": 7.03134
+  },
+  "fixed": {
+   "max_success": 87.0,
+   "cost_at_max": 255.81996,
+   "min_cost": 1.539756
+  },
+  "scheduled": {
+   "max_success": 100.0,
+   "cost_at_max": 11.48051242062,
+   "min_cost": 3.35293912098
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 83.0,
+   "cost_ratio_ref_over_scheduled": 76.29722782596444,
+   "matched_compute_gflops": 255.81996,
+   "success_gain_at_ref_peak_cost": 17.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 87.0,
+   "cost_ratio_ref_over_scheduled": 43.29638687599748,
+   "matched_compute_gflops": 255.81996,
+   "success_gain_at_ref_peak_cost": 13.0
+  }
+ },
+ "tworoom_goal50": {
+  "cells": {
+   "baseline": 110,
+   "fixed": 154,
+   "scheduled": 93
+  },
+  "baseline": {
+   "max_success": 71.0,
+   "cost_at_max": 1434.13176,
+   "min_cost": 9.611752
+  },
+  "fixed": {
+   "max_success": 75.0,
+   "cost_at_max": 72.08814,
+   "min_cost": 2.118376
+  },
+  "scheduled": {
+   "max_success": 77.0,
+   "cost_at_max": 162.4380537034,
+   "min_cost": 9.7129208706
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 71.0,
+   "cost_ratio_ref_over_scheduled": 17.65758364254499,
+   "matched_compute_gflops": 1434.13176,
+   "success_gain_at_ref_peak_cost": 6.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 75.0,
+   "cost_ratio_ref_over_scheduled": 0.48095914932401485,
+   "matched_compute_gflops": 72.08814,
+   "success_gain_at_ref_peak_cost": -6.0
+  }
+ },
+ "pusht_goal50": {
+  "cells": {
+   "baseline": 125,
+   "fixed": 100,
+   "scheduled": 475
+  },
+  "baseline": {
+   "max_success": 37.0,
+   "cost_at_max": 1695.964752,
+   "min_cost": 22.6277088
+  },
+  "fixed": {
+   "max_success": 44.0,
+   "cost_at_max": 847.982376,
+   "min_cost": 37.55256
+  },
+  "scheduled": {
+   "max_success": 48.0,
+   "cost_at_max": 3930.830064,
+   "min_cost": 44.3351136
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 37.0,
+   "cost_ratio_ref_over_scheduled": 2.3565114793350945,
+   "matched_compute_gflops": 1695.964752,
+   "success_gain_at_ref_peak_cost": 8.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 44.0,
+   "cost_ratio_ref_over_scheduled": 1.1782557396675473,
+   "matched_compute_gflops": 847.982376,
+   "success_gain_at_ref_peak_cost": 1.0
+  }
+ },
+ "ogb_goal50": {
+  "cells": {
+   "baseline": 125,
+   "fixed": 175,
+   "scheduled": 475
+  },
+  "baseline": {
+   "max_success": 54.0,
+   "cost_at_max": 528.96482,
+   "min_cost": 21.1609
+  },
+  "fixed": {
+   "max_success": 64.0,
+   "cost_at_max": 83.73603,
+   "min_cost": 4.638148
+  },
+  "scheduled": {
+   "max_success": 67.0,
+   "cost_at_max": 939.616752,
+   "min_cost": 9.5611816
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 54.0,
+   "cost_ratio_ref_over_scheduled": 13.265622663784784,
+   "matched_compute_gflops": 528.96482,
+   "success_gain_at_ref_peak_cost": 11.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 64.0,
+   "cost_ratio_ref_over_scheduled": 0.6999902043538312,
+   "matched_compute_gflops": 83.73603,
+   "success_gain_at_ref_peak_cost": -5.0
+  }
+ },
+ "reacher_goal50": {
+  "cells": {
+   "baseline": 125,
+   "fixed": 175,
+   "scheduled": 475
+  },
+  "baseline": {
+   "max_success": 86.0,
+   "cost_at_max": 2115.82928,
+   "min_cost": 21.1594
+  },
+  "fixed": {
+   "max_success": 86.0,
+   "cost_at_max": 2142.02272,
+   "min_cost": 4.636648
+  },
+  "scheduled": {
+   "max_success": 92.0,
+   "cost_at_max": 352.47284,
+   "min_cost": 9.5596816
+  },
+  "scheduled_vs_baseline": {
+   "matched_success_target": 86.0,
+   "cost_ratio_ref_over_scheduled": 9.606023553545734,
+   "matched_compute_gflops": 2115.82928,
+   "success_gain_at_ref_peak_cost": 6.0
+  },
+  "scheduled_vs_fixed": {
+   "matched_success_target": 86.0,
+   "cost_ratio_ref_over_scheduled": 9.724943734850903,
+   "matched_compute_gflops": 2142.02272,
+   "success_gain_at_ref_peak_cost": 6.0
+  }
+ }
+}

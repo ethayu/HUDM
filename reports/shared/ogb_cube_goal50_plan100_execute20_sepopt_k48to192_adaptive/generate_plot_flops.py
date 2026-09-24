@@ -95,30 +95,34 @@ def main() -> None:
 
     draw_series(ax)
     ax.scatter([], [], s=45, color=PURPLE, linewidths=0,
-               label=f"MWM (scheduled) (Pareto frontier, {a_done}/{a_target})")
+               label="MWM (scheduled) (Pareto frontier)")
     ax.scatter([], [], s=14, color=PURPLE, alpha=0.25, linewidths=0,
                label="MWM (scheduled) (all cells)")
     ax.scatter([], [], s=45, color=ORANGE, marker="^", linewidths=0,
-               label=f"Baseline (Pareto frontier, {s_done}/{s_target})")
+               label="Single-$d$ (Pareto frontier)")
     ax.scatter([], [], s=14, color=ORANGE, alpha=0.25, marker="^", linewidths=0,
-               label="Baseline (all cells)")
+               label="Single-$d$ (all cells)")
     ax.scatter([], [], s=40, color=TEAL, marker="s", linewidths=0,
-               label=f"MWM (fixed) (Pareto frontier, {d_done}/{d_target})")
+               label="MWM (fixed) (Pareto frontier)")
     ax.scatter([], [], s=14, color=TEAL, alpha=0.25, marker="s", linewidths=0,
                label="MWM (fixed) (all cells)")
 
-    ax.set_xlabel("Audited dynamics GFLOPs per episode", fontsize=13)
-    ax.set_ylabel("Success rate (%)", fontsize=13)
+    ax.set_xlabel("Audited dynamics GFLOPs per episode", fontsize=18)
+    ax.set_ylabel("Success rate (%)", fontsize=18)
     ax.set_title(
         r"OGB-Cube  $\Delta$=50",
-        fontsize=16, fontweight="bold",
+        fontsize=20, fontweight="bold",
     )
-    ax.set_ylim(0, 102)
+    all_success_rates = [sr for _, sr in dense_pts + singlek_pts + adaptive_pts]
+    y_min = max(0, min(all_success_rates) - 5)
+    y_max = min(102, max(all_success_rates) + 5)
+    ax.set_ylim(y_min, y_max)
     ax.set_xscale("log")
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
     for spine in ax.spines.values():
         spine.set_color(GRID)
-    ax.legend(loc="lower right", fontsize=9, framealpha=0.95)
+    ax.tick_params(axis='both', labelsize=14)
+    ax.legend(loc="lower right", fontsize=14, framealpha=0.95)
 
     # No inset here: on this log-scale x-axis, a zoomed inset of the
     # low-cost region visually collides with the outer plot's own real

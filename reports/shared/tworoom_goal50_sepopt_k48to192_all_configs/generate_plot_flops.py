@@ -73,7 +73,7 @@ def main() -> None:
                    label=f"{label} -- frontier, max {max(p[1] for p in pts):.0f}%")
 
     ax.set_xlabel("Audited dynamics GFLOPs per episode", fontsize=13)
-    ax.set_ylabel("Success rate (%)", fontsize=13)
+    ax.set_ylabel("Success rate (%)", fontsize=18)
     ax.set_title(
         r"TwoRoom  $\Delta$=50",
         fontsize=16, fontweight="bold",

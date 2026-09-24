@@ -1,0 +1,554 @@
+{
+ "runs": [
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 53.0,
+   "bits_used_total": 537600000,
+   "dynamics_flops_total": 4112001120000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 5,
+    "planner.pop_size": 20
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":20}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 60.0,
+   "bits_used_total": 1075200000,
+   "dynamics_flops_total": 8224002240000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 10,
+    "planner.pop_size": 20
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":20}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 59.0,
+   "bits_used_total": 1612800000,
+   "dynamics_flops_total": 12336003360000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 15,
+    "planner.pop_size": 20
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":20}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 55.00000000000001,
+   "bits_used_total": 1344000000,
+   "dynamics_flops_total": 10280002800000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 5,
+    "planner.pop_size": 50
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":50}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 67.0,
+   "bits_used_total": 2688000000,
+   "dynamics_flops_total": 20560005600000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 10,
+    "planner.pop_size": 50
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":50}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 76.0,
+   "bits_used_total": 4032000000,
+   "dynamics_flops_total": 30840008400000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 15,
+    "planner.pop_size": 50
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":50}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 62.0,
+   "bits_used_total": 2688000000,
+   "dynamics_flops_total": 20560005600000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 5,
+    "planner.pop_size": 100
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":100}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 77.0,
+   "bits_used_total": 5376000000,
+   "dynamics_flops_total": 41120011200000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 10,
+    "planner.pop_size": 100
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":100}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 79.0,
+   "bits_used_total": 8064000000,
+   "dynamics_flops_total": 61680016800000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 15,
+    "planner.pop_size": 100
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":100}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 56.99999999999999,
+   "bits_used_total": 2150400000,
+   "dynamics_flops_total": 16448004480000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 20,
+    "planner.pop_size": 20
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":20}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 60.0,
+   "bits_used_total": 3225600000,
+   "dynamics_flops_total": 24672006720000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 30,
+    "planner.pop_size": 20
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":20}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 71.0,
+   "bits_used_total": 5376000000,
+   "dynamics_flops_total": 41120011200000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 20,
+    "planner.pop_size": 50
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":50}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 71.0,
+   "bits_used_total": 8064000000,
+   "dynamics_flops_total": 61680016800000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 30,
+    "planner.pop_size": 50
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":50}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 75.0,
+   "bits_used_total": 10752000000,
+   "dynamics_flops_total": 82240022400000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 20,
+    "planner.pop_size": 100
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":100}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 76.0,
+   "bits_used_total": 16128000000,
+   "dynamics_flops_total": 123360033600000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 30,
+    "planner.pop_size": 100
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":100}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 60.0,
+   "bits_used_total": 4032000000,
+   "dynamics_flops_total": 30840008400000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 5,
+    "planner.pop_size": 150
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":150}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 79.0,
+   "bits_used_total": 8064000000,
+   "dynamics_flops_total": 61680016800000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 10,
+    "planner.pop_size": 150
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":150}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 85.0,
+   "bits_used_total": 12096000000,
+   "dynamics_flops_total": 92520025200000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 15,
+    "planner.pop_size": 150
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":150}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 82.0,
+   "bits_used_total": 16128000000,
+   "dynamics_flops_total": 123360033600000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 20,
+    "planner.pop_size": 150
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":150}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 80.0,
+   "bits_used_total": 24192000000,
+   "dynamics_flops_total": 185040050400000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 30,
+    "planner.pop_size": 150
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":150}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 64.0,
+   "bits_used_total": 5376000000,
+   "dynamics_flops_total": 41120011200000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 5,
+    "planner.pop_size": 200
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":5,\"planner.pop_size\":200}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 76.0,
+   "bits_used_total": 10752000000,
+   "dynamics_flops_total": 82240022400000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 10,
+    "planner.pop_size": 200
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":10,\"planner.pop_size\":200}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 83.0,
+   "bits_used_total": 16128000000,
+   "dynamics_flops_total": 123360033600000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 15,
+    "planner.pop_size": 200
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":15,\"planner.pop_size\":200}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 76.0,
+   "bits_used_total": 21504000000,
+   "dynamics_flops_total": 164480044800000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 20,
+    "planner.pop_size": 200
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":20,\"planner.pop_size\":200}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  },
+  {
+   "base_name": "level5_k168_all_fixed",
+   "role": "release20260728_goal25_dense_checkpoint_level5_k168_all_fixed",
+   "schedule": "dense checkpoint | fixed level 5 (K=168) | MPC/CEM/Rollout all fixed",
+   "episodes": 100,
+   "success_rate": 80.0,
+   "bits_used_total": 32256000000,
+   "dynamics_flops_total": 246720067200000,
+   "flop_audit_error_count": 0,
+   "sweep_params": {
+    "planner.elite_frac": 0.1,
+    "planner.n_iter": 30,
+    "planner.pop_size": 200
+   },
+   "sweep_key": "{\"planner.elite_frac\":0.1,\"planner.n_iter\":30,\"planner.pop_size\":200}",
+   "manifest": {
+    "manifest_sha256": "35fdc39bd5fced36ad71f40dcb33a978056e705ab49598c75f9e4ea6efafd4b8",
+    "path": "configs/manifest/data/release20260728/pusht_goal25_exact_seed42_n100.json",
+    "sha256": "acfe5883b4a23f36bd96aa3cf2a2b3b9564f01305f8bae3ed4bb3179ee4f01f9"
+   },
+   "checkpoint_run_dir": "checkpoints_mwm/mwm_paper10_pusht_k48_72_96_120_144_168_192_sepopt_actckpt_20260917"
+  }
+ ]
+}
