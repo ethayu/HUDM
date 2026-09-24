@@ -2,34 +2,13 @@
 REAL audited dynamics FLOPs (dynamics_flops_total) as the x-axis instead of
 the bits/latent-work proxy (bits_used_total).
 
-dynamics_flops_total in data/sepopt_k48to192_adaptive_summary.json,
-data/fixed_k_baselines_summary.json, and data/sepopt_k96_fixed_cem_grid_summary.json
-was reconstructed post-hoc: the FLOP audit (flop_accounting: dynamics_audit)
-silently recorded 0 for every run in this repo due to a
-torch.inference_mode()/FlopCounterMode interaction bug (see
-mwm/diagnostics/flops.py, fixed after these runs completed). Since
-FlopCounterMode counts are a pure function of tensor shapes (not data
-values) and scale exactly linearly in batch*samples (verified empirically),
-the true dynamics_flops_total was recovered from each eval.json's saved
-per-CEM-iteration trace combined with a small shape-only calibration pass
-against the real checkpoints -- no re-running of the actual benchmark was
-needed. All 565 cells across adaptive (418) + fixed-K baselines (125) +
-Fixed K=96 sepopt grid (22) reconstructed with zero shape-matching
-mismatches (see "dynamics_flops_reconstructed_posthoc" on each run).
-
-data/individual_fixed_k_baselines_summary.json (110 cells) and
-data/dense_checkpoint_individual_levels_summary.json (154 cells) are a
-separate, newer pair of sweeps (run after the FLOP-audit bug was fixed) --
-their dynamics_flops_total is real audited data from the start, not
-reconstructed. They replace fixed_k_baselines_summary.json /
-sepopt_k96_fixed_cem_grid_summary.json as the plotted fixed-K and
-dense-sliced series (see the README).
-
-NOTE: the K=48-96 restricted adaptive-schedule probe
-(data/sepopt_k48_96_probe_summary.json) is intentionally NOT plotted here
-(excluded on request).
-
-NOTE: dense-sliced fixed-level excludes n_iter=5 cells (119/154 plotted).
+Unlike ../ogb_cube_goal25_sepopt_k48to192_all_configs/, no post-hoc FLOP
+reconstruction is needed here: all three sweeps in this report
+(adaptive_summary.json, singlek_summary.json,
+dense_checkpoint_individual_levels_summary.json) ran after the
+torch.inference_mode()/FlopCounterMode audit bug was fixed
+(mwm/diagnostics/flops.py), so dynamics_flops_total is real audited data
+from the start.
 
 Usage: python generate_plot_flops.py  (writes plot_flops.png)
 """
@@ -67,32 +46,36 @@ def pareto_frontier(points: list[tuple[float, float]]) -> list[tuple[float, floa
     return frontier
 
 
+def load(name: str) -> dict:
+    return json.load(open(HERE / "data" / name))
+
+
 def main() -> None:
-    adaptive = json.load(open(HERE / "data" / "sepopt_k48to192_adaptive_summary.json"))
-    fixedk = json.load(open(HERE / "data" / "individual_fixed_k_baselines_summary.json"))
-    dense = json.load(open(HERE / "data" / "dense_checkpoint_individual_levels_summary.json"))
+    adaptive = load("adaptive_summary.json")
+    singlek = load("singlek_summary.json")
+    dense_levels = load("dense_checkpoint_individual_levels_summary.json")
 
-    adaptive_runs = adaptive["runs"]
-    fixedk_runs = fixedk["runs"]
-    d_total = len(dense["runs"])
-    dense_runs = [r for r in dense["runs"] if r.get("n_iter") != 5]
-    a_shown = a_total = len(adaptive_runs)
-    f_shown = f_total = len(fixedk_runs)
-    d_shown = len(dense_runs)
+    a_done = adaptive.get("runs_completed", len(adaptive["runs"]))
+    a_target = adaptive.get("runs_target", len(adaptive["runs"]))
+    s_done = singlek.get("runs_completed", len(singlek["runs"]))
+    s_target = singlek.get("runs_target", len(singlek["runs"]))
+    d_target = len(dense_levels["runs"])
+    dense_runs = [r for r in dense_levels["runs"] if r.get("n_iter") != 5]
+    d_done = len(dense_runs)
 
-    adaptive_pts = [(gflops_per_ep(r), r["success_rate"]) for r in adaptive_runs]
-    fixedk_pts = [(gflops_per_ep(r), r["success_rate"]) for r in fixedk_runs]
+    adaptive_pts = [(gflops_per_ep(r), r["success_rate"]) for r in adaptive["runs"]]
+    singlek_pts = [(gflops_per_ep(r), r["success_rate"]) for r in singlek["runs"]]
     dense_pts = [(gflops_per_ep(r), r["success_rate"]) for r in dense_runs]
 
     adaptive_frontier = pareto_frontier(adaptive_pts)
-    fixedk_frontier = pareto_frontier(fixedk_pts)
+    singlek_frontier = pareto_frontier(singlek_pts)
     dense_frontier = pareto_frontier(dense_pts)
 
     def draw_series(target_ax, marker_scale=1.0):
         # Dimmed all-cells scatter (same visual language across all three series).
         target_ax.scatter(*zip(*dense_pts), s=14 * marker_scale, color=TEAL, alpha=0.25,
                            marker="s", zorder=2, linewidths=0)
-        target_ax.scatter(*zip(*fixedk_pts), s=14 * marker_scale, color=ORANGE, alpha=0.25,
+        target_ax.scatter(*zip(*singlek_pts), s=14 * marker_scale, color=ORANGE, alpha=0.25,
                            marker="^", zorder=3, linewidths=0)
         target_ax.scatter(*zip(*adaptive_pts), s=14 * marker_scale, color=BLUE, alpha=0.25,
                            zorder=4, linewidths=0)
@@ -100,8 +83,8 @@ def main() -> None:
         target_ax.plot(*zip(*dense_frontier), color=TEAL, lw=2, zorder=5)
         target_ax.scatter(*zip(*dense_frontier), s=40 * marker_scale, color=TEAL, marker="s",
                            zorder=6, linewidths=0)
-        target_ax.plot(*zip(*fixedk_frontier), color=ORANGE, lw=2, zorder=7)
-        target_ax.scatter(*zip(*fixedk_frontier), s=45 * marker_scale, color=ORANGE, marker="^",
+        target_ax.plot(*zip(*singlek_frontier), color=ORANGE, lw=2, zorder=7)
+        target_ax.scatter(*zip(*singlek_frontier), s=45 * marker_scale, color=ORANGE, marker="^",
                            zorder=8, linewidths=0)
         target_ax.plot(*zip(*adaptive_frontier), color=BLUE, lw=2, zorder=9)
         target_ax.scatter(*zip(*adaptive_frontier), s=45 * marker_scale, color=BLUE, zorder=10, linewidths=0)
@@ -112,26 +95,26 @@ def main() -> None:
 
     draw_series(ax)
     ax.scatter([], [], s=45, color=BLUE, linewidths=0,
-               label=f"Adaptive schedules (Pareto frontier, {a_shown}/{a_total})")
+               label=f"Adaptive schedules (Pareto frontier, {a_done}/{a_target})")
     ax.scatter([], [], s=14, color=BLUE, alpha=0.25, linewidths=0,
                label="Adaptive schedules (all cells)")
     ax.scatter([], [], s=45, color=ORANGE, marker="^", linewidths=0,
-               label=f"Individually-trained fixed-K (Pareto frontier, {f_shown}/{f_total})")
+               label=f"Individually-trained fixed-K (Pareto frontier, {s_done}/{s_target})")
     ax.scatter([], [], s=14, color=ORANGE, alpha=0.25, marker="^", linewidths=0,
                label="Individually-trained fixed-K (all cells)")
     ax.scatter([], [], s=40, color=TEAL, marker="s", linewidths=0,
-               label=f"Dense-sliced fixed-level (Pareto frontier, {d_shown}/{d_total})")
+               label=f"Dense-sliced fixed-level (Pareto frontier, {d_done}/{d_target})")
     ax.scatter([], [], s=14, color=TEAL, alpha=0.25, marker="s", linewidths=0,
                label="Dense-sliced fixed-level (all cells)")
 
     ax.set_xlabel("Audited dynamics GFLOPs per episode", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)
-    title = (
-        "OGB-Cube  goal_offset=25  100 episodes  horizon 2\n"
+    ax.set_title(
+        "OGB-Cube  goal_offset=50  100 episodes  horizon 4 (plan20/execute4)\n"
         "adaptive fidelity scheduling vs. fixed-K -- sepopt K48-192 checkpoint\n"
-        "(real audited FLOPs)"
+        "(real audited FLOPs)",
+        fontsize=13, fontweight="bold",
     )
-    ax.set_title(title, fontsize=13, fontweight="bold")
     ax.set_ylim(0, 102)
     ax.set_xscale("log")
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
@@ -139,11 +122,9 @@ def main() -> None:
         spine.set_color(GRID)
     ax.legend(loc="lower right", fontsize=9, framealpha=0.95)
 
-    # No inset here: on this log-scale x-axis, a zoomed inset of the low-cost
-    # region visually collides with the outer plot's own real low-cost data
-    # (which is also compressed into that corner by the log scale), making
-    # the frontier look like it dips when it doesn't. See git history for
-    # the removed inset code if this needs revisiting with a better placement.
+    # No inset here: on this log-scale x-axis, a zoomed inset of the
+    # low-cost region visually collides with the outer plot's own real
+    # low-cost data (also compressed into that corner by the log scale).
     fig.tight_layout()
 
     out = HERE / "plot_flops.png"
