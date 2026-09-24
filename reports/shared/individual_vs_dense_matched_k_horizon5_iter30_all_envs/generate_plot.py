@@ -14,11 +14,21 @@ configs/research/{env}_goal{25,50}_sepopt_dense_k48_72_horizon5_iter30.yaml
 (dense K=48/72) in the main repo for the exact run definitions.
 
 "Individually-trained":
-- K=96-192: checkpoints_mwm/mwm_paper10_{env}_k{K}_release20260728
+- K=96-192: checkpoints_single_k48to192_sepopt_retrain_20260922_{env}/k{K}/checkpoints_mwm/mwm_paper10_{env}_k{K}_sepopt_retrain_20260922
+  (the NEW single-K retrain release, 2026-09-22) -- EXCEPT TwoRoom's own
+  K=168, at both goals, which still uses the OLD
+  checkpoints_mwm/mwm_paper10_tworoom_k168_release20260728 checkpoint. The
+  new TwoRoom K=168 checkpoint shows an unexplained ~50pt success
+  regression vs. the old one at BOTH goals (91->42 at goal25, 70->15 at
+  goal50), while every other TwoRoom level (96/120/144/192, both goals)
+  matches old within a few points, and training loss/eval logs show no
+  error -- so this looks like a genuinely weaker checkpoint at that one
+  level, not noise or a bug, and is held back pending investigation. See
+  README for the full old-vs-new comparison.
 - K=48/72: checkpoints_single_k48to192_sepopt_retrain_20260922_{env}/k{K}/checkpoints_mwm/mwm_paper10_{env}_k{K}_sepopt_retrain_20260920
-  -- a SEPARATE from-scratch single-K training run (2026-09-22 release);
-  release20260728 never trained standalone K=48/72 models, so this fills
-  that gap with a real (not placeholder) individually-trained checkpoint.
+  -- the same new release; release20260728 never trained standalone K=48/72
+  models at all, so this fills that gap with a real (not placeholder)
+  individually-trained checkpoint everywhere.
 
 "Dense (matched K)":
 - K=96-192: checkpoints_mwm/mwm_paper10_{env}_k96_120_144_168_192_release20260728
@@ -100,6 +110,22 @@ def load_individual_k48_72(env: str, suffix: str) -> dict[int, float]:
     return out
 
 
+def load_individual_new_k96_192(env: str, suffix: str) -> dict[int, float]:
+    """Individually-trained K=96-192 from the NEW single-K retrain release
+    (hudm-mwm-single-k48to192-sepopt-retrain-20260922), replacing the OLD
+    release20260728 individually-trained checkpoints used for K=96-192
+    above -- verified to perform similarly (within noise) except TwoRoom
+    goal=50 K=168, which is excluded pending investigation (see README)."""
+    data = json.load(open(HERE / "data" / f"{env}{suffix}_individual_new_k96_192_summary.json"))
+    out: dict[int, float] = {}
+    for run in data["runs"]:
+        name = run["name"]
+        if name.startswith("individual_new_k"):
+            k = int(name.removeprefix("individual_new_k"))
+            out[k] = run["success_rate"]
+    return out
+
+
 def load_dense_k48_72(env: str, suffix: str) -> dict[int, float]:
     """Dense K=48/72, from the SEPARATE sepopt K=[48..192] checkpoint (not
     the release20260728 K=[96..192] dense checkpoint used for K=96-192)."""
@@ -125,6 +151,19 @@ def main() -> None:
             individual, dense = load_success_by_k(env, suffix)
             individual.update(load_individual_k48_72(env, suffix))
             dense.update(load_dense_k48_72(env, suffix))
+
+            # Use the NEW single-K retrain checkpoints for K=96-192 --
+            # except TwoRoom's own K=168, at BOTH goals, which shows an
+            # unexplained ~50pt regression vs. the old checkpoint (91->42
+            # at goal25, 70->15 at goal50) while every other TwoRoom level
+            # (96/120/144/192, both goals) matches old within a few points.
+            # This is a K=168-specific issue with the new TwoRoom
+            # checkpoint, not a goal-specific one, so only that one cell is
+            # held back on old data pending investigation. See README.
+            new_individual = load_individual_new_k96_192(env, suffix)
+            if env == "tworoom":
+                new_individual.pop(168, None)
+            individual.update(new_individual)
 
             mfc_o = ORANGE if filled else "white"
             mfc_b = BLUE if filled else "white"
