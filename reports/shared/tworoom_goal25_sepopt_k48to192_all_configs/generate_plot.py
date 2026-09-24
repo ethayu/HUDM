@@ -96,25 +96,24 @@ def main() -> None:
     # (baselines) -- otherwise overlapping points hide the adaptive-schedule
     # result.
     ax.scatter(*zip(*fixedsub_pts), s=14, color=ORANGE, alpha=0.35, marker="o", zorder=2,
-               linewidths=0, label="Fixed K<192 (96/120/144/168, individually-trained)")
+               linewidths=0, label="Fixed K<192 (96/120/144/168, Baseline)")
 
     ax.scatter(*zip(*fixed192_pts), s=28, color=BLACK, alpha=0.55, marker="s", zorder=3,
-               linewidths=0, label="Fixed K=192 (baseline, individually-trained)")
+               linewidths=0, label="Fixed K=192 (Baseline)")
 
     ax.scatter(*zip(*sepopt_k192_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
-               label="Fixed K=192 (sepopt checkpoint, no scheduling)")
+               label="MWM (fixed) (K=192)")
 
     ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=5, linewidths=0)
     ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=6)
     ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=7, linewidths=0,
-               label="Winning adaptive schedules (Pareto frontier, changing fidelity)")
+               label="MWM (scheduled) (Pareto frontier, changing fidelity)")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)
     ax.set_title(
-        "TwoRoom  goal_offset=25  100 episodes  horizon 2\n"
-        "adaptive fidelity scheduling vs. fixed-K -- sepopt K48-192 checkpoint",
-        fontsize=13, fontweight="bold",
+        r"TwoRoom  $\Delta$=25",
+        fontsize=16, fontweight="bold",
     )
     ax.set_ylim(0, 102)
     ax.grid(True, color=GRID, lw=0.8, zorder=0)

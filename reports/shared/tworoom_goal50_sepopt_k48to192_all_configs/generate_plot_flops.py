@@ -57,9 +57,9 @@ def main() -> None:
 
     series = [
         ([(gflops_per_ep(r), r["success_rate"]) for r in singlek["runs"]], ORANGE, "^",
-         f"Individually-trained fixed-K ({singlek['runs_completed']}/{singlek['runs_target']}; {singlek_ks_str})"),
+         f"Baseline ({singlek['runs_completed']}/{singlek['runs_target']}; {singlek_ks_str})"),
         ([(gflops_per_ep(r), r["success_rate"]) for r in k96["runs"]], PURPLE, "D",
-         f"Joint K96-192 ckpt, adaptive ({k96['runs_completed']}/{k96['runs_target']})"),
+         f"Joint K96-192 ckpt, MWM (scheduled) ({k96['runs_completed']}/{k96['runs_target']})"),
     ]
 
     fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
@@ -75,10 +75,8 @@ def main() -> None:
     ax.set_xlabel("Audited dynamics GFLOPs per episode", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)
     ax.set_title(
-        "TwoRoom  goal_offset=50  100 episodes  horizon 4\n"
-        "adaptive scheduling (joint K96-192 checkpoint) vs. individually-trained fixed-K\n"
-        "(real audited FLOPs; sweep PARTIAL -- counts in legend)",
-        fontsize=11, fontweight="bold",
+        r"TwoRoom  $\Delta$=50",
+        fontsize=16, fontweight="bold",
     )
     ax.set_ylim(0, 102)
     ax.set_xscale("log")

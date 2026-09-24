@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt
 
 HERE = Path(__file__).resolve().parent
 FIXED_K_MIN = 120  # drop fixed-K cells below this K from both fixed-K series
-TITLE = "TwoRoom  goal_offset=25  100 episodes  horizon 2"
+TITLE = r"TwoRoom  $\Delta$=25"
 
 PURPLE = "#8e5fd1"
 ORANGE = "#e07b1a"
@@ -87,7 +87,7 @@ def plot(series: list[tuple], cost_fn, xlabel: str, subtitle: str, out_name: str
 
     ax.set_xlabel(xlabel, fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)
-    ax.set_title(f"{TITLE}\n{subtitle}", fontsize=11, fontweight="bold")
+    ax.set_title(TITLE, fontsize=16, fontweight="bold")
     ax.set_ylim(0, 102)
     ax.set_xscale("log")
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
@@ -111,12 +111,12 @@ def main() -> None:
     singlek_runs = [r for r in singlek["runs"] if fixed_k(r) >= FIXED_K_MIN]
 
     flops_series = [
-        (dense_runs, TEAL, "s", f"Dense-sliced fixed-level, sepopt ckpt, K{FIXED_K_MIN}-192 ({count(dense, dense_runs)})"),
-        (singlek_runs, ORANGE, "^", f"Individually-trained fixed-K, K{FIXED_K_MIN}-192 ({count(singlek, singlek_runs)})"),
-        (k96["runs"], PURPLE, "D", f"Joint K96-192 ckpt, adaptive schedules ({count(k96)})"),
+        (dense_runs, TEAL, "s", f"MWM (fixed), sepopt ckpt, K{FIXED_K_MIN}-192 ({count(dense, dense_runs)})"),
+        (singlek_runs, ORANGE, "^", f"Baseline, K{FIXED_K_MIN}-192 ({count(singlek, singlek_runs)})"),
+        (k96["runs"], PURPLE, "D", f"Joint K96-192 ckpt, MWM (scheduled) ({count(k96)})"),
     ]
     sepopt_series = (sepopt["runs"], BLUE, "o",
-                     f"Sepopt K48-192 ckpt, adaptive schedules ({sepopt.get('runs_completed', len(sepopt['runs']))}"
+                     f"Sepopt K48-192 ckpt, MWM (scheduled) ({sepopt.get('runs_completed', len(sepopt['runs']))}"
                      f"/{sepopt.get('runs_target', 418)})")
 
     plot([flops_series[0], flops_series[1], sepopt_series, flops_series[2]], bits_per_ep,

@@ -125,25 +125,23 @@ def main() -> None:
 
     draw_series(ax)
     ax.scatter([], [], s=45, color=PURPLE, marker="D", linewidths=0,
-               label=f"K96-192 floor: adaptive schedules (Pareto frontier, {k96_done}/{k96_target})")
+               label=f"K96-192 floor: MWM (scheduled) (Pareto frontier, {k96_done}/{k96_target})")
     ax.scatter([], [], s=14, color=PURPLE, alpha=0.25, linewidths=0,
-               label="K96-192 floor: adaptive schedules (all cells)")
+               label="K96-192 floor: MWM (scheduled) (all cells)")
     ax.scatter([], [], s=45, color=ORANGE, marker="^", linewidths=0,
-               label=f"Individually-trained fixed-K (Pareto frontier, {s_done}/{s_target})")
+               label=f"Baseline (Pareto frontier, {s_done}/{s_target})")
     ax.scatter([], [], s=14, color=ORANGE, alpha=0.25, marker="^", linewidths=0,
-               label="Individually-trained fixed-K (all cells)")
+               label="Baseline (all cells)")
     ax.scatter([], [], s=40, color=TEAL, marker="s", linewidths=0,
-               label=f"Dense-sliced fixed-level (Pareto frontier, {d_done}/{d_target})")
+               label=f"MWM (fixed) (Pareto frontier, {d_done}/{d_target})")
     ax.scatter([], [], s=14, color=TEAL, alpha=0.25, marker="s", linewidths=0,
-               label="Dense-sliced fixed-level (all cells)")
+               label="MWM (fixed) (all cells)")
 
     ax.set_xlabel("Bits per episode (×10$^6$)", fontsize=13)
     ax.set_ylabel("Success rate (%)", fontsize=13)
     ax.set_title(
-        "Reacher  goal_offset=25  100 episodes  horizon 2 (plan10/execute2)\n"
-        "adaptive scheduling (K96-192 floor) vs. individually-trained and dense-sliced fixed-K models\n"
-        "sepopt K48-192 checkpoint",
-        fontsize=11, fontweight="bold",
+        r"Reacher  $\Delta$=25",
+        fontsize=16, fontweight="bold",
     )
     ax.set_ylim(0, 102)
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
