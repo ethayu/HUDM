@@ -34,6 +34,23 @@ python reports/shared/aurora_appendix_a6_encoder_dynamics_profile_20260925/profi
 | Dynamics | 168 | 8.542 | 17.042 | 0.831 | 0.831 |
 | Dynamics | 192 | 11.740 | 23.436 | 0.859 | 0.864 |
 
+## Normalize against theoretical FP32 throughput
+
+NVIDIA's [RTX Blackwell architecture whitepaper, Appendix A](https://images.nvidia.com/aem-dam/Solutions/geforce/blackwell/nvidia-rtx-blackwell-gpu-architecture.pdf) gives the RTX 5090 a **104.8 TFLOP/s non-Tensor FP32 peak**, based on GPU Boost Clock. For each module, define `peak-equivalent time (µs) = counted FLOPs / 104.8e12 × 1e6` and `percent of peak = 100 × peak-equivalent time (µs) / [measured CUDA-event time (ms) × 1000]`. Calculations use the **unrounded** counts and medians in [`profile_encoder_dynamics_a6.json`](profile_encoder_dynamics_a6.json), not the rounded table above. The normalizer is the same GPU peak for every level; thus it exposes how far each small forward pass is from a hypothetical arithmetic-only limit rather than correcting measured latency for a changing device.
+
+| Module | d | Peak-equivalent µs | MWM % peak | Single-d % peak |
+|---|---:|---:|---:|---:|
+| Encoder + projector | all | 32.4104 | 2.1134 | 2.1134 |
+| Dynamics | 48 | 0.0098 | 0.0012 | 0.0012 |
+| Dynamics | 72 | 0.0236 | 0.0029 | 0.0029 |
+| Dynamics | 96 | 0.0447 | 0.0055 | 0.0055 |
+| Dynamics | 120 | 0.0742 | 0.0091 | 0.0090 |
+| Dynamics | 144 | 0.1132 | 0.0137 | 0.0136 |
+| Dynamics | 168 | 0.1626 | 0.0196 | 0.0196 |
+| Dynamics | 192 | 0.2236 | 0.0260 | 0.0259 |
+
+This is **not an attainable runtime estimate**. The quoted throughput is a boost-clock non-Tensor arithmetic peak, while the measured path has serial launches, small matrix operations, memory traffic, and operators not represented in the FLOP counter. In particular, the near-flat ~0.8 ms dynamics medians are consistent with a fixed small-workload overhead, but this normalization alone does not prove which overhead dominates. The 22.9x growth in counted dynamics FLOPs remains real, and full CEM planning may behave differently from a single batch-one pass.
+
 The encoder is invariant to `d`; the dynamics module grows by 22.9x in counted MFLOPs/pass from `d=48` to `d=192`. One MWM encoder plus all seven dynamics modules contains 40.552M parameters, compared with 78.317M for the seven independent Single-`d` encoder-plus-dynamics models. A single Single-`d` checkpoint remains smaller than the full MWM hierarchy. These totals exclude reconstruction networks.
 
 The [released TwoRoom fixed-level sweep](../tworoom_goal25_sepopt_k48to192_all_configs/data/dense_checkpoint_individual_levels_summary.json) independently audits accumulated dynamics FLOPs from one trained seven-level checkpoint. At matched horizon two, population 100, 30 CEM iterations, and 100 episodes, the reported dynamics costs are 31.101, 74.814, 141.728, 235.161, 358.431, 514.855, and 707.752 GFLOPs per episode for increasing `d`. This confirms the large level-dependent arithmetic difference at planning scale; it is not derived by multiplying the isolated table values. The sweep uses `flop_accounting: dynamics_audit`, so its wall times include profiler overhead and should not be treated as clean end-to-end latency measurements.

@@ -39,4 +39,29 @@ We profile the module architectures using the saved TwoRoom $d=192$ source confi
 
 The encoder's 6.294M parameters and 3396.609M counted FLOPs per image are independent of $d$. MWM stores that path once, whereas a bank of seven Single-\(d\) checkpoints stores seven copies. Including only the encoder and dynamics modules, MWM has 40.552M parameters across all seven levels, versus 78.317M across the seven separate Single-\(d\) models; one Single-\(d\) model is smaller than the complete MWM hierarchy. In contrast to the shared encoder, dynamics cost changes sharply with level: one $d=192$ prediction has 22.9 times the counted FLOPs of a $d=48$ prediction. The released TwoRoom fixed-level sweep provides a planning-scale cross-check under one checkpoint and matched horizon-two, population-100, 30-iteration settings: audited dynamics cost rises from 31.1 to 707.8 GFLOPs per episode between those levels. OGBench-Cube uses a 25-dimensional action block instead of 10; this adds only 150 parameters and 300 counted FLOPs per dynamics pass at each level, below the table's displayed precision.
 
-The batch-one device times change much less than operator counts on this GPU, so per-pass latency should not be read as proportional to the dynamics GFLOPs accumulated by CEM. Conversely, the table does not show equal planning cost across levels: Section~\ref{sec:exp_compute_budgets} reports that accumulated dynamics computation separately. A clean end-to-end latency comparison would disable FLOP auditing and hold hardware and planner settings fixed; these architecture-only component profiles are not trained-checkpoint or full-episode timing measurements.
+To normalize these nearly flat batch-one times, we divide each module's counted FLOPs by the RTX 5090's published 104.8 TFLOP/s non-Tensor FP32 peak at boost clock~\footnote{\href{https://images.nvidia.com/aem-dam/Solutions/geforce/blackwell/nvidia-rtx-blackwell-gpu-architecture.pdf}{NVIDIA, \emph{RTX Blackwell GPU Architecture}, Appendix A, Table 3.}}. We call the result $t_{\mathrm{peak}}$ and report $100t_{\mathrm{peak}}/t_{\mathrm{measured}}$ as a peak-equivalent throughput fraction. This is a reference normalization, not a predicted runtime: peak arithmetic throughput cannot be sustained by every operation, and the FLOP counter omits unsupported operators, memory costs, and launch overhead.
+
+\begin{table}[t]
+    \centering
+    \caption{\textbf{FP32 peak-throughput normalization of Table~\ref{tab:component_profiles}.} $t_{\mathrm{peak}}=\text{counted FLOPs}/(104.8\,\text{TFLOP/s})$. The percentages are $100t_{\mathrm{peak}}/t_{\mathrm{measured}}$, using the unrounded CUDA-event medians. The common hardware peak is a comparison reference, not an attainable latency estimate.}
+    \label{tab:component_peak_normalization}
+    {\small
+    \begin{tabular}{@{}lrrrr@{}}
+        \toprule
+        Component & Level $d$ & $t_{\mathrm{peak}}$ ($\mu$s) & MWM (\% peak) & Single-\(d\) (\% peak) \\
+        \midrule
+        Encoder + projector & all & 32.4104 & 2.1134 & 2.1134 \\
+        Dynamics & 48 & 0.0098 & 0.0012 & 0.0012 \\
+        Dynamics & 72 & 0.0236 & 0.0029 & 0.0029 \\
+        Dynamics & 96 & 0.0447 & 0.0055 & 0.0055 \\
+        Dynamics & 120 & 0.0742 & 0.0091 & 0.0090 \\
+        Dynamics & 144 & 0.1132 & 0.0137 & 0.0136 \\
+        Dynamics & 168 & 0.1626 & 0.0196 & 0.0196 \\
+        Dynamics & 192 & 0.2236 & 0.0260 & 0.0259 \\
+        \bottomrule
+    \end{tabular}
+    }
+\end{table}
+\FloatBarrier
+
+The batch-one device times change much less than operator counts: the $d=48$ and $d=192$ dynamics passes reach only about 0.0012\% and 0.0260\% of the published FP32 peak, respectively, when normalized by counted FLOPs. This is consistent with a small-workload overhead floor, but the normalization alone does not identify its cause. Per-pass latency therefore should not be read as proportional to the dynamics GFLOPs accumulated by CEM. Conversely, the table does not show equal planning cost across levels: Section~\ref{sec:exp_compute_budgets} reports accumulated dynamics computation separately. A clean end-to-end latency comparison would disable FLOP auditing and hold hardware and planner settings fixed; these architecture-only component profiles are not trained-checkpoint or full-episode timing measurements.
