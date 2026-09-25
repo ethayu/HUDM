@@ -1,0 +1,145 @@
+{
+  "protocol": {
+    "source_config": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922/config.json",
+    "checkpoint_config_sha256": "adcd01731671dabfacfb3913ef51a19fbfad6fc2deba13ea563ebe0af29e9a2a",
+    "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+    "device": "NVIDIA GeForce RTX 5090",
+    "torch": "2.11.0+cu130",
+    "python": "3.11.15",
+    "precision": "float32",
+    "mode": "eval + inference_mode",
+    "batch_size": 1,
+    "warmup_passes": 20,
+    "timed_passes": 100,
+    "timing": "CUDA event elapsed time per forward pass; median reported",
+    "flops": "torch.utils.flop_counter.FlopCounterMode total; one forward pass",
+    "input_preprocessing": "excluded (normalized 3x224x224 tensor supplied)",
+    "weights": "architecture instantiated from saved config; weights not loaded"
+  },
+  "encoder_backbone_params": 5501376,
+  "projector_params": 792768,
+  "encoder_path": {
+    "input_shape": [
+      1,
+      3,
+      224,
+      224
+    ],
+    "params": 6294144,
+    "flops_per_pass": 3396609024,
+    "latency": {
+      "median_ms": 1.5335360169410706,
+      "min_ms": 1.53164803981781,
+      "max_ms": 1.6002240180969238,
+      "p10_ms": 1.5321919918060303,
+      "p90_ms": 1.5345920324325562
+    }
+  },
+  "decoders": {
+    "48": {
+      "input_shape": [
+        1,
+        48
+      ],
+      "params": 1234723,
+      "flops_per_pass": 2920243200,
+      "latency": {
+        "median_ms": 0.5133920013904572,
+        "min_ms": 0.5113599896430969,
+        "max_ms": 0.5394560098648071,
+        "p10_ms": 0.5126399993896484,
+        "p90_ms": 0.5147519707679749
+      }
+    },
+    "72": {
+      "input_shape": [
+        1,
+        72
+      ],
+      "params": 1535779,
+      "flops_per_pass": 2920845312,
+      "latency": {
+        "median_ms": 0.5073279738426208,
+        "min_ms": 0.5053439736366272,
+        "max_ms": 0.5400000214576721,
+        "p10_ms": 0.5065280199050903,
+        "p90_ms": 0.5081599950790405
+      }
+    },
+    "96": {
+      "input_shape": [
+        1,
+        96
+      ],
+      "params": 1836835,
+      "flops_per_pass": 2921447424,
+      "latency": {
+        "median_ms": 0.5076319873332977,
+        "min_ms": 0.50518399477005,
+        "max_ms": 0.5474240183830261,
+        "p10_ms": 0.5071679949760437,
+        "p90_ms": 0.5092800259590149
+      }
+    },
+    "120": {
+      "input_shape": [
+        1,
+        120
+      ],
+      "params": 2137891,
+      "flops_per_pass": 2922049536,
+      "latency": {
+        "median_ms": 0.507311999797821,
+        "min_ms": 0.5061759948730469,
+        "max_ms": 0.5354560017585754,
+        "p10_ms": 0.5070719718933105,
+        "p90_ms": 0.5086399912834167
+      }
+    },
+    "144": {
+      "input_shape": [
+        1,
+        144
+      ],
+      "params": 2438947,
+      "flops_per_pass": 2922651648,
+      "latency": {
+        "median_ms": 0.5077440142631531,
+        "min_ms": 0.5061759948730469,
+        "max_ms": 0.532480001449585,
+        "p10_ms": 0.5071679949760437,
+        "p90_ms": 0.5095040202140808
+      }
+    },
+    "168": {
+      "input_shape": [
+        1,
+        168
+      ],
+      "params": 2740003,
+      "flops_per_pass": 2923253760,
+      "latency": {
+        "median_ms": 0.509440004825592,
+        "min_ms": 0.5078399777412415,
+        "max_ms": 0.5327680110931396,
+        "p10_ms": 0.508575975894928,
+        "p90_ms": 0.5103359818458557
+      }
+    },
+    "192": {
+      "input_shape": [
+        1,
+        192
+      ],
+      "params": 3041059,
+      "flops_per_pass": 2923855872,
+      "latency": {
+        "median_ms": 0.5095679759979248,
+        "min_ms": 0.5072320103645325,
+        "max_ms": 0.530784010887146,
+        "p10_ms": 0.5082880258560181,
+        "p90_ms": 0.5106239914894104
+      }
+    }
+  }
+}

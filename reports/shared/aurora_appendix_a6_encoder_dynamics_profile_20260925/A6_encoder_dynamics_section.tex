@@ -1,0 +1,66 @@
+\subsection{Encoder and Dynamics Module Size and Inference Cost}
+\label{app:component_profiles}
+
+Section~3 defines the representation module $E_\theta$ and the action-conditioned dynamics modules $G_{\phi_k}$. In our LeWorldModel instantiation, $E_\theta$ is the ViT-Tiny image encoder plus its latent projector; each $G_{\phi_k}$ contains an action encoder, predictor, and prediction projection. The image-reconstruction networks are auxiliary training and visualization components, not the dynamics modules used by the planner, and are excluded here. MWM stores one shared $E_\theta$ and one $G_{\phi_k}$ per level. The independently trained Single-\(d\) models each store their own encoder--projector and one dynamics module at width $d$.
+
+We profile the module architectures using the saved TwoRoom $d=192$ source configuration and the released seven-level adapter construction. For Single-\(d\), we instantiate a separate model at each $d\in\{48,72,96,120,144,168,192\}$ from that source configuration; its components have the same parameter and operator counts as the corresponding MWM components. We do not load trained weights. The encoder input is a batch-one FP32 tensor of shape $1\times3\times224\times224$, and one dynamics prediction takes latent history $1\times1\times d$ and an action block $1\times1\times10$, returning $1\times1\times d$. The history length of one matches the TwoRoom model's evaluation configuration. On an NVIDIA RTX 5090 with PyTorch 2.11.0+cu130 and TF32 disabled, we warm up each module for 20 passes and report the median of 100 synchronized CUDA-event forward-pass times without FLOP instrumentation. Counted FLOPs are PyTorch \texttt{FlopCounterMode} supported-operator totals for one pass. Inputs are synthetic; preprocessing, transfers, CEM search, and episode-level rollouts are excluded.
+
+\begin{table}[t]
+    \centering
+    \caption{\textbf{Encoder and dynamics size and isolated inference cost.} The encoder includes the image backbone and projector. Dynamics includes the action encoder, predictor, and prediction projection, not the reconstruction network. Matched MWM and Single-\(d\) components have identical architectures but independently initialized weights. Counts are for one batch-one forward pass; times are uninstrumented FP32 CUDA-event medians on an RTX 5090.}
+    \label{tab:component_profiles}
+    {\small
+    \begin{tabular}{@{}llrrrr@{}}
+        \toprule
+        Component & Setting & Level $d$ & Params (M) & FLOPs (M) & Time (ms) \\
+        \midrule
+        Encoder + projector & MWM (shared) & all & 6.294 & 3396.609 & 1.534 \\
+        Encoder + projector & Single-\(d\) (each) & all & 6.294 & 3396.609 & 1.534 \\
+        \midrule
+        Dynamics & MWM & 48 & 0.521 & 1.025 & 0.815 \\
+        Dynamics & Single-\(d\) & 48 & 0.521 & 1.025 & 0.816 \\
+        Dynamics & MWM & 72 & 1.246 & 2.470 & 0.817 \\
+        Dynamics & Single-\(d\) & 72 & 1.246 & 2.470 & 0.817 \\
+        Dynamics & MWM & 96 & 2.356 & 4.683 & 0.816 \\
+        Dynamics & Single-\(d\) & 96 & 2.356 & 4.683 & 0.817 \\
+        Dynamics & MWM & 120 & 3.905 & 7.776 & 0.815 \\
+        Dynamics & Single-\(d\) & 120 & 3.905 & 7.776 & 0.823 \\
+        Dynamics & MWM & 144 & 5.948 & 11.859 & 0.828 \\
+        Dynamics & Single-\(d\) & 144 & 5.948 & 11.859 & 0.835 \\
+        Dynamics & MWM & 168 & 8.542 & 17.042 & 0.831 \\
+        Dynamics & Single-\(d\) & 168 & 8.542 & 17.042 & 0.831 \\
+        Dynamics & MWM & 192 & 11.740 & 23.436 & 0.859 \\
+        Dynamics & Single-\(d\) & 192 & 11.740 & 23.436 & 0.864 \\
+        \bottomrule
+    \end{tabular}
+    }
+\end{table}
+\FloatBarrier
+
+The encoder's 6.294M parameters and 3396.609M counted FLOPs per image are independent of $d$. MWM stores that path once, whereas a bank of seven Single-\(d\) checkpoints stores seven copies. Including only the encoder and dynamics modules, MWM has 40.552M parameters across all seven levels, versus 78.317M across the seven separate Single-\(d\) models; one Single-\(d\) model is smaller than the complete MWM hierarchy. In contrast to the shared encoder, dynamics cost changes sharply with level: one $d=192$ prediction has 22.9 times the counted FLOPs of a $d=48$ prediction. OGBench-Cube uses a 25-dimensional action block instead of 10; this adds only 150 parameters and 300 counted FLOPs per dynamics pass at each level, below the table's displayed precision.
+
+For a planning-scale measurement, Table~\ref{tab:retrained_individual_plan_throughput} uses the released retrained Single-\(d\) TwoRoom benchmark summaries for $d=48,72$ and $d=96$--$192$~\footnote{Released summaries: \href{https://github.com/ethayu/HUDM/blob/multienv-support/reports/shared/individual_vs_dense_matched_k_horizon5_iter30_all_envs/data/tworoom_individual_k48_72_summary.json}{$d=48,72$} and \href{https://github.com/ethayu/HUDM/blob/multienv-support/reports/shared/individual_vs_dense_matched_k_horizon5_iter30_all_envs/data/tworoom_individual_new_k96_192_summary.json}{$d=96$--$192$}.}. The matched protocol is goal offset 25, horizon and receding horizon five, population 300, 30 CEM iterations, 100 episodes, and seed 42. We divide each run's \texttt{dynamics\_flops\_total} by its \texttt{plan\_time\_total\_sec}; the result is counted dynamics FLOPs per second of the \emph{audited whole-planner solve}, not a dynamics-kernel throughput or a hardware-peak utilization measurement.
+
+\begin{table}[t]
+    \centering
+    \caption{\textbf{Planning time and counted dynamics work for retrained Single-\(d\) TwoRoom models.} Each row is one 100-episode, seed-42 run at the same horizon-five, population-300, 30-iteration CEM setting. Time is \texttt{plan\_time\_total\_sec}/100; effective rate is \texttt{dynamics\_flops\_total}/\texttt{plan\_time\_total\_sec}. FLOP auditing ran inside the timed planner and affects these descriptive times.}
+    \label{tab:retrained_individual_plan_throughput}
+    {\small
+    \begin{tabular}{@{}rrrr@{}}
+        \toprule
+        Level $d$ & Dynamics (GFLOPs/ep.) & Plan (s/ep.) & Rate (GFLOP/s) \\
+        \midrule
+        48 & 96.3 & 4.14 & 23.3 \\
+        72 & 230.8 & 4.13 & 55.9 \\
+        96 & 436.2 & 4.13 & 105.6 \\
+        120 & 722.4 & 4.17 & 173.1 \\
+        144 & 1099.3 & 4.17 & 263.7 \\
+        168 & 1576.9 & 4.17 & 377.9 \\
+        192 & 2165.2 & 4.23 & 511.9 \\
+        \bottomrule
+    \end{tabular}
+    }
+\end{table}
+\FloatBarrier
+
+Across these runs, counted dynamics work rises 22.5-fold from $d=48$ to $d=192$, while audited plan time per episode rises only about 2\%. The resulting effective-rate increase is arithmetic divided by a near-flat total time; it does not show that the larger dynamics module executes at the same uninstrumented latency. In this benchmark, \texttt{FlopCounterMode} wraps dynamics calls inside the timed CEM solve, and the summaries do not record the GPU model. The isolated Table~\ref{tab:component_profiles} timings and these trained-checkpoint planner ratios therefore answer different questions. A clean end-to-end latency comparison would rerun the same planner settings on identified, fixed hardware with FLOP auditing disabled.
