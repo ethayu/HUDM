@@ -1,0 +1,509 @@
+{
+  "protocol": {
+    "source_config": "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922/config.json",
+    "checkpoint_config_sha256": "32a55761129393b207f68fbed0d897a68ba15b5f176d87bcded4fb4767437150",
+    "source_config_sha256": "4d446944fe28922cc2c5763f43d4ef9132a457bd89e9a0ce5dbceac183994999",
+    "instantiation": "Saved Single-K=192 base source config; K replaced with seven released MWM levels; no weights loaded",
+    "device": "NVIDIA GeForce RTX 5090",
+    "torch": "2.11.0+cu130",
+    "python": "3.11.15",
+    "precision": "float32; TF32 disabled",
+    "mode": "eval; no_grad FLOP count; inference_mode latency",
+    "batch_size": 1,
+    "history_length": 1,
+    "action_dim": 25,
+    "warmup_passes": 20,
+    "timed_passes": 100,
+    "timing": "Synchronized CUDA-event per forward pass; median; FLOP profiler disabled during timing",
+    "flops": "torch.utils.flop_counter.FlopCounterMode supported operator totals for one forward pass",
+    "excludes": "preprocessing, transfers, reconstruction decoders, CEM search, episode rollout loop"
+  },
+  "encoder_path": {
+    "input_shapes": [
+      [
+        1,
+        3,
+        224,
+        224
+      ]
+    ],
+    "output_shape": [
+      1,
+      192
+    ],
+    "params": 6294144,
+    "flops_per_pass": 3396609024,
+    "latency_ms": {
+      "median": 1.533568024635315,
+      "p10": 1.5323840379714966,
+      "p90": 1.5346239805221558,
+      "min": 1.5320639610290527,
+      "max": 1.5888960361480713
+    }
+  },
+  "mwm_dynamics": {
+    "48": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          48
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        48
+      ],
+      "params": 520724,
+      "flops_per_pass": 1025780,
+      "latency_ms": {
+        "median": 0.7824639976024628,
+        "p10": 0.7766720056533813,
+        "p90": 0.790880024433136,
+        "min": 0.7731199860572815,
+        "max": 0.8163520097732544
+      }
+    },
+    "72": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          72
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        72
+      ],
+      "params": 1246364,
+      "flops_per_pass": 2470388,
+      "latency_ms": {
+        "median": 0.7790559828281403,
+        "p10": 0.77292799949646,
+        "p90": 0.7844480276107788,
+        "min": 0.769760012626648,
+        "max": 0.8393920063972473
+      }
+    },
+    "96": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          96
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        96
+      ],
+      "params": 2356004,
+      "flops_per_pass": 4683764,
+      "latency_ms": {
+        "median": 0.7828960120677948,
+        "p10": 0.777567982673645,
+        "p90": 0.7883840203285217,
+        "min": 0.7682880163192749,
+        "max": 0.8778240084648132
+      }
+    },
+    "120": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          120
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        120
+      ],
+      "params": 3904940,
+      "flops_per_pass": 7776500,
+      "latency_ms": {
+        "median": 0.7798399925231934,
+        "p10": 0.7741760015487671,
+        "p90": 0.7906240224838257,
+        "min": 0.7703999876976013,
+        "max": 0.8468160033226013
+      }
+    },
+    "144": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          144
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        144
+      ],
+      "params": 5948468,
+      "flops_per_pass": 11859188,
+      "latency_ms": {
+        "median": 0.8093920052051544,
+        "p10": 0.8039039969444275,
+        "p90": 0.8169919848442078,
+        "min": 0.799839973449707,
+        "max": 0.8798080086708069
+      }
+    },
+    "168": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          168
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        168
+      ],
+      "params": 8541884,
+      "flops_per_pass": 17042420,
+      "latency_ms": {
+        "median": 0.8084160089492798,
+        "p10": 0.8029119968414307,
+        "p90": 0.8162559866905212,
+        "min": 0.7995520234107971,
+        "max": 0.8790079951286316
+      }
+    },
+    "192": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          192
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        192
+      ],
+      "params": 11740484,
+      "flops_per_pass": 23436788,
+      "latency_ms": {
+        "median": 0.8328479826450348,
+        "p10": 0.8272320032119751,
+        "p90": 0.842464029788971,
+        "min": 0.8222399950027466,
+        "max": 0.8961600065231323
+      }
+    }
+  },
+  "single_d_dynamics": {
+    "48": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          48
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        48
+      ],
+      "params": 520724,
+      "flops_per_pass": 1025780,
+      "latency_ms": {
+        "median": 0.7845119833946228,
+        "p10": 0.779744029045105,
+        "p90": 0.7918400168418884,
+        "min": 0.773855984210968,
+        "max": 0.8137279748916626
+      }
+    },
+    "72": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          72
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        72
+      ],
+      "params": 1246364,
+      "flops_per_pass": 2470388,
+      "latency_ms": {
+        "median": 0.7821759879589081,
+        "p10": 0.7761279940605164,
+        "p90": 0.7902719974517822,
+        "min": 0.7728959918022156,
+        "max": 0.8123520016670227
+      }
+    },
+    "96": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          96
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        96
+      ],
+      "params": 2356004,
+      "flops_per_pass": 4683764,
+      "latency_ms": {
+        "median": 0.7879680097103119,
+        "p10": 0.7804480195045471,
+        "p90": 0.7980160117149353,
+        "min": 0.7752320170402527,
+        "max": 0.802016019821167
+      }
+    },
+    "120": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          120
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        120
+      ],
+      "params": 3904940,
+      "flops_per_pass": 7776500,
+      "latency_ms": {
+        "median": 0.7883040010929108,
+        "p10": 0.7825919985771179,
+        "p90": 0.7986559867858887,
+        "min": 0.7794880270957947,
+        "max": 0.8256639838218689
+      }
+    },
+    "144": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          144
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        144
+      ],
+      "params": 5948468,
+      "flops_per_pass": 11859188,
+      "latency_ms": {
+        "median": 0.8119840025901794,
+        "p10": 0.8055040240287781,
+        "p90": 0.8251199722290039,
+        "min": 0.8002240061759949,
+        "max": 0.8528640270233154
+      }
+    },
+    "168": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          168
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        168
+      ],
+      "params": 8541884,
+      "flops_per_pass": 17042420,
+      "latency_ms": {
+        "median": 0.8124800026416779,
+        "p10": 0.8053119778633118,
+        "p90": 0.8266879916191101,
+        "min": 0.800383985042572,
+        "max": 0.8511999845504761
+      }
+    },
+    "192": {
+      "input_shapes": [
+        [
+          1,
+          1,
+          192
+        ],
+        [
+          1,
+          1,
+          25
+        ]
+      ],
+      "output_shape": [
+        1,
+        1,
+        192
+      ],
+      "params": 11740484,
+      "flops_per_pass": 23436788,
+      "latency_ms": {
+        "median": 0.8401760160923004,
+        "p10": 0.8333439826965332,
+        "p90": 0.857695996761322,
+        "min": 0.8274880051612854,
+        "max": 0.9031680226325989
+      }
+    }
+  },
+  "single_d_architecture_check": {
+    "48": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 520724,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    },
+    "72": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 1246364,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    },
+    "96": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 2356004,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    },
+    "120": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 3904940,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    },
+    "144": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 5948468,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    },
+    "168": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 8541884,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    },
+    "192": {
+      "encoder_path_params": 6294144,
+      "dynamics_params": 11740484,
+      "matches_mwm_component_params": true,
+      "matches_mwm_dynamics_flops": true
+    }
+  },
+  "single_d_encoder_path": {
+    "input_shapes": [
+      [
+        1,
+        3,
+        224,
+        224
+      ]
+    ],
+    "output_shape": [
+      1,
+      192
+    ],
+    "params": 6294144,
+    "flops_per_pass": 3396609024,
+    "latency_ms": {
+      "median": 1.534175992012024,
+      "p10": 1.5322240591049194,
+      "p90": 1.535423994064331,
+      "min": 1.531391978263855,
+      "max": 1.5880639553070068
+    }
+  },
+  "mwm_encoder_plus_dynamics_params": 40553012,
+  "seven_single_d_encoder_plus_dynamics_params": 78317876
+}

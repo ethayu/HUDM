@@ -1,0 +1,42 @@
+\subsection{Encoder and Dynamics Module Size and Inference Cost}
+\label{app:component_profiles}
+
+Section~3 defines the representation module $E_\theta$ and the action-conditioned dynamics modules $G_{\phi_k}$. In our LeWorldModel instantiation, $E_\theta$ is the ViT-Tiny image encoder plus its latent projector; each $G_{\phi_k}$ contains an action encoder, predictor, and prediction projection. The image-reconstruction networks are auxiliary training and visualization components, not the dynamics modules used by the planner, and are excluded here. MWM stores one shared $E_\theta$ and one $G_{\phi_k}$ per level. The independently trained Single-\(d\) models each store their own encoder--projector and one dynamics module at width $d$.
+
+We profile the module architectures using the saved TwoRoom $d=192$ source configuration and the released seven-level adapter construction. For Single-\(d\), we instantiate a separate model at each $d\in\{48,72,96,120,144,168,192\}$ from that source configuration; its components have the same parameter and operator counts as the corresponding MWM components. We do not load trained weights. The encoder input is a batch-one FP32 tensor of shape $1\times3\times224\times224$, and one dynamics prediction takes latent history $1\times1\times d$ and an action block $1\times1\times10$, returning $1\times1\times d$. The history length of one matches the TwoRoom model's evaluation configuration. On an NVIDIA RTX 5090 with PyTorch 2.11.0+cu130 and TF32 disabled, we warm up each module for 20 passes and report the median of 100 synchronized CUDA-event forward-pass times without FLOP instrumentation. Counted FLOPs are PyTorch \texttt{FlopCounterMode} supported-operator totals for one pass. Inputs are synthetic; preprocessing, transfers, CEM search, and episode-level rollouts are excluded.
+
+\begin{table}[t]
+    \centering
+    \caption{\textbf{Encoder and dynamics size and isolated inference cost.} The encoder includes the image backbone and projector. Dynamics includes the action encoder, predictor, and prediction projection, not the reconstruction network. Matched MWM and Single-\(d\) components have identical architectures but independently initialized weights. Counts are for one batch-one forward pass; times are uninstrumented FP32 CUDA-event medians on an RTX 5090.}
+    \label{tab:component_profiles}
+    {\small
+    \begin{tabular}{@{}llrrrr@{}}
+        \toprule
+        Component & Setting & Level $d$ & Params (M) & FLOPs (M) & Time (ms) \\
+        \midrule
+        Encoder + projector & MWM (shared) & all & 6.294 & 3396.609 & 1.534 \\
+        Encoder + projector & Single-\(d\) (each) & all & 6.294 & 3396.609 & 1.534 \\
+        \midrule
+        Dynamics & MWM & 48 & 0.521 & 1.025 & 0.815 \\
+        Dynamics & Single-\(d\) & 48 & 0.521 & 1.025 & 0.816 \\
+        Dynamics & MWM & 72 & 1.246 & 2.470 & 0.817 \\
+        Dynamics & Single-\(d\) & 72 & 1.246 & 2.470 & 0.817 \\
+        Dynamics & MWM & 96 & 2.356 & 4.683 & 0.816 \\
+        Dynamics & Single-\(d\) & 96 & 2.356 & 4.683 & 0.817 \\
+        Dynamics & MWM & 120 & 3.905 & 7.776 & 0.815 \\
+        Dynamics & Single-\(d\) & 120 & 3.905 & 7.776 & 0.823 \\
+        Dynamics & MWM & 144 & 5.948 & 11.859 & 0.828 \\
+        Dynamics & Single-\(d\) & 144 & 5.948 & 11.859 & 0.835 \\
+        Dynamics & MWM & 168 & 8.542 & 17.042 & 0.831 \\
+        Dynamics & Single-\(d\) & 168 & 8.542 & 17.042 & 0.831 \\
+        Dynamics & MWM & 192 & 11.740 & 23.436 & 0.859 \\
+        Dynamics & Single-\(d\) & 192 & 11.740 & 23.436 & 0.864 \\
+        \bottomrule
+    \end{tabular}
+    }
+\end{table}
+\FloatBarrier
+
+The encoder's 6.294M parameters and 3396.609M counted FLOPs per image are independent of $d$. MWM stores that path once, whereas a bank of seven Single-\(d\) checkpoints stores seven copies. Including only the encoder and dynamics modules, MWM has 40.552M parameters across all seven levels, versus 78.317M across the seven separate Single-\(d\) models; one Single-\(d\) model is smaller than the complete MWM hierarchy. In contrast to the shared encoder, dynamics cost changes sharply with level: one $d=192$ prediction has 22.9 times the counted FLOPs of a $d=48$ prediction. The released TwoRoom fixed-level sweep provides a planning-scale cross-check under one checkpoint and matched horizon-two, population-100, 30-iteration settings: audited dynamics cost rises from 31.1 to 707.8 GFLOPs per episode between those levels. OGBench-Cube uses a 25-dimensional action block instead of 10; this adds only 150 parameters and 300 counted FLOPs per dynamics pass at each level, below the table's displayed precision.
+
+The batch-one device times change much less than operator counts on this GPU, so per-pass latency should not be read as proportional to the dynamics GFLOPs accumulated by CEM. Conversely, the table does not show equal planning cost across levels: Section~\ref{sec:exp_compute_budgets} reports that accumulated dynamics computation separately. A clean end-to-end latency comparison would disable FLOP auditing and hold hardware and planner settings fixed; these architecture-only component profiles are not trained-checkpoint or full-episode timing measurements.

@@ -1,5 +1,7 @@
 # Aurora Appendix A.6 component profile
 
+**Superseded for Appendix A.6.** This folder measured the auxiliary image-reconstruction `ConvImageDecoder`, which is not the action-conditioned dynamics module defined in Section 3. The corrected manuscript table and source measurements are in [`../aurora_appendix_a6_encoder_dynamics_profile_20260925/`](../aurora_appendix_a6_encoder_dynamics_profile_20260925/README.md). Keep these files only as a historical reconstruction-decoder profile; do not use their decoder FLOPs as planning dynamics FLOPs.
+
 This folder supports Table 6, “Encoder and decoder size and isolated inference cost,” in Section A.6 of the ICLR Aurora manuscript. The raw output is [`profile_components_rtx5090.json`](profile_components_rtx5090.json); [`profile_components.py`](profile_components.py) is the executable measurement script.
 
 ## Provenance and method
