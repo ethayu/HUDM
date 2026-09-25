@@ -28,6 +28,8 @@ ENVS = [
     ("reacher", "Reacher"),
 ]
 
+GOAL_COLORS = {25: BLUE, 50: ORANGE}
+
 
 def main() -> None:
     out = Path(sys.argv[1]) if len(sys.argv) > 1 else HERE / "fixed_level_planning.pdf"
@@ -35,11 +37,13 @@ def main() -> None:
 
     fig, axes = plt.subplots(1, 4, figsize=(5.5, 1.75), sharey=True)
     for ax, (env, label) in zip(axes, ENVS):
-        for goal, suffix, ls, filled in GOALS:
+        for goal, suffix, _, _ in GOALS:
             individual, dense = load_success_by_k(env, suffix)
             individual.update(load_individual_k48_72(env, suffix))
             dense.update(load_dense_k48_72(env, suffix))
-            for series, color, marker in ((individual, ORANGE, "o"), (dense, BLUE, "s")):
+            # Color encodes the goal offset; fill/line style encodes the setting.
+            color = GOAL_COLORS[goal]
+            for series, marker, ls, filled in ((individual, "o", "--", False), (dense, "s", "-", True)):
                 ax.plot(ALL_LEVELS, [series[k] for k in ALL_LEVELS], color=color, marker=marker,
                         lw=1.1, ms=3, ls=ls, markerfacecolor=color if filled else "white",
                         markeredgewidth=0.8)
@@ -54,11 +58,11 @@ def main() -> None:
     axes[0].set_ylabel("Success rate (%)")
 
     handles = [
-        Line2D([], [], color=ORANGE, marker="o", ms=3, lw=1.1, label=r"Single-$d$"),
-        Line2D([], [], color=BLUE, marker="s", ms=3, lw=1.1, label="MWM (fixed)"),
-        Line2D([], [], color="0.35", ls="-", marker="o", ms=3, lw=1.1, label=r"$\Delta=25$"),
         Line2D([], [], color="0.35", ls="--", marker="o", ms=3, lw=1.1,
-               markerfacecolor="white", label=r"$\Delta=50$"),
+               markerfacecolor="white", label=r"Single-$d$"),
+        Line2D([], [], color="0.35", ls="-", marker="s", ms=3, lw=1.1, label="MWM (fixed)"),
+        Line2D([], [], color=GOAL_COLORS[25], lw=1.1, label=r"$\Delta=25$"),
+        Line2D([], [], color=GOAL_COLORS[50], lw=1.1, label=r"$\Delta=50$"),
     ]
     fig.legend(handles=handles, loc="upper center", ncol=4, frameon=False,
                bbox_to_anchor=(0.5, 1.02), handlelength=2.2, columnspacing=1.5)

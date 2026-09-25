@@ -87,10 +87,17 @@ def plot(series: list[tuple], cost_fn, xlabel: str, subtitle: str, out_name: str
         pts = [(cost_fn(r), r["success_rate"]) for r in runs]
         all_success_rates.extend(sr for _, sr in pts)
         frontier = pareto_frontier(pts)
-        ax.scatter(*zip(*pts), s=14, color=color, alpha=0.25, marker=marker, zorder=2 + z, linewidths=0)
+        # Both MWM series (scheduled + fixed) get an explicit "(all cells)" /
+        # "(Pareto frontier)" legend split, matching the reacher folders'
+        # convention. Single-$d$ (Baseline) keeps its single bare label.
+        is_mwm = label.startswith("MWM")
+        dim_label = f"{label} (all cells)" if is_mwm else None
+        frontier_label = f"{label} (Pareto frontier)" if is_mwm else label
+        ax.scatter(*zip(*pts), s=14, color=color, alpha=0.25, marker=marker, zorder=2 + z, linewidths=0,
+                   label=dim_label)
         ax.plot(*zip(*frontier), color=color, lw=2, zorder=10 + z)
         ax.scatter(*zip(*frontier), s=42, color=color, marker=marker, zorder=20 + z, linewidths=0,
-                   label=label)
+                   label=frontier_label)
 
     ax.set_xlabel(xlabel, fontsize=18)
     ax.set_ylabel("Success rate (%)", fontsize=18)

@@ -94,6 +94,7 @@ def main() -> None:
         if r.get("checkpoint_run_dir") != k192_ckpt
     ]
     sepopt_k192_pts = [(bits_per_ep(r), r["success_rate"]) for r in sepopt_k192["runs"]]
+    sepopt_k192_frontier = pareto_frontier(sepopt_k192_pts)
 
     fig, ax = plt.subplots(figsize=(9.5, 6.2), dpi=150)
     ax.set_facecolor("#fcfcfb")
@@ -109,10 +110,14 @@ def main() -> None:
     ax.scatter(*zip(*fixed192_pts), s=28, color=BLACK, alpha=0.55, marker="s", zorder=3,
                linewidths=0, label="Single-$d$ (K=192)")
 
-    ax.scatter(*zip(*sepopt_k192_pts), s=40, color=AQUA, marker="^", zorder=4, linewidths=0,
-               label="MWM (fixed) (K=192)")
+    ax.scatter(*zip(*sepopt_k192_pts), s=14, color=AQUA, alpha=0.35, marker="^", zorder=3.3,
+               linewidths=0, label="MWM (fixed) (K=192) (all cells)")
+    ax.plot(*zip(*sepopt_k192_frontier), color=AQUA, lw=2, zorder=3.6)
+    ax.scatter(*zip(*sepopt_k192_frontier), s=40, color=AQUA, marker="^", zorder=3.9, linewidths=0,
+               label="MWM (fixed) (K=192) (Pareto frontier)")
 
-    ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=5, linewidths=0)
+    ax.scatter(*zip(*adaptive_pts), s=14, color=BLUE, alpha=0.25, zorder=5, linewidths=0,
+               label="MWM (scheduled) (all cells)")
     ax.plot(*zip(*frontier), color=BLUE, lw=2, zorder=6)
     ax.scatter(*zip(*frontier), s=45, color=BLUE, zorder=7, linewidths=0,
                label="MWM (scheduled) (Pareto frontier)")
