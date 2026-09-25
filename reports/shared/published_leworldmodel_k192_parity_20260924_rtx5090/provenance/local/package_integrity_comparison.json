@@ -1,0 +1,20 @@
+{
+  "stable-pretraining": {
+    "version": "0.1.6",
+    "source_record_files_checked": 170,
+    "source_modified": [],
+    "source_missing": [],
+    "local_record_files_checked": 171,
+    "local_modified": [],
+    "local_missing": []
+  },
+  "stable-worldmodel": {
+    "version": "0.1.0",
+    "source_record_files_checked": 121,
+    "source_modified": [],
+    "source_missing": [],
+    "local_record_files_checked": 121,
+    "local_modified": [],
+    "local_missing": []
+  }
+}

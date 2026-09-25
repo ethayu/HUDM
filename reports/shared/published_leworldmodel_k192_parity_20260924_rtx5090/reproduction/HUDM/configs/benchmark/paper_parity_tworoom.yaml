@@ -1,0 +1,21 @@
+output_dir: rollouts/mwm_paper_parity_tworoom
+title: Paper-Parity Le-WM Identity Check on TwoRoom
+env_id: swm/TwoRoom-v1
+seed: 42
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  config: configs/manifest/tworoom_paper_seed42.yaml
+paper_targets:
+  enabled: true
+  source: https://arxiv.org/pdf/2603.19312v1#page=7
+  tolerance_pp: 1.0
+  retrained_match_tolerance_pp: 5.0
+  success_rate:
+    swm/TwoRoom-v1: 87.0
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_tworoom
+  - name: retrained_identity
+    role: retrained_lewm_identity
+    checkpoint: checkpoints_mwm/retrained_lewm_identity_tworoom_upstream

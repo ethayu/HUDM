@@ -1,0 +1,920 @@
+{
+  "verified": true,
+  "seed": 2002,
+  "env_id": "swm/OGBCube-v0",
+  "config": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/ogb_cube/seed_2002.yaml",
+  "roles": [
+    {
+      "role": "upstream_lewm_converted",
+      "episodes": 100,
+      "successes": 69,
+      "success_rate": 69.0,
+      "weights_sha256": "9400a6f64e7ad176ccd345556d107e927612070535adc6de7a2657bd136506a0",
+      "trace_sha256": "1f84c2d04f6d4e85a5e101db16dbca00c05442fbe48642063a14209795bceab8",
+      "resolved_config_sha256": "e9ac79e1b8e3d72af962f84ac6b0ef50bdd2f1e407e3e385b68826b63401b315",
+      "manifest_sha256": "6b78567566069fbb9726e6bf25cebbcfd98c671f82e1ccaf13643c678cf3cdf5",
+      "dynamics_flops_total": 169599175200000
+    },
+    {
+      "role": "sepopt_k192_20260922",
+      "episodes": 100,
+      "successes": 71,
+      "success_rate": 71.0,
+      "weights_sha256": "f8f023c1bfd5fe6d6a176d8f138e0c650f0857ebe372868298ec08319bb48781",
+      "trace_sha256": "0b0752cc3289e0dd211fa3e3c0dfcf7cf3bb1ba974b52703fd9147d77e1aadcb",
+      "resolved_config_sha256": "2955ee8ee1d95e1f94a214b7879759227b31172e56b54c611afe244195004a30",
+      "manifest_sha256": "6b78567566069fbb9726e6bf25cebbcfd98c671f82e1ccaf13643c678cf3cdf5",
+      "dynamics_flops_total": 169599175200000
+    }
+  ],
+  "paired_episodes": [
+    {
+      "episode_index": 0,
+      "dataset_episode": 40,
+      "start_step": 82,
+      "goal_step": 106,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 1,
+      "dataset_episode": 70,
+      "start_step": 76,
+      "goal_step": 100,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 2,
+      "dataset_episode": 365,
+      "start_step": 161,
+      "goal_step": 185,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 3,
+      "dataset_episode": 445,
+      "start_step": 151,
+      "goal_step": 175,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 4,
+      "dataset_episode": 783,
+      "start_step": 96,
+      "goal_step": 120,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 5,
+      "dataset_episode": 791,
+      "start_step": 60,
+      "goal_step": 84,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 6,
+      "dataset_episode": 892,
+      "start_step": 60,
+      "goal_step": 84,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 7,
+      "dataset_episode": 910,
+      "start_step": 104,
+      "goal_step": 128,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 8,
+      "dataset_episode": 1000,
+      "start_step": 103,
+      "goal_step": 127,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 9,
+      "dataset_episode": 1058,
+      "start_step": 162,
+      "goal_step": 186,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 10,
+      "dataset_episode": 1079,
+      "start_step": 140,
+      "goal_step": 164,
+      "published_success": false,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 11,
+      "dataset_episode": 1103,
+      "start_step": 51,
+      "goal_step": 75,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 12,
+      "dataset_episode": 1256,
+      "start_step": 31,
+      "goal_step": 55,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 13,
+      "dataset_episode": 1323,
+      "start_step": 75,
+      "goal_step": 99,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 14,
+      "dataset_episode": 1335,
+      "start_step": 136,
+      "goal_step": 160,
+      "published_success": false,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 15,
+      "dataset_episode": 1364,
+      "start_step": 35,
+      "goal_step": 59,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 16,
+      "dataset_episode": 1374,
+      "start_step": 26,
+      "goal_step": 50,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 17,
+      "dataset_episode": 1438,
+      "start_step": 51,
+      "goal_step": 75,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 18,
+      "dataset_episode": 1450,
+      "start_step": 35,
+      "goal_step": 59,
+      "published_success": true,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 19,
+      "dataset_episode": 1512,
+      "start_step": 85,
+      "goal_step": 109,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 20,
+      "dataset_episode": 1521,
+      "start_step": 26,
+      "goal_step": 50,
+      "published_success": true,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 21,
+      "dataset_episode": 1577,
+      "start_step": 164,
+      "goal_step": 188,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 22,
+      "dataset_episode": 1716,
+      "start_step": 33,
+      "goal_step": 57,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 23,
+      "dataset_episode": 1796,
+      "start_step": 155,
+      "goal_step": 179,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 24,
+      "dataset_episode": 1813,
+      "start_step": 29,
+      "goal_step": 53,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 25,
+      "dataset_episode": 1915,
+      "start_step": 100,
+      "goal_step": 124,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 26,
+      "dataset_episode": 1962,
+      "start_step": 38,
+      "goal_step": 62,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 27,
+      "dataset_episode": 1965,
+      "start_step": 72,
+      "goal_step": 96,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 28,
+      "dataset_episode": 2120,
+      "start_step": 35,
+      "goal_step": 59,
+      "published_success": false,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 29,
+      "dataset_episode": 2234,
+      "start_step": 108,
+      "goal_step": 132,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 30,
+      "dataset_episode": 2235,
+      "start_step": 31,
+      "goal_step": 55,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 31,
+      "dataset_episode": 2266,
+      "start_step": 0,
+      "goal_step": 24,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 32,
+      "dataset_episode": 2304,
+      "start_step": 77,
+      "goal_step": 101,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 33,
+      "dataset_episode": 2382,
+      "start_step": 126,
+      "goal_step": 150,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 34,
+      "dataset_episode": 2388,
+      "start_step": 68,
+      "goal_step": 92,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 35,
+      "dataset_episode": 2474,
+      "start_step": 140,
+      "goal_step": 164,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 36,
+      "dataset_episode": 2475,
+      "start_step": 94,
+      "goal_step": 118,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 37,
+      "dataset_episode": 2482,
+      "start_step": 21,
+      "goal_step": 45,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 38,
+      "dataset_episode": 2490,
+      "start_step": 157,
+      "goal_step": 181,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 39,
+      "dataset_episode": 2506,
+      "start_step": 42,
+      "goal_step": 66,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 40,
+      "dataset_episode": 2676,
+      "start_step": 131,
+      "goal_step": 155,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 41,
+      "dataset_episode": 2958,
+      "start_step": 97,
+      "goal_step": 121,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 42,
+      "dataset_episode": 3153,
+      "start_step": 121,
+      "goal_step": 145,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 43,
+      "dataset_episode": 3186,
+      "start_step": 128,
+      "goal_step": 152,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 44,
+      "dataset_episode": 3252,
+      "start_step": 116,
+      "goal_step": 140,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 45,
+      "dataset_episode": 3549,
+      "start_step": 28,
+      "goal_step": 52,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 46,
+      "dataset_episode": 3740,
+      "start_step": 98,
+      "goal_step": 122,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 47,
+      "dataset_episode": 3763,
+      "start_step": 141,
+      "goal_step": 165,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 48,
+      "dataset_episode": 4089,
+      "start_step": 175,
+      "goal_step": 199,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 49,
+      "dataset_episode": 4127,
+      "start_step": 7,
+      "goal_step": 31,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 50,
+      "dataset_episode": 4138,
+      "start_step": 70,
+      "goal_step": 94,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 51,
+      "dataset_episode": 4400,
+      "start_step": 37,
+      "goal_step": 61,
+      "published_success": false,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 52,
+      "dataset_episode": 4520,
+      "start_step": 49,
+      "goal_step": 73,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 53,
+      "dataset_episode": 4521,
+      "start_step": 135,
+      "goal_step": 159,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 54,
+      "dataset_episode": 4551,
+      "start_step": 63,
+      "goal_step": 87,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 55,
+      "dataset_episode": 4564,
+      "start_step": 110,
+      "goal_step": 134,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 56,
+      "dataset_episode": 4586,
+      "start_step": 42,
+      "goal_step": 66,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 57,
+      "dataset_episode": 4773,
+      "start_step": 107,
+      "goal_step": 131,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 58,
+      "dataset_episode": 4808,
+      "start_step": 36,
+      "goal_step": 60,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 59,
+      "dataset_episode": 5104,
+      "start_step": 136,
+      "goal_step": 160,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 60,
+      "dataset_episode": 5149,
+      "start_step": 111,
+      "goal_step": 135,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 61,
+      "dataset_episode": 5194,
+      "start_step": 36,
+      "goal_step": 60,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 62,
+      "dataset_episode": 5441,
+      "start_step": 142,
+      "goal_step": 166,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 63,
+      "dataset_episode": 5700,
+      "start_step": 139,
+      "goal_step": 163,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 64,
+      "dataset_episode": 5731,
+      "start_step": 136,
+      "goal_step": 160,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 65,
+      "dataset_episode": 5772,
+      "start_step": 136,
+      "goal_step": 160,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 66,
+      "dataset_episode": 5906,
+      "start_step": 40,
+      "goal_step": 64,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 67,
+      "dataset_episode": 5935,
+      "start_step": 120,
+      "goal_step": 144,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 68,
+      "dataset_episode": 6076,
+      "start_step": 136,
+      "goal_step": 160,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 69,
+      "dataset_episode": 6143,
+      "start_step": 110,
+      "goal_step": 134,
+      "published_success": false,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 70,
+      "dataset_episode": 6479,
+      "start_step": 162,
+      "goal_step": 186,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 71,
+      "dataset_episode": 6580,
+      "start_step": 135,
+      "goal_step": 159,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 72,
+      "dataset_episode": 6802,
+      "start_step": 65,
+      "goal_step": 89,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 73,
+      "dataset_episode": 6924,
+      "start_step": 151,
+      "goal_step": 175,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 74,
+      "dataset_episode": 7240,
+      "start_step": 37,
+      "goal_step": 61,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 75,
+      "dataset_episode": 7368,
+      "start_step": 78,
+      "goal_step": 102,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 76,
+      "dataset_episode": 7633,
+      "start_step": 43,
+      "goal_step": 67,
+      "published_success": true,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 77,
+      "dataset_episode": 7713,
+      "start_step": 113,
+      "goal_step": 137,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 78,
+      "dataset_episode": 7890,
+      "start_step": 104,
+      "goal_step": 128,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 79,
+      "dataset_episode": 8134,
+      "start_step": 57,
+      "goal_step": 81,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 80,
+      "dataset_episode": 8288,
+      "start_step": 104,
+      "goal_step": 128,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 81,
+      "dataset_episode": 8375,
+      "start_step": 140,
+      "goal_step": 164,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 82,
+      "dataset_episode": 8451,
+      "start_step": 72,
+      "goal_step": 96,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 83,
+      "dataset_episode": 8568,
+      "start_step": 30,
+      "goal_step": 54,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 84,
+      "dataset_episode": 8862,
+      "start_step": 142,
+      "goal_step": 166,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 85,
+      "dataset_episode": 8887,
+      "start_step": 16,
+      "goal_step": 40,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 86,
+      "dataset_episode": 8963,
+      "start_step": 170,
+      "goal_step": 194,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 87,
+      "dataset_episode": 8988,
+      "start_step": 169,
+      "goal_step": 193,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 88,
+      "dataset_episode": 9016,
+      "start_step": 153,
+      "goal_step": 177,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 89,
+      "dataset_episode": 9143,
+      "start_step": 91,
+      "goal_step": 115,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 90,
+      "dataset_episode": 9241,
+      "start_step": 32,
+      "goal_step": 56,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 91,
+      "dataset_episode": 9336,
+      "start_step": 72,
+      "goal_step": 96,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 92,
+      "dataset_episode": 9362,
+      "start_step": 77,
+      "goal_step": 101,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 93,
+      "dataset_episode": 9470,
+      "start_step": 16,
+      "goal_step": 40,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 94,
+      "dataset_episode": 9562,
+      "start_step": 164,
+      "goal_step": 188,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 95,
+      "dataset_episode": 9606,
+      "start_step": 102,
+      "goal_step": 126,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 96,
+      "dataset_episode": 9719,
+      "start_step": 164,
+      "goal_step": 188,
+      "published_success": true,
+      "retrained_success": true
+    },
+    {
+      "episode_index": 97,
+      "dataset_episode": 9734,
+      "start_step": 107,
+      "goal_step": 131,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 98,
+      "dataset_episode": 9818,
+      "start_step": 10,
+      "goal_step": 34,
+      "published_success": false,
+      "retrained_success": false
+    },
+    {
+      "episode_index": 99,
+      "dataset_episode": 9940,
+      "start_step": 86,
+      "goal_step": 110,
+      "published_success": true,
+      "retrained_success": true
+    }
+  ],
+  "protocol": {
+    "data": {
+      "path": "data/upstream/ogb_cube_single_expert.lance",
+      "format": "lance",
+      "split_ratio": 0.9,
+      "pixels_key": "pixels",
+      "action_key": "action",
+      "keys_to_load": [
+        "pixels",
+        "action",
+        "qpos",
+        "qvel",
+        "observation",
+        "privileged/block_0_pos",
+        "privileged/block_0_quat"
+      ],
+      "keys_to_cache": [
+        "action",
+        "qpos",
+        "qvel",
+        "observation",
+        "privileged/block_0_pos",
+        "privileged/block_0_quat"
+      ],
+      "action_preprocessing": "standard_scaler"
+    },
+    "eval": {
+      "episodes": 100,
+      "num_envs": 50,
+      "goal_offset": 25,
+      "goal_indexing": "upstream_lewm_end_exclusive",
+      "seed": 2002,
+      "budget": 50,
+      "sampling": "upstream_lewm",
+      "manifest_path": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/ogb_cube_seed2002.json"
+    },
+    "env": {
+      "max_episode_steps": 100,
+      "goal_conditioned": true,
+      "kwargs": {
+        "env_type": "single",
+        "ob_type": "states",
+        "multiview": false,
+        "width": 224,
+        "height": 224,
+        "visualize_info": false,
+        "terminate_at_goal": true
+      }
+    },
+    "executed_env_runtime": {},
+    "restore": {
+      "import_path": "mwm.ogbench.restore.ogbench_cube_restore_spec"
+    },
+    "planner": {
+      "rollout_semantics": "upstream_lewm_historical",
+      "policy_semantics": "upstream_lewm_historical",
+      "horizon": 5,
+      "receding_horizon": 5,
+      "action_block": 5,
+      "batch_size": 1,
+      "pop_size": 300,
+      "topk": 30,
+      "elite_frac": 0.1,
+      "n_iter": 10,
+      "init_std": 1.0,
+      "seed": 42,
+      "warm_start": true,
+      "clamp_actions": false,
+      "std_unbiased": true,
+      "scheduler": {
+        "enabled": true,
+        "mpc": {
+          "mode": "fixed",
+          "level": "finest"
+        },
+        "cem": {
+          "mode": "fixed",
+          "level": "base"
+        },
+        "rollout": {
+          "mode": "fixed",
+          "level": "base"
+        }
+      },
+      "flop_accounting": "dynamics_audit"
+    },
+    "device": "auto"
+  }
+}

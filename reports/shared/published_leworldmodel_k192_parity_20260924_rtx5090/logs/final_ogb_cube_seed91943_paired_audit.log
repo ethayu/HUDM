@@ -1,0 +1,26 @@
+
+{"started_at": "2026-09-24T22:22:10.404435+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "/tmp/hudm-5090-20260924-0z4ayR/audit_paired.py", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/ogb_cube/seed_91943.yaml"]}
+{"verified": true, "audit": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/ogb_cube/seed_91943/paired_audit.json", "roles": [{"role": "upstream_lewm_converted", "episodes": 100, "successes": 73, "success_rate": 73.0, "weights_sha256": "9400a6f64e7ad176ccd345556d107e927612070535adc6de7a2657bd136506a0", "trace_sha256": "4b0e06646e3f40464ff02d5d9e3e6541ddba83b22d0dc873259cfda48e7bfdfa", "resolved_config_sha256": "0c2fcb52f2866463e0ba69e968c4865930e4fa9d41a6d5eb1e91effd29ab0b02", "manifest_sha256": "5f403867ae64d0b209171061019d6f6f38d0140425a773d8b4bce64b3ecaf2a9", "dynamics_flops_total": 169599175200000}, {"role": "sepopt_k192_20260922", "episodes": 100, "successes": 75, "success_rate": 75.0, "weights_sha256": "f8f023c1bfd5fe6d6a176d8f138e0c650f0857ebe372868298ec08319bb48781", "trace_sha256": "0c2510f25c1cd8daa05d6a3f4645cddde2ce48f91f9710ead39058c978f0f577", "resolved_config_sha256": "75fc6c8c41a8931a05e53bfe62b78e7dd4c519133d817824588b37980f32060d", "manifest_sha256": "5f403867ae64d0b209171061019d6f6f38d0140425a773d8b4bce64b3ecaf2a9", "dynamics_flops_total": 169599175200000}]}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python /tmp/hudm-5090-20260924-0z4ayR/audit_paired.py reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/ogb_cube/seed_91943.yaml"
+	User time (seconds): 0.19
+	System time (seconds): 0.03
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.22
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 70948
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 25037
+	Voluntary context switches: 1
+	Involuntary context switches: 73
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

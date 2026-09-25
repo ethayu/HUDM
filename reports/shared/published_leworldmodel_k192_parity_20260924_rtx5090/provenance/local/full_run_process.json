@@ -1,0 +1,18 @@
+{
+  "pid": 767493,
+  "launched_at": "2026-09-24T15:07:54.305803+00:00",
+  "log": "/tmp/hudm-5090-20260924-0z4ayR/full_run.log",
+  "runner": "/tmp/hudm-5090-20260924-0z4ayR/run_local.py",
+  "command": [
+    "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+    "-u",
+    "/tmp/hudm-5090-20260924-0z4ayR/run_local.py",
+    "--stages",
+    "final",
+    "--environments",
+    "tworoom",
+    "reacher",
+    "pusht"
+  ],
+  "scope": "qualified final runs while Cube awaits additional host memory"
+}

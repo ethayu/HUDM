@@ -1,0 +1,159 @@
+{
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "torch": "2.11.0+cu130",
+  "cuda": "13.0",
+  "models": [
+    {
+      "checkpoint": "upstream_lewm_tworoom",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 177823232
+    },
+    {
+      "checkpoint": "mwm_paper10_tworoom_k192_sepopt_retrain_20260922",
+      "history": 1,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 338280448
+    },
+    {
+      "checkpoint": "upstream_lewm_reacher",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 326107136
+    },
+    {
+      "checkpoint": "mwm_paper10_reacher_k192_sepopt_retrain_20260922",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 338280448
+    },
+    {
+      "checkpoint": "upstream_lewm_pusht",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 326107136
+    },
+    {
+      "checkpoint": "mwm_paper10_pusht_k192_sepopt_retrain_20260922",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 338280448
+    },
+    {
+      "checkpoint": "upstream_lewm_ogb_cube",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 326108160
+    },
+    {
+      "checkpoint": "mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922",
+      "history": 3,
+      "prediction_shape": [
+        1,
+        2,
+        6,
+        192
+      ],
+      "peak_cuda_memory_bytes": 338281472
+    }
+  ],
+  "environments": [
+    {
+      "environment": "tworoom",
+      "render_shape": [
+        224,
+        224,
+        3
+      ],
+      "runtime": {}
+    },
+    {
+      "environment": "reacher",
+      "render_shape": [
+        224,
+        224,
+        3
+      ],
+      "runtime": {
+        "reacher_qpos_threshold": 0.1,
+        "dependency_default_qpos_thresholds": [
+          0.05
+        ],
+        "applied_env_count": 1
+      }
+    },
+    {
+      "environment": "pusht",
+      "render_shape": [
+        224,
+        224,
+        3
+      ],
+      "runtime": {}
+    },
+    {
+      "environment": "ogb_cube",
+      "render_shape": [
+        224,
+        224,
+        3
+      ],
+      "runtime": {}
+    }
+  ],
+  "dependencies": {
+    "stable-worldmodel": {
+      "version": "0.1.0",
+      "sha256": "fe2bc305449dfcc9939248571566ba5292901cdab31e6dc9e4f0bff0a1d0b85a"
+    },
+    "stable-pretraining": {
+      "version": "0.1.6",
+      "sha256": "b28797825408b3df31ab445098073f371e44c48fcbc709b7e9616913018a0857"
+    },
+    "torch": {
+      "version": "2.11.0",
+      "sha256": "2153f0c814d99b4ce4a7bf9d4dcacbfa720b35de4c09ec042cdcca4ebb0ad54b"
+    },
+    "local_repo": {
+      "commit_id": "28d0e78a5011c72bebf8b01073163cf45e60f680",
+      "dirty": true,
+      "diff_sha256": "e1c09a73a3966f911e5157e7bb83cd308e8c6875fc2a47c9f0ab7bfea336b379"
+    }
+  },
+  "passed": true
+}

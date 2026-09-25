@@ -1,0 +1,20 @@
+{
+  "ready": true,
+  "verified_at": "2026-09-24T14:09:48.856784+00:00",
+  "source_input_receipt": "source_input_verification_receipt.json",
+  "execution_source_check": "execution_source_hash_check.json",
+  "dataset_structure_receipt": "dataset_structure_receipt.json",
+  "paired_evaluator_smoke_receipt": "evaluator_smoke_receipt.json",
+  "runtime_smoke_receipt": "runtime_smoke_receipt.json",
+  "vector_env_smoke_receipt": "vector_env_smoke_receipt.json",
+  "hardware": "hardware.json",
+  "source_snapshot_files_verified": 508,
+  "source_dataset_hashes_compared": true,
+  "evaluator_smokes_passed": [
+    "ogb_cube",
+    "pusht",
+    "reacher",
+    "tworoom"
+  ],
+  "note": "All four exact source datasets and eight checkpoint evaluations verified; local Python 3.11 and CUDA 13 runtime use pinned source package versions. Compiled source Python caches are preserved in the snapshot; execution uses local Python caches."
+}

@@ -1,0 +1,38 @@
+output_dir: reports/research/k192_sepopt_published_parity_20260924/final_n100/tworoom/seed_82715
+title: TwoRoom published LeWorldModel vs September K=192 sepopt baseline (evaluation
+  seed 82715, n=100)
+env_id: swm/TwoRoom-v1
+seed: 82715
+eval_config: configs/eval/paper_tworoom.yaml
+manifest:
+  group: k192_sepopt_published_parity_swm/TwoRoom-v1_seed82715_n100
+  path: reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/tworoom_seed82715.json
+run_defaults:
+  planner:
+    flop_accounting: dynamics_audit
+    scheduler:
+      enabled: true
+      mpc:
+        mode: fixed
+        level: finest
+      cem:
+        mode: fixed
+        level: base
+      rollout:
+        mode: fixed
+        level: base
+runs:
+- name: published
+  role: upstream_lewm_converted
+  checkpoint: checkpoints_mwm/upstream_lewm_tworoom
+  eval:
+    episodes: 100
+    num_envs: 50
+    budget: 50
+- name: sepopt_k192_20260922
+  role: sepopt_k192_20260922
+  checkpoint: checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922
+  eval:
+    episodes: 100
+    num_envs: 50
+    budget: 50

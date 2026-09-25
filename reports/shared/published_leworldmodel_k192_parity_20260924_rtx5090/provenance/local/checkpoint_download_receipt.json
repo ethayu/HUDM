@@ -1,0 +1,49 @@
+{
+  "verified": true,
+  "models": [
+    {
+      "environment": "tworoom",
+      "checkpoint": "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922",
+      "archive_sha256": "d36c2878ddba09cc1ddb4c70d7fb82c8d453ad7c47a8523ae768c14550aa34cd",
+      "weights_sha256": "0782bd7798c560178d7cea962790ff774fd2d60f7630e02cee80d3f8307f2cf4",
+      "files": [
+        "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922/config.json",
+        "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922/weights.pt",
+        "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922/world_metadata.json"
+      ]
+    },
+    {
+      "environment": "ogb_cube",
+      "checkpoint": "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922",
+      "archive_sha256": "9b94c89bca46a5e075d8376c78ff587a1fb89826d69862bc3710cb4f670dc824",
+      "weights_sha256": "f8f023c1bfd5fe6d6a176d8f138e0c650f0857ebe372868298ec08319bb48781",
+      "files": [
+        "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922/config.json",
+        "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922/weights.pt",
+        "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922/world_metadata.json"
+      ]
+    },
+    {
+      "environment": "reacher",
+      "checkpoint": "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922",
+      "archive_sha256": "fcd4755a78f49d6c4e0bf1f686ea1d32380478e79a3bc60c43e30d25752b788b",
+      "weights_sha256": "2993c6146f5ad6ec160c35422c75c89113d25b51c6de2552f1ecc5b30fe891ff",
+      "files": [
+        "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922/config.json",
+        "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922/weights.pt",
+        "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922/world_metadata.json"
+      ]
+    },
+    {
+      "environment": "pusht",
+      "checkpoint": "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922",
+      "archive_sha256": "a36f7e1a1e98fdd855b5ba0298df6feda0454442d138049d18dd083293e05334",
+      "weights_sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c",
+      "files": [
+        "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922/config.json",
+        "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922/weights.pt",
+        "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922/world_metadata.json"
+      ]
+    }
+  ]
+}

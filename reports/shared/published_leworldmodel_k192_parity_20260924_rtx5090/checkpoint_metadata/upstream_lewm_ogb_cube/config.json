@@ -1,0 +1,83 @@
+{
+  "kwargs": {
+    "K": [
+      192
+    ],
+    "action_block": 5,
+    "action_dim": 25,
+    "component_policy": {
+      "per_level": [
+        "transition"
+      ],
+      "reconstructor": [],
+      "shared": [
+        "latent_producer"
+      ]
+    },
+    "expected_D": 192,
+    "family": "lewm",
+    "image_shape": [
+      224,
+      224
+    ],
+    "normalize_imagenet": true,
+    "source_config": {
+      "_target_": "stable_worldmodel.wm.lewm.LeWM",
+      "action_encoder": {
+        "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+        "emb_dim": 192,
+        "input_dim": 25
+      },
+      "encoder": {
+        "_target_": "stable_pretraining.backbone.utils.vit_hf",
+        "image_size": 224,
+        "patch_size": 14,
+        "pretrained": false,
+        "size": "tiny",
+        "use_mask_token": false
+      },
+      "pred_proj": {
+        "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+        "hidden_dim": 2048,
+        "input_dim": 192,
+        "norm_fn": {
+          "_partial_": true,
+          "_target_": "torch.nn.BatchNorm1d"
+        },
+        "output_dim": 192
+      },
+      "predictor": {
+        "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+        "depth": 6,
+        "dim_head": 64,
+        "dropout": 0.1,
+        "emb_dropout": 0.0,
+        "heads": 16,
+        "hidden_dim": 192,
+        "input_dim": 192,
+        "mlp_dim": 2048,
+        "num_frames": 3,
+        "output_dim": 192
+      },
+      "projector": {
+        "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+        "hidden_dim": 2048,
+        "input_dim": 192,
+        "norm_fn": {
+          "_partial_": true,
+          "_target_": "torch.nn.BatchNorm1d"
+        },
+        "output_dim": 192
+      }
+    },
+    "source_config_sha256": "4d446944fe28922cc2c5763f43d4ef9132a457bd89e9a0ce5dbceac183994999",
+    "training_recipe": {
+      "history_size": 3,
+      "loss_scope": {
+        "regularizers": "shared_latent"
+      },
+      "num_preds": 1
+    }
+  },
+  "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+}

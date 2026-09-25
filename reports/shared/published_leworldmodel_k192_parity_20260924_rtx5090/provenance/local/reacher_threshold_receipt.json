@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "records": [
+    {
+      "role": "upstream_lewm_converted",
+      "env_runtime": {
+        "applied_env_count": 2,
+        "dependency_default_qpos_thresholds": [
+          0.05,
+          0.05
+        ],
+        "post_reset_validation": "passed",
+        "reacher_qpos_threshold": 0.1
+      }
+    },
+    {
+      "role": "sepopt_k192_20260922",
+      "env_runtime": {
+        "applied_env_count": 2,
+        "dependency_default_qpos_thresholds": [
+          0.05,
+          0.05
+        ],
+        "post_reset_validation": "passed",
+        "reacher_qpos_threshold": 0.1
+      }
+    }
+  ]
+}

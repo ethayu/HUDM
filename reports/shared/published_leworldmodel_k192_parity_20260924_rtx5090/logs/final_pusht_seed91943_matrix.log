@@ -1,0 +1,60 @@
+
+{"started_at": "2026-09-24T16:21:50.419384+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml", "--resume"]}
+[benchmark] 1/2 published
+[benchmark] 2/2 sepopt_k192_20260922
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943/summary.json
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943/review.html
+[benchmark] inspect rollout videos with: python -m mwm.benchmark.render_review reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943 --serve
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml --resume"
+	User time (seconds): 552.41
+	System time (seconds): 2.48
+	Percent of CPU this job got: 101%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 9:07.34
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 3479732
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1645591
+	Voluntary context switches: 81177
+	Involuntary context switches: 99726
+	Swaps: 0
+	File system inputs: 75368
+	File system outputs: 217480
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:49:37.774342+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml", "--resume"]}
+[benchmark] resume skip published
+[benchmark] resume skip sepopt_k192_20260922
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943/summary.json
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943/review.html
+[benchmark] inspect rollout videos with: python -m mwm.benchmark.render_review reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943 --serve
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml --resume"
+	User time (seconds): 1.11
+	System time (seconds): 0.09
+	Percent of CPU this job got: 116%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:01.03
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 174248
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 66659
+	Voluntary context switches: 175
+	Involuntary context switches: 408
+	Swaps: 0
+	File system inputs: 87696
+	File system outputs: 10336
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

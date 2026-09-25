@@ -1,0 +1,57 @@
+
+{"started_at": "2026-09-24T14:55:56.620132+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml", "--resume"]}
+[benchmark] 1/2 published
+Command terminated by signal 9
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml --resume"
+	User time (seconds): 73.57
+	System time (seconds): 7.47
+	Percent of CPU this job got: 85%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:35.32
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 11812704
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 8227
+	Minor (reclaiming a frame) page faults: 4080661
+	Voluntary context switches: 333479
+	Involuntary context switches: 23594
+	Swaps: 0
+	File system inputs: 2326856
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:27:42.195524+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml", "--resume"]}
+[benchmark] 1/2 published
+[benchmark] 2/2 sepopt_k192_20260922
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/screen_n50/ogb_cube/seed_0/summary.json
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/screen_n50/ogb_cube/seed_0/review.html
+[benchmark] inspect rollout videos with: python -m mwm.benchmark.render_review reports/research/k192_sepopt_published_parity_20260924/screen_n50/ogb_cube/seed_0 --serve
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml --resume"
+	User time (seconds): 248.96
+	System time (seconds): 11.84
+	Percent of CPU this job got: 102%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 4:13.92
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 14407972
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 46
+	Minor (reclaiming a frame) page faults: 7117555
+	Voluntary context switches: 103571
+	Involuntary context switches: 49942
+	Swaps: 0
+	File system inputs: 1432912
+	File system outputs: 61376
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

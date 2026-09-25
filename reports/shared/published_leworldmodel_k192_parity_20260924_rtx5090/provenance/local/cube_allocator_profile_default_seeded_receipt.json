@@ -1,0 +1,77 @@
+{
+  "diagnostic_only": true,
+  "completed_at": "2026-09-24T16:39:04.555759+00:00",
+  "device": "cpu",
+  "diagnostic_seed": 42,
+  "variant": "default_seeded",
+  "python_allocator": "default",
+  "python_hash_seed": "42",
+  "diagnostic_script_sha256": "5ad2668cce01e70d19f2da4cad3f726d263f02dd6e97a3aa134f84c6c83d61e3",
+  "environment_created": false,
+  "rollouts_executed": false,
+  "source_config_sha256": "ada7bf016721582af1598316d559af78dfb3c032a00d14ff5e987df4a3166376",
+  "checkpoint": "checkpoints_mwm/upstream_lewm_ogb_cube",
+  "source_and_dependencies_modified": false,
+  "arrow_allocator": "mimalloc",
+  "gc_objects_collected": 0,
+  "malloc_trim_result": 1,
+  "model_and_scaler_values_unchanged": true,
+  "model_and_scaler_sha256": "d2f3a6f35342df864f10931429bbaa7898c6a2550e0caca6e0fcb65bfe50e68b",
+  "rng_state_unchanged": true,
+  "rng_sha256": "d5780f94dfc34cd38353decab4512c5a968e2f602f31ad0759d71336137b1c47",
+  "samples": [
+    {
+      "phase": "imports_complete",
+      "rss_bytes": 527953920,
+      "host_available_bytes": 12452442112,
+      "arrow_allocated_bytes": 0,
+      "VmRSS": "515580 kB",
+      "RssAnon": "283204 kB",
+      "RssFile": "232376 kB",
+      "RssShmem": "0 kB"
+    },
+    {
+      "phase": "runtime_ready",
+      "rss_bytes": 2497126400,
+      "host_available_bytes": 10126348288,
+      "arrow_allocated_bytes": 0,
+      "VmRSS": "2438600 kB",
+      "RssAnon": "2008072 kB",
+      "RssFile": "430528 kB",
+      "RssShmem": "0 kB"
+    },
+    {
+      "phase": "after_gc",
+      "rss_bytes": 2497126400,
+      "host_available_bytes": 10122248192,
+      "arrow_allocated_bytes": 0,
+      "VmRSS": "2438600 kB",
+      "RssAnon": "2008072 kB",
+      "RssFile": "430528 kB",
+      "RssShmem": "0 kB"
+    },
+    {
+      "phase": "after_arrow_release_unused",
+      "rss_bytes": 2497179648,
+      "host_available_bytes": 10122248192,
+      "arrow_allocated_bytes": 0,
+      "VmRSS": "2438652 kB",
+      "RssAnon": "2008060 kB",
+      "RssFile": "430592 kB",
+      "RssShmem": "0 kB"
+    },
+    {
+      "phase": "after_malloc_trim",
+      "rss_bytes": 2418425856,
+      "host_available_bytes": 10199146496,
+      "arrow_allocated_bytes": 0,
+      "VmRSS": "2361740 kB",
+      "RssAnon": "1931148 kB",
+      "RssFile": "430592 kB",
+      "RssShmem": "0 kB"
+    }
+  ],
+  "rss_released_bytes": 78700544,
+  "scope": "CPU setup memory only; does not prove that the 50-environment GPU experiment fits.",
+  "diagnostic_script_snapshot": "profile_cube_setup_memory.cpu_comparison.py"
+}

@@ -1,0 +1,165 @@
+
+{"started_at": "2026-09-24T12:31:06.473076+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_tworoom"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml",
+  "env_id": "swm/TwoRoom-v1",
+  "expected_cells": [
+    [
+      "swm/TwoRoom-v1",
+      0,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/TwoRoom-v1",
+      0,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/TwoRoom-v1_seed0_n50",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/screen_n50/tworoom_seed0.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_0",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 0,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml --static-only"
+	User time (seconds): 0.95
+	System time (seconds): 0.13
+	Percent of CPU this job got: 119%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.90
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 611536
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81592
+	Voluntary context switches: 64
+	Involuntary context switches: 470
+	Swaps: 0
+	File system inputs: 264
+	File system outputs: 136
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T14:09:48.919651+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_tworoom"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml",
+  "env_id": "swm/TwoRoom-v1",
+  "expected_cells": [
+    [
+      "swm/TwoRoom-v1",
+      0,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/TwoRoom-v1",
+      0,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/TwoRoom-v1_seed0_n50",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/screen_n50/tworoom_seed0.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_0",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 0,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml --static-only"
+	User time (seconds): 0.92
+	System time (seconds): 0.11
+	Percent of CPU this job got: 120%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.86
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 611980
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81550
+	Voluntary context switches: 96
+	Involuntary context switches: 446
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:26:58.997897+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_tworoom"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml",
+  "env_id": "swm/TwoRoom-v1",
+  "expected_cells": [
+    [
+      "swm/TwoRoom-v1",
+      0,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/TwoRoom-v1",
+      0,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/TwoRoom-v1_seed0_n50",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/screen_n50/tworoom_seed0.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_0",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 0,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_0.yaml --static-only"
+	User time (seconds): 0.88
+	System time (seconds): 0.12
+	Percent of CPU this job got: 120%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.84
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 611640
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 2
+	Minor (reclaiming a frame) page faults: 81479
+	Voluntary context switches: 153
+	Involuntary context switches: 478
+	Swaps: 0
+	File system inputs: 8080
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

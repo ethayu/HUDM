@@ -1,0 +1,295 @@
+{
+  "D": 192,
+  "action_block": 5,
+  "action_dim": 2,
+  "action_high": [
+    1.0,
+    1.0
+  ],
+  "action_low": [
+    -1.0,
+    -1.0
+  ],
+  "action_preprocessing": "standard_scaler",
+  "action_spec": {
+    "base_dim": 2,
+    "block": 5,
+    "dim": 10
+  },
+  "adapter": "lewm",
+  "adapter_family": "lewm",
+  "architecture_version": "lewm_base_adapter_v1",
+  "artifacts": {
+    "config": {
+      "path": "config.json",
+      "sha256": "df3851f937b4f14854c460c5ee9a696170c6089c0102e5dbc74016a98230807e"
+    },
+    "weights": {
+      "path": "weights.pt",
+      "sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c"
+    }
+  },
+  "best_checkpoint": "logs/mwm_training/mwm_paper10_pusht_k192_sepopt_retrain_20260922/csv_logs/version_0/checkpoints/epoch=9-step=278660.ckpt",
+  "best_model_score": null,
+  "checkpoint_monitor": null,
+  "component_policy": {
+    "per_level": [
+      "transition"
+    ],
+    "reconstructor": [
+      "decoder"
+    ],
+    "shared": [
+      "latent_producer"
+    ]
+  },
+  "dataset": {
+    "action_key": "action",
+    "format": "lance",
+    "normalized_columns": [
+      "pixels",
+      "action",
+      "proprio",
+      "state"
+    ],
+    "path": "data/upstream/pusht_expert_train.lance",
+    "pixels_key": "pixels",
+    "runtime_format": "lance",
+    "runtime_path": "data/upstream/pusht_expert_train.lance",
+    "split": "stable_pretraining_random_split"
+  },
+  "decoder_architectures": [
+    {
+      "K": 192,
+      "decoder": "ConvImageDecoder",
+      "image_shape": [
+        224,
+        224
+      ],
+      "latent_dim": 192
+    }
+  ],
+  "dependencies": {
+    "local_repo": {
+      "commit_id": "28d0e78a5011c72bebf8b01073163cf45e60f680",
+      "diff_sha256": "9bd3e4b3efceb4d57adf8172ad4850e2c612a10c04238c5e2cfcd021500196ea",
+      "dirty": true
+    },
+    "stable-pretraining": {
+      "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+      "version": "0.1.6"
+    },
+    "stable-worldmodel": {
+      "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+      "version": "0.1.0"
+    },
+    "torch": {
+      "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+      "version": "2.11.0"
+    }
+  },
+  "env_id": "swm/PushT-v1",
+  "epoch": 9,
+  "export_checkpoint": "last",
+  "format": "mwm_world_v1",
+  "fresh_init": true,
+  "head_architectures": [
+    {
+      "K": 192,
+      "action_encoder_emb_dim": 192,
+      "action_encoder_hidden_dim": null,
+      "action_encoder_out_dim": null,
+      "pred_proj_hidden_dim": 2048,
+      "pred_proj_input_dim": 192,
+      "pred_proj_output_dim": 192,
+      "predictor_dim_head": 64,
+      "predictor_heads": 16,
+      "predictor_hidden_dim": 192,
+      "predictor_input_dim": 192,
+      "predictor_mlp_dim": 2048,
+      "predictor_output_dim": 192
+    }
+  ],
+  "image_shape": [
+    224,
+    224
+  ],
+  "last_checkpoint": "logs/mwm_training/mwm_paper10_pusht_k192_sepopt_retrain_20260922/csv_logs/version_0/checkpoints/last.ckpt",
+  "levels": [
+    192
+  ],
+  "loss_scope": {
+    "reconstructor_contributes_to_encoder_loss": false,
+    "reconstructor_detach_encoder": true,
+    "regularizers": "shared_latent"
+  },
+  "model": {
+    "kwargs": {
+      "K": [
+        192
+      ],
+      "action_block": 5,
+      "action_dim": 10,
+      "component_policy": {
+        "per_level": [
+          "transition"
+        ],
+        "reconstructor": [
+          "decoder"
+        ],
+        "shared": [
+          "latent_producer"
+        ]
+      },
+      "expected_D": 192,
+      "family": "lewm",
+      "image_shape": [
+        224,
+        224
+      ],
+      "normalize_imagenet": true,
+      "source_config": {
+        "_target_": "stable_worldmodel.wm.lewm.LeWM",
+        "action_encoder": {
+          "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+          "emb_dim": 192,
+          "input_dim": 10
+        },
+        "encoder": {
+          "_target_": "stable_pretraining.backbone.utils.vit_hf",
+          "image_size": 224,
+          "patch_size": 14,
+          "pretrained": false,
+          "size": "tiny",
+          "use_mask_token": false
+        },
+        "pred_proj": {
+          "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+          "hidden_dim": 2048,
+          "input_dim": 192,
+          "norm_fn": {
+            "_partial_": true,
+            "_target_": "torch.nn.BatchNorm1d"
+          },
+          "output_dim": 192
+        },
+        "predictor": {
+          "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+          "depth": 6,
+          "dim_head": 64,
+          "dropout": 0.1,
+          "emb_dropout": 0.0,
+          "heads": 16,
+          "hidden_dim": 192,
+          "input_dim": 192,
+          "mlp_dim": 2048,
+          "num_frames": 3,
+          "output_dim": 192
+        },
+        "projector": {
+          "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+          "hidden_dim": 2048,
+          "input_dim": 192,
+          "norm_fn": {
+            "_partial_": true,
+            "_target_": "torch.nn.BatchNorm1d"
+          },
+          "output_dim": 192
+        }
+      },
+      "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+      "training_recipe": {
+        "action_preprocessing": "standard_scaler",
+        "history_size": 3,
+        "loss_scope": {
+          "reconstructor_contributes_to_encoder_loss": false,
+          "reconstructor_detach_encoder": true,
+          "regularizers": "shared_latent"
+        },
+        "num_preds": 1,
+        "rollout_weight": 1.0,
+        "sigreg_knots": 17,
+        "sigreg_num_proj": 1024,
+        "sigreg_weight": 0.1
+      }
+    },
+    "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+  },
+  "normalize_imagenet": true,
+  "preprocessing_spec": {
+    "image": "imagenet",
+    "image_shape": [
+      224,
+      224
+    ],
+    "layout": "BCHW"
+  },
+  "restore_spec": "pusht_state_goal_state",
+  "selected_lightning_checkpoint": "logs/mwm_training/mwm_paper10_pusht_k192_sepopt_retrain_20260922/csv_logs/version_0/checkpoints/last.ckpt",
+  "source_config": {
+    "_target_": "stable_worldmodel.wm.lewm.LeWM",
+    "action_encoder": {
+      "_target_": "stable_worldmodel.wm.lewm.module.Embedder",
+      "emb_dim": 192,
+      "input_dim": 10
+    },
+    "encoder": {
+      "_target_": "stable_pretraining.backbone.utils.vit_hf",
+      "image_size": 224,
+      "patch_size": 14,
+      "pretrained": false,
+      "size": "tiny",
+      "use_mask_token": false
+    },
+    "pred_proj": {
+      "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+      "hidden_dim": 2048,
+      "input_dim": 192,
+      "norm_fn": {
+        "_partial_": true,
+        "_target_": "torch.nn.BatchNorm1d"
+      },
+      "output_dim": 192
+    },
+    "predictor": {
+      "_target_": "stable_worldmodel.wm.lewm.module.Predictor",
+      "depth": 6,
+      "dim_head": 64,
+      "dropout": 0.1,
+      "emb_dropout": 0.0,
+      "heads": 16,
+      "hidden_dim": 192,
+      "input_dim": 192,
+      "mlp_dim": 2048,
+      "num_frames": 3,
+      "output_dim": 192
+    },
+    "projector": {
+      "_target_": "stable_worldmodel.wm.lewm.module.MLP",
+      "hidden_dim": 2048,
+      "input_dim": 192,
+      "norm_fn": {
+        "_partial_": true,
+        "_target_": "torch.nn.BatchNorm1d"
+      },
+      "output_dim": 192
+    }
+  },
+  "source_config_sha256": "2564086e961e7b5c7c04dffc451091115b389a590645ff19653c64fd0bc16e09",
+  "training_backend": "stable_worldmodel_lewm",
+  "training_recipe": {
+    "action_preprocessing": "standard_scaler",
+    "history_size": 3,
+    "loss_scope": {
+      "reconstructor_contributes_to_encoder_loss": false,
+      "reconstructor_detach_encoder": true,
+      "regularizers": "shared_latent"
+    },
+    "num_preds": 1,
+    "rollout_weight": 1.0,
+    "sigreg_knots": 17,
+    "sigreg_num_proj": 1024,
+    "sigreg_weight": 0.1
+  },
+  "weights": "weights.pt"
+}

@@ -1,0 +1,3 @@
+env_id,role,runs,mean_success_rate,seeds
+swm/PushT-v1,sepopt_k192_20260922,1,94.0,86604
+swm/PushT-v1,upstream_lewm_converted,1,83.0,86604

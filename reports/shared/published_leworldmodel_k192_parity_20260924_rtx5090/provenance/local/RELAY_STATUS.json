@@ -1,0 +1,78 @@
+{
+  "blockers": [],
+  "canonical_k192": {
+    "ogb_cube": {
+      "matches_release": true,
+      "path": "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922/weights.pt",
+      "release_sha256": "f8f023c1bfd5fe6d6a176d8f138e0c650f0857ebe372868298ec08319bb48781",
+      "sha256": "f8f023c1bfd5fe6d6a176d8f138e0c650f0857ebe372868298ec08319bb48781"
+    },
+    "pusht": {
+      "matches_release": true,
+      "path": "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922/weights.pt",
+      "release_sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c",
+      "sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c"
+    },
+    "reacher": {
+      "matches_release": true,
+      "path": "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922/weights.pt",
+      "release_sha256": "2993c6146f5ad6ec160c35422c75c89113d25b51c6de2552f1ecc5b30fe891ff",
+      "sha256": "2993c6146f5ad6ec160c35422c75c89113d25b51c6de2552f1ecc5b30fe891ff"
+    },
+    "tworoom": {
+      "matches_release": true,
+      "path": "checkpoints_mwm/mwm_paper10_tworoom_k192_sepopt_retrain_20260922/weights.pt",
+      "release_sha256": "0782bd7798c560178d7cea962790ff774fd2d60f7630e02cee80d3f8307f2cf4",
+      "sha256": "0782bd7798c560178d7cea962790ff774fd2d60f7630e02cee80d3f8307f2cf4"
+    }
+  },
+  "completed_at": "2026-09-24T14:08:55.447180+00:00",
+  "completed_stages": [
+    "code_and_experiment_snapshot",
+    "converted_upstream_checkpoints",
+    "canonical_k192_checkpoints",
+    "four_lance_datasets",
+    "python_environment_inventory",
+    "package_integrity_check",
+    "source_destination_sha256_verification"
+  ],
+  "datasets": {
+    "ogb_cube_single_expert.lance": {
+      "bytes": 19596344782,
+      "files": 4
+    },
+    "pusht_expert_train.lance": {
+      "bytes": 14295082071,
+      "files": 5
+    },
+    "reacher.lance": {
+      "bytes": 17296895002,
+      "files": 4
+    },
+    "tworoom.lance": {
+      "bytes": 4154420932,
+      "files": 3
+    }
+  },
+  "destination": "/tmp/hudm-5090-20260924-0z4ayR/source_snapshot",
+  "integrity": {
+    "destination_inventory": "source_snapshot/provenance/destination_sha256.txt",
+    "diff": "source_snapshot/provenance/sha256_diff.txt",
+    "files": 508,
+    "inventory_sha256": "ef91a15644515d5e9821eba19956c1dded565e4988277210858e37d738c1d70d",
+    "source_inventory": "source_snapshot/provenance/source_sha256.txt",
+    "verified": true
+  },
+  "python_environment": {
+    "integrity": "source_snapshot/provenance/stable_package_integrity.json",
+    "inventory": "source_snapshot/provenance/python_pip_freeze.txt",
+    "local_source_modifications_detected": false,
+    "stable_packages": "source_snapshot/provenance/stable_packages.jsonl"
+  },
+  "source": "betty:/vast/projects/dineshj/lab/ethanyu/code/HUDM",
+  "source_diff_file": "source_snapshot/provenance/git_diff.patch",
+  "source_remote_file": "source_snapshot/provenance/git_remote.txt",
+  "source_revision": "28d0e78a5011c72bebf8b01073163cf45e60f680",
+  "source_status_file": "source_snapshot/provenance/git_status.txt",
+  "status": "complete"
+}

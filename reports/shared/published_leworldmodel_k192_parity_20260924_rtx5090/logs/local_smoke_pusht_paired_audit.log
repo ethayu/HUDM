@@ -1,0 +1,26 @@
+
+{"started_at": "2026-09-24T13:44:57.006300+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "/tmp/hudm-5090-20260924-0z4ayR/audit_paired.py", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/pusht.yaml"]}
+{"verified": true, "audit": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/local_smoke/pusht/paired_audit.json", "roles": [{"role": "upstream_lewm_converted", "episodes": 2, "successes": 2, "success_rate": 100.0, "weights_sha256": "f900533bc36164475063cf1939c55bccbde1aaf1b35a5811301413b81689ed93", "trace_sha256": "13a200e0152e1eb1d4cae8c114a6f0a3b938b660db5624440b6b743420c0c848", "resolved_config_sha256": "7a9ee0312f66fec19ad0e47220d0dbec9eabe25722a0357f4ecf7d33ee1a36f4", "manifest_sha256": "6bef3224e78d9608d49d2bc9be7e558fb0e7401f034d6ae37e9ac596aa8f3f93", "dynamics_flops_total": 5087894256000}, {"role": "sepopt_k192_20260922", "episodes": 2, "successes": 2, "success_rate": 100.0, "weights_sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c", "trace_sha256": "13a200e0152e1eb1d4cae8c114a6f0a3b938b660db5624440b6b743420c0c848", "resolved_config_sha256": "7f5d3805e25a620f902b558d8206465aebbafe8d408f37dfe2fbc46ec16c05f1", "manifest_sha256": "6bef3224e78d9608d49d2bc9be7e558fb0e7401f034d6ae37e9ac596aa8f3f93", "dynamics_flops_total": 5087894256000}]}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python /tmp/hudm-5090-20260924-0z4ayR/audit_paired.py reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/pusht.yaml"
+	User time (seconds): 0.10
+	System time (seconds): 0.01
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.11
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 27592
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 4403
+	Voluntary context switches: 1
+	Involuntary context switches: 60
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,220 @@
+
+{"started_at": "2026-09-24T12:31:36.003137+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_pusht"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml",
+  "env_id": "swm/PushT-v1",
+  "expected_cells": [
+    [
+      "swm/PushT-v1",
+      91943,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/PushT-v1",
+      91943,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/PushT-v1_seed91943_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/pusht_seed91943.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 91943,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml --static-only"
+	User time (seconds): 0.87
+	System time (seconds): 0.12
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.82
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 609596
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81523
+	Voluntary context switches: 38
+	Involuntary context switches: 479
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T15:02:49.065324+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_pusht"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml",
+  "env_id": "swm/PushT-v1",
+  "expected_cells": [
+    [
+      "swm/PushT-v1",
+      91943,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/PushT-v1",
+      91943,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/PushT-v1_seed91943_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/pusht_seed91943.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 91943,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml --static-only"
+	User time (seconds): 0.87
+	System time (seconds): 0.11
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.81
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 608536
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81476
+	Voluntary context switches: 41
+	Involuntary context switches: 485
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T16:21:49.581052+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_pusht"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml",
+  "env_id": "swm/PushT-v1",
+  "expected_cells": [
+    [
+      "swm/PushT-v1",
+      91943,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/PushT-v1",
+      91943,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/PushT-v1_seed91943_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/pusht_seed91943.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 91943,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml --static-only"
+	User time (seconds): 0.86
+	System time (seconds): 0.12
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.80
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 612612
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81489
+	Voluntary context switches: 42
+	Involuntary context switches: 409
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:49:36.918739+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_pusht"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml",
+  "env_id": "swm/PushT-v1",
+  "expected_cells": [
+    [
+      "swm/PushT-v1",
+      91943,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/PushT-v1",
+      91943,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/PushT-v1_seed91943_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/pusht_seed91943.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 91943,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml --static-only"
+	User time (seconds): 0.88
+	System time (seconds): 0.11
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.82
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 612212
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81489
+	Voluntary context switches: 40
+	Involuntary context switches: 458
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

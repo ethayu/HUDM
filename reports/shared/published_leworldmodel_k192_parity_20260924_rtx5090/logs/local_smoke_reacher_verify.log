@@ -1,0 +1,96 @@
+
+{"started_at": "2026-09-24T13:59:11.373737+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/reacher.yaml"]}
+{
+  "cells": [
+    [
+      "swm/ReacherDMControl-v0",
+      42,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/ReacherDMControl-v0",
+      42,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/local_smoke/reacher",
+  "plots": [
+    "efficiency_ratios.png",
+    "paired_success_delta.png",
+    "success_by_env_role.png",
+    "success_vs_compute.png",
+    "success_vs_wall_time.png"
+  ],
+  "runs": 2
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/reacher.yaml"
+	User time (seconds): 0.87
+	System time (seconds): 0.12
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.81
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 613048
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81617
+	Voluntary context switches: 42
+	Involuntary context switches: 445
+	Swaps: 0
+	File system inputs: 48
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T14:00:53.265156+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/reacher.yaml"]}
+{
+  "cells": [
+    [
+      "swm/ReacherDMControl-v0",
+      42,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/ReacherDMControl-v0",
+      42,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/local_smoke/reacher",
+  "plots": [
+    "efficiency_ratios.png",
+    "paired_success_delta.png",
+    "success_by_env_role.png",
+    "success_vs_compute.png",
+    "success_vs_wall_time.png"
+  ],
+  "runs": 2
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/reacher.yaml"
+	User time (seconds): 0.86
+	System time (seconds): 0.11
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.79
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 611964
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81616
+	Voluntary context switches: 39
+	Involuntary context switches: 421
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,104 @@
+{
+  "tworoom": {
+    "verified": true,
+    "episodes_per_model": 250,
+    "paired_delta_pp": {
+      "mean": 6.4,
+      "sample_sd": 3.5777087639996634,
+      "ci95_low": 1.957687831683523,
+      "ci95_high": 10.842312168316479
+    },
+    "qualified_for_n100": true,
+    "source_summary_sha256": "f7cba7801adcfcb17d09bd39f5ae459fe4aaa2a93899c17e39c5a4936fd92d67",
+    "inputs": [
+      {
+        "seed": 0,
+        "paired_audit_sha256": "acf38a36e79cadc6a54a52028d2559a8a84ed1d33108e6aba813e66e2fbfb8b9"
+      },
+      {
+        "seed": 1,
+        "paired_audit_sha256": "ee93f8aa3efc26cc0519e277f4a19869f445b8600d18746b1672747ea51b8688"
+      },
+      {
+        "seed": 2,
+        "paired_audit_sha256": "f41477b5e512eb8acac90c2bbec9e2fb0cef4771620a08980d263c5150936eeb"
+      },
+      {
+        "seed": 42,
+        "paired_audit_sha256": "0d57a672c7d24fdb96afe4d897d9ecc5251274fa359bb592c0307992bad9bd13"
+      },
+      {
+        "seed": 100,
+        "paired_audit_sha256": "66e3611021f39ecd14dd98c4f9d256b0716098440d9af56efbac4ce27f2917d2"
+      }
+    ]
+  },
+  "reacher": {
+    "verified": true,
+    "episodes_per_model": 250,
+    "paired_delta_pp": {
+      "mean": -0.8,
+      "sample_sd": 3.03315017762062,
+      "ci95_low": -4.566153376696883,
+      "ci95_high": 2.9661533766968837
+    },
+    "qualified_for_n100": true,
+    "source_summary_sha256": "4669f0f8c9036dfa923e047235d14f9028f940afd2bffcc68e4fafd1872bf1ce",
+    "inputs": [
+      {
+        "seed": 0,
+        "paired_audit_sha256": "fef95c2b9f08180e157680c26497d2c37a32dfd4288f479a6ebf9744276ab5b6"
+      },
+      {
+        "seed": 1,
+        "paired_audit_sha256": "27d0160b5b5e8d43bdd445bbf4aa8934564dc58bef691d131779ec6561f1e9cf"
+      },
+      {
+        "seed": 2,
+        "paired_audit_sha256": "6996b8fc359364a348381d817f2c432f420a042aeddec6cd84e12c19e2a975d2"
+      },
+      {
+        "seed": 42,
+        "paired_audit_sha256": "f9db8f790e6b9c45ee04f9647634ca2109c5fc6f8b4c253b102aa97e98abdb7c"
+      },
+      {
+        "seed": 100,
+        "paired_audit_sha256": "cecbc20e6b1372ca04559fa811899e1fb6475b40a540d87fc32d67fc9ee61b61"
+      }
+    ]
+  },
+  "pusht": {
+    "verified": true,
+    "episodes_per_model": 250,
+    "paired_delta_pp": {
+      "mean": 7.6,
+      "sample_sd": 4.560701700396552,
+      "ci95_low": 1.9371408920709001,
+      "ci95_high": 13.2628591079291
+    },
+    "qualified_for_n100": true,
+    "source_summary_sha256": "d86a162a69c311050dc68dc1f761cc7aca7983f8db958ebc8f26dca451cfc514",
+    "inputs": [
+      {
+        "seed": 0,
+        "paired_audit_sha256": "f2c81b512318d688ad052310bac24b8228ed671430f1df3be8026257ab79d06f"
+      },
+      {
+        "seed": 1,
+        "paired_audit_sha256": "d92ad3d3fa634415b9761eec641b57bfc0f75ab3eeace5451430eff7d9b20922"
+      },
+      {
+        "seed": 2,
+        "paired_audit_sha256": "a943bd369aba1efb2ce2caeb65bf9492d6fd5c55c344fca5571c97a173c94fd7"
+      },
+      {
+        "seed": 42,
+        "paired_audit_sha256": "791c2f3f1db49f03f9af6a5077092c048e8562a19ba766f9d699baf5ca24f981"
+      },
+      {
+        "seed": 100,
+        "paired_audit_sha256": "060fc38fbc714d2ad4b028044719f43a36fbd6b1397835f06211f5715a06ab99"
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+schema_version: mwm.release20260728.confirmatory_scaleup/v1
+kind: existing_array_target_plan
+episodes: 250
+matrix_cells: 3120
+
+# These cells already exist in the original canonical arrays.  Reusing their
+# exact elements avoids both duplicate computation and concurrent writers.
+# The submitted cell script invokes mwm.benchmark.matrix with --resume.
+execution_contract:
+  mode: existing_array_elements_only
+  submit_new_jobs: false
+  array_script: scripts/slurm/slurm_mwm_release_schedule_cell.sbatch
+  resume: true
+  stage_a_cells: 27
+  stage_b_cells: 1
+  stage_b_target: ogb50/P02/a5
+
+targets:
+  # Stage A: the 27-cell confirmatory set.  Twenty-six elements are currently
+  # held and may be released together; PushT25/2645 is already eligible.
+  - {stage: A, matrix: ogb25, config: configs/research/release20260728_dense_ogb_cube_all_fidelity_schedules.yaml, matrix_index: 2285, schedule: 20, anchor: a1, lane: mig90, array_parent: 7639583, action: release}
+  - {stage: A, matrix: ogb25, config: configs/research/release20260728_dense_ogb_cube_all_fidelity_schedules.yaml, matrix_index: 2525, schedule: 22, anchor: a1, lane: mig90, array_parent: 7639583, action: release}
+  - {stage: A, matrix: ogb25, config: configs/research/release20260728_dense_ogb_cube_all_fidelity_schedules.yaml, matrix_index: 2577, schedule: 22, anchor: a3, lane: dgx, array_parent: 7639580, action: release}
+  - {stage: A, matrix: ogb25, config: configs/research/release20260728_dense_ogb_cube_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639583, action: release}
+
+  - {stage: A, matrix: ogb50, config: configs/research/release20260728_dense_ogb_cube_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639599, action: release}
+  - {stage: A, matrix: ogb50, config: configs/research/release20260728_dense_ogb_cube_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2671, schedule: 23, anchor: a2, lane: dgx, array_parent: 7639597, action: release}
+  - {stage: A, matrix: ogb50, config: configs/research/release20260728_dense_ogb_cube_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2697, schedule: 23, anchor: a3, lane: dgx, array_parent: 7639597, action: release}
+
+  - {stage: A, matrix: pusht25, config: configs/research/release20260728_dense_pusht_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639574, action: already_eligible}
+  - {stage: A, matrix: pusht50, config: configs/research/release20260728_dense_pusht_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 845, schedule: 8, anchor: a1, lane: mig90, array_parent: 7639591, action: release}
+  - {stage: A, matrix: pusht50, config: configs/research/release20260728_dense_pusht_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639591, action: release}
+  - {stage: A, matrix: pusht50, config: configs/research/release20260728_dense_pusht_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 3005, schedule: 26, anchor: a1, lane: mig90, array_parent: 7639591, action: release}
+
+  - {stage: A, matrix: reacher25, config: configs/research/release20260728_dense_reacher_all_fidelity_schedules.yaml, matrix_index: 845, schedule: 8, anchor: a1, lane: mig90, array_parent: 7639578, action: release}
+  - {stage: A, matrix: reacher25, config: configs/research/release20260728_dense_reacher_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639578, action: release}
+  - {stage: A, matrix: reacher25, config: configs/research/release20260728_dense_reacher_all_fidelity_schedules.yaml, matrix_index: 2765, schedule: 24, anchor: a1, lane: mig90, array_parent: 7639578, action: release}
+
+  - {stage: A, matrix: reacher50, config: configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2165, schedule: 19, anchor: a1, lane: mig90, array_parent: 7639595, action: release}
+  - {stage: A, matrix: reacher50, config: configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2285, schedule: 20, anchor: a1, lane: mig90, array_parent: 7639595, action: release}
+  - {stage: A, matrix: reacher50, config: configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2405, schedule: 21, anchor: a1, lane: mig90, array_parent: 7639595, action: release}
+  - {stage: A, matrix: reacher50, config: configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639595, action: release}
+  - {stage: A, matrix: reacher50, config: configs/research/release20260728_dense_reacher_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2911, schedule: 25, anchor: a2, lane: dgx, array_parent: 7639593, action: release}
+
+  - {stage: A, matrix: tworoom25, config: configs/research/release20260728_dense_tworoom_all_fidelity_schedules.yaml, matrix_index: 2045, schedule: 18, anchor: a1, lane: mig90, array_parent: 7639587, action: release}
+  - {stage: A, matrix: tworoom25, config: configs/research/release20260728_dense_tworoom_all_fidelity_schedules.yaml, matrix_index: 2285, schedule: 20, anchor: a1, lane: mig90, array_parent: 7639587, action: release}
+  - {stage: A, matrix: tworoom25, config: configs/research/release20260728_dense_tworoom_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639587, action: release}
+
+  - {stage: A, matrix: tworoom50, config: configs/research/release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 845, schedule: 8, anchor: a1, lane: mig90, array_parent: 7639603, action: release}
+  - {stage: A, matrix: tworoom50, config: configs/research/release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2431, schedule: 21, anchor: a2, lane: dgx, array_parent: 7639601, action: release}
+  - {stage: A, matrix: tworoom50, config: configs/research/release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2551, schedule: 22, anchor: a2, lane: dgx, array_parent: 7639601, action: release}
+  - {stage: A, matrix: tworoom50, config: configs/research/release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2645, schedule: 23, anchor: a1, lane: mig90, array_parent: 7639603, action: release}
+  - {stage: A, matrix: tworoom50, config: configs/research/release20260728_dense_tworoom_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 2671, schedule: 23, anchor: a2, lane: dgx, array_parent: 7639601, action: release}
+
+  # Stage B is deliberately isolated because this single high-budget OGB50
+  # cell is the only a5 confirmation in the design.
+  - {stage: B, matrix: ogb50, config: configs/research/release20260728_dense_ogb_cube_goal50_plan50_execute20_all_fidelity_schedules.yaml, matrix_index: 229, schedule: 2, anchor: a5, lane: dgx, array_parent: 7639597, action: keep_held}

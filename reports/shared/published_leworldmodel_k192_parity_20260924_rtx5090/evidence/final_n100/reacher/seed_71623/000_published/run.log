@@ -1,0 +1,9 @@
+08:28:02.057 | INFO    (800150, stable_pretraining.backbone.utils) | Created ViT-tiny from scratch with config: {'hidden_size': 192, 'num_hidden_layers': 12, 'num_attention_heads': 3, 'intermediate_size': 768, 'image_size': 224, 'patch_size': 14}
+08:28:22.590 | INFO    (800150, stable_pretraining) | MUJOCO_GL=egl, attempting to import specified OpenGL backend.
+08:28:22.592 | INFO    (800150, stable_pretraining) | No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+08:28:22.673 | INFO    (800150, stable_pretraining) | MuJoCo library version is: 3.8.0
+/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/gymnasium/envs/registration.py:728: UserWarning: [33mWARN: The environment is being initialised with render_mode='rgb_array' that is not in the possible render_modes ([]).[0m
+  logger.warn(
+/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/gymnasium/envs/registration.py:728: UserWarning: [33mWARN: The environment is being initialised with render_mode='rgb_array' that is not in the possible render_modes ([]).[0m
+  logger.warn(
+Wrote MWM planning results to reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_71623/000_published/eval.json

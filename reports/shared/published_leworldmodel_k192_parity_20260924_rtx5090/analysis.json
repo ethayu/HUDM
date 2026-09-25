@@ -1,0 +1,828 @@
+{
+  "comparison": "Published LeWorldModel vs September 22 singleton K=192 separate-optimizer models",
+  "confidence_interval": "Two-sided 95% Student t over five paired evaluation-seed differences (df=4)",
+  "interpretation": "Intervals describe evaluation-manifest variability for these fixed checkpoints, not training-seed uncertainty; the screen gate is a point-estimate selection rule, not a noninferiority test.",
+  "results": [
+    {
+      "stage": "screen",
+      "environment": "ogb_cube",
+      "seeds": [
+        0,
+        1,
+        2,
+        42,
+        100
+      ],
+      "episodes_per_seed_per_model": 50,
+      "paired_results": [
+        {
+          "stage": "screen",
+          "environment": "ogb_cube",
+          "seed": 0,
+          "episodes_per_model": 50,
+          "published_successes": 36,
+          "retrained_successes": 39,
+          "published_success_rate": 72.0,
+          "retrained_success_rate": 78.0,
+          "retrained_minus_published_pp": 6.0,
+          "both_succeed": 36,
+          "published_only": 0,
+          "retrained_only": 3
+        },
+        {
+          "stage": "screen",
+          "environment": "ogb_cube",
+          "seed": 1,
+          "episodes_per_model": 50,
+          "published_successes": 29,
+          "retrained_successes": 31,
+          "published_success_rate": 58.0,
+          "retrained_success_rate": 62.0,
+          "retrained_minus_published_pp": 4.0,
+          "both_succeed": 29,
+          "published_only": 0,
+          "retrained_only": 2
+        },
+        {
+          "stage": "screen",
+          "environment": "ogb_cube",
+          "seed": 2,
+          "episodes_per_model": 50,
+          "published_successes": 34,
+          "retrained_successes": 34,
+          "published_success_rate": 68.0,
+          "retrained_success_rate": 68.0,
+          "retrained_minus_published_pp": 0.0,
+          "both_succeed": 33,
+          "published_only": 1,
+          "retrained_only": 1
+        },
+        {
+          "stage": "screen",
+          "environment": "ogb_cube",
+          "seed": 42,
+          "episodes_per_model": 50,
+          "published_successes": 37,
+          "retrained_successes": 36,
+          "published_success_rate": 74.0,
+          "retrained_success_rate": 72.0,
+          "retrained_minus_published_pp": -2.0,
+          "both_succeed": 34,
+          "published_only": 3,
+          "retrained_only": 2
+        },
+        {
+          "stage": "screen",
+          "environment": "ogb_cube",
+          "seed": 100,
+          "episodes_per_model": 50,
+          "published_successes": 35,
+          "retrained_successes": 33,
+          "published_success_rate": 70.0,
+          "retrained_success_rate": 66.0,
+          "retrained_minus_published_pp": -4.0,
+          "both_succeed": 32,
+          "published_only": 3,
+          "retrained_only": 1
+        }
+      ],
+      "published": {
+        "mean": 68.4,
+        "sample_sd": 6.2289646009589745,
+        "ci95_low": 60.66571890890356,
+        "ci95_high": 76.13428109109645
+      },
+      "retrained": {
+        "mean": 69.2,
+        "sample_sd": 6.099180272790763,
+        "ci95_low": 61.626867436721085,
+        "ci95_high": 76.77313256327892
+      },
+      "paired_delta_pp": {
+        "mean": 0.8,
+        "sample_sd": 4.147288270665544,
+        "ci95_low": -4.349538535858164,
+        "ci95_high": 5.949538535858164
+      },
+      "qualified_for_n100": true
+    },
+    {
+      "stage": "screen",
+      "environment": "reacher",
+      "seeds": [
+        0,
+        1,
+        2,
+        42,
+        100
+      ],
+      "episodes_per_seed_per_model": 50,
+      "paired_results": [
+        {
+          "stage": "screen",
+          "environment": "reacher",
+          "seed": 0,
+          "episodes_per_model": 50,
+          "published_successes": 50,
+          "retrained_successes": 49,
+          "published_success_rate": 100.0,
+          "retrained_success_rate": 98.0,
+          "retrained_minus_published_pp": -2.0,
+          "both_succeed": 49,
+          "published_only": 1,
+          "retrained_only": 0
+        },
+        {
+          "stage": "screen",
+          "environment": "reacher",
+          "seed": 1,
+          "episodes_per_model": 50,
+          "published_successes": 49,
+          "retrained_successes": 49,
+          "published_success_rate": 98.0,
+          "retrained_success_rate": 98.0,
+          "retrained_minus_published_pp": 0.0,
+          "both_succeed": 48,
+          "published_only": 1,
+          "retrained_only": 1
+        },
+        {
+          "stage": "screen",
+          "environment": "reacher",
+          "seed": 2,
+          "episodes_per_model": 50,
+          "published_successes": 48,
+          "retrained_successes": 47,
+          "published_success_rate": 96.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": -2.0,
+          "both_succeed": 46,
+          "published_only": 2,
+          "retrained_only": 1
+        },
+        {
+          "stage": "screen",
+          "environment": "reacher",
+          "seed": 42,
+          "episodes_per_model": 50,
+          "published_successes": 45,
+          "retrained_successes": 47,
+          "published_success_rate": 90.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": 4.0,
+          "both_succeed": 44,
+          "published_only": 1,
+          "retrained_only": 3
+        },
+        {
+          "stage": "screen",
+          "environment": "reacher",
+          "seed": 100,
+          "episodes_per_model": 50,
+          "published_successes": 49,
+          "retrained_successes": 47,
+          "published_success_rate": 98.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": -4.0,
+          "both_succeed": 46,
+          "published_only": 3,
+          "retrained_only": 1
+        }
+      ],
+      "published": {
+        "mean": 96.4,
+        "sample_sd": 3.847076812334269,
+        "ci95_low": 91.62322322380004,
+        "ci95_high": 101.17677677619997
+      },
+      "retrained": {
+        "mean": 95.6,
+        "sample_sd": 2.1908902300206643,
+        "ci95_low": 92.87965047736697,
+        "ci95_high": 98.32034952263302
+      },
+      "paired_delta_pp": {
+        "mean": -0.8,
+        "sample_sd": 3.03315017762062,
+        "ci95_low": -4.566153376696883,
+        "ci95_high": 2.9661533766968837
+      },
+      "qualified_for_n100": true
+    },
+    {
+      "stage": "screen",
+      "environment": "pusht",
+      "seeds": [
+        0,
+        1,
+        2,
+        42,
+        100
+      ],
+      "episodes_per_seed_per_model": 50,
+      "paired_results": [
+        {
+          "stage": "screen",
+          "environment": "pusht",
+          "seed": 0,
+          "episodes_per_model": 50,
+          "published_successes": 42,
+          "retrained_successes": 45,
+          "published_success_rate": 84.0,
+          "retrained_success_rate": 90.0,
+          "retrained_minus_published_pp": 6.0,
+          "both_succeed": 41,
+          "published_only": 1,
+          "retrained_only": 4
+        },
+        {
+          "stage": "screen",
+          "environment": "pusht",
+          "seed": 1,
+          "episodes_per_model": 50,
+          "published_successes": 42,
+          "retrained_successes": 47,
+          "published_success_rate": 84.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": 10.0,
+          "both_succeed": 41,
+          "published_only": 1,
+          "retrained_only": 6
+        },
+        {
+          "stage": "screen",
+          "environment": "pusht",
+          "seed": 2,
+          "episodes_per_model": 50,
+          "published_successes": 42,
+          "retrained_successes": 49,
+          "published_success_rate": 84.0,
+          "retrained_success_rate": 98.0,
+          "retrained_minus_published_pp": 14.0,
+          "both_succeed": 42,
+          "published_only": 0,
+          "retrained_only": 7
+        },
+        {
+          "stage": "screen",
+          "environment": "pusht",
+          "seed": 42,
+          "episodes_per_model": 50,
+          "published_successes": 47,
+          "retrained_successes": 48,
+          "published_success_rate": 94.0,
+          "retrained_success_rate": 96.0,
+          "retrained_minus_published_pp": 2.0,
+          "both_succeed": 46,
+          "published_only": 1,
+          "retrained_only": 2
+        },
+        {
+          "stage": "screen",
+          "environment": "pusht",
+          "seed": 100,
+          "episodes_per_model": 50,
+          "published_successes": 42,
+          "retrained_successes": 45,
+          "published_success_rate": 84.0,
+          "retrained_success_rate": 90.0,
+          "retrained_minus_published_pp": 6.0,
+          "both_succeed": 42,
+          "published_only": 0,
+          "retrained_only": 3
+        }
+      ],
+      "published": {
+        "mean": 86.0,
+        "sample_sd": 4.47213595499958,
+        "ci95_low": 80.4471097896044,
+        "ci95_high": 91.5528902103956
+      },
+      "retrained": {
+        "mean": 93.6,
+        "sample_sd": 3.5777087639996634,
+        "ci95_low": 89.15768783168352,
+        "ci95_high": 98.04231216831647
+      },
+      "paired_delta_pp": {
+        "mean": 7.6,
+        "sample_sd": 4.560701700396552,
+        "ci95_low": 1.9371408920709001,
+        "ci95_high": 13.2628591079291
+      },
+      "qualified_for_n100": true
+    },
+    {
+      "stage": "screen",
+      "environment": "tworoom",
+      "seeds": [
+        0,
+        1,
+        2,
+        42,
+        100
+      ],
+      "episodes_per_seed_per_model": 50,
+      "paired_results": [
+        {
+          "stage": "screen",
+          "environment": "tworoom",
+          "seed": 0,
+          "episodes_per_model": 50,
+          "published_successes": 42,
+          "retrained_successes": 47,
+          "published_success_rate": 84.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": 10.0,
+          "both_succeed": 42,
+          "published_only": 0,
+          "retrained_only": 5
+        },
+        {
+          "stage": "screen",
+          "environment": "tworoom",
+          "seed": 1,
+          "episodes_per_model": 50,
+          "published_successes": 48,
+          "retrained_successes": 49,
+          "published_success_rate": 96.0,
+          "retrained_success_rate": 98.0,
+          "retrained_minus_published_pp": 2.0,
+          "both_succeed": 48,
+          "published_only": 0,
+          "retrained_only": 1
+        },
+        {
+          "stage": "screen",
+          "environment": "tworoom",
+          "seed": 2,
+          "episodes_per_model": 50,
+          "published_successes": 46,
+          "retrained_successes": 49,
+          "published_success_rate": 92.0,
+          "retrained_success_rate": 98.0,
+          "retrained_minus_published_pp": 6.0,
+          "both_succeed": 46,
+          "published_only": 0,
+          "retrained_only": 3
+        },
+        {
+          "stage": "screen",
+          "environment": "tworoom",
+          "seed": 42,
+          "episodes_per_model": 50,
+          "published_successes": 45,
+          "retrained_successes": 47,
+          "published_success_rate": 90.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": 4.0,
+          "both_succeed": 44,
+          "published_only": 1,
+          "retrained_only": 3
+        },
+        {
+          "stage": "screen",
+          "environment": "tworoom",
+          "seed": 100,
+          "episodes_per_model": 50,
+          "published_successes": 39,
+          "retrained_successes": 44,
+          "published_success_rate": 78.0,
+          "retrained_success_rate": 88.0,
+          "retrained_minus_published_pp": 10.0,
+          "both_succeed": 38,
+          "published_only": 1,
+          "retrained_only": 6
+        }
+      ],
+      "published": {
+        "mean": 88.0,
+        "sample_sd": 7.0710678118654755,
+        "ci95_low": 79.22010966914915,
+        "ci95_high": 96.77989033085085
+      },
+      "retrained": {
+        "mean": 94.4,
+        "sample_sd": 4.09878030638384,
+        "ci95_low": 89.31069205701658,
+        "ci95_high": 99.48930794298343
+      },
+      "paired_delta_pp": {
+        "mean": 6.4,
+        "sample_sd": 3.5777087639996634,
+        "ci95_low": 1.957687831683523,
+        "ci95_high": 10.842312168316479
+      },
+      "qualified_for_n100": true
+    },
+    {
+      "stage": "final",
+      "environment": "ogb_cube",
+      "seeds": [
+        2002,
+        71623,
+        82715,
+        86604,
+        91943
+      ],
+      "episodes_per_seed_per_model": 100,
+      "paired_results": [
+        {
+          "stage": "final",
+          "environment": "ogb_cube",
+          "seed": 2002,
+          "episodes_per_model": 100,
+          "published_successes": 69,
+          "retrained_successes": 71,
+          "published_success_rate": 69.0,
+          "retrained_success_rate": 71.0,
+          "retrained_minus_published_pp": 2.0,
+          "both_succeed": 66,
+          "published_only": 3,
+          "retrained_only": 5
+        },
+        {
+          "stage": "final",
+          "environment": "ogb_cube",
+          "seed": 71623,
+          "episodes_per_model": 100,
+          "published_successes": 72,
+          "retrained_successes": 68,
+          "published_success_rate": 72.0,
+          "retrained_success_rate": 68.0,
+          "retrained_minus_published_pp": -4.0,
+          "both_succeed": 66,
+          "published_only": 6,
+          "retrained_only": 2
+        },
+        {
+          "stage": "final",
+          "environment": "ogb_cube",
+          "seed": 82715,
+          "episodes_per_model": 100,
+          "published_successes": 68,
+          "retrained_successes": 70,
+          "published_success_rate": 68.0,
+          "retrained_success_rate": 70.0,
+          "retrained_minus_published_pp": 2.0,
+          "both_succeed": 65,
+          "published_only": 3,
+          "retrained_only": 5
+        },
+        {
+          "stage": "final",
+          "environment": "ogb_cube",
+          "seed": 86604,
+          "episodes_per_model": 100,
+          "published_successes": 74,
+          "retrained_successes": 72,
+          "published_success_rate": 74.0,
+          "retrained_success_rate": 72.0,
+          "retrained_minus_published_pp": -2.0,
+          "both_succeed": 71,
+          "published_only": 3,
+          "retrained_only": 1
+        },
+        {
+          "stage": "final",
+          "environment": "ogb_cube",
+          "seed": 91943,
+          "episodes_per_model": 100,
+          "published_successes": 73,
+          "retrained_successes": 75,
+          "published_success_rate": 73.0,
+          "retrained_success_rate": 75.0,
+          "retrained_minus_published_pp": 2.0,
+          "both_succeed": 68,
+          "published_only": 5,
+          "retrained_only": 7
+        }
+      ],
+      "published": {
+        "mean": 71.2,
+        "sample_sd": 2.588435821108957,
+        "ci95_low": 67.98603242926801,
+        "ci95_high": 74.413967570732
+      },
+      "retrained": {
+        "mean": 71.2,
+        "sample_sd": 2.588435821108957,
+        "ci95_low": 67.98603242926801,
+        "ci95_high": 74.413967570732
+      },
+      "paired_delta_pp": {
+        "mean": 0.0,
+        "sample_sd": 2.8284271247461903,
+        "ci95_low": -3.511956132340338,
+        "ci95_high": 3.511956132340338
+      }
+    },
+    {
+      "stage": "final",
+      "environment": "reacher",
+      "seeds": [
+        2002,
+        71623,
+        82715,
+        86604,
+        91943
+      ],
+      "episodes_per_seed_per_model": 100,
+      "paired_results": [
+        {
+          "stage": "final",
+          "environment": "reacher",
+          "seed": 2002,
+          "episodes_per_model": 100,
+          "published_successes": 96,
+          "retrained_successes": 99,
+          "published_success_rate": 96.0,
+          "retrained_success_rate": 99.0,
+          "retrained_minus_published_pp": 3.0,
+          "both_succeed": 95,
+          "published_only": 1,
+          "retrained_only": 4
+        },
+        {
+          "stage": "final",
+          "environment": "reacher",
+          "seed": 71623,
+          "episodes_per_model": 100,
+          "published_successes": 99,
+          "retrained_successes": 99,
+          "published_success_rate": 99.0,
+          "retrained_success_rate": 99.0,
+          "retrained_minus_published_pp": 0.0,
+          "both_succeed": 98,
+          "published_only": 1,
+          "retrained_only": 1
+        },
+        {
+          "stage": "final",
+          "environment": "reacher",
+          "seed": 82715,
+          "episodes_per_model": 100,
+          "published_successes": 97,
+          "retrained_successes": 96,
+          "published_success_rate": 97.0,
+          "retrained_success_rate": 96.0,
+          "retrained_minus_published_pp": -1.0,
+          "both_succeed": 94,
+          "published_only": 3,
+          "retrained_only": 2
+        },
+        {
+          "stage": "final",
+          "environment": "reacher",
+          "seed": 86604,
+          "episodes_per_model": 100,
+          "published_successes": 95,
+          "retrained_successes": 95,
+          "published_success_rate": 95.0,
+          "retrained_success_rate": 95.0,
+          "retrained_minus_published_pp": 0.0,
+          "both_succeed": 94,
+          "published_only": 1,
+          "retrained_only": 1
+        },
+        {
+          "stage": "final",
+          "environment": "reacher",
+          "seed": 91943,
+          "episodes_per_model": 100,
+          "published_successes": 96,
+          "retrained_successes": 99,
+          "published_success_rate": 96.0,
+          "retrained_success_rate": 99.0,
+          "retrained_minus_published_pp": 3.0,
+          "both_succeed": 95,
+          "published_only": 1,
+          "retrained_only": 4
+        }
+      ],
+      "published": {
+        "mean": 96.6,
+        "sample_sd": 1.51657508881031,
+        "ci95_low": 94.71692331165156,
+        "ci95_high": 98.48307668834843
+      },
+      "retrained": {
+        "mean": 97.6,
+        "sample_sd": 1.949358868961793,
+        "ci95_low": 95.17955127283092,
+        "ci95_high": 100.02044872716907
+      },
+      "paired_delta_pp": {
+        "mean": 1.0,
+        "sample_sd": 1.8708286933869707,
+        "ci95_low": -1.3229406353851942,
+        "ci95_high": 3.3229406353851942
+      }
+    },
+    {
+      "stage": "final",
+      "environment": "pusht",
+      "seeds": [
+        2002,
+        71623,
+        82715,
+        86604,
+        91943
+      ],
+      "episodes_per_seed_per_model": 100,
+      "paired_results": [
+        {
+          "stage": "final",
+          "environment": "pusht",
+          "seed": 2002,
+          "episodes_per_model": 100,
+          "published_successes": 87,
+          "retrained_successes": 93,
+          "published_success_rate": 87.0,
+          "retrained_success_rate": 93.0,
+          "retrained_minus_published_pp": 6.0,
+          "both_succeed": 85,
+          "published_only": 2,
+          "retrained_only": 8
+        },
+        {
+          "stage": "final",
+          "environment": "pusht",
+          "seed": 71623,
+          "episodes_per_model": 100,
+          "published_successes": 93,
+          "retrained_successes": 90,
+          "published_success_rate": 93.0,
+          "retrained_success_rate": 90.0,
+          "retrained_minus_published_pp": -3.0,
+          "both_succeed": 88,
+          "published_only": 5,
+          "retrained_only": 2
+        },
+        {
+          "stage": "final",
+          "environment": "pusht",
+          "seed": 82715,
+          "episodes_per_model": 100,
+          "published_successes": 83,
+          "retrained_successes": 92,
+          "published_success_rate": 83.0,
+          "retrained_success_rate": 92.0,
+          "retrained_minus_published_pp": 9.0,
+          "both_succeed": 80,
+          "published_only": 3,
+          "retrained_only": 12
+        },
+        {
+          "stage": "final",
+          "environment": "pusht",
+          "seed": 86604,
+          "episodes_per_model": 100,
+          "published_successes": 83,
+          "retrained_successes": 94,
+          "published_success_rate": 83.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": 11.0,
+          "both_succeed": 81,
+          "published_only": 2,
+          "retrained_only": 13
+        },
+        {
+          "stage": "final",
+          "environment": "pusht",
+          "seed": 91943,
+          "episodes_per_model": 100,
+          "published_successes": 86,
+          "retrained_successes": 93,
+          "published_success_rate": 86.0,
+          "retrained_success_rate": 93.0,
+          "retrained_minus_published_pp": 7.0,
+          "both_succeed": 84,
+          "published_only": 2,
+          "retrained_only": 9
+        }
+      ],
+      "published": {
+        "mean": 86.4,
+        "sample_sd": 4.09878030638384,
+        "ci95_low": 81.31069205701658,
+        "ci95_high": 91.48930794298343
+      },
+      "retrained": {
+        "mean": 92.4,
+        "sample_sd": 1.51657508881031,
+        "ci95_low": 90.51692331165157,
+        "ci95_high": 94.28307668834844
+      },
+      "paired_delta_pp": {
+        "mean": 6.0,
+        "sample_sd": 5.385164807134504,
+        "ci95_low": -0.6865652654128427,
+        "ci95_high": 12.686565265412842
+      }
+    },
+    {
+      "stage": "final",
+      "environment": "tworoom",
+      "seeds": [
+        2002,
+        71623,
+        82715,
+        86604,
+        91943
+      ],
+      "episodes_per_seed_per_model": 100,
+      "paired_results": [
+        {
+          "stage": "final",
+          "environment": "tworoom",
+          "seed": 2002,
+          "episodes_per_model": 100,
+          "published_successes": 85,
+          "retrained_successes": 96,
+          "published_success_rate": 85.0,
+          "retrained_success_rate": 96.0,
+          "retrained_minus_published_pp": 11.0,
+          "both_succeed": 85,
+          "published_only": 0,
+          "retrained_only": 11
+        },
+        {
+          "stage": "final",
+          "environment": "tworoom",
+          "seed": 71623,
+          "episodes_per_model": 100,
+          "published_successes": 85,
+          "retrained_successes": 95,
+          "published_success_rate": 85.0,
+          "retrained_success_rate": 95.0,
+          "retrained_minus_published_pp": 10.0,
+          "both_succeed": 85,
+          "published_only": 0,
+          "retrained_only": 10
+        },
+        {
+          "stage": "final",
+          "environment": "tworoom",
+          "seed": 82715,
+          "episodes_per_model": 100,
+          "published_successes": 79,
+          "retrained_successes": 90,
+          "published_success_rate": 79.0,
+          "retrained_success_rate": 90.0,
+          "retrained_minus_published_pp": 11.0,
+          "both_succeed": 77,
+          "published_only": 2,
+          "retrained_only": 13
+        },
+        {
+          "stage": "final",
+          "environment": "tworoom",
+          "seed": 86604,
+          "episodes_per_model": 100,
+          "published_successes": 86,
+          "retrained_successes": 93,
+          "published_success_rate": 86.0,
+          "retrained_success_rate": 93.0,
+          "retrained_minus_published_pp": 7.0,
+          "both_succeed": 86,
+          "published_only": 0,
+          "retrained_only": 7
+        },
+        {
+          "stage": "final",
+          "environment": "tworoom",
+          "seed": 91943,
+          "episodes_per_model": 100,
+          "published_successes": 82,
+          "retrained_successes": 94,
+          "published_success_rate": 82.0,
+          "retrained_success_rate": 94.0,
+          "retrained_minus_published_pp": 12.0,
+          "both_succeed": 82,
+          "published_only": 0,
+          "retrained_only": 12
+        }
+      ],
+      "published": {
+        "mean": 83.4,
+        "sample_sd": 2.8809720581775866,
+        "ci95_low": 79.8228007155299,
+        "ci95_high": 86.97719928447012
+      },
+      "retrained": {
+        "mean": 93.6,
+        "sample_sd": 2.3021728866442674,
+        "ci95_low": 90.74147480901297,
+        "ci95_high": 96.45852519098702
+      },
+      "paired_delta_pp": {
+        "mean": 10.2,
+        "sample_sd": 1.9235384061671346,
+        "ci95_low": 7.811611611900014,
+        "ci95_high": 12.588388388099984
+      }
+    }
+  ],
+  "skipped_after_screen": []
+}

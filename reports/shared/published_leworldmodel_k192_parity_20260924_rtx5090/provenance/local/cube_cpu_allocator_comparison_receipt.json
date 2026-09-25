@@ -1,0 +1,10 @@
+{
+  "verified_at": "2026-09-24T16:44:04.972895+00:00",
+  "diagnostic_only": true,
+  "model_scaler_and_rng_fingerprints_match": true,
+  "default_retained_rss_bytes": 2418425856,
+  "malloc_retained_rss_bytes": 2394816512,
+  "malloc_retained_rss_reduction_bytes": 23609344,
+  "production_allocator_changed": false,
+  "decision": "Do not adopt malloc; retained-memory reduction is too small to justify another full Cube attempt. Measure the actual CUDA setup before concluding cleanup cannot help."
+}

@@ -1,0 +1,106 @@
+
+{"started_at": "2026-09-24T13:29:32.309297+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/ogb_cube.yaml", "--resume"]}
+[benchmark] 1/2 published
+[benchmark] 2/2 sepopt_k192_20260922
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/local_smoke/ogb_cube/summary.json
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/local_smoke/ogb_cube/review.html
+[benchmark] inspect rollout videos with: python -m mwm.benchmark.render_review reports/research/k192_sepopt_published_parity_20260924/local_smoke/ogb_cube --serve
+Exception ignored in: <function Renderer.__del__ at 0x7702bc90ad40>
+Traceback (most recent call last):
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/rendering/classic/renderer.py", line 339, in __del__
+    self.close()
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/rendering/classic/renderer.py", line 325, in close
+    self._gl_context.free()
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/egl/__init__.py", line 133, in free
+    EGL.eglDestroyContext(EGL_DISPLAY, self._context)
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/OpenGL/error.py", line 230, in glCheckError
+    raise self._errorClass(
+OpenGL.raw.EGL._errors.EGLError: EGLError(
+	err = EGL_NOT_INITIALIZED,
+	baseOperation = eglDestroyContext,
+	cArguments = (
+		<OpenGL._opaque.EGLDisplay_pointer object at 0x770261d23c80>,
+		<OpenGL._opaque.EGLContext_pointer object at 0x770261505fd0>,
+	),
+	result = 0
+)
+Exception ignored in: <function GLContext.__del__ at 0x7702bc90a700>
+Traceback (most recent call last):
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/egl/__init__.py", line 138, in __del__
+    self.free()
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/egl/__init__.py", line 133, in free
+    EGL.eglDestroyContext(EGL_DISPLAY, self._context)
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/OpenGL/error.py", line 230, in glCheckError
+    raise self._errorClass(
+OpenGL.raw.EGL._errors.EGLError: EGLError(
+	err = EGL_NOT_INITIALIZED,
+	baseOperation = eglDestroyContext,
+	cArguments = (
+		<OpenGL._opaque.EGLDisplay_pointer object at 0x770261d23c80>,
+		<OpenGL._opaque.EGLContext_pointer object at 0x770261505fd0>,
+	),
+	result = 0
+)
+Exception ignored in: <function Renderer.__del__ at 0x7702bc90ad40>
+Traceback (most recent call last):
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/rendering/classic/renderer.py", line 339, in __del__
+    self.close()
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/rendering/classic/renderer.py", line 325, in close
+    self._gl_context.free()
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/egl/__init__.py", line 131, in free
+    EGL.eglMakeCurrent(EGL_DISPLAY, EGL.EGL_NO_SURFACE,
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/OpenGL/error.py", line 230, in glCheckError
+    raise self._errorClass(
+OpenGL.raw.EGL._errors.EGLError: EGLError(
+	err = EGL_NOT_INITIALIZED,
+	baseOperation = eglMakeCurrent,
+	cArguments = (
+		<OpenGL._opaque.EGLDisplay_pointer object at 0x770261d23c80>,
+		<OpenGL._opaque.EGLSurface_pointer object at 0x7703ff11bf50>,
+		<OpenGL._opaque.EGLSurface_pointer object at 0x7703ff11bf50>,
+		<OpenGL._opaque.EGLContext_pointer object at 0x7703ff11bec0>,
+	),
+	result = 0
+)
+Exception ignored in: <function GLContext.__del__ at 0x7702bc90a700>
+Traceback (most recent call last):
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/egl/__init__.py", line 138, in __del__
+    self.free()
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/mujoco/egl/__init__.py", line 131, in free
+    EGL.eglMakeCurrent(EGL_DISPLAY, EGL.EGL_NO_SURFACE,
+  File "/tmp/hudm-5090-20260924-0z4ayR/venv/lib/python3.11/site-packages/OpenGL/error.py", line 230, in glCheckError
+    raise self._errorClass(
+OpenGL.raw.EGL._errors.EGLError: EGLError(
+	err = EGL_NOT_INITIALIZED,
+	baseOperation = eglMakeCurrent,
+	cArguments = (
+		<OpenGL._opaque.EGLDisplay_pointer object at 0x770261d23c80>,
+		<OpenGL._opaque.EGLSurface_pointer object at 0x7703ff11bf50>,
+		<OpenGL._opaque.EGLSurface_pointer object at 0x7703ff11bf50>,
+		<OpenGL._opaque.EGLContext_pointer object at 0x7703ff11bec0>,
+	),
+	result = 0
+)
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/local_smoke/ogb_cube.yaml --resume"
+	User time (seconds): 119.67
+	System time (seconds): 3.57
+	Percent of CPU this job got: 100%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 2:02.29
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 5549348
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 4368
+	Minor (reclaiming a frame) page faults: 2514431
+	Voluntary context switches: 54984
+	Involuntary context switches: 30514
+	Swaps: 0
+	File system inputs: 2228976
+	File system outputs: 35840
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,60 @@
+
+{"started_at": "2026-09-24T14:16:39.547109+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_100.yaml", "--resume"]}
+[benchmark] 1/2 published
+[benchmark] 2/2 sepopt_k192_20260922
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_100/summary.json
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_100/review.html
+[benchmark] inspect rollout videos with: python -m mwm.benchmark.render_review reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_100 --serve
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_100.yaml --resume"
+	User time (seconds): 110.97
+	System time (seconds): 2.23
+	Percent of CPU this job got: 110%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:42.17
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 2637016
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 1546840
+	Voluntary context switches: 81536
+	Involuntary context switches: 21047
+	Swaps: 0
+	File system inputs: 8
+	File system outputs: 53544
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:27:10.818757+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.matrix", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_100.yaml", "--resume"]}
+[benchmark] resume skip published
+[benchmark] resume skip sepopt_k192_20260922
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_100/summary.json
+[benchmark] wrote reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_100/review.html
+[benchmark] inspect rollout videos with: python -m mwm.benchmark.render_review reports/research/k192_sepopt_published_parity_20260924/screen_n50/tworoom/seed_100 --serve
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.matrix reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/tworoom/seed_100.yaml --resume"
+	User time (seconds): 0.85
+	System time (seconds): 0.05
+	Percent of CPU this job got: 124%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.73
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 142604
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 51293
+	Voluntary context switches: 79
+	Involuntary context switches: 332
+	Swaps: 0
+	File system inputs: 18992
+	File system outputs: 10296
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

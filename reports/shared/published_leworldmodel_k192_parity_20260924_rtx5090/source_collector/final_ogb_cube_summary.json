@@ -1,0 +1,112 @@
+{
+  "environment": "ogb_cube",
+  "episodes_per_seed_per_model": 100,
+  "paired_delta_pp": {
+    "ci95_high": 3.511956132340338,
+    "ci95_low": -3.511956132340338,
+    "mean": 0.0,
+    "sample_sd": 2.8284271247461903
+  },
+  "paired_results": [
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "ogb_cube",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "6b78567566069fbb9726e6bf25cebbcfd98c671f82e1ccaf13643c678cf3cdf5",
+      "population": 300,
+      "published_dynamics_flops_total": 169599175200000,
+      "published_success_rate": 69.0,
+      "retrained_dynamics_flops_total": 169599175200000,
+      "retrained_minus_published_pp": 2.0,
+      "retrained_success_rate": 71.0,
+      "seed": 2002,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "ogb_cube",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "fa93ab615814c28e0cc2da9c4e6021b343d21213d2944ed882cf9ce7236cffc4",
+      "population": 300,
+      "published_dynamics_flops_total": 169599175200000,
+      "published_success_rate": 72.0,
+      "retrained_dynamics_flops_total": 169599175200000,
+      "retrained_minus_published_pp": -4.0,
+      "retrained_success_rate": 68.0,
+      "seed": 71623,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "ogb_cube",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "a697f4d0fc5f93becc5e833357ad698a77f10fd460941a9fc75600a66437d569",
+      "population": 300,
+      "published_dynamics_flops_total": 169599175200000,
+      "published_success_rate": 68.0,
+      "retrained_dynamics_flops_total": 169599175200000,
+      "retrained_minus_published_pp": 2.0,
+      "retrained_success_rate": 70.0,
+      "seed": 82715,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "ogb_cube",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "8b2a3158996ed3c81d3eba1f3d4c32d25c09f0057629b6268afaa4c48a3ba02a",
+      "population": 300,
+      "published_dynamics_flops_total": 169599175200000,
+      "published_success_rate": 74.0,
+      "retrained_dynamics_flops_total": 169599175200000,
+      "retrained_minus_published_pp": -2.0,
+      "retrained_success_rate": 72.0,
+      "seed": 86604,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "ogb_cube",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "5f403867ae64d0b209171061019d6f6f38d0140425a773d8b4bce64b3ecaf2a9",
+      "population": 300,
+      "published_dynamics_flops_total": 169599175200000,
+      "published_success_rate": 73.0,
+      "retrained_dynamics_flops_total": 169599175200000,
+      "retrained_minus_published_pp": 2.0,
+      "retrained_success_rate": 75.0,
+      "seed": 91943,
+      "top_k": 30
+    }
+  ],
+  "published": {
+    "ci95_high": 74.413967570732,
+    "ci95_low": 67.98603242926801,
+    "mean": 71.2,
+    "sample_sd": 2.588435821108957
+  },
+  "retrained": {
+    "ci95_high": 74.413967570732,
+    "ci95_low": 67.98603242926801,
+    "mean": 71.2,
+    "sample_sd": 2.588435821108957
+  },
+  "seeds": [
+    2002,
+    71623,
+    82715,
+    86604,
+    91943
+  ],
+  "stage": "final"
+}

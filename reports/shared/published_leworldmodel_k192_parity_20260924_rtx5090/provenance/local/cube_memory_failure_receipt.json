@@ -1,0 +1,26 @@
+{
+  "recorded_at": "2026-09-24T15:07:54.305803+00:00",
+  "environment": "ogb_cube",
+  "stage": "screen",
+  "seed": 0,
+  "status": "technical_failure_pending_retry",
+  "scientific_screen_decision": null,
+  "matrix_exit_code": 137,
+  "kernel_reason": "global OOM",
+  "killed_pid": 746686,
+  "kernel_time_utc": "2026-09-24T14:57:31Z",
+  "kernel_anon_rss_kib": 11706348,
+  "time_max_rss_kib": 11812704,
+  "minimum_sampled_host_available_bytes": 833339392,
+  "unrelated_host_shared_memory_gib_approx": 100,
+  "retry_requirement": "Additional available host RAM; retain num_envs=50 and all source protocol parameters",
+  "other_screens_verified": 15,
+  "qualified_final_environments": [
+    "tworoom",
+    "reacher",
+    "pusht"
+  ],
+  "recovery": "Run qualified finals now; resume full protocol with original parameters after host memory is available",
+  "user_ram_request_pending": true,
+  "unrelated_workloads_modified": false
+}

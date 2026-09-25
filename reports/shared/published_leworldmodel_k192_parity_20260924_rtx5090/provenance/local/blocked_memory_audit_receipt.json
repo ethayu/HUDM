@@ -1,0 +1,20 @@
+{
+  "verified_at": "2026-09-24T16:52:54.111907+00:00",
+  "available_GiB": 11.94,
+  "shared_GiB": 100.99,
+  "completed_scientific_cells": 30,
+  "run_status": "selected_runs_complete",
+  "live_processes": [],
+  "cube_screen_summary_exists": false,
+  "prior_impasse_count": 2,
+  "consecutive_impasse_goal_turns": 3,
+  "goal_achieved": false,
+  "remaining_requirements": [
+    "Cube five-seed screen",
+    "Cube five-seed final if it passes the predeclared gate",
+    "Full source final collector",
+    "Verified complete paper handoff and figure",
+    "Relay verified results to source through laptop task"
+  ],
+  "reason": "Additional host RAM is required to retry the unchanged 50-environment Cube protocol; unrelated workloads must remain untouched."
+}

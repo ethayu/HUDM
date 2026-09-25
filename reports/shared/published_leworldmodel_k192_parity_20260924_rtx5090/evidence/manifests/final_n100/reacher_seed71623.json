@@ -1,0 +1,747 @@
+{
+  "dataset_metadata": {
+    "action_key": "action",
+    "column_names": [
+      "pixels",
+      "action",
+      "qpos",
+      "qvel",
+      "observation"
+    ],
+    "path": "data/upstream/reacher.lance",
+    "pixels_key": "pixels",
+    "sidecar": {},
+    "split_ratio": 1.0
+  },
+  "dataset_path": "data/upstream/reacher.lance",
+  "dependency_shas": {
+    "local_repo": {
+      "commit_id": "28d0e78a5011c72bebf8b01073163cf45e60f680",
+      "diff_sha256": "45a29f464f5b34aa5d6ba1d9ea7ba28db01e537ccc527009dead5cc3404ef461",
+      "dirty": true
+    },
+    "stable-pretraining": {
+      "sha256": "b28797825408b3df31ab445098073f371e44c48fcbc709b7e9616913018a0857",
+      "version": "0.1.6"
+    },
+    "stable-worldmodel": {
+      "sha256": "fe2bc305449dfcc9939248571566ba5292901cdab31e6dc9e4f0bff0a1d0b85a",
+      "version": "0.1.0"
+    },
+    "torch": {
+      "sha256": "2153f0c814d99b4ce4a7bf9d4dcacbfa720b35de4c09ec042cdcca4ebb0ad54b",
+      "version": "2.11.0"
+    }
+  },
+  "effective_goal_offset": 24,
+  "env_id": "swm/ReacherDMControl-v0",
+  "eval_budget": 50,
+  "goal_indexing": "upstream_lewm_end_exclusive",
+  "goal_offset": 25,
+  "manifest_sha256": "739b7f8f9e55277987153afbbe496d9ab6e0ddfe808959c2bec0ac95803be88f",
+  "pairs": [
+    {
+      "episode": 30,
+      "goal_row": 6128,
+      "goal_step": 98,
+      "start_row": 6104,
+      "start_step": 74
+    },
+    {
+      "episode": 38,
+      "goal_row": 7765,
+      "goal_step": 127,
+      "start_row": 7741,
+      "start_step": 103
+    },
+    {
+      "episode": 103,
+      "goal_row": 20829,
+      "goal_step": 126,
+      "start_row": 20805,
+      "start_step": 102
+    },
+    {
+      "episode": 180,
+      "goal_row": 36307,
+      "goal_step": 127,
+      "start_row": 36283,
+      "start_step": 103
+    },
+    {
+      "episode": 420,
+      "goal_row": 84609,
+      "goal_step": 189,
+      "start_row": 84585,
+      "start_step": 165
+    },
+    {
+      "episode": 491,
+      "goal_row": 98792,
+      "goal_step": 101,
+      "start_row": 98768,
+      "start_step": 77
+    },
+    {
+      "episode": 523,
+      "goal_row": 105243,
+      "goal_step": 120,
+      "start_row": 105219,
+      "start_step": 96
+    },
+    {
+      "episode": 619,
+      "goal_row": 124586,
+      "goal_step": 167,
+      "start_row": 124562,
+      "start_step": 143
+    },
+    {
+      "episode": 964,
+      "goal_row": 193848,
+      "goal_step": 84,
+      "start_row": 193824,
+      "start_step": 60
+    },
+    {
+      "episode": 1318,
+      "goal_row": 265003,
+      "goal_step": 85,
+      "start_row": 264979,
+      "start_step": 61
+    },
+    {
+      "episode": 1398,
+      "goal_row": 281128,
+      "goal_step": 130,
+      "start_row": 281104,
+      "start_step": 106
+    },
+    {
+      "episode": 1435,
+      "goal_row": 288478,
+      "goal_step": 43,
+      "start_row": 288454,
+      "start_step": 19
+    },
+    {
+      "episode": 1510,
+      "goal_row": 303637,
+      "goal_step": 127,
+      "start_row": 303613,
+      "start_step": 103
+    },
+    {
+      "episode": 1533,
+      "goal_row": 308243,
+      "goal_step": 110,
+      "start_row": 308219,
+      "start_step": 86
+    },
+    {
+      "episode": 1653,
+      "goal_row": 332321,
+      "goal_step": 68,
+      "start_row": 332297,
+      "start_step": 44
+    },
+    {
+      "episode": 1748,
+      "goal_row": 351540,
+      "goal_step": 192,
+      "start_row": 351516,
+      "start_step": 168
+    },
+    {
+      "episode": 1882,
+      "goal_row": 378426,
+      "goal_step": 144,
+      "start_row": 378402,
+      "start_step": 120
+    },
+    {
+      "episode": 2042,
+      "goal_row": 410493,
+      "goal_step": 51,
+      "start_row": 410469,
+      "start_step": 27
+    },
+    {
+      "episode": 2155,
+      "goal_row": 433189,
+      "goal_step": 34,
+      "start_row": 433165,
+      "start_step": 10
+    },
+    {
+      "episode": 2155,
+      "goal_row": 433322,
+      "goal_step": 167,
+      "start_row": 433298,
+      "start_step": 143
+    },
+    {
+      "episode": 2256,
+      "goal_row": 453653,
+      "goal_step": 197,
+      "start_row": 453629,
+      "start_step": 173
+    },
+    {
+      "episode": 2258,
+      "goal_row": 453899,
+      "goal_step": 41,
+      "start_row": 453875,
+      "start_step": 17
+    },
+    {
+      "episode": 2263,
+      "goal_row": 455039,
+      "goal_step": 176,
+      "start_row": 455015,
+      "start_step": 152
+    },
+    {
+      "episode": 2277,
+      "goal_row": 457792,
+      "goal_step": 115,
+      "start_row": 457768,
+      "start_step": 91
+    },
+    {
+      "episode": 2414,
+      "goal_row": 485325,
+      "goal_step": 111,
+      "start_row": 485301,
+      "start_step": 87
+    },
+    {
+      "episode": 2448,
+      "goal_row": 492120,
+      "goal_step": 72,
+      "start_row": 492096,
+      "start_step": 48
+    },
+    {
+      "episode": 2466,
+      "goal_row": 495835,
+      "goal_step": 169,
+      "start_row": 495811,
+      "start_step": 145
+    },
+    {
+      "episode": 2552,
+      "goal_row": 513015,
+      "goal_step": 63,
+      "start_row": 512991,
+      "start_step": 39
+    },
+    {
+      "episode": 2583,
+      "goal_row": 519315,
+      "goal_step": 132,
+      "start_row": 519291,
+      "start_step": 108
+    },
+    {
+      "episode": 2690,
+      "goal_row": 540882,
+      "goal_step": 192,
+      "start_row": 540858,
+      "start_step": 168
+    },
+    {
+      "episode": 2748,
+      "goal_row": 552382,
+      "goal_step": 34,
+      "start_row": 552358,
+      "start_step": 10
+    },
+    {
+      "episode": 2843,
+      "goal_row": 571499,
+      "goal_step": 56,
+      "start_row": 571475,
+      "start_step": 32
+    },
+    {
+      "episode": 2931,
+      "goal_row": 589274,
+      "goal_step": 143,
+      "start_row": 589250,
+      "start_step": 119
+    },
+    {
+      "episode": 2952,
+      "goal_row": 593448,
+      "goal_step": 96,
+      "start_row": 593424,
+      "start_step": 72
+    },
+    {
+      "episode": 2972,
+      "goal_row": 597407,
+      "goal_step": 35,
+      "start_row": 597383,
+      "start_step": 11
+    },
+    {
+      "episode": 3026,
+      "goal_row": 608345,
+      "goal_step": 119,
+      "start_row": 608321,
+      "start_step": 95
+    },
+    {
+      "episode": 3044,
+      "goal_row": 611885,
+      "goal_step": 41,
+      "start_row": 611861,
+      "start_step": 17
+    },
+    {
+      "episode": 3111,
+      "goal_row": 625437,
+      "goal_step": 126,
+      "start_row": 625413,
+      "start_step": 102
+    },
+    {
+      "episode": 3152,
+      "goal_row": 633584,
+      "goal_step": 32,
+      "start_row": 633560,
+      "start_step": 8
+    },
+    {
+      "episode": 3467,
+      "goal_row": 696938,
+      "goal_step": 71,
+      "start_row": 696914,
+      "start_step": 47
+    },
+    {
+      "episode": 3519,
+      "goal_row": 707358,
+      "goal_step": 39,
+      "start_row": 707334,
+      "start_step": 15
+    },
+    {
+      "episode": 3612,
+      "goal_row": 726169,
+      "goal_step": 157,
+      "start_row": 726145,
+      "start_step": 133
+    },
+    {
+      "episode": 3676,
+      "goal_row": 738915,
+      "goal_step": 39,
+      "start_row": 738891,
+      "start_step": 15
+    },
+    {
+      "episode": 3739,
+      "goal_row": 751637,
+      "goal_step": 98,
+      "start_row": 751613,
+      "start_step": 74
+    },
+    {
+      "episode": 3756,
+      "goal_row": 755137,
+      "goal_step": 181,
+      "start_row": 755113,
+      "start_step": 157
+    },
+    {
+      "episode": 3793,
+      "goal_row": 762583,
+      "goal_step": 190,
+      "start_row": 762559,
+      "start_step": 166
+    },
+    {
+      "episode": 3914,
+      "goal_row": 786766,
+      "goal_step": 52,
+      "start_row": 786742,
+      "start_step": 28
+    },
+    {
+      "episode": 4203,
+      "goal_row": 844901,
+      "goal_step": 98,
+      "start_row": 844877,
+      "start_step": 74
+    },
+    {
+      "episode": 4275,
+      "goal_row": 859455,
+      "goal_step": 180,
+      "start_row": 859431,
+      "start_step": 156
+    },
+    {
+      "episode": 4344,
+      "goal_row": 873275,
+      "goal_step": 131,
+      "start_row": 873251,
+      "start_step": 107
+    },
+    {
+      "episode": 4391,
+      "goal_row": 882662,
+      "goal_step": 71,
+      "start_row": 882638,
+      "start_step": 47
+    },
+    {
+      "episode": 4403,
+      "goal_row": 885155,
+      "goal_step": 152,
+      "start_row": 885131,
+      "start_step": 128
+    },
+    {
+      "episode": 4589,
+      "goal_row": 922535,
+      "goal_step": 146,
+      "start_row": 922511,
+      "start_step": 122
+    },
+    {
+      "episode": 4705,
+      "goal_row": 945797,
+      "goal_step": 92,
+      "start_row": 945773,
+      "start_step": 68
+    },
+    {
+      "episode": 4978,
+      "goal_row": 1000605,
+      "goal_step": 27,
+      "start_row": 1000581,
+      "start_step": 3
+    },
+    {
+      "episode": 5137,
+      "goal_row": 1032586,
+      "goal_step": 49,
+      "start_row": 1032562,
+      "start_step": 25
+    },
+    {
+      "episode": 5186,
+      "goal_row": 1042541,
+      "goal_step": 155,
+      "start_row": 1042517,
+      "start_step": 131
+    },
+    {
+      "episode": 5189,
+      "goal_row": 1043078,
+      "goal_step": 89,
+      "start_row": 1043054,
+      "start_step": 65
+    },
+    {
+      "episode": 5237,
+      "goal_row": 1052814,
+      "goal_step": 177,
+      "start_row": 1052790,
+      "start_step": 153
+    },
+    {
+      "episode": 5468,
+      "goal_row": 1099098,
+      "goal_step": 30,
+      "start_row": 1099074,
+      "start_step": 6
+    },
+    {
+      "episode": 6047,
+      "goal_row": 1215477,
+      "goal_step": 30,
+      "start_row": 1215453,
+      "start_step": 6
+    },
+    {
+      "episode": 6141,
+      "goal_row": 1234437,
+      "goal_step": 96,
+      "start_row": 1234413,
+      "start_step": 72
+    },
+    {
+      "episode": 6142,
+      "goal_row": 1234636,
+      "goal_step": 94,
+      "start_row": 1234612,
+      "start_step": 70
+    },
+    {
+      "episode": 6189,
+      "goal_row": 1244167,
+      "goal_step": 178,
+      "start_row": 1244143,
+      "start_step": 154
+    },
+    {
+      "episode": 6348,
+      "goal_row": 1276000,
+      "goal_step": 52,
+      "start_row": 1275976,
+      "start_step": 28
+    },
+    {
+      "episode": 6424,
+      "goal_row": 1291304,
+      "goal_step": 80,
+      "start_row": 1291280,
+      "start_step": 56
+    },
+    {
+      "episode": 6440,
+      "goal_row": 1294608,
+      "goal_step": 168,
+      "start_row": 1294584,
+      "start_step": 144
+    },
+    {
+      "episode": 6517,
+      "goal_row": 1310048,
+      "goal_step": 131,
+      "start_row": 1310024,
+      "start_step": 107
+    },
+    {
+      "episode": 6600,
+      "goal_row": 1326739,
+      "goal_step": 139,
+      "start_row": 1326715,
+      "start_step": 115
+    },
+    {
+      "episode": 6757,
+      "goal_row": 1358297,
+      "goal_step": 140,
+      "start_row": 1358273,
+      "start_step": 116
+    },
+    {
+      "episode": 6760,
+      "goal_row": 1358949,
+      "goal_step": 189,
+      "start_row": 1358925,
+      "start_step": 165
+    },
+    {
+      "episode": 6881,
+      "goal_row": 1383118,
+      "goal_step": 37,
+      "start_row": 1383094,
+      "start_step": 13
+    },
+    {
+      "episode": 6987,
+      "goal_row": 1404536,
+      "goal_step": 149,
+      "start_row": 1404512,
+      "start_step": 125
+    },
+    {
+      "episode": 7234,
+      "goal_row": 1454211,
+      "goal_step": 177,
+      "start_row": 1454187,
+      "start_step": 153
+    },
+    {
+      "episode": 7329,
+      "goal_row": 1473243,
+      "goal_step": 114,
+      "start_row": 1473219,
+      "start_step": 90
+    },
+    {
+      "episode": 7343,
+      "goal_row": 1475976,
+      "goal_step": 33,
+      "start_row": 1475952,
+      "start_step": 9
+    },
+    {
+      "episode": 7465,
+      "goal_row": 1500627,
+      "goal_step": 162,
+      "start_row": 1500603,
+      "start_step": 138
+    },
+    {
+      "episode": 7686,
+      "goal_row": 1545071,
+      "goal_step": 185,
+      "start_row": 1545047,
+      "start_step": 161
+    },
+    {
+      "episode": 7773,
+      "goal_row": 1562404,
+      "goal_step": 31,
+      "start_row": 1562380,
+      "start_step": 7
+    },
+    {
+      "episode": 7818,
+      "goal_row": 1571547,
+      "goal_step": 129,
+      "start_row": 1571523,
+      "start_step": 105
+    },
+    {
+      "episode": 7851,
+      "goal_row": 1578220,
+      "goal_step": 169,
+      "start_row": 1578196,
+      "start_step": 145
+    },
+    {
+      "episode": 7981,
+      "goal_row": 1604378,
+      "goal_step": 197,
+      "start_row": 1604354,
+      "start_step": 173
+    },
+    {
+      "episode": 8106,
+      "goal_row": 1629471,
+      "goal_step": 165,
+      "start_row": 1629447,
+      "start_step": 141
+    },
+    {
+      "episode": 8109,
+      "goal_row": 1629965,
+      "goal_step": 56,
+      "start_row": 1629941,
+      "start_step": 32
+    },
+    {
+      "episode": 8133,
+      "goal_row": 1634824,
+      "goal_step": 91,
+      "start_row": 1634800,
+      "start_step": 67
+    },
+    {
+      "episode": 8186,
+      "goal_row": 1645555,
+      "goal_step": 169,
+      "start_row": 1645531,
+      "start_step": 145
+    },
+    {
+      "episode": 8328,
+      "goal_row": 1674082,
+      "goal_step": 154,
+      "start_row": 1674058,
+      "start_step": 130
+    },
+    {
+      "episode": 8696,
+      "goal_row": 1747936,
+      "goal_step": 40,
+      "start_row": 1747912,
+      "start_step": 16
+    },
+    {
+      "episode": 8821,
+      "goal_row": 1773156,
+      "goal_step": 135,
+      "start_row": 1773132,
+      "start_step": 111
+    },
+    {
+      "episode": 8922,
+      "goal_row": 1793371,
+      "goal_step": 49,
+      "start_row": 1793347,
+      "start_step": 25
+    },
+    {
+      "episode": 8948,
+      "goal_row": 1798643,
+      "goal_step": 95,
+      "start_row": 1798619,
+      "start_step": 71
+    },
+    {
+      "episode": 8995,
+      "goal_row": 1808094,
+      "goal_step": 99,
+      "start_row": 1808070,
+      "start_step": 75
+    },
+    {
+      "episode": 9007,
+      "goal_row": 1810437,
+      "goal_step": 30,
+      "start_row": 1810413,
+      "start_step": 6
+    },
+    {
+      "episode": 9364,
+      "goal_row": 1882253,
+      "goal_step": 89,
+      "start_row": 1882229,
+      "start_step": 65
+    },
+    {
+      "episode": 9423,
+      "goal_row": 1894136,
+      "goal_step": 113,
+      "start_row": 1894112,
+      "start_step": 89
+    },
+    {
+      "episode": 9509,
+      "goal_row": 1911415,
+      "goal_step": 106,
+      "start_row": 1911391,
+      "start_step": 82
+    },
+    {
+      "episode": 9517,
+      "goal_row": 1912971,
+      "goal_step": 54,
+      "start_row": 1912947,
+      "start_step": 30
+    },
+    {
+      "episode": 9550,
+      "goal_row": 1919723,
+      "goal_step": 173,
+      "start_row": 1919699,
+      "start_step": 149
+    },
+    {
+      "episode": 9666,
+      "goal_row": 1942920,
+      "goal_step": 54,
+      "start_row": 1942896,
+      "start_step": 30
+    },
+    {
+      "episode": 9704,
+      "goal_row": 1950641,
+      "goal_step": 137,
+      "start_row": 1950617,
+      "start_step": 113
+    }
+  ],
+  "restore_spec": "reacher_qpos_match_qpos_qvel",
+  "schema_version": "mwm_swm_eval_manifest_v1",
+  "seed": 71623
+}

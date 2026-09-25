@@ -1,0 +1,165 @@
+
+{"started_at": "2026-09-24T12:31:19.899595+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_ogb_cube"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml",
+  "env_id": "swm/OGBCube-v0",
+  "expected_cells": [
+    [
+      "swm/OGBCube-v0",
+      0,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/OGBCube-v0",
+      0,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/OGBCube-v0_seed0_n50",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/screen_n50/ogb_cube_seed0.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/screen_n50/ogb_cube/seed_0",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 0,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml --static-only"
+	User time (seconds): 0.89
+	System time (seconds): 0.14
+	Percent of CPU this job got: 114%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.90
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 610052
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81491
+	Voluntary context switches: 916
+	Involuntary context switches: 645
+	Swaps: 0
+	File system inputs: 306208
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T14:55:55.786303+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_ogb_cube"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml",
+  "env_id": "swm/OGBCube-v0",
+  "expected_cells": [
+    [
+      "swm/OGBCube-v0",
+      0,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/OGBCube-v0",
+      0,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/OGBCube-v0_seed0_n50",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/screen_n50/ogb_cube_seed0.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/screen_n50/ogb_cube/seed_0",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 0,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml --static-only"
+	User time (seconds): 0.88
+	System time (seconds): 0.11
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.81
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 611908
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81492
+	Voluntary context switches: 42
+	Involuntary context switches: 357
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:27:41.306190+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_ogb_cube_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_ogb_cube"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml",
+  "env_id": "swm/OGBCube-v0",
+  "expected_cells": [
+    [
+      "swm/OGBCube-v0",
+      0,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/OGBCube-v0",
+      0,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/OGBCube-v0_seed0_n50",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/screen_n50/ogb_cube_seed0.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/screen_n50/ogb_cube/seed_0",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 0,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml --static-only"
+	User time (seconds): 0.87
+	System time (seconds): 0.13
+	Percent of CPU this job got: 118%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.85
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 612456
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81504
+	Voluntary context switches: 513
+	Involuntary context switches: 456
+	Swaps: 0
+	File system inputs: 165040
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

@@ -1,0 +1,112 @@
+{
+  "environment": "tworoom",
+  "episodes_per_seed_per_model": 100,
+  "paired_delta_pp": {
+    "ci95_high": 12.588388388099984,
+    "ci95_low": 7.811611611900014,
+    "mean": 10.2,
+    "sample_sd": 1.9235384061671346
+  },
+  "paired_results": [
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "tworoom",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "b16d0a63cc7f37193a4c4948401f1c50ee21018fad66b1cd37d7f1137cbac7ea",
+      "population": 300,
+      "published_dynamics_flops_total": 169596475200000,
+      "published_success_rate": 85.0,
+      "retrained_dynamics_flops_total": 72172296000000,
+      "retrained_minus_published_pp": 11.0,
+      "retrained_success_rate": 96.0,
+      "seed": 2002,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "tworoom",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "241f1ce09649d74e9c5443dadbd079570f897ed1f52b765cf91e868d190a2397",
+      "population": 300,
+      "published_dynamics_flops_total": 169596475200000,
+      "published_success_rate": 85.0,
+      "retrained_dynamics_flops_total": 72172296000000,
+      "retrained_minus_published_pp": 10.0,
+      "retrained_success_rate": 95.0,
+      "seed": 71623,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "tworoom",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "621816e2d86f134a26e89c118d366cd7b32c7e4962b6bf485e18588f0a5e5aff",
+      "population": 300,
+      "published_dynamics_flops_total": 169596475200000,
+      "published_success_rate": 79.0,
+      "retrained_dynamics_flops_total": 72172296000000,
+      "retrained_minus_published_pp": 11.0,
+      "retrained_success_rate": 90.0,
+      "seed": 82715,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "tworoom",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "70328e5abbdbb7a1a2edbd9eb28db4ff9de18548d7761dd4cb60662473b29359",
+      "population": 300,
+      "published_dynamics_flops_total": 169596475200000,
+      "published_success_rate": 86.0,
+      "retrained_dynamics_flops_total": 72172296000000,
+      "retrained_minus_published_pp": 7.0,
+      "retrained_success_rate": 93.0,
+      "seed": 86604,
+      "top_k": 30
+    },
+    {
+      "cem_iterations": 10,
+      "elite_fraction": 0.1,
+      "environment": "tworoom",
+      "episodes_per_model": 100,
+      "goal_offset": 25,
+      "manifest_file_sha256": "b23ee8875d1688c612fc870685a0be2458c461016f0db997506e5df24c51d182",
+      "population": 300,
+      "published_dynamics_flops_total": 169596475200000,
+      "published_success_rate": 82.0,
+      "retrained_dynamics_flops_total": 72172296000000,
+      "retrained_minus_published_pp": 12.0,
+      "retrained_success_rate": 94.0,
+      "seed": 91943,
+      "top_k": 30
+    }
+  ],
+  "published": {
+    "ci95_high": 86.97719928447012,
+    "ci95_low": 79.8228007155299,
+    "mean": 83.4,
+    "sample_sd": 2.8809720581775866
+  },
+  "retrained": {
+    "ci95_high": 96.45852519098702,
+    "ci95_low": 90.74147480901297,
+    "mean": 93.6,
+    "sample_sd": 2.3021728866442674
+  },
+  "seeds": [
+    2002,
+    71623,
+    82715,
+    86604,
+    91943
+  ],
+  "stage": "final"
+}

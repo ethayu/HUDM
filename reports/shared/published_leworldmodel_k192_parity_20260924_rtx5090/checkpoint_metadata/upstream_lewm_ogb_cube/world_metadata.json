@@ -1,0 +1,132 @@
+{
+  "action_block": 5,
+  "action_dim": 5,
+  "action_high": [
+    1.0,
+    1.0,
+    1.0,
+    1.0,
+    1.0
+  ],
+  "action_low": [
+    -1.0,
+    -1.0,
+    -1.0,
+    -1.0,
+    -1.0
+  ],
+  "action_preprocessing": "standard_scaler",
+  "action_spec": {
+    "base_dim": 5,
+    "block": 5,
+    "dim": 25
+  },
+  "adapter_family": "lewm",
+  "architecture_version": "lewm_base_adapter_v1",
+  "artifacts": {
+    "config": {
+      "path": "config.json",
+      "sha256": "4ce44adbeeb9f7e4fe0da0bedfdc830f64fe70bcf3ba2f044739d5c65b23d3b6"
+    },
+    "weights": {
+      "path": "weights.pt",
+      "sha256": "9400a6f64e7ad176ccd345556d107e927612070535adc6de7a2657bd136506a0"
+    }
+  },
+  "component_policy": {
+    "per_level": [
+      "transition"
+    ],
+    "reconstructor": [],
+    "shared": [
+      "latent_producer"
+    ]
+  },
+  "dataset": {
+    "action_key": "action",
+    "pixels_key": "pixels"
+  },
+  "dependencies": {
+    "local_repo": {
+      "commit_id": "2f54b271d7eeb3c77cb0a03b7299d9f9adb8948b",
+      "diff_sha256": "c2a8ee3c9817a08695f279ad074d5ef0ab74ed03d04089293e76e2f5ba72c83c",
+      "dirty": true
+    },
+    "stable-pretraining": {
+      "sha256": "8a6b58c6a13aec8a789187c9bae0dcc5f4d66b87f550b91ac1aadecf07a48035",
+      "version": "0.1.6"
+    },
+    "stable-worldmodel": {
+      "sha256": "89246b37cd491c51b5f0d4828a0aa6dc142db20cfe048e90f0980d5186befd78",
+      "version": "0.1.0"
+    },
+    "torch": {
+      "sha256": "3d3b2ceffa4fbb25846084218dc508d2804f61e152fedd3f928fbb8aad231796",
+      "version": "2.11.0"
+    }
+  },
+  "env_id": "swm/OGBCube-v0",
+  "format": "mwm_world_v1",
+  "fresh_init": false,
+  "head_architectures": [
+    {
+      "K": 192,
+      "action_encoder_emb_dim": 192,
+      "action_encoder_hidden_dim": null,
+      "action_encoder_out_dim": null,
+      "pred_proj_hidden_dim": 2048,
+      "pred_proj_input_dim": 192,
+      "pred_proj_output_dim": 192,
+      "predictor_dim_head": 64,
+      "predictor_heads": 16,
+      "predictor_hidden_dim": 192,
+      "predictor_input_dim": 192,
+      "predictor_mlp_dim": 2048,
+      "predictor_output_dim": 192
+    }
+  ],
+  "image_shape": [
+    224,
+    224
+  ],
+  "levels": [
+    192
+  ],
+  "loss_scope": {
+    "regularizers": "shared_latent"
+  },
+  "model": {
+    "D": 192,
+    "K": [
+      192
+    ],
+    "action_block": 5,
+    "action_dim": 25,
+    "target": "mwm.adapters.builder.build_mwm_from_stable_config"
+  },
+  "preprocessing_spec": {
+    "image": "imagenet",
+    "image_shape": [
+      224,
+      224
+    ],
+    "layout": "BCHW"
+  },
+  "restore_spec": "ogbench_cube_single_qpos_qvel_target_pose",
+  "role": "upstream_lewm_converted",
+  "source_config_sha256": "4d446944fe28922cc2c5763f43d4ef9132a457bd89e9a0ce5dbceac183994999",
+  "source_history_size": 3,
+  "training_recipe": {
+    "history_size": 3,
+    "loss_scope": {
+      "regularizers": "shared_latent"
+    },
+    "num_preds": 1
+  },
+  "upstream": {
+    "repo": "quentinll/lewm-cube",
+    "source": "quentinll/lewm-cube",
+    "source_config": "/vast/home/e/ethanyu/.stable_worldmodel/checkpoints/models--quentinll--lewm-cube/config.json"
+  },
+  "weights": "weights.pt"
+}

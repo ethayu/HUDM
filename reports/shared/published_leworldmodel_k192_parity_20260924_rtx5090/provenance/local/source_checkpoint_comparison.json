@@ -1,0 +1,22 @@
+[
+  {
+    "environment": "tworoom",
+    "source_weights_match_release": true,
+    "sha256": "0782bd7798c560178d7cea962790ff774fd2d60f7630e02cee80d3f8307f2cf4"
+  },
+  {
+    "environment": "ogb_cube",
+    "source_weights_match_release": true,
+    "sha256": "f8f023c1bfd5fe6d6a176d8f138e0c650f0857ebe372868298ec08319bb48781"
+  },
+  {
+    "environment": "reacher",
+    "source_weights_match_release": true,
+    "sha256": "2993c6146f5ad6ec160c35422c75c89113d25b51c6de2552f1ecc5b30fe891ff"
+  },
+  {
+    "environment": "pusht",
+    "source_weights_match_release": true,
+    "sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c"
+  }
+]

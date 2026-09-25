@@ -1,0 +1,123 @@
+{
+  "created_at": "2026-09-24T14:03:58.440165+00:00",
+  "datasets": [
+    {
+      "name": "ogb_cube_single_expert.lance",
+      "version": 1,
+      "rows": 2010000,
+      "schema": "episode_idx: int32\nstep_idx: int32\npixels: binary\naction: fixed_size_list<item: float>[5]\n  child 0, item: float\nobservation: fixed_size_list<item: float>[28]\n  child 0, item: float\nqpos: fixed_size_list<item: float>[21]\n  child 0, item: float\nqvel: fixed_size_list<item: float>[20]\n  child 0, item: float\nprivileged/block_0_pos: fixed_size_list<item: float>[3]\n  child 0, item: float\nprivileged/block_0_quat: fixed_size_list<item: float>[4]\n  child 0, item: float",
+      "lance_validation_passed": true,
+      "files": [
+        {
+          "path": "data/upstream/ogb_cube_single_expert.lance/_transactions/0-5859d352-371e-46a8-af75-4d6e129e3fa8.txn",
+          "bytes": 767,
+          "sha256": "f617ffd3607fb6fc7e0f62c72f3eedb6713140e2e8e23f776fdb21aaf99c7dfc"
+        },
+        {
+          "path": "data/upstream/ogb_cube_single_expert.lance/_versions/18446744073709551614.manifest",
+          "bytes": 1617,
+          "sha256": "2e223b8056a715811cd441223e66efcc270005f69833f21330b870b79ae15752"
+        },
+        {
+          "path": "data/upstream/ogb_cube_single_expert.lance/data/10110101011000001000000079e25d4f1cbe8f9e0dd32696f9.lance",
+          "bytes": 10237644732,
+          "sha256": "78a64cc54a102ca1ff9b4e41a98c4417ce226073565fbcd7fe2e8a38b138dcbb"
+        },
+        {
+          "path": "data/upstream/ogb_cube_single_expert.lance/data/111101111010110110111110b39a3b49beb83cafe86a187ef1.lance",
+          "bytes": 9358697666,
+          "sha256": "15c8fd9616c0e2cde6cb90f2cf31a74af4f918c0ad50ff14fb95d82ef366e83c"
+        }
+      ]
+    },
+    {
+      "name": "reacher.lance",
+      "version": 1,
+      "rows": 2010000,
+      "schema": "episode_idx: int32\nstep_idx: int32\npixels: binary\naction: fixed_size_list<item: float>[2]\n  child 0, item: float\nqpos: fixed_size_list<item: float>[2]\n  child 0, item: float\nqvel: fixed_size_list<item: float>[2]\n  child 0, item: float\nobservation: fixed_size_list<item: float>[6]\n  child 0, item: float",
+      "lance_validation_passed": true,
+      "files": [
+        {
+          "path": "data/upstream/reacher.lance/_transactions/0-57d1f512-38a8-439c-80b6-4539291f867e.txn",
+          "bytes": 619,
+          "sha256": "eb5ecb5b2b417655687a64c4b15c8142b0e82a5fb1d29900a3b0c3607ad24187"
+        },
+        {
+          "path": "data/upstream/reacher.lance/_versions/18446744073709551614.manifest",
+          "bytes": 1321,
+          "sha256": "75a16a862849ed1177ac9af98d12d8b4d3d505c5be5979251102b7b11da0c485"
+        },
+        {
+          "path": "data/upstream/reacher.lance/data/0001000100001000110001110570e94dba9900c932d5a40dbf.lance",
+          "bytes": 9024036700,
+          "sha256": "7b3fdf64ac1ce85c6adaeae6b1e716af14922c2c8b07fda6eca38bcd0077faa5"
+        },
+        {
+          "path": "data/upstream/reacher.lance/data/011110010101011011110011a591c7471b83d1968b98da5c3b.lance",
+          "bytes": 8272856362,
+          "sha256": "16194f2528367cb6bc2451289873d745261b8af42e4da33af6e0c1f1c5066f20"
+        }
+      ]
+    },
+    {
+      "name": "pusht_expert_train.lance",
+      "version": 1,
+      "rows": 2336736,
+      "schema": "episode_idx: int32\nstep_idx: int32\naction: fixed_size_list<item: float>[2]\n  child 0, item: float\npixels: binary\nproprio: fixed_size_list<item: float>[4]\n  child 0, item: float\nstate: fixed_size_list<item: float>[7]\n  child 0, item: float",
+      "lance_validation_passed": true,
+      "files": [
+        {
+          "path": "data/upstream/pusht_expert_train.lance/_transactions/0-539a6f7d-98be-49f7-be2c-c14fa77b64ce.txn",
+          "bytes": 652,
+          "sha256": "5792392aa04f3276cfa62230b1f8afbaf96b96d3fbf4b4f34b782260953df87c"
+        },
+        {
+          "path": "data/upstream/pusht_expert_train.lance/_versions/18446744073709551614.manifest",
+          "bytes": 1388,
+          "sha256": "f19a193c9f98eaa304be450aa41e89a0668bce98dc961ac85933881348fb24c8"
+        },
+        {
+          "path": "data/upstream/pusht_expert_train.lance/data/000011100101000101101101f62acd4b09ba50d40865372a16.lance",
+          "bytes": 6438539739,
+          "sha256": "9e813b5589454d9d7df2d3d4ca8e564a8e8a9a83038aaa181ecdf48c8e927e3f"
+        },
+        {
+          "path": "data/upstream/pusht_expert_train.lance/data/010111111101111100111101f5180d4d4aa964c1d47acce8b8.lance",
+          "bytes": 1476533575,
+          "sha256": "141d8ad91dc474ea009916e5d1d1fde82ecf33e869f20fb7a9d8b351e4e75f51"
+        },
+        {
+          "path": "data/upstream/pusht_expert_train.lance/data/01100100101001001101110053a11144b6b76ac5c858033220.lance",
+          "bytes": 6380006717,
+          "sha256": "245e1ec041558aa27696951aad1e9e7a737b57067d840877408cb0b6cdbd2955"
+        }
+      ]
+    },
+    {
+      "name": "tworoom.lance",
+      "version": 1,
+      "rows": 920809,
+      "schema": "episode_idx: int32\nstep_idx: int32\naction: fixed_size_list<item: float>[2]\n  child 0, item: float\ndistance_to_target: fixed_size_list<item: float>[1]\n  child 0, item: float\nep_idx: fixed_size_list<item: float>[1]\n  child 0, item: float\nid: fixed_size_list<item: float>[1]\n  child 0, item: float\nobservation: fixed_size_list<item: float>[10]\n  child 0, item: float\npixels: binary\npos_agent: fixed_size_list<item: float>[2]\n  child 0, item: float\npos_target: fixed_size_list<item: float>[2]\n  child 0, item: float\nproprio: fixed_size_list<item: float>[2]\n  child 0, item: float\nrender_time: fixed_size_list<item: float>[1]\n  child 0, item: float\nreward: fixed_size_list<item: float>[1]\n  child 0, item: float\nterminated: fixed_size_list<item: float>[1]\n  child 0, item: float\ntruncated: fixed_size_list<item: float>[1]\n  child 0, item: float",
+      "lance_validation_passed": true,
+      "files": [
+        {
+          "path": "data/upstream/tworoom.lance/_transactions/0-cfa62910-38e4-4bd2-83bd-b7bb945dc5ca.txn",
+          "bytes": 992,
+          "sha256": "4c4f28ca9bdbc7152f0ab26cd43b5ab05bc09eddcafd30a390b0a47d006f6502"
+        },
+        {
+          "path": "data/upstream/tworoom.lance/_versions/18446744073709551614.manifest",
+          "bytes": 2065,
+          "sha256": "5bca0e99e155628cf12427aadf091c978186a80842186e72a96f4277d72078a9"
+        },
+        {
+          "path": "data/upstream/tworoom.lance/data/000101010110001101000111601c114d2499c09414afc0cfcd.lance",
+          "bytes": 4154417875,
+          "sha256": "a5f32a4cf5b5181bdff706d9645ccb373a224798b9dd442ffe152782357ebbaa"
+        }
+      ]
+    }
+  ],
+  "source_hashes_compared": false,
+  "source_comparison_pending": true
+}

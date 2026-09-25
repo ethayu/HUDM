@@ -1,0 +1,26 @@
+{
+  "diagnostic_only": true,
+  "started_at": "2026-09-24T16:39:22.549264+00:00",
+  "finished_at": "2026-09-24T16:40:37.849535+00:00",
+  "command": [
+    "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+    "-u",
+    "/tmp/hudm-5090-20260924-0z4ayR/profile_cube_setup_memory.py",
+    "--label",
+    "malloc_seeded"
+  ],
+  "allocator_environment": {
+    "PYTHONMALLOC": "malloc",
+    "PYTHONHASHSEED": "42"
+  },
+  "guard_script_sha256": "4f32e35629a6e3b5c01e244017e70d782c061f07cbb802388f0138f03f072531",
+  "allocator_reference": "https://docs.python.org/3.11/using/cmdline.html#envvar-PYTHONMALLOC",
+  "returncode": 0,
+  "guard_stop_reason": null,
+  "peak_diagnostic_rss_bytes": 2714947584,
+  "minimum_host_available_bytes": 9666990080,
+  "elapsed_seconds": 75.30037047690712,
+  "log": "/tmp/hudm-5090-20260924-0z4ayR/cube_allocator_profile_malloc_seeded.log",
+  "other_processes_modified": false,
+  "guard_script_snapshot": "run_memory_profile_guarded.cpu_comparison.py"
+}

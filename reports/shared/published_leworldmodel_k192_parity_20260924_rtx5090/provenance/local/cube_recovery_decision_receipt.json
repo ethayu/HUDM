@@ -1,0 +1,76 @@
+{
+  "status": "awaiting_additional_host_memory",
+  "updated_at": "2026-09-24T16:48:32.117931+00:00",
+  "completed_non_cube_scientific_cells": 30,
+  "live_scientific_or_diagnostic_processes": [],
+  "host_available_bytes": 12790689792,
+  "additional_ram_requested_gib": 15,
+  "cuda_setup_cleanup_released_bytes": 131694592,
+  "alternative_cpu_allocator_retained_rss_gain_bytes": 23609344,
+  "scientific_allocator_changed": false,
+  "scientific_protocol_changed": false,
+  "unrelated_workloads_modified": false,
+  "cube_screen_decision": null,
+  "next_action": "After additional host RAM is available, resume the original full runner; it verifies and reuses the 30 completed cells and executes Cube with num_envs=50.",
+  "resume_command": [
+    "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+    "-u",
+    "/tmp/hudm-5090-20260924-0z4ayR/run_local.py"
+  ],
+  "remaining_requirements": [
+    "Cube five-seed screen",
+    "Cube five-seed final if it passes the predeclared gate",
+    "Full source final collector",
+    "Verified complete paper handoff and figure",
+    "Relay verified results to source through laptop task"
+  ],
+  "first_full_goal_impasse_at": "2026-09-24T16:48:32.117931+00:00",
+  "consecutive_impasse_goal_turns": 1,
+  "note": "All independent scientific runs and bounded allocator diagnostics completed. CPU cleanup/allocator comparison and CUDA setup cleanup do not support another full Cube attempt at current RAM availability. This is the first goal turn at a full-task memory impasse; do not mark blocked until the condition recurs for three consecutive impasse goal turns.",
+  "diagnostic_inputs": [
+    {
+      "path": "cube_allocator_profile_cuda_default_seeded_guard_receipt.json",
+      "sha256": "c47e423871f2102d83098b47bc5447e1128196a8b1ed874b7342c45e2a485b09"
+    },
+    {
+      "path": "cube_allocator_profile_cuda_default_seeded_receipt.json",
+      "sha256": "7d1add9a9da676a62f2a8b490317c6e48c03aca6cb70d83e4e95b0c24b48608d"
+    },
+    {
+      "path": "cube_allocator_profile_default_seeded_guard_receipt.json",
+      "sha256": "2f2d1d10418936e39c898f902e8d1948ccba69479ee379730aa22a56689ace64"
+    },
+    {
+      "path": "cube_allocator_profile_default_seeded_receipt.json",
+      "sha256": "15b834ee43e5977316971e94c705d61c753ff7f41d375f8e7c068b3b1a41ce48"
+    },
+    {
+      "path": "cube_allocator_profile_guard_receipt.json",
+      "sha256": "d8eec2e1083a00e770886869de9d0602dcd7543f31a854235c3d6f2018d478de"
+    },
+    {
+      "path": "cube_allocator_profile_malloc_seeded_guard_receipt.json",
+      "sha256": "eab86d47140ef2710c3f10af195090fdb82b8fe8284a315d42bb4a3f462148f2"
+    },
+    {
+      "path": "cube_allocator_profile_malloc_seeded_receipt.json",
+      "sha256": "bf29b619859b2d79b2d22326cabace3e820e33aef0d7d5fe583e82e124d6d776"
+    },
+    {
+      "path": "cube_allocator_profile_receipt.json",
+      "sha256": "d01cc407cc7d45f8505c9367322edd1581ca1a3a746e1655226c5b4e025d991e"
+    },
+    {
+      "path": "cube_cpu_allocator_comparison_receipt.json",
+      "sha256": "56c98d29e6520bf97445159e8783bd910125be7b2155ba74ac833af042a198ec"
+    },
+    {
+      "path": "cube_lance_validation_receipt.json",
+      "sha256": "54751229074ca495b76564b5dc347db468420f822acb94f976d3a0798c8b82f3"
+    },
+    {
+      "path": "cube_memory_failure_receipt.json",
+      "sha256": "71f9eea7882b42c0e49d04bdfef0bd37bad512f887ee130ec4ec736cc240df03"
+    }
+  ]
+}

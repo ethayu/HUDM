@@ -1,0 +1,32 @@
+{
+  "verified": true,
+  "verified_at": "2026-09-24T15:29:59.112956+00:00",
+  "stage": "final",
+  "environment": "reacher",
+  "seed": 2002,
+  "scope": "First 100-episode Reacher final cell; per-cell paired audit enforces this runtime invariant for every subsequent seed.",
+  "roles": [
+    {
+      "role": "upstream_lewm_converted",
+      "batches": 2,
+      "episodes_per_batch": [
+        50,
+        50
+      ],
+      "threshold": 0.1,
+      "post_reset_validation": "passed",
+      "output_sha256": "7a5037fbad2cd23b4a498e25e9a9ca2d7acf24ef47ae2f95e0a693b2d40e93ab"
+    },
+    {
+      "role": "sepopt_k192_20260922",
+      "batches": 2,
+      "episodes_per_batch": [
+        50,
+        50
+      ],
+      "threshold": 0.1,
+      "post_reset_validation": "passed",
+      "output_sha256": "055efbb1e5c9de09e013ea9a8c821b92d19f4b9688e70892c698ce1ae8da3481"
+    }
+  ]
+}

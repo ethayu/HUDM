@@ -1,0 +1,52 @@
+
+{"started_at": "2026-09-24T16:30:58.920570+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "/tmp/hudm-5090-20260924-0z4ayR/audit_paired.py", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml"]}
+{"verified": true, "audit": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943/paired_audit.json", "roles": [{"role": "upstream_lewm_converted", "episodes": 100, "successes": 86, "success_rate": 86.0, "weights_sha256": "f900533bc36164475063cf1939c55bccbde1aaf1b35a5811301413b81689ed93", "trace_sha256": "c68747454422fd452ed1aa1405dce8809b8820111fc8b8c6fe3e01f52a0b225a", "resolved_config_sha256": "fb115c7edb4801deb8ab644516bd0e64ea7c49e9a89c2c35431bc2fda2f1ff8b", "manifest_sha256": "d0fbeb12595e1ec915846930d7e5b3175d53ce089c805be05004058ccdb25dea", "dynamics_flops_total": 508789425600000}, {"role": "sepopt_k192_20260922", "episodes": 100, "successes": 93, "success_rate": 93.0, "weights_sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c", "trace_sha256": "c47de89ecd09ab92d680c3ff3c20b2caf4dafe03404a11f50e50e4beac101167", "resolved_config_sha256": "4a1dfd4df82f8eac1f2675028dd7304e712edcc771b532cd57a972473740f49c", "manifest_sha256": "d0fbeb12595e1ec915846930d7e5b3175d53ce089c805be05004058ccdb25dea", "dynamics_flops_total": 508789425600000}]}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python /tmp/hudm-5090-20260924-0z4ayR/audit_paired.py reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml"
+	User time (seconds): 0.28
+	System time (seconds): 0.04
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.32
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 123356
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 39745
+	Voluntary context switches: 1
+	Involuntary context switches: 104
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:49:39.987075+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "/tmp/hudm-5090-20260924-0z4ayR/audit_paired.py", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml"]}
+{"verified": true, "audit": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/pusht/seed_91943/paired_audit.json", "roles": [{"role": "upstream_lewm_converted", "episodes": 100, "successes": 86, "success_rate": 86.0, "weights_sha256": "f900533bc36164475063cf1939c55bccbde1aaf1b35a5811301413b81689ed93", "trace_sha256": "c68747454422fd452ed1aa1405dce8809b8820111fc8b8c6fe3e01f52a0b225a", "resolved_config_sha256": "fb115c7edb4801deb8ab644516bd0e64ea7c49e9a89c2c35431bc2fda2f1ff8b", "manifest_sha256": "d0fbeb12595e1ec915846930d7e5b3175d53ce089c805be05004058ccdb25dea", "dynamics_flops_total": 508789425600000}, {"role": "sepopt_k192_20260922", "episodes": 100, "successes": 93, "success_rate": 93.0, "weights_sha256": "7d4bb58ba598efa8e7520d2ea2732c9d6a1d359db91ae1e7cc012c77b119417c", "trace_sha256": "c47de89ecd09ab92d680c3ff3c20b2caf4dafe03404a11f50e50e4beac101167", "resolved_config_sha256": "4a1dfd4df82f8eac1f2675028dd7304e712edcc771b532cd57a972473740f49c", "manifest_sha256": "d0fbeb12595e1ec915846930d7e5b3175d53ce089c805be05004058ccdb25dea", "dynamics_flops_total": 508789425600000}]}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python /tmp/hudm-5090-20260924-0z4ayR/audit_paired.py reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/pusht/seed_91943.yaml"
+	User time (seconds): 0.26
+	System time (seconds): 0.06
+	Percent of CPU this job got: 99%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.33
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 123356
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 39488
+	Voluntary context switches: 1
+	Involuntary context switches: 93
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 48
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

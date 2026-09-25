@@ -1,0 +1,43 @@
+{
+  "applied_at": "2026-09-24T14:28:08.946756+00:00",
+  "policy": "Prefer this experiment and its inherited child processes for termination if the host runs out of memory; no memory cap or evaluation parameter changes.",
+  "changes": [
+    {
+      "pid": 677402,
+      "command": [
+        "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+        "-u",
+        "/tmp/hudm-5090-20260924-0z4ayR/run_local.py"
+      ],
+      "previous_oom_score_adj": 0,
+      "oom_score_adj": 1000
+    },
+    {
+      "pid": 701427,
+      "command": [
+        "/usr/bin/time",
+        "-v",
+        "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+        "-m",
+        "mwm.benchmark.matrix",
+        "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/reacher/seed_42.yaml",
+        "--resume"
+      ],
+      "previous_oom_score_adj": 0,
+      "oom_score_adj": 1000
+    },
+    {
+      "pid": 701428,
+      "command": [
+        "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+        "-m",
+        "mwm.benchmark.matrix",
+        "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/reacher/seed_42.yaml",
+        "--resume"
+      ],
+      "previous_oom_score_adj": 0,
+      "oom_score_adj": 1000
+    }
+  ],
+  "host_available_bytes": 8352075776
+}

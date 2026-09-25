@@ -1,0 +1,35 @@
+{
+  "status": "failed",
+  "updated_at": "2026-09-24T14:57:31.981925+00:00",
+  "pid": 677402,
+  "stage": "screen",
+  "environment": "ogb_cube",
+  "seed": 0,
+  "completed": [
+    "screen_tworoom_seed0",
+    "screen_tworoom_seed1",
+    "screen_tworoom_seed2",
+    "screen_tworoom_seed42",
+    "screen_tworoom_seed100",
+    "screen_reacher_seed0",
+    "screen_reacher_seed1",
+    "screen_reacher_seed2",
+    "screen_reacher_seed42",
+    "screen_reacher_seed100",
+    "screen_pusht_seed0",
+    "screen_pusht_seed1",
+    "screen_pusht_seed2",
+    "screen_pusht_seed42",
+    "screen_pusht_seed100"
+  ],
+  "skipped_after_screen": [],
+  "command": [
+    "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+    "-m",
+    "mwm.benchmark.matrix",
+    "reports/research/k192_sepopt_published_parity_20260924/generated_configs/screen_n50/ogb_cube/seed_0.yaml",
+    "--resume"
+  ],
+  "returncode": 137,
+  "log": "/tmp/hudm-5090-20260924-0z4ayR/logs/screen_ogb_cube_seed0_matrix.log"
+}

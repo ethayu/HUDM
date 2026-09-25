@@ -1,0 +1,14 @@
+env_id: swm/PushT-v1
+image_shape: 96
+max_episode_steps: 50
+num_envs: 1
+episodes: 4
+seed: 7
+output_path: data/local/pusht_smoke.lance
+format: lance
+goal_conditioned: true
+env_kwargs: {}
+policy:
+  import_path: null
+restore:
+  import_path: null

@@ -1,0 +1,14 @@
+output_dir: rollouts/mwm_paper_parity_reacher
+title: Paper-Parity Le-WM Identity Check on Reacher
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/eval/paper_reacher.yaml
+manifest:
+  config: configs/manifest/reacher_paper_seed42.yaml
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_reacher
+  - name: retrained_identity
+    role: retrained_lewm_identity
+    checkpoint: checkpoints_mwm/retrained_lewm_identity_reacher_upstream

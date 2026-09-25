@@ -1,0 +1,24 @@
+output_dir: rollouts/mwm_release20260728_identity_parity_ogb_cube
+title: Release 2026-07-28 Fixed-Finest Identity Parity on OGBench Cube
+env_id: swm/OGBCube-v0
+seed: 42
+eval_config: configs/eval/paper_ogb_cube.yaml
+manifest:
+  config: configs/manifest/ogb_cube_paper_seed42.yaml
+run_defaults:
+  planner:
+    scheduler:
+      enabled: true
+      mpc: {mode: fixed, level: finest}
+      cem: {mode: fixed, level: finest}
+      rollout: {mode: fixed, level: finest}
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_ogb_cube
+  - name: single_k192
+    role: release_single_k192
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k192_release20260728
+  - name: dense_fixed_finest
+    role: release_dense_fixed_finest
+    checkpoint: checkpoints_mwm/mwm_paper10_ogb_cube_k96_120_144_168_192_release20260728

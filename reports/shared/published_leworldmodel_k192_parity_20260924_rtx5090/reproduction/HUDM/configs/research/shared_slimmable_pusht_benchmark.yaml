@@ -1,0 +1,95 @@
+output_dir: reports/research/shared_slimmable_pusht
+title: Shared Slimmable Le-WM Dynamics on PushT
+env_id: swm/PushT-v1
+seed: 42
+eval_config: configs/eval/paper_pusht.yaml
+manifest:
+  config: configs/manifest/pusht_paper_seed42.yaml
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_pusht
+
+  - name: shared_fixed_k6
+    role: shared_slimmable_fixed_k6
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: 6}
+        cem: {mode: fixed, k: base}
+        rollout: {mode: fixed, k: base}
+
+  - name: shared_fixed_k24
+    role: shared_slimmable_fixed_k24
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: 24}
+        cem: {mode: fixed, k: base}
+        rollout: {mode: fixed, k: base}
+
+  - name: shared_fixed_k48
+    role: shared_slimmable_fixed_k48
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: 48}
+        cem: {mode: fixed, k: base}
+        rollout: {mode: fixed, k: base}
+
+  - name: shared_fixed_k96
+    role: shared_slimmable_fixed_k96
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: 96}
+        cem: {mode: fixed, k: base}
+        rollout: {mode: fixed, k: base}
+
+  - name: shared_fixed_k144
+    role: shared_slimmable_fixed_k144
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: 144}
+        cem: {mode: fixed, k: base}
+        rollout: {mode: fixed, k: base}
+
+  - name: shared_fixed_k192
+    role: shared_slimmable_fixed_k192
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: finest}
+        cem: {mode: fixed, k: base}
+        rollout: {mode: fixed, k: base}
+
+  - name: shared_scheduled_k
+    role: shared_slimmable_scheduled_k
+    checkpoint: checkpoints_mwm/mwm_shared_slimmable_pusht
+    planner:
+      flop_accounting: dynamics_audit
+      scheduler:
+        enabled: true
+        fidelity_unit: k
+        mpc: {mode: fixed, k: finest}
+        cem: {mode: linear, start_k: coarsest, end_k: finest}
+        rollout: {mode: fixed, k: base}

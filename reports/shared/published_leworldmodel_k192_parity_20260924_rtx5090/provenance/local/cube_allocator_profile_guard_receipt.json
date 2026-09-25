@@ -1,0 +1,19 @@
+{
+  "diagnostic_only": true,
+  "started_at": "2026-09-24T16:32:09.779839+00:00",
+  "finished_at": "2026-09-24T16:33:10.859952+00:00",
+  "command": [
+    "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+    "-u",
+    "/tmp/hudm-5090-20260924-0z4ayR/profile_cube_setup_memory.py"
+  ],
+  "returncode": 0,
+  "guard_stop_reason": null,
+  "peak_diagnostic_rss_bytes": 3087491072,
+  "minimum_host_available_bytes": 9802604544,
+  "elapsed_seconds": 61.08013449097052,
+  "log": "/tmp/hudm-5090-20260924-0z4ayR/cube_allocator_profile.log",
+  "other_processes_modified": false,
+  "diagnostic_script_snapshot": "run_memory_profile_guarded.initial.py",
+  "diagnostic_script_sha256": "cf3b741027aa5bf6e3fe20a622289129b711628d6a75809cd1412332b6cb613b"
+}

@@ -1,0 +1,220 @@
+
+{"started_at": "2026-09-24T12:31:30.093681+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_reacher"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml",
+  "env_id": "swm/ReacherDMControl-v0",
+  "expected_cells": [
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/ReacherDMControl-v0_seed82715_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/reacher_seed82715.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_82715",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 82715,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml --static-only"
+	User time (seconds): 0.90
+	System time (seconds): 0.12
+	Percent of CPU this job got: 121%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.85
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 610464
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81495
+	Voluntary context switches: 41
+	Involuntary context switches: 516
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T15:02:43.000887+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_reacher"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml",
+  "env_id": "swm/ReacherDMControl-v0",
+  "expected_cells": [
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/ReacherDMControl-v0_seed82715_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/reacher_seed82715.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_82715",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 82715,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml --static-only"
+	User time (seconds): 0.86
+	System time (seconds): 0.13
+	Percent of CPU this job got: 121%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.82
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 610432
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81500
+	Voluntary context switches: 40
+	Involuntary context switches: 475
+	Swaps: 0
+	File system inputs: 8
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T15:32:08.323536+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_reacher"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml",
+  "env_id": "swm/ReacherDMControl-v0",
+  "expected_cells": [
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/ReacherDMControl-v0_seed82715_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/reacher_seed82715.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_82715",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 82715,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml --static-only"
+	User time (seconds): 0.86
+	System time (seconds): 0.13
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.81
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 612440
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81499
+	Voluntary context switches: 41
+	Involuntary context switches: 404
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0
+
+{"started_at": "2026-09-24T21:49:14.317417+00:00", "command": ["/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python", "-m", "mwm.benchmark.verify", "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml", "--static-only"]}
+{
+  "check_checkpoints": true,
+  "checkpoint_contracts": [
+    "checkpoints_mwm/mwm_paper10_reacher_k192_sepopt_retrain_20260922",
+    "checkpoints_mwm/upstream_lewm_reacher"
+  ],
+  "config": "reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml",
+  "env_id": "swm/ReacherDMControl-v0",
+  "expected_cells": [
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "sepopt_k192_20260922"
+    ],
+    [
+      "swm/ReacherDMControl-v0",
+      82715,
+      "upstream_lewm_converted"
+    ]
+  ],
+  "manifest": {
+    "group": "k192_sepopt_published_parity_swm/ReacherDMControl-v0_seed82715_n100",
+    "path": "reports/research/k192_sepopt_published_parity_20260924/manifests/final_n100/reacher_seed82715.json"
+  },
+  "output_dir": "reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_82715",
+  "paper_targets": {},
+  "runs": 2,
+  "seed": 82715,
+  "static_only": true
+}
+	Command being timed: "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python -m mwm.benchmark.verify reports/research/k192_sepopt_published_parity_20260924/generated_configs/final_n100/reacher/seed_82715.yaml --static-only"
+	User time (seconds): 0.87
+	System time (seconds): 0.11
+	Percent of CPU this job got: 122%
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 0:00.81
+	Average shared text size (kbytes): 0
+	Average unshared data size (kbytes): 0
+	Average stack size (kbytes): 0
+	Average total size (kbytes): 0
+	Maximum resident set size (kbytes): 612732
+	Average resident set size (kbytes): 0
+	Major (requiring I/O) page faults: 0
+	Minor (reclaiming a frame) page faults: 81486
+	Voluntary context switches: 41
+	Involuntary context switches: 388
+	Swaps: 0
+	File system inputs: 0
+	File system outputs: 8
+	Socket messages sent: 0
+	Socket messages received: 0
+	Signals delivered: 0
+	Page size (bytes): 4096
+	Exit status: 0

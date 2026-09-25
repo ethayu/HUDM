@@ -1,0 +1,19 @@
+{
+  "local_repo": {
+    "commit_id": "28d0e78a5011c72bebf8b01073163cf45e60f680",
+    "diff_sha256": "45a29f464f5b34aa5d6ba1d9ea7ba28db01e537ccc527009dead5cc3404ef461",
+    "dirty": true
+  },
+  "stable-pretraining": {
+    "sha256": "b28797825408b3df31ab445098073f371e44c48fcbc709b7e9616913018a0857",
+    "version": "0.1.6"
+  },
+  "stable-worldmodel": {
+    "sha256": "fe2bc305449dfcc9939248571566ba5292901cdab31e6dc9e4f0bff0a1d0b85a",
+    "version": "0.1.0"
+  },
+  "torch": {
+    "sha256": "2153f0c814d99b4ce4a7bf9d4dcacbfa720b35de4c09ec042cdcca4ebb0ad54b",
+    "version": "2.11.0"
+  }
+}

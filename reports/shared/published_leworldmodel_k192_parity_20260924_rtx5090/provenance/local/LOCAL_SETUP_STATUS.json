@@ -1,0 +1,46 @@
+{
+  "goal_active": true,
+  "runtime_ready": true,
+  "gpu": "NVIDIA GeForce RTX 5090",
+  "torch": "2.11.0+cu130",
+  "checkpoint_hashes_verified": 8,
+  "cuda_checkpoint_rollouts_passed": 8,
+  "simulator_renders_passed": 4,
+  "full_protocol_static_configs_passed": 40,
+  "num_envs_50_smokes_passed": 4,
+  "dataset_transfer_complete": true,
+  "scientific_evaluation_started": true,
+  "remaining_setup": null,
+  "notes": "OGB Cube 50-env simulator startup used about 10 GiB RSS in a probe. Host had about 11 GiB available afterward. Keep the experiment serial. Do not alter relay or cluster jobs.",
+  "local_dataset_inventory": "local_dataset_inventory.json",
+  "first_completed_fragment": {
+    "path": "data/upstream/ogb_cube_single_expert.lance/data/10110101011000001000000079e25d4f1cbe8f9e0dd32696f9.lance",
+    "bytes": 10237644732,
+    "sha256": "78a64cc54a102ca1ff9b4e41a98c4417ce226073565fbcd7fe2e8a38b138dcbb",
+    "source_hash_comparison_pending": false
+  },
+  "result_packager_prepared": true,
+  "statistics_implementation_checks_passed": true,
+  "paired_evaluator_smokes_passed": [
+    "ogb_cube",
+    "pusht",
+    "reacher",
+    "tworoom"
+  ],
+  "locally_complete_datasets": [
+    "ogb_cube_single_expert.lance",
+    "reacher.lance",
+    "pusht_expert_train.lance",
+    "tworoom.lance"
+  ],
+  "source_dataset_hash_comparison_pending": false,
+  "all_local_dataset_structures_validated": true,
+  "ready_for_full_protocol": true,
+  "full_run_process": "full_run_process.json",
+  "full_run_status": "local_run_status.json",
+  "source_input_verification_receipt": "source_input_verification_receipt.json",
+  "execution_status": "awaiting_additional_host_memory_for_cube",
+  "execution_updated_at": "2026-09-24T16:48:32.117931+00:00",
+  "cube_memory_failure_receipt": "cube_memory_failure_receipt.json",
+  "completed_scientific_cells": 30
+}

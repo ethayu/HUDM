@@ -1,0 +1,10 @@
+{
+  "recorded_at": "2026-09-24T15:14:59.274587+00:00",
+  "read_only": true,
+  "unrelated_workloads_modified": false,
+  "shared_memory_mount_used_gib_approx": 91.4,
+  "run_tmpfs_used_gib_approx": 7.7,
+  "shared_memory_top_level_directories_count": 2740,
+  "finding": "Host memory is largely occupied by unrelated experiment scratch files in /dev/shm and /run. No files were removed, relocated, or modified.",
+  "detailed_inventory": "Kept locally only; excluded from experiment handoff."
+}

@@ -1,0 +1,10 @@
+{
+  "validated_at": "2026-09-24T13:28:29.312077+00:00",
+  "dataset": "/tmp/hudm-5090-20260924-0z4ayR/source_snapshot/data/upstream/ogb_cube_single_expert.lance",
+  "lance_validation_passed": true,
+  "version": 1,
+  "rows": 2010000,
+  "schema": "episode_idx: int32\nstep_idx: int32\npixels: binary\naction: fixed_size_list<item: float>[5]\n  child 0, item: float\nobservation: fixed_size_list<item: float>[28]\n  child 0, item: float\nqpos: fixed_size_list<item: float>[21]\n  child 0, item: float\nqvel: fixed_size_list<item: float>[20]\n  child 0, item: float\nprivileged/block_0_pos: fixed_size_list<item: float>[3]\n  child 0, item: float\nprivileged/block_0_quat: fixed_size_list<item: float>[4]\n  child 0, item: float",
+  "source_hash_comparison_pending": true,
+  "eligible_for": "isolated diagnostic smoke only; official experiment awaits source identity checks"
+}

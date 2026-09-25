@@ -1,0 +1,10 @@
+{
+  "passed": true,
+  "checks": [
+    "t interval agrees with scipy.stats",
+    "screen -4.8 pp qualifies",
+    "screen -5.2 pp skips final",
+    "incomplete episode evidence rejected"
+  ],
+  "synthetic_inputs": "temporary test fixture removed; no experiment result or figure generated"
+}

@@ -1,0 +1,3 @@
+env_id,role,runs,mean_success_rate,seeds
+swm/ReacherDMControl-v0,sepopt_k192_20260922,1,99.0,91943
+swm/ReacherDMControl-v0,upstream_lewm_converted,1,96.0,91943

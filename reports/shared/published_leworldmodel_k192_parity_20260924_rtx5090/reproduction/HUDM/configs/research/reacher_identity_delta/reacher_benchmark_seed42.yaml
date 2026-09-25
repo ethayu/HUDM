@@ -1,0 +1,21 @@
+output_dir: reports/research/reacher_identity_delta/seed_sweep/reacher_seed42
+title: Reacher Identity-Upstream Delta Seed Sweep
+env_id: swm/ReacherDMControl-v0
+seed: 42
+eval_config: configs/research/reacher_identity_delta/reacher_eval.yaml
+manifest:
+  group: reacher_identity_delta
+  dir: reports/research/reacher_identity_delta/seed_sweep/manifests
+runs:
+  - name: upstream
+    role: upstream_lewm_converted
+    checkpoint: ${oc.env:MWM_ARTIFACT_ROOT}/checkpoints_mwm/upstream_lewm_reacher
+    eval:
+      episodes: 200
+      num_envs: 50
+  - name: retrained_identity
+    role: retrained_lewm_identity
+    checkpoint: ${oc.env:MWM_ARTIFACT_ROOT}/checkpoints_mwm/retrained_lewm_identity_reacher_upstream
+    eval:
+      episodes: 200
+      num_envs: 50

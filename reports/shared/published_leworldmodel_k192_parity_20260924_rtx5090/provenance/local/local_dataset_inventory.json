@@ -1,0 +1,118 @@
+{
+  "created_at": "2026-09-24T14:02:08.812432+00:00",
+  "source_hashes_compared": false,
+  "datasets": [
+    {
+      "name": "ogb_cube_single_expert.lance",
+      "version": 1,
+      "rows": 2010000,
+      "status": "complete_bytes_pending_source_hash_comparison",
+      "expected_data_bytes": 19596342398,
+      "present_data_bytes": 19596342398,
+      "files": [
+        {
+          "relative_path": "data/upstream/ogb_cube_single_expert.lance/data/10110101011000001000000079e25d4f1cbe8f9e0dd32696f9.lance",
+          "expected_bytes": 10237644732,
+          "present_bytes": 10237644732,
+          "mtime_ns": 1790254743697566194,
+          "ctime_ns": 1790254743697566194,
+          "inode": 88629984,
+          "sha256": "78a64cc54a102ca1ff9b4e41a98c4417ce226073565fbcd7fe2e8a38b138dcbb"
+        },
+        {
+          "relative_path": "data/upstream/ogb_cube_single_expert.lance/data/111101111010110110111110b39a3b49beb83cafe86a187ef1.lance",
+          "expected_bytes": 9358697666,
+          "present_bytes": 9358697666,
+          "mtime_ns": 1790256467947758022,
+          "ctime_ns": 1790256467947758022,
+          "inode": 88636968,
+          "sha256": "15c8fd9616c0e2cde6cb90f2cf31a74af4f918c0ad50ff14fb95d82ef366e83c"
+        }
+      ]
+    },
+    {
+      "name": "reacher.lance",
+      "version": 1,
+      "rows": 2010000,
+      "status": "complete_bytes_pending_source_hash_comparison",
+      "expected_data_bytes": 17296893062,
+      "present_data_bytes": 17296893062,
+      "files": [
+        {
+          "relative_path": "data/upstream/reacher.lance/data/0001000100001000110001110570e94dba9900c932d5a40dbf.lance",
+          "expected_bytes": 9024036700,
+          "present_bytes": 9024036700,
+          "mtime_ns": 1790257884488916887,
+          "ctime_ns": 1790257884488916887,
+          "inode": 88741930,
+          "sha256": "7b3fdf64ac1ce85c6adaeae6b1e716af14922c2c8b07fda6eca38bcd0077faa5"
+        },
+        {
+          "relative_path": "data/upstream/reacher.lance/data/011110010101011011110011a591c7471b83d1968b98da5c3b.lance",
+          "expected_bytes": 8272856362,
+          "present_bytes": 8272856362,
+          "mtime_ns": 1790258263491637030,
+          "ctime_ns": 1790258263491637030,
+          "inode": 88741971,
+          "sha256": "16194f2528367cb6bc2451289873d745261b8af42e4da33af6e0c1f1c5066f20"
+        }
+      ]
+    },
+    {
+      "name": "pusht_expert_train.lance",
+      "version": 1,
+      "rows": 2336736,
+      "status": "complete_bytes_pending_source_hash_comparison",
+      "expected_data_bytes": 14295080031,
+      "present_data_bytes": 14295080031,
+      "files": [
+        {
+          "relative_path": "data/upstream/pusht_expert_train.lance/data/000011100101000101101101f62acd4b09ba50d40865372a16.lance",
+          "expected_bytes": 6438539739,
+          "present_bytes": 6438539739,
+          "mtime_ns": 1790256855117074980,
+          "ctime_ns": 1790256855117074980,
+          "inode": 88636986,
+          "sha256": "9e813b5589454d9d7df2d3d4ca8e564a8e8a9a83038aaa181ecdf48c8e927e3f"
+        },
+        {
+          "relative_path": "data/upstream/pusht_expert_train.lance/data/01100100101001001101110053a11144b6b76ac5c858033220.lance",
+          "expected_bytes": 6380006717,
+          "present_bytes": 6380006717,
+          "mtime_ns": 1790257394265783509,
+          "ctime_ns": 1790257394265783509,
+          "inode": 88637017,
+          "sha256": "245e1ec041558aa27696951aad1e9e7a737b57067d840877408cb0b6cdbd2955"
+        },
+        {
+          "relative_path": "data/upstream/pusht_expert_train.lance/data/010111111101111100111101f5180d4d4aa964c1d47acce8b8.lance",
+          "expected_bytes": 1476533575,
+          "present_bytes": 1476533575,
+          "mtime_ns": 1790256931802156086,
+          "ctime_ns": 1790256931802156086,
+          "inode": 88636992,
+          "sha256": "141d8ad91dc474ea009916e5d1d1fde82ecf33e869f20fb7a9d8b351e4e75f51"
+        }
+      ]
+    },
+    {
+      "name": "tworoom.lance",
+      "version": 1,
+      "rows": 920809,
+      "status": "complete_bytes_pending_source_hash_comparison",
+      "expected_data_bytes": 4154417875,
+      "present_data_bytes": 4154417875,
+      "files": [
+        {
+          "relative_path": "data/upstream/tworoom.lance/data/000101010110001101000111601c114d2499c09414afc0cfcd.lance",
+          "expected_bytes": 4154417875,
+          "present_bytes": 4154417875,
+          "mtime_ns": 1790258443120348859,
+          "ctime_ns": 1790258443120348859,
+          "inode": 88741978,
+          "sha256": "a5f32a4cf5b5181bdff706d9645ccb373a224798b9dd442ffe152782357ebbaa"
+        }
+      ]
+    }
+  ]
+}

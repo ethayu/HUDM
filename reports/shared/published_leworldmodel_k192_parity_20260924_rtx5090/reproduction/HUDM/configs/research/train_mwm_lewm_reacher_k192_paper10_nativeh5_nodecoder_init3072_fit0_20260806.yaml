@@ -1,0 +1,94 @@
+seed: 3072
+env_id: swm/ReacherDMControl-v0
+base:
+  family: lewm
+  checkpoint: models--quentinll--lewm-reacher
+mwm:
+  component_policy:
+    shared: [latent_producer]
+    per_level: [transition]
+    reconstructor: [decoder]
+  loss_terms:
+    regularizers: shared_latent
+    reconstructor_detach_encoder: true
+    reconstructor_contributes_to_encoder_loss: false
+data:
+  path: data/upstream/reacher.lance
+  format: lance
+  training_source:
+    path: data/upstream/reacher.h5
+    format: hdf5
+    archive: data/upstream/reacher.tar.zst
+    archive_sha256: 4ff2385e49712caa89f21b8e0a246e2614b621d3f22cf2d1224d845e879a1cc2
+    member: reacher.h5
+    extracted_sha256: 85a7dddfa1801302abcb175a80a23bb69c78291dd977ce40d69aedcb9123da06
+  split_ratio: 0.9
+  pixels_key: pixels
+  action_key: action
+  frameskip: 5
+  # Match upstream training exactly. qpos/qvel remain available for runtime
+  # evaluation restore, but they are not model inputs and are not loaded here.
+  keys_to_load: [pixels, action, observation]
+  keys_to_cache: [action, observation]
+restore:
+  import_path: mwm.swm.restore.reacher_qpos_match_restore_spec
+model:
+  D: 192
+  K: [192]
+  action_dim: auto
+  action_block: 5
+  image_shape: auto
+  history_size: 3
+  num_preds: 1
+train:
+  batch_size: 128
+  horizon: 4
+  num_workers: 6
+  drop_last: true
+  prefetch_factor: 3
+  pin_memory: true
+  precision: bf16
+  no_cuda: false
+  checkpoint_dir: checkpoints_mwm
+  run_name: mwm_reacher_k192_paper10_nativeh5_nodecoder_init3072_fit0_20260806
+  timestamp_run_dir: false
+  clean_trainer_root: true
+  resume_checkpoint: null
+  backend: stable_worldmodel_lewm
+  limit_train_batches: 1.0
+  limit_val_batches: 1.0
+  # 12,796 batches/epoch. Retain every five-epoch milestone so downstream
+  # control can distinguish data fixes from schedule-length effects.
+  checkpoint_every_n_train_steps: 63980
+  save_top_k: -1
+  gradient_clip_val: 1.0
+  # Upstream does not override PyTorch's default float32 matmul precision.
+  matmul_precision: highest
+  slurm_auto_requeue: false
+  # Upstream constructs its model before Manager(seed=None), then Lightning
+  # resolves that fit-time seed to 0. Keep all three seed roles explicit: the
+  # top-level seed controls split/shuffle, this seed controls construction,
+  # and fit_seed controls fit-time dropout/SIGReg/data-worker randomness.
+  model_init_seed: 3072
+  fit_seed: 0
+optim:
+  lr: 0.00005
+  weight_decay: 0.001
+decoder_training:
+  enabled: false
+  mode: separate_optimizer
+  gradient_clip_val: 1.0
+  lr: 0.00005
+  weight_decay: 0.001
+loss:
+  rollout_weight: 1.0
+  sigreg_weight: 0.09
+  sigreg_knots: 17
+  sigreg_num_proj: 1024
+  history_size: 3
+  num_preds: 1
+schedule:
+  # LeWM paper Appendix E specifies 10 epochs for Reacher. The public
+  # repository YAML's 100-epoch value does not match the paper recipe.
+  max_epochs: 10
+  lr_max_epochs: 10

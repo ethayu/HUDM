@@ -1,0 +1,510 @@
+diff --git a/LIBRARY_FILE_REVIEW.md b/LIBRARY_FILE_REVIEW.md
+index d514d7d..4669521 100644
+--- a/LIBRARY_FILE_REVIEW.md
++++ b/LIBRARY_FILE_REVIEW.md
+@@ -14,6 +14,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and
+ - `LIBRARY_FILE_REVIEW.md`: This file; a file-by-file orientation map for reviewing the current library surface.
+ - `REPO_ORGANIZATION_CRITIQUE.md`: Organization audit summarizing resolved architectural cleanup and remaining low-priority repo-structure concerns.
+ - `requirements.txt`: Python dependency list, including pinned `stable-worldmodel[env]==0.1.0`.
++- `plot_cem_grid.py`: Standalone research plotting helper for CEM population/iteration grid sweeps, converting scheduler choices into planning-FLOP estimates and loading success-rate points.
+ 
+ ## `mwm` Package
+ 
+@@ -88,8 +89,11 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and
+ - `mwm/eval/manifest.py`: Converts manifest rows to `StartGoalPair`s or samples/writes manifests for eval runs.
+ - `mwm/eval/policy.py`: Stable-WM policy wrapper that tracks action calls, plan time, latent work, and solver diagnostics.
+ - `mwm/eval/policy_builder.py`: Constructs `MWMScheduledCEMSolver`, `PlanConfig`, image transforms, and `MWMWorldModelPolicy`.
++- `mwm/eval/review_trace.py`: Expands planner diagnostics into per-episode review traces, including primitive-timestep fidelity traces and replayable action traces.
+ - `mwm/eval/runner.py`: Main evaluation CLI/orchestrator: public device resolution, config load, checkpoint load, dataset load, metadata/restore validation, manifest selection, batch execution, and output JSON writing.
++- `mwm/eval/runtime.py`: Shared eval-runtime loader that resolves device, checkpoint, dataset, action preprocessing, image shape, and restore callables for both evaluation and review-media rendering.
+ - `mwm/eval/validation.py`: Dataset metadata validation, manifest validation, keys-to-load resolution, dataset path/runtime metadata helpers, and dataset close helper.
++- `mwm/eval/videos.py`: Canonical SWM video collector that recognizes and sorts `env_*`, `episode_*`, and `episode_remaining_*` MP4 outputs.
+ 
+ ### Benchmarking
+ 
+@@ -107,6 +111,8 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and
+ - `mwm/benchmark/static_verify.py`: Static benchmark verifier for config matrix shape, paper targets, and optional checkpoint role contracts.
+ - `mwm/benchmark/plots.py`: Matplotlib plot generation for success vs compute/time, by-env success, paired deltas, efficiency ratios, and scheduler usage.
+ - `mwm/benchmark/render_review.py`: Re-renders plots, CSV/JSONL summaries, and HTML review pages from an existing benchmark output directory.
++- `mwm/benchmark/review_media.py`: On-demand rollout media renderer that records media metadata in eval JSON, replays action traces into environment videos, and renders latent reconstruction videos from fidelity traces.
++- `mwm/benchmark/review_server.py`: Localhost-only review server that serves rollout drilldown pages and POST endpoints for rendering environment or latent review videos.
+ - `mwm/benchmark/summary.py`: Converts eval payloads into summary rows and writes aggregate/per-env CSV tables.
+ - `mwm/benchmark/verify.py`: CLI-only orchestrator for selecting static or output benchmark verification.
+ 
+@@ -282,6 +288,7 @@ This repository is a Stable-WM-compatible Matryoshka World Models benchmark and
+ - `tests/test_mwm_local_workflow.py`: Ensures local smoke configs/scripts stay small, CPU-safe, and not Slurm/PARCC gated.
+ - `tests/test_mwm_migration_hygiene.py`: Enforces module split, absence of retired facades, public script imports, and canonical ownership boundaries.
+ - `tests/test_mwm_repo_hygiene.py`: Broad repo/config/script/doc hygiene tests for Lance-only paths, scheduler branch use, Slurm gating, removed legacy surfaces, and grouped workflows.
++- `tests/test_mwm_review_media.py`: Review-media tests for fidelity-trace expansion, eval JSON augmentation, video discovery, safe review-server path resolution, and HTML media links.
+ 
+ ## Quick Review Notes
+ 
+diff --git a/configs/train/mwm_lewm_dense_tworoom.yaml b/configs/train/mwm_lewm_dense_tworoom.yaml
+index c0878d7..6205130 100644
+--- a/configs/train/mwm_lewm_dense_tworoom.yaml
++++ b/configs/train/mwm_lewm_dense_tworoom.yaml
+@@ -27,7 +27,7 @@ model:
+   action_dim: auto
+   action_block: 5
+   image_shape: auto
+-  history_size: 3
++  history_size: 1
+   num_preds: 1
+ train:
+   batch_size: 128
+@@ -60,10 +60,10 @@ decoder_training:
+   weight_decay: 0.001
+ loss:
+   rollout_weight: 1.0
+-  sigreg_weight: 0.09
++  sigreg_weight: 0.1
+   sigreg_knots: 17
+   sigreg_num_proj: 1024
+-  history_size: 3
++  history_size: 1
+   num_preds: 1
+ schedule:
+   max_epochs: 10
+diff --git a/mwm/models/lewm.py b/mwm/models/lewm.py
+index e33ac54..79e4bfe 100644
+--- a/mwm/models/lewm.py
++++ b/mwm/models/lewm.py
+@@ -253,6 +253,7 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
+         rollout_weight: float = 1.0,
+         recon_latent_weight: float = 0.0,
+         decoder_training_enabled: bool = True,
++        decoder_activation_checkpointing: bool | Sequence[int] = False,
+         sigreg: nn.Module | None = None,
+         sigreg_weight: float = 0.0,
+         sigreg_scope: str = "shared_latent",
+@@ -266,6 +267,7 @@ class LeWMMatryoshkaWorldModel(MatryoshkaRuntimeModel):
+             rollout_weight=rollout_weight,
+             recon_latent_weight=recon_latent_weight,
+             decoder_training_enabled=decoder_training_enabled,
++            decoder_activation_checkpointing=decoder_activation_checkpointing,
+             sigreg=sigreg,
+             sigreg_weight=sigreg_weight,
+             sigreg_scope=sigreg_scope,
+diff --git a/mwm/models/objectives.py b/mwm/models/objectives.py
+index 2a22d48..2de4d4c 100644
+--- a/mwm/models/objectives.py
++++ b/mwm/models/objectives.py
+@@ -4,6 +4,7 @@ from typing import Any, Sequence
+ 
+ import torch
+ import torch.nn as nn
++from torch.utils.checkpoint import checkpoint
+ 
+ from mwm.models.losses import matryoshka_base_loss, weighted_level_mean
+ from mwm.preprocessing.images import image_tensor_to_bchw
+@@ -24,15 +25,31 @@ def _decoder_reconstruction_losses(
+     target: torch.Tensor,
+     *,
+     detach_latents: bool,
++    activation_checkpointing: bool | Sequence[int] = False,
+ ) -> list[torch.Tensor]:
+     losses: list[torch.Tensor] = []
+     batch_shape = tuple(emb.shape[:-1])
+     target_flat = target.reshape(-1, *target.shape[-3:])
++    if isinstance(activation_checkpointing, bool):
++        checkpointed_levels = set(range(len(model.K))) if activation_checkpointing else set()
++    else:
++        checkpointed_levels = {int(level_idx) for level_idx in activation_checkpointing}
++        invalid = sorted(level_idx for level_idx in checkpointed_levels if level_idx < 0 or level_idx >= len(model.K))
++        if invalid:
++            raise ValueError(f"Invalid decoder activation-checkpoint level indices: {invalid}")
+     for level_idx, k in enumerate(model.K):
+         latent = emb[..., : int(k)]
+         if detach_latents:
+             latent = latent.detach()
+-        recon = model.decode(level_idx, latent.reshape(-1, int(k)))
++        latent_flat = latent.reshape(-1, int(k))
++        if level_idx in checkpointed_levels and torch.is_grad_enabled():
++            recon = checkpoint(
++                lambda value, idx=level_idx: model.decode(idx, value),
++                latent_flat,
++                use_reentrant=False,
++            )
++        else:
++            recon = model.decode(level_idx, latent_flat)
+         recon = recon.reshape(*batch_shape, *recon.shape[-3:])
+         recon_flat = recon.reshape(-1, *recon.shape[-3:])
+         losses.append((recon_flat - target_flat).pow(2).mean())
+@@ -47,6 +64,7 @@ def matryoshka_training_loss(
+     rollout_weight: float = 1.0,
+     recon_latent_weight: float = 0.0,
+     decoder_training_enabled: bool = True,
++    decoder_activation_checkpointing: bool | Sequence[int] = False,
+     sigreg: nn.Module | None = None,
+     sigreg_weight: float = 0.0,
+     sigreg_scope: str = "shared_latent",
+@@ -139,7 +157,13 @@ def matryoshka_training_loss(
+     logs["world_loss"] = logs["loss"].detach()
+     if bool(decoder_training_enabled):
+         target = _reconstruction_target(batch["pixels"], dtype=emb.dtype, device=emb.device)
+-        recon_losses = _decoder_reconstruction_losses(model, emb, target, detach_latents=True)
++        recon_losses = _decoder_reconstruction_losses(
++            model,
++            emb,
++            target,
++            detach_latents=True,
++            activation_checkpointing=decoder_activation_checkpointing,
++        )
+         decoder_loss, recon_logs = weighted_level_mean(
+             recon_losses,
+             level_weights=level_weights,
+diff --git a/mwm/training/stable_wm_config.py b/mwm/training/stable_wm_config.py
+index dae5bce..b000792 100644
+--- a/mwm/training/stable_wm_config.py
++++ b/mwm/training/stable_wm_config.py
+@@ -115,9 +115,26 @@ def validate_stable_wm_loss_config(loss_cfg: Any, decoder_training_cfg: Any | No
+     decoder_training = as_container(decoder_training_cfg)
+     if not isinstance(decoder_training, dict):
+         raise ValueError("decoder_training must be a mapping.")
+-    unknown = set(decoder_training) - {"enabled", "mode", "gradient_clip_val", "lr", "weight_decay"}
++    unknown = set(decoder_training) - {
++        "enabled",
++        "mode",
++        "gradient_clip_val",
++        "lr",
++        "weight_decay",
++        "activation_checkpointing",
++    }
+     if unknown:
+         raise ValueError(f"Unknown decoder_training keys: {sorted(unknown)}")
++    activation_checkpointing = decoder_training.get("activation_checkpointing", False)
++    if not isinstance(activation_checkpointing, bool):
++        if not isinstance(activation_checkpointing, (list, tuple)):
++            raise ValueError("decoder_training.activation_checkpointing must be a boolean or a list of level indices.")
++        if any(not isinstance(level_idx, int) or level_idx < 0 for level_idx in activation_checkpointing):
++            raise ValueError(
++                "decoder_training.activation_checkpointing level indices must be non-negative integers."
++            )
++        if len(set(activation_checkpointing)) != len(activation_checkpointing):
++            raise ValueError("decoder_training.activation_checkpointing level indices must be unique.")
+     mode = str(decoder_training.get("mode", "separate_optimizer"))
+     if mode != "separate_optimizer":
+         raise ValueError(
+diff --git a/mwm/training/stable_wm_lightning.py b/mwm/training/stable_wm_lightning.py
+index 667899e..5d53a49 100644
+--- a/mwm/training/stable_wm_lightning.py
++++ b/mwm/training/stable_wm_lightning.py
+@@ -162,6 +162,9 @@ def stable_wm_adapter_forward(module: Any, batch: dict[str, torch.Tensor], stage
+         loss_kwargs.update(
+             {
+                 "decoder_training_enabled": bool(cfg.get("decoder_training", {}).get("enabled", True)),
++                "decoder_activation_checkpointing": cfg.get("decoder_training", {}).get(
++                    "activation_checkpointing", False
++                ),
+                 "random_prefix_weight": float(cfg.loss.get("random_prefix_weight", 0.0)),
+                 "sample_random_prefixes": str(stage).strip().lower() in {"fit", "train"},
+             }
+diff --git a/scripts/slurm/slurm_mwm_release_schedule_cell.sbatch b/scripts/slurm/slurm_mwm_release_schedule_cell.sbatch
+index d389556..7bacf9a 100644
+--- a/scripts/slurm/slurm_mwm_release_schedule_cell.sbatch
++++ b/scripts/slurm/slurm_mwm_release_schedule_cell.sbatch
+@@ -8,7 +8,7 @@
+ set -euo pipefail
+ 
+ if [[ -z "${SLURM_JOB_ID:-}" || -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+-  echo "ERROR: submit this script as a Slurm array." >&2
++  echo "ERROR: this script must be submitted with sbatch as a Slurm array." >&2
+   exit 2
+ fi
+ if [[ -z "${MWM_BENCHMARK_CONFIG:-}" ]]; then
+diff --git a/tests/test_mwm_core.py b/tests/test_mwm_core.py
+index 0e2f166..c73e23c 100644
+--- a/tests/test_mwm_core.py
++++ b/tests/test_mwm_core.py
+@@ -24,6 +24,8 @@ from mwm.adapters.builder import build_mwm_from_stable_config
+ from mwm.checkpoint_io import save_world_checkpoint
+ from mwm.data.transforms import MWMTrainSampleTransform, ZScoreScaler
+ from mwm.eval.policy import MWMWorldModelPolicy
++from mwm.eval.runtime import effective_goal_offset, normalize_eval_data_format, normalize_goal_indexing
++from mwm.eval.validation import dataset_path
+ from mwm.fidelity import FidelityScheduler
+ from mwm.models.common import MatryoshkaRuntimeModel
+ from mwm.models.lewm import LeWMMatryoshkaWorldModel
+@@ -76,8 +78,10 @@ class FakeLeWMActionEncoder(nn.Module):
+     def __init__(self, action_dim: int = 2, out_dim: int = 4) -> None:
+         super().__init__()
+         self.proj = nn.Linear(action_dim, out_dim)
++        self.seen_sequence_lengths: list[int] = []
+ 
+     def forward(self, action: torch.Tensor) -> torch.Tensor:
++        self.seen_sequence_lengths.append(int(action.shape[-2]))
+         return self.proj(action)
+ 
+ 
+@@ -679,6 +683,28 @@ class MWMCoreTests(unittest.TestCase):
+         for enabled_param, disabled_param in zip(enabled, disabled):
+             self.assertTrue(torch.equal(enabled_param, disabled_param))
+ 
++    def test_decoder_activation_checkpointing_preserves_loss_and_gradients(self) -> None:
++        torch.manual_seed(29)
++        initial = _lewm_matryoshka_model(K=(4, 8), D=8, action_dim=2)
++        batch = {"pixels": torch.rand(2, 3, 3, 8, 8), "action": torch.randn(2, 3, 2)}
++
++        def loss_and_gradients(enabled: bool) -> tuple[torch.Tensor, list[torch.Tensor]]:
++            model = copy.deepcopy(initial)
++            output = model.training_loss(
++                {key: value.clone() for key, value in batch.items()},
++                decoder_activation_checkpointing=enabled,
++            )
++            output["decoder_loss"].backward()
++            gradients = [parameter.grad.detach().clone() for parameter in model.decoders.parameters()]
++            return output["decoder_loss"].detach(), gradients
++
++        ordinary_loss, ordinary_gradients = loss_and_gradients(False)
++        for checkpointing in (True, [0]):
++            checkpointed_loss, checkpointed_gradients = loss_and_gradients(checkpointing)
++            self.assertTrue(torch.equal(ordinary_loss, checkpointed_loss))
++            for ordinary, checkpointed in zip(ordinary_gradients, checkpointed_gradients):
++                self.assertTrue(torch.equal(ordinary, checkpointed))
++
+     def test_optimizer_isolated_decoder_config_rejects_reconstruction_weights(self) -> None:
+         decoder_training = {
+             "enabled": True,
+@@ -686,6 +712,7 @@ class MWMCoreTests(unittest.TestCase):
+             "gradient_clip_val": 1.0,
+             "lr": 5e-5,
+             "weight_decay": 1e-3,
++            "activation_checkpointing": [0, 1],
+         }
+         validate_stable_wm_loss_config({"rollout_weight": 1.0}, decoder_training)
+         validate_stable_wm_loss_config({"recon_latent_weight": 0.0}, decoder_training)
+@@ -927,6 +954,39 @@ class MWMCoreTests(unittest.TestCase):
+         )
+         self.assertTrue(np.allclose(np.asarray(review_trace["action_trace"]), action[:, None, :]))
+ 
++    def test_historical_policy_keeps_terminated_envs_in_shared_cem_stream(self) -> None:
++        info = {
++            "pixels": np.zeros((2, 1, 8, 8, 3), dtype=np.uint8),
++            "goal": np.zeros((2, 1, 8, 8, 3), dtype=np.uint8),
++            "terminated": np.array([True, False]),
++        }
++        optimized = MWMWorldModelPolicy(
++            model=nn.Linear(1, 1),
++            solver=FakeSolver(),
++            config=PlanConfig(horizon=1, receding_horizon=1, action_block=1),
++            transform={},
++        )
++        optimized.set_env(FakeVectorEnv())
++        optimized_action = optimized.get_action(dict(info))
++        self.assertTrue(np.isnan(optimized_action[0]).all())
++        self.assertTrue(np.array_equal(optimized_action[1], np.array([0.0, 1.0], dtype=np.float32)))
++
++        historical = MWMWorldModelPolicy(
++            model=nn.Linear(1, 1),
++            solver=FakeSolver(),
++            config=PlanConfig(horizon=1, receding_horizon=1, action_block=1),
++            transform={},
++            policy_semantics="upstream_lewm_historical",
++        )
++        historical.set_env(FakeVectorEnv())
++        historical_action = historical.get_action(dict(info))
++        self.assertTrue(
++            np.array_equal(
++                historical_action,
++                np.array([[0.0, 1.0], [2.0, 3.0]], dtype=np.float32),
++            )
++        )
++
+     def test_action_spec_distinguishes_base_and_block_dims(self) -> None:
+         model = _lewm_matryoshka_model(K=(8,), D=8, action_dim=10, action_block=5)
+ 
+@@ -965,6 +1025,45 @@ class MWMCoreTests(unittest.TestCase):
+ 
+         self.assertEqual(tuple(out["predicted_emb"].shape), (1, 2, 6, 4))
+ 
++    def test_historical_rollout_embeds_growing_action_prefix(self) -> None:
++        model = LeWMMatryoshkaWorldModel(
++            encoder=FakeLeWMEncoder(out_dim=4),
++            projector=nn.Identity(),
++            transitions=[
++                TransitionPackage(
++                    action_encoder=FakeLeWMActionEncoder(action_dim=2, out_dim=4),
++                    predictor=FakeLeWMPredictor(),
++                    pred_proj=nn.Identity(),
++                )
++            ],
++            decoders=[ConvImageDecoder(latent_dim=4, image_shape=(8, 8))],
++            K=[4],
++            D=4,
++            action_dim=2,
++            action_block=1,
++            image_shape=(8, 8),
++            normalize_imagenet=False,
++            history_size=3,
++            num_preds=1,
++            head_architectures=[{"K": 4}],
++        )
++        candidates = torch.rand(1, 2, 5, 2)
++        transition = model.transitions[0]
++
++        model.rollout_at_level(
++            {"pixels": torch.rand(1, 2, 3, 3, 8, 8)}, candidates, level_idx=0
++        )
++        self.assertEqual(transition.action_encoder.seen_sequence_lengths, [3, 3, 3])
++
++        transition.action_encoder.seen_sequence_lengths.clear()
++        model.set_planning_rollout_semantics("upstream_lewm_historical")
++        model.rollout_at_level(
++            {"pixels": torch.rand(1, 2, 3, 3, 8, 8)}, candidates, level_idx=0
++        )
++        self.assertEqual(transition.action_encoder.seen_sequence_lengths, [3, 4, 5])
++        with self.assertRaisesRegex(ValueError, "Unsupported Le-WM planning rollout semantics"):
++            model.set_planning_rollout_semantics("typo")
++
+     def test_eval_policy_uses_explicit_topk_and_auto_batching(self) -> None:
+         cfg = OmegaConf.create(
+             {
+@@ -1064,6 +1163,31 @@ class MWMCoreTests(unittest.TestCase):
+             )
+         )
+ 
++    def test_eval_data_format_accepts_lossless_hdf5_for_upstream_parity(self) -> None:
++        self.assertEqual(normalize_eval_data_format("lance"), "lance")
++        self.assertEqual(normalize_eval_data_format("h5"), "hdf5")
++        self.assertEqual(normalize_eval_data_format("HDF5"), "hdf5")
++        with self.assertRaisesRegex(ValueError, "lance or hdf5"):
++            normalize_eval_data_format("folder")
++
++    def test_upstream_lewm_goal_indexing_reproduces_end_exclusive_slice(self) -> None:
++        self.assertEqual(normalize_goal_indexing("upstream_lewm"), "upstream_lewm_end_exclusive")
++        self.assertEqual(effective_goal_offset(25, "upstream_lewm_end_exclusive"), 24)
++        self.assertEqual(effective_goal_offset(25, "exact"), 25)
++        with self.assertRaisesRegex(ValueError, "effective offset must be positive"):
++            effective_goal_offset(1, "upstream_lewm_end_exclusive")
++
++    def test_eval_dataset_identity_path_is_stable_across_node_local_hdf5_extracts(self) -> None:
++        cfg = OmegaConf.create(
++            {
++                "data": {
++                    "path": "/tmp/job-specific/reacher.h5",
++                    "identity_path": "data/upstream/reacher.h5",
++                }
++            }
++        )
++        self.assertEqual(dataset_path(object(), cfg), "data/upstream/reacher.h5")
++
+     def test_eval_action_process_stats_skip_missing_optional_columns(self) -> None:
+         cfg = OmegaConf.create(
+             {
+diff --git a/tests/test_mwm_eval_artifacts.py b/tests/test_mwm_eval_artifacts.py
+index 27c8775..7664c52 100644
+--- a/tests/test_mwm_eval_artifacts.py
++++ b/tests/test_mwm_eval_artifacts.py
+@@ -24,7 +24,7 @@ from mwm.benchmark.eval_artifacts import (
+ )
+ from mwm.benchmark import eval_artifacts as artifact_module
+ from mwm.benchmark.review_media import record_review_media
+-from mwm.benchmark.review_server import rollout_page_html
++from mwm.benchmark.review_server import rollout_page_html, warm_review_assets
+ from mwm.benchmark.render_review import render_benchmark_review
+ from mwm.benchmark.matrix import _completed_row, _completed_run, _configure_run_paths
+ from mwm.io import file_sha256, load_json, write_json
+@@ -287,6 +287,25 @@ class EvalArtifactTests(unittest.TestCase):
+             self.assertIn("synthetic", page)
+             self.assertIn("episode 0", page)
+ 
++    def test_review_warmup_materializes_compressed_rollout_once(self) -> None:
++        with tempfile.TemporaryDirectory() as tmp:
++            run_dir, payload = self._completed_cell(Path(tmp))
++            payload["review_rollouts"][0].update(start_row=10, goal_row=20)
++            write_json(run_dir / "eval.json", payload)
++            compress_completed_eval(run_dir)
++
++            with mock.patch(
++                "mwm.benchmark.replay_runtime.warm_review_runtime",
++                return_value={"checkpoint": "loaded"},
++            ) as warm:
++                report = warm_review_assets(run_dir.parent)
++
++            self.assertEqual(report["checkpoint_count"], 1)
++            self.assertEqual(report["warnings"], [])
++            warm.assert_called_once()
++            self.assertEqual(warm.call_args.kwargs["start_row"], 10)
++            self.assertEqual(warm.call_args.kwargs["goal_row"], 20)
++
+     def test_static_review_materializes_compressed_rollouts(self) -> None:
+         with tempfile.TemporaryDirectory() as tmp:
+             root = Path(tmp)
+diff --git a/tests/test_mwm_repo_hygiene.py b/tests/test_mwm_repo_hygiene.py
+index 63b0d8b..1ca333c 100644
+--- a/tests/test_mwm_repo_hygiene.py
++++ b/tests/test_mwm_repo_hygiene.py
+@@ -292,6 +292,11 @@ class MWMRepoHygieneTests(unittest.TestCase):
+             self.assertEqual(cfg["train"]["backend"], "stable_worldmodel_lewm", name)
+             self.assertEqual(set(cfg["schedule"]), {"max_epochs"}, name)
+             self.assertEqual(cfg["schedule"]["max_epochs"], 10, name)
++            if name.startswith("mwm_lewm_dense_"):
++                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.1, name)
++            if name == "mwm_lewm_dense_tworoom.yaml":
++                self.assertEqual(cfg["model"]["history_size"], 1, name)
++                self.assertEqual(cfg["loss"]["history_size"], 1, name)
+             if name.startswith(("mwm_lewm_scheduled_", "mwm_lewm_dense_")) or name in {
+                 "mwm_lewm_reacher_upstream.yaml",
+                 "mwm_lewm_ogb_cube_upstream.yaml",
+@@ -305,7 +310,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
+                 self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"], name)
+                 self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "qpos", "qvel", "observation"], name)
+                 self.assertEqual(cfg["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec", name)
+-                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
++                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.1 if name.startswith("mwm_lewm_dense_") else 0.09, name)
+                 self.assertEqual(cfg["loss"]["sigreg_knots"], 17, name)
+                 self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
+             if "ogb_cube" in name:
+@@ -315,7 +320,7 @@ class MWMRepoHygieneTests(unittest.TestCase):
+                 self.assertEqual(cfg["data"]["keys_to_load"], ["pixels", "action", "observation"], name)
+                 self.assertEqual(cfg["data"]["keys_to_cache"], ["action", "observation"], name)
+                 self.assertEqual(cfg["restore"]["import_path"], "mwm.ogbench.restore.ogbench_cube_restore_spec", name)
+-                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.09, name)
++                self.assertEqual(cfg["loss"]["sigreg_weight"], 0.1 if name.startswith("mwm_lewm_dense_") else 0.09, name)
+                 self.assertEqual(cfg["loss"]["sigreg_knots"], 17, name)
+                 self.assertEqual(cfg["loss"]["sigreg_num_proj"], 1024, name)
+ 
+@@ -369,14 +374,18 @@ class MWMRepoHygieneTests(unittest.TestCase):
+ 
+             self.assertEqual(cfg["data"]["format"], "lance", name)
+             self.assertEqual(cfg["data"]["action_preprocessing"], "standard_scaler", name)
+-            self.assertEqual(cfg["eval"]["sampling"], "stable_worldmodel", name)
++            self.assertEqual(cfg["eval"]["sampling"], "upstream_lewm", name)
+             self.assertEqual(cfg["eval"]["goal_offset"], 25, name)
++            self.assertEqual(cfg["eval"]["goal_indexing"], "upstream_lewm_end_exclusive", name)
+             self.assertEqual(cfg["eval"]["episodes"], 50, name)
+             self.assertEqual(cfg["eval"]["budget"], 50, name)
+             self.assertEqual(cfg["planner"]["pop_size"], 300, name)
+             self.assertEqual(cfg["planner"]["topk"], 30, name)
+-            self.assertEqual(cfg["planner"]["n_iter"], 30, name)
++            expected_iterations = 30 if name == "paper_pusht.yaml" else 10
++            self.assertEqual(cfg["planner"]["n_iter"], expected_iterations, name)
+             self.assertEqual(cfg["planner"]["action_block"], 5, name)
++            self.assertEqual(cfg["planner"]["rollout_semantics"], "upstream_lewm_historical", name)
++            self.assertEqual(cfg["planner"]["policy_semantics"], "upstream_lewm_historical", name)
+             self.assertEqual(cfg["planner"]["scheduler"]["mpc"], {"mode": "fixed", "level": "finest"}, name)
+             self.assertEqual(cfg["planner"]["scheduler"]["cem"], {"mode": "fixed", "level": "base"}, name)
+             self.assertEqual(cfg["planner"]["scheduler"]["rollout"], {"mode": "fixed", "level": "base"}, name)
+@@ -392,8 +401,22 @@ class MWMRepoHygieneTests(unittest.TestCase):
+         self.assertEqual(reacher_eval["data"]["keys_to_load"], ["pixels", "action", "qpos", "qvel", "observation"])
+         self.assertEqual(reacher_eval["data"]["keys_to_cache"], ["action", "qpos", "qvel", "observation"])
+         self.assertEqual(reacher_eval["env"]["kwargs"], {"task": "qpos_match"})
++        self.assertEqual(reacher_eval["env"]["runtime"], {"reacher_qpos_threshold": 0.1})
+         self.assertEqual(reacher_eval["restore"]["import_path"], "mwm.swm.restore.reacher_qpos_match_restore_spec")
+ 
++        public_reacher_eval = yaml.safe_load(
++            (ROOT / "configs" / "eval" / "public_lewm_reacher.yaml").read_text(encoding="utf-8")
++        )
++        self.assertEqual(public_reacher_eval["env_id"], reacher_eval["env_id"])
++        self.assertEqual(public_reacher_eval["data"], reacher_eval["data"])
++        self.assertEqual(public_reacher_eval["env"]["kwargs"], reacher_eval["env"]["kwargs"])
++        self.assertEqual(public_reacher_eval["env"]["runtime"], {"reacher_qpos_threshold": 0.05})
++        self.assertEqual(public_reacher_eval["restore"], reacher_eval["restore"])
++        self.assertEqual(public_reacher_eval["planner"]["pop_size"], 300)
++        self.assertEqual(public_reacher_eval["planner"]["topk"], 30)
++        self.assertEqual(public_reacher_eval["planner"]["n_iter"], 30)
++        self.assertEqual(reacher_eval["planner"]["n_iter"], 10)
++
+         cube_eval = yaml.safe_load((ROOT / "configs" / "eval" / "paper_ogb_cube.yaml").read_text(encoding="utf-8"))
+         self.assertEqual(cube_eval["env_id"], "swm/OGBCube-v0")
+         self.assertEqual(cube_eval["checkpoint"]["run_dir"], "checkpoints_mwm/upstream_lewm_ogb_cube")

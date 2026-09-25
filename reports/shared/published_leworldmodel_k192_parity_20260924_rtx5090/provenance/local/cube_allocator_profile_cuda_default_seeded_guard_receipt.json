@@ -1,0 +1,28 @@
+{
+  "diagnostic_only": true,
+  "started_at": "2026-09-24T16:44:09.685162+00:00",
+  "finished_at": "2026-09-24T16:45:08.562042+00:00",
+  "command": [
+    "/tmp/hudm-5090-20260924-0z4ayR/venv/bin/python",
+    "-u",
+    "/tmp/hudm-5090-20260924-0z4ayR/profile_cube_setup_memory.py",
+    "--label",
+    "cuda_default_seeded",
+    "--device",
+    "cuda"
+  ],
+  "diagnostic_device": "cuda",
+  "allocator_environment": {
+    "PYTHONMALLOC": "default",
+    "PYTHONHASHSEED": "42"
+  },
+  "guard_script_sha256": "25f6298e7c23f794d00ffaf312ce201dcae43b25d95db9648550dc18b25c8bd3",
+  "allocator_reference": "https://docs.python.org/3.11/using/cmdline.html#envvar-PYTHONMALLOC",
+  "returncode": 0,
+  "guard_stop_reason": null,
+  "peak_diagnostic_rss_bytes": 2734415872,
+  "minimum_host_available_bytes": 9572642816,
+  "elapsed_seconds": 58.876999160973355,
+  "log": "/tmp/hudm-5090-20260924-0z4ayR/cube_allocator_profile_cuda_default_seeded.log",
+  "other_processes_modified": false
+}

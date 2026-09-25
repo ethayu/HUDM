@@ -1,0 +1,23 @@
+output_dir: reports/research/k192_sepopt_published_parity_20260924/placeholder
+title: PushT published LeWorldModel vs September K=192 sepopt baseline
+env_id: swm/PushT-v1
+seed: 42
+eval_config: configs/eval/paper_pusht.yaml
+manifest:
+  group: k192_sepopt_published_parity_pusht_placeholder
+  path: reports/research/k192_sepopt_published_parity_20260924/manifests/placeholder.json
+run_defaults:
+  planner:
+    flop_accounting: dynamics_audit
+    scheduler:
+      enabled: true
+      mpc: {mode: fixed, level: finest}
+      cem: {mode: fixed, level: base}
+      rollout: {mode: fixed, level: base}
+runs:
+  - name: published
+    role: upstream_lewm_converted
+    checkpoint: checkpoints_mwm/upstream_lewm_pusht
+  - name: sepopt_k192_20260922
+    role: sepopt_k192_20260922
+    checkpoint: checkpoints_mwm/mwm_paper10_pusht_k192_sepopt_retrain_20260922

@@ -1,0 +1,92 @@
+{
+  "verified": true,
+  "verified_at": "2026-09-24T15:45:39.571399+00:00",
+  "environment": "reacher",
+  "stage": "final",
+  "episodes_per_seed_per_model": 100,
+  "total_paired_episodes": 500,
+  "seeds": [
+    2002,
+    71623,
+    82715,
+    86604,
+    91943
+  ],
+  "seed_results": [
+    {
+      "seed": 2002,
+      "published": 96,
+      "retrained": 99,
+      "paired_delta_pp": 3
+    },
+    {
+      "seed": 71623,
+      "published": 99,
+      "retrained": 99,
+      "paired_delta_pp": 0
+    },
+    {
+      "seed": 82715,
+      "published": 97,
+      "retrained": 96,
+      "paired_delta_pp": -1
+    },
+    {
+      "seed": 86604,
+      "published": 95,
+      "retrained": 95,
+      "paired_delta_pp": 0
+    },
+    {
+      "seed": 91943,
+      "published": 96,
+      "retrained": 99,
+      "paired_delta_pp": 3
+    }
+  ],
+  "reconstructed_statistics": {
+    "published": {
+      "mean": 96.6,
+      "sample_sd": 1.51657508881031,
+      "ci95_low": 94.71692331165156,
+      "ci95_high": 98.48307668834843
+    },
+    "retrained": {
+      "mean": 97.6,
+      "sample_sd": 1.949358868961793,
+      "ci95_low": 95.17955127283092,
+      "ci95_high": 100.02044872716907
+    },
+    "paired_delta_pp": {
+      "mean": 1,
+      "sample_sd": 1.8708286933869707,
+      "ci95_low": -1.3229406353851942,
+      "ci95_high": 3.3229406353851942
+    }
+  },
+  "source_collector_matches": true,
+  "source_collector_sha256": "74e3aea2ec220131c93da4c5a65c9615f00c375e177aba021a3a0fbbed999625",
+  "audited_inputs": [
+    {
+      "path": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_2002/paired_audit.json",
+      "sha256": "7da60d6d1d2bd575befd977a4aa90c30ec2385ce1257723148012ba226aa0203"
+    },
+    {
+      "path": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_71623/paired_audit.json",
+      "sha256": "09f02e04dab1ab3d6044a55b3846b0d5aee6da8bc62a8cfd3b51f9cca096d696"
+    },
+    {
+      "path": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_82715/paired_audit.json",
+      "sha256": "3c0acd36d247c3b6e2eae374b2d1c4154a46b855a367747629f0cebf627bca46"
+    },
+    {
+      "path": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_86604/paired_audit.json",
+      "sha256": "34c8059be1a1ef024dc090443700959f720684c3ad2f2686633b41fbe02e54fc"
+    },
+    {
+      "path": "/tmp/hudm-5090-20260924-0z4ayR/HUDM/reports/research/k192_sepopt_published_parity_20260924/final_n100/reacher/seed_91943/paired_audit.json",
+      "sha256": "a79fe076ed1fee94496d2c8ea55ebc9d84e29c7c6d713541dac1c3669872e18a"
+    }
+  ],
+  "interval": "95% Student t across five evaluation seeds, df=4; fixed checkpoints, not training-seed uncertainty"
+}
