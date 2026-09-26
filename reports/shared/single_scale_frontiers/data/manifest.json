@@ -1,0 +1,82 @@
+[
+  {
+    "file": "data/tworoom_goal25/scheduled.json",
+    "source": "reports/shared/planning_frontiers_all_envs/data/tworoom_goal25_scheduled_flops_reconstructed.json",
+    "sha256": "03f7f69f627e8440646dcf71f0ba14edf82f47c361d8895946911d40af07bd1d"
+  },
+  {
+    "file": "data/tworoom_goal25/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/tworoom_goal25_sepopt_k48to192_all_configs/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "90c65e56c62439163f0b6208db73fb3465d5d4c1c2de99d938177d65902f1289"
+  },
+  {
+    "file": "data/tworoom_goal50/scheduled.json",
+    "source": "reports/shared/planning_frontiers_all_envs/data/tworoom_goal50_scheduled_flops_reconstructed.json",
+    "sha256": "9f0323ca5be4324dc10f7ee2791f49ec4e9737af8f9d7a3971293ead3bb9a838"
+  },
+  {
+    "file": "data/tworoom_goal50/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/tworoom_goal50_sepopt_k48to192_all_configs/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "55a95a29c1494ff18403ae9d3bac22084e9275e106580f28e5f84cc2f7a7eea1"
+  },
+  {
+    "file": "data/pusht_goal25/scheduled.json",
+    "source": "reports/shared/pusht_goal25_sepopt_k120to192_adaptive/data/adaptive_summary.json",
+    "sha256": "7887bbcfa619ca7be52f3663709ffae7fe9bff31521ee552fa84a7a6599ce003"
+  },
+  {
+    "file": "data/pusht_goal25/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/pusht_goal25_sepopt_k120to192_adaptive/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "dc3eee5b783c53ed17732f85a583c42c99082956cd8d716a49e44ca9aa3b1670"
+  },
+  {
+    "file": "data/pusht_goal50/scheduled.json",
+    "source": "reports/shared/pusht_goal50_plan100_execute20_sepopt_k120to192_adaptive/data/adaptive_summary.json",
+    "sha256": "51c53081ae8f1f870fc3577b3263410e16966d9d85c14c5f2bdb18f31701a7fb"
+  },
+  {
+    "file": "data/pusht_goal50/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/pusht_goal50_plan100_execute20_sepopt_k120to192_adaptive/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "31405cd8ef025c0693e2a53ea43d862e1aef1d0eb1da0062342da7ac434209dd"
+  },
+  {
+    "file": "data/ogb_goal25/scheduled.json",
+    "source": "reports/shared/ogb_cube_goal25_sepopt_k48to192_all_configs/data/sepopt_k48to192_adaptive_summary.json",
+    "sha256": "fc55c0a49128fad5cc81ea72de2a6c4f04e1ea16d64ccb717d9b2b3638efd52f"
+  },
+  {
+    "file": "data/ogb_goal25/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/ogb_cube_goal25_sepopt_k48to192_all_configs/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "a7b39278b24d8d340dd75f848d409035604cac5a529fb9c85fe1a5414f3cbb39"
+  },
+  {
+    "file": "data/ogb_goal50/scheduled.json",
+    "source": "reports/shared/ogb_cube_goal50_plan100_execute20_sepopt_k48to192_adaptive/data/adaptive_summary.json",
+    "sha256": "666fb18018998217d6c5cc98954cba7e4556f9333c33bd28ae502ad9b8c8c7f4"
+  },
+  {
+    "file": "data/ogb_goal50/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/ogb_cube_goal50_plan100_execute20_sepopt_k48to192_adaptive/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "a7a57907f5770d6e4e9567668495f8f9f9a838809b3151aeecb039d2bfc7a20b"
+  },
+  {
+    "file": "data/reacher_goal25/scheduled.json",
+    "source": "reports/shared/reacher_goal25_sepopt_k48to192_all_configs/data/k96to192_slice_summary.json",
+    "sha256": "feb1a495e1727d3956b59dd5d91555be61f1bd915b5fd3ad63d13b8365fde7fc"
+  },
+  {
+    "file": "data/reacher_goal25/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/reacher_goal25_sepopt_k48to192_all_configs/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "481826b7a04b47d785276646673cf3f0aecd83114a8ac87f67ab027bd442958f"
+  },
+  {
+    "file": "data/reacher_goal50/scheduled.json",
+    "source": "reports/shared/reacher_goal50_plan100_execute20_sepopt_k48to192_adaptive/data/k96to192_slice_summary.json",
+    "sha256": "f73ad04d6fdd4b36d653d5b9d7531c71ddd488a28c5ee7d011982a3c45077a55"
+  },
+  {
+    "file": "data/reacher_goal50/data/dense_checkpoint_individual_levels_summary.json",
+    "source": "reports/shared/reacher_goal50_plan100_execute20_sepopt_k48to192_adaptive/data/dense_checkpoint_individual_levels_summary.json",
+    "sha256": "d444f0224a2745ee6748bf900d11ba9a409d34d2ca37afb28da22173284f0ec9"
+  }
+]
