@@ -227,7 +227,7 @@ def frontiers_figure(stats, out):
     fig.text(.72, .945, 'Below zero: hurts', color=negative, fontsize=7,
              ha='center', va='top')
     fig.supxlabel('Dynamics GFLOPs per episode', fontsize=7, y=.025)
-    fig.supylabel('Success change (pp)', fontsize=7, x=.005)
+    fig.supylabel('Success change (%)', fontsize=7, x=.005)
     for ext in ('pdf', 'png'):
         fig.savefig(out / f'single_scale_frontiers.{ext}', bbox_inches='tight',
                     pad_inches=.03, dpi=250)
