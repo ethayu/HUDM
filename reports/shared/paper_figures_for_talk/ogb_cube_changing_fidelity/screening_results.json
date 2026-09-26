@@ -1,0 +1,23 @@
+[
+  {
+    "episode": 93,
+    "steps": 20,
+    "success": true,
+    "run": "reports/research/release20260728_sepopt_k48to192_ogb_cube_all_fidelity_schedules/342_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse__pop100__elite0p1__iter15",
+    "env_runtime": {}
+  },
+  {
+    "episode": 2,
+    "steps": 18,
+    "success": true,
+    "run": "reports/research/release20260728_sepopt_k48to192_ogb_cube_all_fidelity_schedules/342_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse__pop100__elite0p1__iter15",
+    "env_runtime": {}
+  },
+  {
+    "episode": 27,
+    "steps": 18,
+    "success": true,
+    "run": "reports/research/release20260728_sepopt_k48to192_ogb_cube_all_fidelity_schedules/342_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse__pop100__elite0p1__iter15",
+    "env_runtime": {}
+  }
+]

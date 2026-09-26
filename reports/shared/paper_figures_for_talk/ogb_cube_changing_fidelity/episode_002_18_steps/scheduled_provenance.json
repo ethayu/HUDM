@@ -1,0 +1,55 @@
+{
+  "source_eval": "/home/aurora/HUDM-mwm-ethan/reports/research/release20260728_sepopt_k48to192_ogb_cube_all_fidelity_schedules/342_23_mpc_coarse_to_fine_cem_coarse_to_base_rollout_base_to_coarse__pop100__elite0p1__iter15/eval.json",
+  "episode_index": 2,
+  "dataset_episode": 679,
+  "stored_success": true,
+  "replay_success": true,
+  "executed_actions": 18,
+  "checkpoint": "checkpoints_dense_k48to192_sepopt_20260917_ogb_cube/checkpoints_mwm/mwm_paper10_ogb_cube_k48_72_96_120_144_168_192_sepopt_actckpt_20260917",
+  "action_source": "model_action_trace",
+  "schedule": "MPC=coarse -> fine | CEM=coarse -> base | Rollout=base -> coarse",
+  "predicted_blocks": [
+    {
+      "block_idx": 0,
+      "level_idx": 0,
+      "K": 48,
+      "primitive_start": 0,
+      "primitive_end": 5,
+      "distance_since_anchor": 5,
+      "replan_idx": 0,
+      "anchor_step": 0,
+      "mpc_k": 48,
+      "base_k": 48
+    },
+    {
+      "block_idx": 1,
+      "level_idx": 0,
+      "K": 48,
+      "primitive_start": 5,
+      "primitive_end": 10,
+      "distance_since_anchor": 10,
+      "replan_idx": 0,
+      "anchor_step": 0,
+      "mpc_k": 48,
+      "base_k": 48
+    },
+    {
+      "block_idx": 0,
+      "level_idx": 2,
+      "K": 96,
+      "primitive_start": 10,
+      "primitive_end": 15,
+      "distance_since_anchor": 5,
+      "replan_idx": 1,
+      "anchor_step": 10,
+      "mpc_k": 96,
+      "base_k": 96
+    }
+  ],
+  "semantics": "Recompute predictions for the executed action sequence using exactly the saved fidelity_trace levels. Within a replan, predictions are carried forward and truncated when the scheduled level decreases; only actual replans re-encode observations. These are not independently computed fixed-level predictions. +0 panels are anchor reconstructions. CEM candidate trajectories and intermediate iterations are not recorded or visualized.",
+  "env_id": "swm/OGBCube-v0",
+  "env_runtime": {},
+  "goal_offset": 25,
+  "action_block": 5,
+  "replan_interval": 10
+}

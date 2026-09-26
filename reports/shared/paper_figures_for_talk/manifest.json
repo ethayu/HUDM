@@ -1,0 +1,147 @@
+{
+  "paper": "Matryoshka World Models: Test-Time Scaling Beyond Search",
+  "paper_repository": "/home/aurora/HUDM-mwm-paper",
+  "paper_revision": "1c33c47c243ba5f9278006d10ff7bba9fb32f63e",
+  "figures": [
+    {
+      "number": 1,
+      "title": "Predictive fidelity as a planning resource",
+      "section": "Main paper",
+      "source": "figures/mwm_headline.png",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "7d5593536556aafd0367fc81f6a10d733be489d6582096dd4a80e044bebf6888",
+      "files": [
+        "figure_01_predictive_fidelity_as_a_planning_resource.png"
+      ]
+    },
+    {
+      "number": 2,
+      "title": "Matryoshka training",
+      "section": "Main paper",
+      "source": "figures/training_hatched_suffixes_transparent.png",
+      "latex_options": "width=\\linewidth,trim=24bp 81bp 4bp 29bp,clip",
+      "original_sha256": "147949d0be4829c5583cac700cdbc7abd0a48e5a9f912d6a0d3773626d74d7fa",
+      "files": [
+        "figure_02_matryoshka_training.png"
+      ]
+    },
+    {
+      "number": 3,
+      "title": "Changing levels within a rollout",
+      "section": "Main paper",
+      "source": "figures/rollout_transition_symbolic.png",
+      "latex_options": "width=0.95\\linewidth",
+      "original_sha256": "83dff93d724576516c7c27e3be9b2489d07292ea7571a1ba4b18bfc6319ccefc",
+      "files": [
+        "figure_03_changing_levels_within_a_rollout.png"
+      ]
+    },
+    {
+      "number": 4,
+      "title": "Planning at a fixed level",
+      "section": "Main paper",
+      "source": "figures/fixed_level_planning.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "2eba15c6e552f47ff3013aee7a65b563784c629b028725b2af74be5ae1528c81",
+      "files": [
+        "figure_04_planning_at_a_fixed_level.pdf",
+        "figure_04_planning_at_a_fixed_level.png"
+      ]
+    },
+    {
+      "number": 5,
+      "title": "Reconstruction of MWM nested latents",
+      "section": "Main paper",
+      "source": "figures/figure5_shared_labels.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "f971c55da6c1e6af019a6398d038cee7b4cde169ae13e3b778d422d2cbefaf88",
+      "files": [
+        "figure_05_reconstruction_of_mwm_nested_latents.pdf",
+        "figure_05_reconstruction_of_mwm_nested_latents.png"
+      ]
+    },
+    {
+      "number": 6,
+      "title": "Planning performance across compute budgets",
+      "section": "Main paper",
+      "source": "figures/planning_frontiers_compact.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "9459ed0ff0af488358260533130d54209874707963db70e58f4c2e1327c9bbaa",
+      "files": [
+        "figure_06_planning_performance_across_compute_budgets.pdf",
+        "figure_06_planning_performance_across_compute_budgets.png"
+      ]
+    },
+    {
+      "number": 7,
+      "title": "Where does scheduling help?",
+      "section": "Main paper",
+      "source": "figures/single_scale_frontiers.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "0ff4e31b1be32009dc187b2886e3df51b53745069c0f55dd07e8c8ccccb973c0",
+      "files": [
+        "figure_07_where_does_scheduling_help.pdf",
+        "figure_07_where_does_scheduling_help.png"
+      ]
+    },
+    {
+      "number": 8,
+      "title": "An illustrative nested fidelity schedule",
+      "section": "Appendix",
+      "source": "figures/nested_schedules_detailed.png",
+      "latex_options": "width=0.82\\linewidth",
+      "original_sha256": "018f8ccf3d2fa0d3367296b79c939bf26346e270a141de776d5936dd1f6343fa",
+      "files": [
+        "figure_08_an_illustrative_nested_fidelity_schedule.png"
+      ]
+    },
+    {
+      "number": 9,
+      "title": "Reconstructions and predicted rollouts across all MWM levels",
+      "section": "Appendix",
+      "source": "figures/decoder_levels.pdf",
+      "latex_options": "width=0.94\\linewidth",
+      "original_sha256": "2cea6060f74cb4334f889ab90d3f0de6c308f6487b4e3cc3d561e1f81153f3b4",
+      "files": [
+        "figure_09_reconstructions_and_predicted_rollouts_across_all_mwm_levels.pdf",
+        "figure_09_reconstructions_and_predicted_rollouts_across_all_mwm_levels.png"
+      ]
+    },
+    {
+      "number": 10,
+      "title": "Full frontiers for the single-scheduler comparisons",
+      "section": "Appendix",
+      "source": "figures/single_scale_frontiers_full.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "b6a7c42b0ae3b0b34385318bde1bb43e863c778454dd4d7610dc18f0f5472b20",
+      "files": [
+        "figure_10_full_frontiers_for_the_single_scheduler_comparisons.pdf",
+        "figure_10_full_frontiers_for_the_single_scheduler_comparisons.png"
+      ]
+    },
+    {
+      "number": 11,
+      "title": "Average scheduling effects across combinations",
+      "section": "Appendix",
+      "source": "figures/factorial_scheduling_gains.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "61ff4df6732da0b20b7cd0103773cba38c53d2e077a8f46f1f69285444e4e9a0",
+      "files": [
+        "figure_11_average_scheduling_effects_across_combinations.pdf",
+        "figure_11_average_scheduling_effects_across_combinations.png"
+      ]
+    },
+    {
+      "number": 12,
+      "title": "Per-schedule performance--compute frontiers",
+      "section": "Appendix",
+      "source": "figures/schedule_frontiers.pdf",
+      "latex_options": "width=\\linewidth",
+      "original_sha256": "ad498492ea96d4d78d75d727bb7aec349d91b6d398bf41730e4cb4bf84899afb",
+      "files": [
+        "figure_12_per_schedule_performance_compute_frontiers.pdf",
+        "figure_12_per_schedule_performance_compute_frontiers.png"
+      ]
+    }
+  ]
+}
