@@ -16,10 +16,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
-from generate_plot import (
-    ALL_LEVELS, BLUE, GOALS, GRID, HERE, ORANGE,
-    load_dense_k48_72, load_individual_k48_72, load_success_by_k,
-)
+from generate_plot import ALL_LEVELS, BLUE, GOALS, GRID, HERE, ORANGE, load_success_by_k
 
 ENVS = [
     ("tworoom", "TwoRoom"),
@@ -37,10 +34,8 @@ def main() -> None:
 
     fig, axes = plt.subplots(1, 4, figsize=(5.5, 1.75), sharey=True)
     for ax, (env, label) in zip(axes, ENVS):
-        for goal, suffix, _, _ in GOALS:
-            individual, dense = load_success_by_k(env, suffix)
-            individual.update(load_individual_k48_72(env, suffix))
-            dense.update(load_dense_k48_72(env, suffix))
+        for goal, _, _ in GOALS:
+            individual, dense = load_success_by_k(env, goal)
             # Color encodes the goal offset; fill/line style encodes the setting.
             color = GOAL_COLORS[goal]
             for series, marker, ls, filled in ((individual, "o", "--", False), (dense, "s", "-", True)):
@@ -49,7 +44,9 @@ def main() -> None:
                         markeredgewidth=0.8)
         ax.set_title(label, fontsize=8)
         ax.set_ylim(-5, 105)
-        ax.set_xticks(ALL_LEVELS[::2])
+        ax.set_xscale("log", base=2)
+        ax.set_xticks(ALL_LEVELS[::2], [str(k) for k in ALL_LEVELS[::2]])
+        ax.minorticks_off()
         ax.set_xlabel(r"Level $d$")
         ax.grid(True, color=GRID, lw=0.5)
         ax.tick_params(length=2, pad=1.5)
