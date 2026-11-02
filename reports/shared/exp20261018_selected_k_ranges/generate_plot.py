@@ -15,6 +15,10 @@ PushT uses the original K=64..192 all-configs sweep, which still carries all
 as 02, 06, 07, 08, 02, see scripts/research/gen_exp20261018_k4to16_configs.py)
 are dropped so every panel shows the same 13 schedules.
 
+The other folders here hold the rest of the release's sweeps (the full
+K..192 all-configs sweeps and the other K ranges tried), each with its own
+build_summary.py / generate_plot.py; they are not part of this figure.
+
 Usage: python generate_plot.py  (writes plot.png and plot_flops.png)
 """
 from __future__ import annotations
